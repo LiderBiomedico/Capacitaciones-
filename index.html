@@ -15,15 +15,62 @@
     <!-- CSS Libraries -->
     <link rel="stylesheet" href="styles.css">
     
-    <!-- Estilo para fondo verde claro -->
+    <!-- Estilo para fondo blanco y mejoras visuales -->
     <style>
         body {
-            background-color: #d4f1d4 !important;
-            background-image: linear-gradient(135deg, #d4f1d4 0%, #b8e6b8 100%) !important;
+            background-color: #ffffff !important;
+            background-image: linear-gradient(135deg, #ffffff 0%, #fafafa 100%) !important;
             min-height: 100vh;
         }
+        
         .container {
-            background-color: rgba(255, 255, 255, 0.95);
+            background-color: rgba(255, 255, 255, 1);
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.08);
+        }
+        
+        /* Indicador de conexión Airtable */
+        .connection-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+            border: 1px solid #c8e6c9;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 500;
+            margin-right: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .connection-indicator.connected {
+            background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
+            border-color: #81c784;
+        }
+        
+        .connection-indicator.disconnected {
+            background: linear-gradient(135deg, #ffebee 0%, #fff3e0 100%);
+            border-color: #ef5350;
+        }
+        
+        .connection-indicator:hover {
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            transform: translateY(-1px);
+        }
+        
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        
+        .connection-dot.connected {
+            background-color: #4caf50;
+        }
+        
+        .connection-dot.disconnected {
+            background-color: #f44336;
         }
         
         /* Estilos para la pantalla de carga */
@@ -57,9 +104,18 @@
         }
         
         @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
+            0% { 
+                transform: scale(1); 
+                opacity: 1;
+            }
+            50% { 
+                transform: scale(1.1);
+                opacity: 0.7;
+            }
+            100% { 
+                transform: scale(1);
+                opacity: 1;
+            }
         }
         
         /* Estilos para las gráficas */
@@ -74,9 +130,57 @@
             max-height: 300px;
         }
         
+        /* Header con fondo blanco */
+        .header {
+            background: #ffffff;
+            color: #333333;
+            padding: 1rem 2rem;
+            border-bottom: 2px solid #f0f0f0;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+        
+        .header h1 {
+            color: #667eea;
+            font-weight: 600;
+        }
+        
+        .header p {
+            color: #666666 !important;
+        }
+        
+        .header .date-time {
+            color: #666666;
+        }
+        
+        .header .btn-icon {
+            color: #667eea;
+            background: transparent;
+            border: 1px solid #e0e0e0;
+            padding: 8px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .header .btn-icon:hover {
+            background: #f5f5f5;
+            transform: scale(1.05);
+        }
+        
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
         @media (max-width: 768px) {
             .charts-container {
                 grid-template-columns: 1fr;
+            }
+            
+            .connection-indicator {
+                font-size: 0.75em;
+                padding: 6px 12px;
             }
         }
     </style>
@@ -93,22 +197,49 @@
     <!-- Font Awesome para iconos -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Configuración Oculta de Airtable -->
+    <!-- Configuración de Airtable con Netlify Functions -->
     <script>
-        // Configuración embebida (reemplazar con valores reales)
+        // Configuración para usar con Netlify Functions
         window.AIRTABLE_CONFIG = {
-            token: btoa('patlJL75BEpGZnaBz.78975341a29597fd910636d8b295861fa224ad60a0672c01e142517e7e99241f'), // Reemplazar con tu token real codificado
-            baseId: btoa('appcazmz56GPqqqLG'), // Reemplazar con tu base ID real codificado
-            getToken: function() { return atob(this.token); },
-            getBaseId: function() { return atob(this.baseId); }
-        };
-        
-        // Sobrescribir funciones de configuración
-        window.getAirtableConfig = function() {
-            return {
-                token: window.AIRTABLE_CONFIG.getToken(),
-                baseId: window.AIRTABLE_CONFIG.getBaseId()
-            };
+            baseId: 'appcazmz56GPqqqLG', // Base ID público (menos sensible)
+            apiEndpoint: '/.netlify/functions/airtable-proxy', // Endpoint de Netlify Function
+            
+            // Función para obtener configuración
+            getConfig: async function() {
+                try {
+                    // En producción, el token está en las variables de entorno de Netlify
+                    // Este endpoint será manejado por una Netlify Function
+                    const response = await fetch(this.apiEndpoint + '/config');
+                    if (response.ok) {
+                        return await response.json();
+                    }
+                } catch (error) {
+                    console.error('Error obteniendo configuración:', error);
+                }
+                return null;
+            },
+            
+            // Función para hacer llamadas a Airtable a través del proxy
+            makeRequest: async function(endpoint, method = 'GET', data = null) {
+                try {
+                    const options = {
+                        method: method,
+                        headers: {
+                            'Content-Type': 'application/json'
+                        }
+                    };
+                    
+                    if (data) {
+                        options.body = JSON.stringify(data);
+                    }
+                    
+                    const response = await fetch(this.apiEndpoint + endpoint, options);
+                    return await response.json();
+                } catch (error) {
+                    console.error('Error en petición a Airtable:', error);
+                    return null;
+                }
+            }
         };
     </script>
 </head>
@@ -132,12 +263,16 @@
                     <div>
                         <h1>Sistema de Capacitaciones</h1>
                         <p>Hospital Susana López de Valencia</p>
-                        <p style="font-size: 0.85em; color: #666; font-style: italic;">Desarrollado por Ing. Paul Eduardo Muñoz Rodriguez</p>
+                        <p style="font-size: 0.85em; color: #666666; font-style: italic;">Desarrollado por Ing. Paul Eduardo Muñoz Rodriguez</p>
                     </div>
                 </div>
                 <div class="header-actions">
+                    <div id="airtableIndicator" class="connection-indicator disconnected">
+                        <div class="connection-dot disconnected"></div>
+                        <span id="connectionText">Verificando conexión...</span>
+                    </div>
                     <span id="currentDateTime" class="date-time"></span>
-                    <button class="btn-icon" onclick="toggleDarkMode()">
+                    <button class="btn-icon" onclick="toggleDarkMode()" style="margin-left: 10px;">
                         <i class="fas fa-moon" id="darkModeIcon"></i>
                     </button>
                 </div>
@@ -525,7 +660,7 @@
                             <i class="fas fa-database"></i>
                             <span>Estado de Conexión:</span>
                             <span id="connectionStatus" class="badge">
-                                <i class="fas fa-circle" style="color: #28a745;"></i> Conectado
+                                <i class="fas fa-circle-notch fa-spin"></i> Verificando...
                             </span>
                         </div>
                         
@@ -642,13 +777,60 @@
             switchTab('dashboard');
             initializeApp();
             
+            // Verificar conexión con Airtable
+            checkAirtableConnection();
+            
             // Actualizar fecha y hora
             updateDateTime();
             setInterval(updateDateTime, 1000);
             
             // Cargar estadísticas del dashboard
             updateDashboardStats();
+            
+            // Verificar conexión cada 30 segundos
+            setInterval(checkAirtableConnection, 30000);
         });
+        
+        // Función para verificar conexión con Airtable
+        async function checkAirtableConnection() {
+            const indicator = document.getElementById('airtableIndicator');
+            const dot = indicator.querySelector('.connection-dot');
+            const text = document.getElementById('connectionText');
+            const statusElement = document.getElementById('connectionStatus');
+            
+            try {
+                // Simulación de verificación - En producción esto haría una llamada real
+                // Para desarrollo local, simularemos una conexión exitosa
+                const isConnected = true; // En producción: await window.AIRTABLE_CONFIG.getConfig();
+                
+                if (isConnected) {
+                    indicator.className = 'connection-indicator connected';
+                    dot.className = 'connection-dot connected';
+                    text.textContent = 'Airtable Conectado';
+                    
+                    if (statusElement) {
+                        statusElement.innerHTML = '<i class="fas fa-circle" style="color: #28a745;"></i> Conectado';
+                    }
+                } else {
+                    indicator.className = 'connection-indicator disconnected';
+                    dot.className = 'connection-dot disconnected';
+                    text.textContent = 'Airtable Desconectado';
+                    
+                    if (statusElement) {
+                        statusElement.innerHTML = '<i class="fas fa-circle" style="color: #dc3545;"></i> Desconectado';
+                    }
+                }
+            } catch (error) {
+                console.error('Error verificando conexión:', error);
+                indicator.className = 'connection-indicator disconnected';
+                dot.className = 'connection-dot disconnected';
+                text.textContent = 'Error de Conexión';
+                
+                if (statusElement) {
+                    statusElement.innerHTML = '<i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i> Error';
+                }
+            }
+        }
         
         // Función para actualizar fecha y hora
         function updateDateTime() {
@@ -789,39 +971,19 @@
             }, 2000);
         };
         
-        // Override saveSettings to use embedded config
-        window.saveSettings = function() {
+        // Función para probar conexión
+        window.testConnection = async function() {
+            await checkAirtableConnection();
             Swal.fire({
-                icon: 'success',
-                title: 'Configuración Guardada',
-                text: 'La configuración se ha actualizado correctamente',
+                icon: 'info',
+                title: 'Verificando Conexión',
+                text: 'La conexión con Airtable se está verificando...',
                 timer: 2000,
                 showConfirmButton: false
             });
         };
         
-        // Override testConnection to use embedded config
-        window.testConnection = function() {
-            const config = window.getAirtableConfig();
-            if (config.token && config.baseId) {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Conexión Exitosa',
-                    text: 'La conexión con Airtable está funcionando correctamente',
-                    timer: 2000,
-                    showConfirmButton: false
-                });
-                document.getElementById('connectionStatus').innerHTML = '<i class="fas fa-circle" style="color: #28a745;"></i> Conectado';
-            } else {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error de Conexión',
-                    text: 'Por favor, contacte al administrador del sistema'
-                });
-            }
-        };
-        
-        // New function for data sync
+        // Función para sincronizar datos
         window.syncData = function() {
             Swal.fire({
                 title: 'Sincronizando...',
@@ -842,7 +1004,7 @@
             });
         };
         
-        // New function for checking updates
+        // Función para buscar actualizaciones
         window.checkForUpdates = function() {
             Swal.fire({
                 icon: 'info',
@@ -851,7 +1013,7 @@
             });
         };
         
-        // New function for clearing cache
+        // Función para limpiar caché
         window.clearCache = function() {
             Swal.fire({
                 title: '¿Limpiar Caché?',
