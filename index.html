@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Capacitaciones - Hospital Susana López de Valencia</title>
+    
+    <!-- Meta tags para PWA -->
+    <meta name="description" content="Sistema integral de gestión de capacitaciones hospitalarias">
+    <meta name="theme-color" content="#667eea">
+    
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="assets/icons/favicon.ico">
+    
+    <!-- CSS Libraries -->
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Chart.js para gráficas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- QRCode.js para generar códigos QR -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <!-- SweetAlert2 para alertas bonitas -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <!-- Font Awesome para iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loader">
+            <i class="fas fa-heartbeat"></i>
+            <p>Cargando Sistema de Capacitaciones...</p>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container" id="mainContainer">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <img src="assets/images/logo-hospital.png" alt="Logo Hospital" class="logo" 
+                         onerror="this.style.display='none'">
+                    <div>
+                        <h1>Sistema de Capacitaciones</h1>
+                        <p>Hospital Susana López de Valencia</p>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <span id="currentDateTime" class="date-time"></span>
+                    <button class="btn-icon" onclick="toggleDarkMode()">
+                        <i class="fas fa-moon" id="darkModeIcon"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="navigation">
+            <button class="nav-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">
+                <i class="fas fa-chart-line"></i>
+                <span>Dashboard</span>
+            </button>
+            <button class="nav-tab" data-tab="create" onclick="switchTab('create')">
+                <i class="fas fa-plus-circle"></i>
+                <span>Crear</span>
+            </button>
+            <button class="nav-tab" data-tab="manage" onclick="switchTab('manage')">
+                <i class="fas fa-tasks"></i>
+                <span>Gestionar</span>
+            </button>
+            <button class="nav-tab" data-tab="exam" onclick="switchTab('exam')">
+                <i class="fas fa-clipboard-check"></i>
+                <span>Examen</span>
+            </button>
+            <button class="nav-tab" data-tab="reports" onclick="switchTab('reports')">
+                <i class="fas fa-chart-bar"></i>
+                <span>Reportes</span>
+            </button>
+            <button class="nav-tab" data-tab="settings" onclick="switchTab('settings')">
+                <i class="fas fa-cog"></i>
+                <span>Ajustes</span>
+            </button>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            
+            <!-- Dashboard Tab -->
+            <section id="dashboard" class="tab-content active">
+                <h2 class="section-title">
+                    <i class="fas fa-chart-line"></i> Panel de Control
+                </h2>
+                
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card blue">
+                        <div class="stat-icon">
+                            <i class="fas fa-graduation-cap"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalTrainings">0</h3>
+                            <p>Capacitaciones Activas</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card green">
+                        <div class="stat-icon">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="totalParticipants">0</h3>
+                            <p>Participantes Totales</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card purple">
+                        <div class="stat-icon">
+                            <i class="fas fa-percentage"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="adherenceRate">0%</h3>
+                            <p>Tasa de Adherencia</p>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-card orange">
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-info">
+                            <h3 id="avgImprovement">0%</h3>
+                            <p>Mejora Promedio</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Charts Section -->
+                <div class="charts-container">
+                    <div class="card">
+                        <h3>Participaciones por Día</h3>
+                        <canvas id="participationsChart"></canvas>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Rendimiento por Departamento</h3>
+                        <canvas id="departmentChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="card">
+                    <h3>Actividad Reciente</h3>
+                    <div id="recentActivity" class="activity-list">
+                        <p class="no-data">No hay actividad reciente</p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Create Training Tab -->
+            <section id="create" class="tab-content">
+                <h2 class="section-title">
+                    <i class="fas fa-plus-circle"></i> Crear Nueva Capacitación
+                </h2>
+                
+                <div class="card">
+                    <h3>Información General</h3>
+                    <form id="trainingForm">
+                        <div class="form-group">
+                            <label for="trainingTitle">
+                                <i class="fas fa-heading"></i> Título de la Capacitación *
+                            </label>
+                            <input type="text" id="trainingTitle" required 
+                                   placeholder="Ej: Protocolo de Higiene de Manos">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="trainingDescription">
+                                <i class="fas fa-align-left"></i> Descripción
+                            </label>
+                            <textarea id="trainingDescription" rows="3" 
+                                      placeholder="Describe los objetivos y contenido de la capacitación..."></textarea>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="trainingDepartment">
+                                    <i class="fas fa-building"></i> Departamento *
+                                </label>
+                                <select id="trainingDepartment" required>
+                                    <option value="">Seleccione...</option>
+                                    <option value="General">General</option>
+                                    <option value="Enfermería">Enfermería</option>
+                                    <option value="Medicina">Medicina</option>
+                                    <option value="Administración">Administración</option>
+                                    <option value="Laboratorio">Laboratorio</option>
+                                    <option value="Radiología">Radiología</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label for="trainingDuration">
+                                    <i class="fas fa-clock"></i> Duración Estimada
+                                </label>
+                                <input type="text" id="trainingDuration" 
+                                       placeholder="Ej: 30 minutos">
+                            </div>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="card">
+                    <h3>
+                        <i class="fas fa-question-circle"></i> Pretest (Evaluación Inicial)
+                    </h3>
+                    <div id="pretestQuestions" class="questions-container"></div>
+                    <button class="btn btn-secondary" onclick="addQuestion('pretest')">
+                        <i class="fas fa-plus"></i> Agregar Pregunta
+                    </button>
+                </div>
+
+                <div class="card">
+                    <h3>
+                        <i class="fas fa-check-circle"></i> Post-test (Evaluación Final)
+                    </h3>
+                    <div id="posttestQuestions" class="questions-container"></div>
+                    <button class="btn btn-secondary" onclick="addQuestion('posttest')">
+                        <i class="fas fa-plus"></i> Agregar Pregunta
+                    </button>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-primary" onclick="saveTraining()">
+                        <i class="fas fa-save"></i> Guardar Capacitación
+                    </button>
+                    <button class="btn btn-secondary" onclick="resetForm()">
+                        <i class="fas fa-undo"></i> Limpiar Formulario
+                    </button>
+                </div>
+            </section>
+
+            <!-- Manage Tab -->
+            <section id="manage" class="tab-content">
+                <h2 class="section-title">
+                    <i class="fas fa-tasks"></i> Gestionar Capacitaciones
+                </h2>
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Capacitaciones Activas</h3>
+                        <button class="btn btn-secondary" onclick="loadTrainings()">
+                            <i class="fas fa-sync"></i> Actualizar
+                        </button>
+                    </div>
+                    
+                    <div id="trainingsList" class="trainings-list">
+                        <div class="loading-message">
+                            <i class="fas fa-spinner fa-spin"></i>
+                            <p>Cargando capacitaciones...</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Exam Tab -->
+            <section id="exam" class="tab-content">
+                <h2 class="section-title">
+                    <i class="fas fa-clipboard-check"></i> Realizar Examen
+                </h2>
+                
+                <div class="card" id="examAccess">
+                    <h3>Acceso a Capacitación</h3>
+                    <form id="accessForm">
+                        <div class="form-group">
+                            <label for="accessCode">
+                                <i class="fas fa-key"></i> Código de Acceso *
+                            </label>
+                            <input type="text" id="accessCode" required 
+                                   placeholder="Ingrese el código o escanee el QR">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="participantName">
+                                <i class="fas fa-user"></i> Nombre Completo *
+                            </label>
+                            <input type="text" id="participantName" required 
+                                   placeholder="Ingrese su nombre completo">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="participantEmail">
+                                <i class="fas fa-envelope"></i> Correo Electrónico
+                            </label>
+                            <input type="email" id="participantEmail" 
+                                   placeholder="correo@hospital.com">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="participantCargo">
+                                <i class="fas fa-id-badge"></i> Cargo *
+                            </label>
+                            <select id="participantCargo" required>
+                                <option value="">Seleccione su cargo...</option>
+                                <option value="Médico">Médico</option>
+                                <option value="Enfermero/a">Enfermero/a</option>
+                                <option value="Administrativo">Administrativo</option>
+                                <option value="Técnico">Técnico</option>
+                                <option value="Auxiliar">Auxiliar</option>
+                                <option value="Otro">Otro</option>
+                            </select>
+                        </div>
+                        
+                        <button type="button" class="btn btn-primary" onclick="accessTraining()">
+                            <i class="fas fa-sign-in-alt"></i> Acceder a Capacitación
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="card" id="examContent" style="display: none;">
+                    <h3 id="examTitle">Examen</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="examProgress" style="width: 0%">
+                            <span>0%</span>
+                        </div>
+                    </div>
+                    
+                    <div id="examQuestions" class="exam-questions"></div>
+                    
+                    <div class="form-actions">
+                        <button class="btn btn-primary" onclick="submitExam()">
+                            <i class="fas fa-paper-plane"></i> Enviar Respuestas
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Reports Tab -->
+            <section id="reports" class="tab-content">
+                <h2 class="section-title">
+                    <i class="fas fa-chart-bar"></i> Reportes y Análisis
+                </h2>
+                
+                <div class="card">
+                    <h3>Seleccionar Capacitación</h3>
+                    <div class="form-group">
+                        <select id="reportTraining" onchange="loadReport()">
+                            <option value="">Seleccione una capacitación...</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div id="reportContent" style="display: none;">
+                    <div class="stats-grid">
+                        <div class="stat-card blue">
+                            <div class="stat-info">
+                                <h3 id="reportParticipants">0</h3>
+                                <p>Participantes</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card green">
+                            <div class="stat-info">
+                                <h3 id="reportCompletion">0%</h3>
+                                <p>Tasa de Finalización</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card purple">
+                            <div class="stat-info">
+                                <h3 id="reportAvgPre">0</h3>
+                                <p>Promedio Pretest</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card orange">
+                            <div class="stat-info">
+                                <h3 id="reportAvgPost">0</h3>
+                                <p>Promedio Post-test</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Comparación Pretest vs Post-test</h3>
+                        <canvas id="reportChart"></canvas>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Resultados Detallados</h3>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Participante</th>
+                                        <th>Cargo</th>
+                                        <th>Fecha</th>
+                                        <th>Pretest</th>
+                                        <th>Post-test</th>
+                                        <th>Mejora</th>
+                                        <th>Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="resultsTableBody">
+                                    <tr>
+                                        <td colspan="7" class="text-center">No hay datos disponibles</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button class="btn btn-success" onclick="exportReport('csv')">
+                                <i class="fas fa-file-csv"></i> Exportar CSV
+                            </button>
+                            <button class="btn btn-info" onclick="exportReport('pdf')">
+                                <i class="fas fa-file-pdf"></i> Exportar PDF
+                            </button>
+                            <button class="btn btn-primary" onclick="printReport()">
+                                <i class="fas fa-print"></i> Imprimir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Tab -->
+            <section id="settings" class="tab-content">
+                <h2 class="section-title">
+                    <i class="fas fa-cog"></i> Configuración
+                </h2>
+                
+                <div class="card">
+                    <h3>Conexión con Airtable</h3>
+                    <form id="settingsForm">
+                        <div class="form-group">
+                            <label for="airtableToken">
+                                <i class="fas fa-key"></i> Personal Access Token
+                            </label>
+                            <input type="password" id="airtableToken" 
+                                   placeholder="patXXXXXXXXXXXXXXXX">
+                            <small>Obtén tu token en airtable.com/create/tokens</small>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="airtableBaseId">
+                                <i class="fas fa-database"></i> Base ID
+                            </label>
+                            <input type="text" id="airtableBaseId" 
+                                   placeholder="appXXXXXXXXXXXXXX">
+                            <small>Encuentra tu Base ID en airtable.com/api</small>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-primary" onclick="saveSettings()">
+                                <i class="fas fa-save"></i> Guardar Configuración
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="testConnection()">
+                                <i class="fas fa-plug"></i> Probar Conexión
+                            </button>
+                        </div>
+                    </form>
+                </div>
+                
+                <div class="card">
+                    <h3>Preferencias del Sistema</h3>
+                    <div class="settings-options">
+                        <div class="setting-item">
+                            <label class="switch">
+                                <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+                                <span class="slider"></span>
+                            </label>
+                            <span>Modo Oscuro</span>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label class="switch">
+                                <input type="checkbox" id="notificationsToggle">
+                                <span class="slider"></span>
+                            </label>
+                            <span>Notificaciones</span>
+                        </div>
+                        
+                        <div class="setting-item">
+                            <label class="switch">
+                                <input type="checkbox" id="autoSaveToggle" checked>
+                                <span class="slider"></span>
+                            </label>
+                            <span>Guardado Automático</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card">
+                    <h3>Información del Sistema</h3>
+                    <div class="system-info">
+                        <p><strong>Versión:</strong> 1.0.0</p>
+                        <p><strong>Última Actualización:</strong> <span id="lastUpdate">-</span></p>
+                        <p><strong>Estado de Conexión:</strong> <span id="connectionStatus" class="badge">Desconectado</span></p>
+                        <p><strong>Registros en Base:</strong> <span id="recordCount">-</span></p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>&copy; 2024 Hospital Susana López de Valencia. Todos los derechos reservados.</p>
+            <p>Desarrollado con ❤️ para mejorar la capacitación hospitalaria</p>
+        </footer>
+    </div>
+
+    <!-- QR Modal -->
+    <div id="qrModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('qrModal')">&times;</span>
+            <h2>Código QR de Acceso</h2>
+            <div id="qrcode" class="qr-container"></div>
+            <div class="access-info">
+                <p><strong>Código:</strong> <span id="modalAccessCode"></span></p>
+                <p><strong>Link:</strong> <span id="modalAccessLink"></span></p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="copyLink()">
+                    <i class="fas fa-copy"></i> Copiar Link
+                </button>
+                <button class="btn btn-success" onclick="shareWhatsApp()">
+                    <i class="fab fa-whatsapp"></i> Compartir
+                </button>
+                <button class="btn btn-info" onclick="downloadQR()">
+                    <i class="fas fa-download"></i> Descargar QR
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+    
+    <script>
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+    </script>
+</body>
+</html>
