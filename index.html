@@ -895,12 +895,27 @@
             }
         };
         
+        // Variables globales para los gráficos
+        let participationsChartInstance = null;
+        let departmentChartInstance = null;
+        
         // Función para inicializar gráficas del dashboard
         function initializeCharts() {
+            // Destruir gráficos existentes si existen
+            if (participationsChartInstance) {
+                participationsChartInstance.destroy();
+                participationsChartInstance = null;
+            }
+            
+            if (departmentChartInstance) {
+                departmentChartInstance.destroy();
+                departmentChartInstance = null;
+            }
+            
             // Gráfica de participaciones por día
             const ctx1 = document.getElementById('participationsChart');
             if (ctx1 && ctx1.getContext) {
-                const chart1 = new Chart(ctx1.getContext('2d'), {
+                participationsChartInstance = new Chart(ctx1.getContext('2d'), {
                     type: 'line',
                     data: {
                         labels: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
@@ -922,7 +937,7 @@
             // Gráfica de rendimiento por departamento
             const ctx2 = document.getElementById('departmentChart');
             if (ctx2 && ctx2.getContext) {
-                const chart2 = new Chart(ctx2.getContext('2d'), {
+                departmentChartInstance = new Chart(ctx2.getContext('2d'), {
                     type: 'bar',
                     data: {
                         labels: ['Enfermería', 'Medicina', 'Admin', 'Lab', 'Radiología'],
