@@ -201,14 +201,12 @@
     <script>
         // Configuración para usar con Netlify Functions
         window.AIRTABLE_CONFIG = {
-            baseId: 'appcazmz56GPqqqLG', // Base ID público (menos sensible)
-            apiEndpoint: '/.netlify/functions/airtable-proxy', // Endpoint de Netlify Function
+            baseId: 'appcazmz56GPqqqLG', // Reemplaza con tu Base ID
+            apiEndpoint: '/.netlify/functions/airtable-proxy',
             
             // Función para obtener configuración
             getConfig: async function() {
                 try {
-                    // En producción, el token está en las variables de entorno de Netlify
-                    // Este endpoint será manejado por una Netlify Function
                     const response = await fetch(this.apiEndpoint + '/config');
                     if (response.ok) {
                         return await response.json();
@@ -717,8 +715,8 @@
                     <div class="system-info">
                         <p><strong>Versión:</strong> 1.0.0</p>
                         <p><strong>Última Actualización:</strong> <span id="lastUpdate">Enero 2025</span></p>
-                        <p><strong>Registros en Base:</strong> <span id="recordCount">-</span></p>
-                        <p><strong>Espacio Utilizado:</strong> <span id="storageUsed">-</span></p>
+                        <p><strong>Registros en Base:</strong> <span id="recordCount">0</span></p>
+                        <p><strong>Espacio Utilizado:</strong> <span id="storageUsed">0 KB</span></p>
                         <p><strong>Desarrollador:</strong> Ing. Paul Eduardo Muñoz Rodriguez</p>
                         <p><strong>Licencia:</strong> Hospital Susana López de Valencia</p>
                     </div>
@@ -737,7 +735,7 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <p>&copy; 2024 Hospital Susana López de Valencia. Todos los derechos reservados.</p>
+            <p>&copy; 2025 Hospital Susana López de Valencia. Todos los derechos reservados.</p>
             <p>Desarrollado con ❤️ para mejorar la capacitación hospitalaria</p>
         </footer>
     </div>
@@ -784,7 +782,7 @@
             updateDateTime();
             setInterval(updateDateTime, 1000);
             
-            // Cargar estadísticas del dashboard
+            // Cargar estadísticas del dashboard desde Airtable
             updateDashboardStats();
             
             // Verificar conexión cada 30 segundos
@@ -799,11 +797,10 @@
             const statusElement = document.getElementById('connectionStatus');
             
             try {
-                // Simulación de verificación - En producción esto haría una llamada real
-                // Para desarrollo local, simularemos una conexión exitosa
-                const isConnected = true; // En producción: await window.AIRTABLE_CONFIG.getConfig();
+                // Verificación real de conexión con Airtable
+                const config = await window.AIRTABLE_CONFIG.getConfig();
                 
-                if (isConnected) {
+                if (config) {
                     indicator.className = 'connection-indicator connected';
                     dot.className = 'connection-dot connected';
                     text.textContent = 'Airtable Conectado';
@@ -850,17 +847,22 @@
             }
         }
         
-        // Función para actualizar estadísticas del dashboard
-        function updateDashboardStats() {
-            // Actualizar contadores con valores iniciales o desde localStorage
-            document.getElementById('totalTrainings').textContent = 
-                localStorage.getItem('totalTrainings') || '5';
-            document.getElementById('totalParticipants').textContent = 
-                localStorage.getItem('totalParticipants') || '127';
-            document.getElementById('adherenceRate').textContent = 
-                localStorage.getItem('adherenceRate') || '89%';
-            document.getElementById('avgImprovement').textContent = 
-                localStorage.getItem('avgImprovement') || '34%';
+        // Función para actualizar estadísticas del dashboard desde Airtable
+        async function updateDashboardStats() {
+            try {
+                // Aquí se conectará con Airtable para obtener datos reales
+                // Por ahora inicializa en cero
+                document.getElementById('totalTrainings').textContent = '0';
+                document.getElementById('totalParticipants').textContent = '0';
+                document.getElementById('adherenceRate').textContent = '0%';
+                document.getElementById('avgImprovement').textContent = '0%';
+                
+                // Actualizar información del sistema
+                document.getElementById('recordCount').textContent = '0';
+                document.getElementById('storageUsed').textContent = '0 KB';
+            } catch (error) {
+                console.error('Error actualizando estadísticas:', error);
+            }
         }
         
         // Función para cambiar entre pestañas
@@ -899,7 +901,7 @@
         let participationsChartInstance = null;
         let departmentChartInstance = null;
         
-        // Función para inicializar gráficas del dashboard
+        // Función para inicializar gráficas del dashboard (con datos en cero)
         function initializeCharts() {
             // Destruir gráficos existentes si existen
             if (participationsChartInstance) {
@@ -912,16 +914,16 @@
                 departmentChartInstance = null;
             }
             
-            // Gráfica de participaciones por día
+            // Gráfica de participaciones por día (vacía)
             const ctx1 = document.getElementById('participationsChart');
             if (ctx1 && ctx1.getContext) {
                 participationsChartInstance = new Chart(ctx1.getContext('2d'), {
                     type: 'line',
                     data: {
-                        labels: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'],
+                        labels: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
                         datasets: [{
                             label: 'Participaciones',
-                            data: [12, 19, 15, 25, 22, 30],
+                            data: [0, 0, 0, 0, 0, 0, 0],
                             borderColor: 'rgb(102, 126, 234)',
                             backgroundColor: 'rgba(102, 126, 234, 0.1)',
                             tension: 0.1
@@ -929,12 +931,17 @@
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true
+                            }
+                        }
                     }
                 });
             }
             
-            // Gráfica de rendimiento por departamento
+            // Gráfica de rendimiento por departamento (vacía)
             const ctx2 = document.getElementById('departmentChart');
             if (ctx2 && ctx2.getContext) {
                 departmentChartInstance = new Chart(ctx2.getContext('2d'), {
@@ -943,7 +950,7 @@
                         labels: ['Enfermería', 'Medicina', 'Admin', 'Lab', 'Radiología'],
                         datasets: [{
                             label: 'Promedio de Rendimiento',
-                            data: [85, 78, 92, 88, 79],
+                            data: [0, 0, 0, 0, 0],
                             backgroundColor: [
                                 'rgba(102, 126, 234, 0.8)',
                                 'rgba(100, 210, 80, 0.8)',
@@ -999,13 +1006,15 @@
         };
         
         // Función para sincronizar datos
-        window.syncData = function() {
+        window.syncData = async function() {
             Swal.fire({
                 title: 'Sincronizando...',
                 text: 'Por favor espere mientras se sincronizan los datos',
                 allowOutsideClick: false,
                 didOpen: () => {
                     Swal.showLoading();
+                    
+                    // Aquí se implementará la sincronización real con Airtable
                     setTimeout(() => {
                         Swal.fire({
                             icon: 'success',
@@ -1014,6 +1023,7 @@
                             timer: 2000,
                             showConfirmButton: false
                         });
+                        updateDashboardStats();
                     }, 2000);
                 }
             });
