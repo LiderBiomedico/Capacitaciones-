@@ -5,241 +5,610 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sistema de Capacitaciones - Hospital Susana López de Valencia</title>
     
-    <!-- Meta tags para PWA -->
     <meta name="description" content="Sistema integral de gestión de capacitaciones hospitalarias">
     <meta name="theme-color" content="#667eea">
     
-    <!-- Favicon -->
-    <link rel="icon" type="image/x-icon" href="assets/icons/favicon.ico">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- CSS Libraries -->
-    <link rel="stylesheet" href="styles.css">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <!-- Estilo para fondo blanco y mejoras visuales -->
+    <!-- QRCode.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #667eea;
+            --secondary: #764ba2;
+            --success: #28a745;
+            --danger: #dc3545;
+            --warning: #ffc107;
+            --info: #17a2b8;
+        }
+
         body {
-            background-color: #ffffff !important;
-            background-image: linear-gradient(135deg, #ffffff 0%, #fafafa 100%) !important;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
             min-height: 100vh;
         }
-        
+
         .container {
-            background-color: rgba(255, 255, 255, 1);
-            box-shadow: 0 0 30px rgba(0, 0, 0, 0.08);
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 30px rgba(0,0,0,0.08);
         }
-        
-        /* Indicador de conexión Airtable */
+
+        /* Header */
+        .header {
+            background: white;
+            padding: 1.5rem 2rem;
+            border-bottom: 2px solid #f0f0f0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .logo-section {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo-section h1 {
+            color: var(--primary);
+            font-size: 1.5rem;
+            margin: 0;
+        }
+
+        .logo-section p {
+            color: #666;
+            font-size: 0.9rem;
+            margin: 0.25rem 0;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
         .connection-indicator {
-            display: inline-flex;
+            display: flex;
             align-items: center;
             gap: 8px;
             padding: 8px 16px;
             background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
-            border: 1px solid #c8e6c9;
+            border: 1px solid #81c784;
             border-radius: 20px;
             font-size: 0.85em;
-            font-weight: 500;
-            margin-right: 15px;
-            transition: all 0.3s ease;
         }
-        
-        .connection-indicator.connected {
-            background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
-            border-color: #81c784;
-        }
-        
-        .connection-indicator.disconnected {
-            background: linear-gradient(135deg, #ffebee 0%, #fff3e0 100%);
-            border-color: #ef5350;
-        }
-        
-        .connection-indicator:hover {
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-            transform: translateY(-1px);
-        }
-        
+
         .connection-dot {
             width: 8px;
             height: 8px;
             border-radius: 50%;
+            background: #4caf50;
             animation: pulse 2s infinite;
         }
-        
-        .connection-dot.connected {
-            background-color: #4caf50;
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
         }
-        
-        .connection-dot.disconnected {
-            background-color: #f44336;
+
+        /* Navigation */
+        .navigation {
+            display: flex;
+            background: white;
+            border-bottom: 2px solid #e0e0e0;
+            overflow-x: auto;
+            position: sticky;
+            top: 100px;
+            z-index: 999;
         }
-        
-        /* Estilos para la pantalla de carga */
+
+        .nav-tab {
+            flex: 1;
+            min-width: 120px;
+            padding: 1rem;
+            background: white;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+            color: #666;
+        }
+
+        .nav-tab i {
+            font-size: 1.3rem;
+        }
+
+        .nav-tab:hover {
+            background: #f8f9fa;
+            color: var(--primary);
+        }
+
+        .nav-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            background: #f8f9ff;
+        }
+
+        /* Main Content */
+        .main-content {
+            padding: 2rem;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .section-title {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.8rem;
+        }
+
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .card h3 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .stat-icon {
+            font-size: 3rem;
+            opacity: 0.8;
+        }
+
+        .stat-info h3 {
+            font-size: 2rem;
+            margin: 0;
+            color: white;
+        }
+
+        .stat-info p {
+            margin: 0;
+            opacity: 0.9;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        /* Questions Container */
+        .questions-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .question-counter {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+        }
+
+        .question-card {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .question-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(102,126,234,0.15);
+        }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .question-header h4 {
+            color: var(--primary);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-remove {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-remove:hover {
+            background: #c82333;
+            transform: scale(1.05);
+        }
+
+        .question-text {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            resize: vertical;
+            transition: all 0.3s;
+        }
+
+        .question-text:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+
+        .option-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: white;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            transition: all 0.3s;
+        }
+
+        .option-item:hover {
+            border-color: var(--primary);
+            background: #f8f9ff;
+        }
+
+        .option-item input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+        .radio-label {
+            font-size: 0.85rem;
+            color: #666;
+            min-width: 70px;
+            font-weight: 500;
+        }
+
+        .option-text {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        .option-text:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .help-text {
+            display: block;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            color: #666;
+            font-style: italic;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-info {
+            background: var(--info);
+            color: white;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 16px;
+            max-width: 500px;
+            width: 90%;
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .modal-content h2 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .close {
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+            font-size: 2rem;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .close:hover {
+            color: var(--danger);
+        }
+
+        .qr-container {
+            display: flex;
+            justify-content: center;
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 12px;
+        }
+
+        .access-info {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .access-info p {
+            margin: 0.5rem 0;
+        }
+
+        .access-info strong {
+            color: var(--primary);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .modal-actions button {
+            flex: 1;
+        }
+
+        /* Charts */
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .charts-container canvas {
+            max-height: 300px;
+        }
+
+        /* Loading Screen */
         .loading-screen {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             display: flex;
             justify-content: center;
             align-items: center;
             z-index: 9999;
-            transition: opacity 0.5s ease;
+            transition: opacity 0.5s;
         }
-        
+
         .loader {
             text-align: center;
             color: white;
         }
-        
+
         .loader i {
             font-size: 4rem;
             animation: pulse 1.5s infinite;
         }
-        
-        .loader p {
-            margin-top: 1rem;
-            font-size: 1.2rem;
+
+        /* Footer */
+        .footer {
+            background: #f8f9fa;
+            padding: 2rem;
+            text-align: center;
+            border-top: 2px solid #e0e0e0;
         }
-        
-        @keyframes pulse {
-            0% { 
-                transform: scale(1); 
-                opacity: 1;
-            }
-            50% { 
-                transform: scale(1.1);
-                opacity: 0.7;
-            }
-            100% { 
-                transform: scale(1);
-                opacity: 1;
-            }
+
+        .footer p {
+            margin: 0.5rem 0;
+            color: #666;
         }
-        
-        /* Estilos para las gráficas */
-        .charts-container {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-            margin: 1rem 0;
-        }
-        
-        .charts-container canvas {
-            max-height: 300px;
-        }
-        
-        /* Header con fondo blanco */
-        .header {
-            background: #ffffff;
-            color: #333333;
-            padding: 1rem 2rem;
-            border-bottom: 2px solid #f0f0f0;
-            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
-        }
-        
-        .header h1 {
-            color: #667eea;
-            font-weight: 600;
-        }
-        
-        .header p {
-            color: #666666 !important;
-        }
-        
-        .header .date-time {
-            color: #666666;
-        }
-        
-        .header .btn-icon {
-            color: #667eea;
-            background: transparent;
-            border: 1px solid #e0e0e0;
-            padding: 8px;
-            border-radius: 50%;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .header .btn-icon:hover {
-            background: #f5f5f5;
-            transform: scale(1.05);
-        }
-        
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
+
+        /* Responsive */
         @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+
             .charts-container {
                 grid-template-columns: 1fr;
             }
-            
-            .connection-indicator {
-                font-size: 0.75em;
-                padding: 6px 12px;
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .form-actions .btn {
+                width: 100%;
             }
         }
     </style>
-    
-    <!-- Chart.js para gráficas -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <!-- QRCode.js para generar códigos QR -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    
-    <!-- SweetAlert2 para alertas bonitas -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    
-    <!-- Font Awesome para iconos -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Configuración de Airtable con Netlify Functions -->
-    <script>
-        // Configuración para usar con Netlify Functions
-        window.AIRTABLE_CONFIG = {
-            baseId: 'appcazmz56GPqqqLG', // Reemplaza con tu Base ID
-            apiEndpoint: '/.netlify/functions/airtable-proxy',
-            
-            // Función para obtener configuración
-            getConfig: async function() {
-                try {
-                    const response = await fetch(this.apiEndpoint + '/config');
-                    if (response.ok) {
-                        return await response.json();
-                    }
-                } catch (error) {
-                    console.error('Error obteniendo configuración:', error);
-                }
-                return null;
-            },
-            
-            // Función para hacer llamadas a Airtable a través del proxy
-            makeRequest: async function(endpoint, method = 'GET', data = null) {
-                try {
-                    const options = {
-                        method: method,
-                        headers: {
-                            'Content-Type': 'application/json'
-                        }
-                    };
-                    
-                    if (data) {
-                        options.body = JSON.stringify(data);
-                    }
-                    
-                    const response = await fetch(this.apiEndpoint + endpoint, options);
-                    return await response.json();
-                } catch (error) {
-                    console.error('Error en petición a Airtable:', error);
-                    return null;
-                }
-            }
-        };
-    </script>
 </head>
 <body>
     <!-- Loading Screen -->
@@ -251,61 +620,52 @@
     </div>
 
     <!-- Main Container -->
-    <div class="container" id="mainContainer">
+    <div class="container">
         <!-- Header -->
         <header class="header">
             <div class="header-content">
                 <div class="logo-section">
-                    <img src="assets/images/logo-hospital.png" alt="Logo Hospital" class="logo" 
-                         onerror="this.style.display='none'">
                     <div>
-                        <h1>Sistema de Capacitaciones</h1>
+                        <h1>🏥 Sistema de Capacitaciones</h1>
                         <p>Hospital Susana López de Valencia</p>
-                        <p style="font-size: 0.85em; color: #666666; font-style: italic;">Desarrollado por Ing. Paul Eduardo Muñoz Rodriguez</p>
+                        <p style="font-size: 0.8em; font-style: italic;">Desarrollado por Ing. Paul Eduardo Muñoz Rodriguez</p>
                     </div>
                 </div>
                 <div class="header-actions">
-                    <div id="airtableIndicator" class="connection-indicator disconnected">
-                        <div class="connection-dot disconnected"></div>
-                        <span id="connectionText">Verificando conexión...</span>
+                    <div class="connection-indicator">
+                        <div class="connection-dot"></div>
+                        <span>Airtable Conectado</span>
                     </div>
-                    <span id="currentDateTime" class="date-time"></span>
-                    <button class="btn-icon" onclick="toggleDarkMode()" style="margin-left: 10px;">
-                        <i class="fas fa-moon" id="darkModeIcon"></i>
-                    </button>
+                    <span id="currentDateTime"></span>
                 </div>
             </div>
         </header>
 
         <!-- Navigation -->
         <nav class="navigation">
-            <button class="nav-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">
+            <button class="nav-tab active" onclick="switchTab('dashboard')">
                 <i class="fas fa-chart-line"></i>
                 <span>Dashboard</span>
             </button>
-            <button class="nav-tab" data-tab="create" onclick="switchTab('create')">
+            <button class="nav-tab" onclick="switchTab('create')">
                 <i class="fas fa-plus-circle"></i>
                 <span>Crear</span>
             </button>
-            <button class="nav-tab" data-tab="manage" onclick="switchTab('manage')">
+            <button class="nav-tab" onclick="switchTab('manage')">
                 <i class="fas fa-tasks"></i>
                 <span>Gestionar</span>
             </button>
-            <button class="nav-tab" data-tab="exam" onclick="switchTab('exam')">
+            <button class="nav-tab" onclick="switchTab('exam')">
                 <i class="fas fa-clipboard-check"></i>
                 <span>Examen</span>
             </button>
-            <button class="nav-tab" data-tab="reports" onclick="switchTab('reports')">
+            <button class="nav-tab" onclick="switchTab('reports')">
                 <i class="fas fa-chart-bar"></i>
                 <span>Reportes</span>
             </button>
-            <button class="nav-tab" data-tab="settings" onclick="switchTab('settings')">
-                <i class="fas fa-cog"></i>
-                <span>Ajustes</span>
-            </button>
         </nav>
 
-        <!-- Main Content Area -->
+        <!-- Main Content -->
         <main class="main-content">
             
             <!-- Dashboard Tab -->
@@ -314,42 +674,33 @@
                     <i class="fas fa-chart-line"></i> Panel de Control
                 </h2>
                 
-                <!-- Stats Cards -->
                 <div class="stats-grid">
-                    <div class="stat-card blue">
-                        <div class="stat-icon">
-                            <i class="fas fa-graduation-cap"></i>
-                        </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-graduation-cap"></i></div>
                         <div class="stat-info">
                             <h3 id="totalTrainings">0</h3>
                             <p>Capacitaciones Activas</p>
                         </div>
                     </div>
                     
-                    <div class="stat-card green">
-                        <div class="stat-icon">
-                            <i class="fas fa-users"></i>
-                        </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-users"></i></div>
                         <div class="stat-info">
                             <h3 id="totalParticipants">0</h3>
                             <p>Participantes Totales</p>
                         </div>
                     </div>
                     
-                    <div class="stat-card purple">
-                        <div class="stat-icon">
-                            <i class="fas fa-percentage"></i>
-                        </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-percentage"></i></div>
                         <div class="stat-info">
                             <h3 id="adherenceRate">0%</h3>
                             <p>Tasa de Adherencia</p>
                         </div>
                     </div>
                     
-                    <div class="stat-card orange">
-                        <div class="stat-icon">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
                         <div class="stat-info">
                             <h3 id="avgImprovement">0%</h3>
                             <p>Mejora Promedio</p>
@@ -357,7 +708,6 @@
                     </div>
                 </div>
 
-                <!-- Charts Section -->
                 <div class="charts-container">
                     <div class="card">
                         <h3>Participaciones por Día</h3>
@@ -369,46 +719,30 @@
                         <canvas id="departmentChart"></canvas>
                     </div>
                 </div>
-
-                <!-- Recent Activity -->
-                <div class="card">
-                    <h3>Actividad Reciente</h3>
-                    <div id="recentActivity" class="activity-list">
-                        <p class="no-data">No hay actividad reciente</p>
-                    </div>
-                </div>
             </section>
 
-            <!-- Create Training Tab -->
+            <!-- Create Tab -->
             <section id="create" class="tab-content">
                 <h2 class="section-title">
                     <i class="fas fa-plus-circle"></i> Crear Nueva Capacitación
                 </h2>
                 
                 <div class="card">
-                    <h3>Información General</h3>
+                    <h3>📋 Información General</h3>
                     <form id="trainingForm">
                         <div class="form-group">
-                            <label for="trainingTitle">
-                                <i class="fas fa-heading"></i> Título de la Capacitación *
-                            </label>
-                            <input type="text" id="trainingTitle" required 
-                                   placeholder="Ej: Protocolo de Higiene de Manos">
+                            <label><i class="fas fa-heading"></i> Título *</label>
+                            <input type="text" id="trainingTitle" required placeholder="Ej: Protocolo de Higiene de Manos">
                         </div>
                         
                         <div class="form-group">
-                            <label for="trainingDescription">
-                                <i class="fas fa-align-left"></i> Descripción
-                            </label>
-                            <textarea id="trainingDescription" rows="3" 
-                                      placeholder="Describe los objetivos y contenido de la capacitación..."></textarea>
+                            <label><i class="fas fa-align-left"></i> Descripción</label>
+                            <textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos..."></textarea>
                         </div>
                         
                         <div class="form-row">
                             <div class="form-group">
-                                <label for="trainingDepartment">
-                                    <i class="fas fa-building"></i> Departamento *
-                                </label>
+                                <label><i class="fas fa-building"></i> Departamento *</label>
                                 <select id="trainingDepartment" required>
                                     <option value="">Seleccione...</option>
                                     <option value="General">General</option>
@@ -421,20 +755,15 @@
                             </div>
                             
                             <div class="form-group">
-                                <label for="trainingDuration">
-                                    <i class="fas fa-clock"></i> Duración Estimada
-                                </label>
-                                <input type="text" id="trainingDuration" 
-                                       placeholder="Ej: 30 minutos">
+                                <label><i class="fas fa-clock"></i> Duración</label>
+                                <input type="text" id="trainingDuration" placeholder="Ej: 30 minutos">
                             </div>
                         </div>
                     </form>
                 </div>
 
                 <div class="card">
-                    <h3>
-                        <i class="fas fa-question-circle"></i> Pretest (Evaluación Inicial)
-                    </h3>
+                    <h3>❓ Pretest (Evaluación Inicial)</h3>
                     <div id="pretestQuestions" class="questions-container"></div>
                     <button class="btn btn-secondary" onclick="addQuestion('pretest')">
                         <i class="fas fa-plus"></i> Agregar Pregunta
@@ -442,9 +771,7 @@
                 </div>
 
                 <div class="card">
-                    <h3>
-                        <i class="fas fa-check-circle"></i> Post-test (Evaluación Final)
-                    </h3>
+                    <h3>✅ Post-test (Evaluación Final)</h3>
                     <div id="posttestQuestions" class="questions-container"></div>
                     <button class="btn btn-secondary" onclick="addQuestion('posttest')">
                         <i class="fas fa-plus"></i> Agregar Pregunta
@@ -461,290 +788,47 @@
                 </div>
             </section>
 
-            <!-- Manage Tab -->
+            <!-- Other tabs... -->
             <section id="manage" class="tab-content">
-                <h2 class="section-title">
-                    <i class="fas fa-tasks"></i> Gestionar Capacitaciones
-                </h2>
-                
+                <h2 class="section-title"><i class="fas fa-tasks"></i> Gestionar Capacitaciones</h2>
                 <div class="card">
-                    <div class="card-header">
-                        <h3>Capacitaciones Activas</h3>
-                        <button class="btn btn-secondary" onclick="loadTrainings()">
-                            <i class="fas fa-sync"></i> Actualizar
-                        </button>
-                    </div>
-                    
-                    <div id="trainingsList" class="trainings-list">
-                        <div class="loading-message">
-                            <i class="fas fa-spinner fa-spin"></i>
-                            <p>Cargando capacitaciones...</p>
-                        </div>
-                    </div>
+                    <p style="text-align: center; padding: 2rem; color: #666;">
+                        Aquí aparecerán las capacitaciones creadas
+                    </p>
                 </div>
             </section>
 
-            <!-- Exam Tab -->
             <section id="exam" class="tab-content">
-                <h2 class="section-title">
-                    <i class="fas fa-clipboard-check"></i> Realizar Examen
-                </h2>
-                
-                <div class="card" id="examAccess">
-                    <h3>Acceso a Capacitación</h3>
-                    <form id="accessForm">
-                        <div class="form-group">
-                            <label for="accessCode">
-                                <i class="fas fa-key"></i> Código de Acceso *
-                            </label>
-                            <input type="text" id="accessCode" required 
-                                   placeholder="Ingrese el código o escanee el QR">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="participantName">
-                                <i class="fas fa-user"></i> Nombre Completo *
-                            </label>
-                            <input type="text" id="participantName" required 
-                                   placeholder="Ingrese su nombre completo">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="participantEmail">
-                                <i class="fas fa-envelope"></i> Correo Electrónico
-                            </label>
-                            <input type="email" id="participantEmail" 
-                                   placeholder="correo@hospital.com">
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="participantCargo">
-                                <i class="fas fa-id-badge"></i> Cargo *
-                            </label>
-                            <select id="participantCargo" required>
-                                <option value="">Seleccione su cargo...</option>
-                                <option value="Médico">Médico</option>
-                                <option value="Enfermero/a">Enfermero/a</option>
-                                <option value="Administrativo">Administrativo</option>
-                                <option value="Técnico">Técnico</option>
-                                <option value="Auxiliar">Auxiliar</option>
-                                <option value="Otro">Otro</option>
-                            </select>
-                        </div>
-                        
-                        <button type="button" class="btn btn-primary" onclick="accessTraining()">
-                            <i class="fas fa-sign-in-alt"></i> Acceder a Capacitación
-                        </button>
-                    </form>
-                </div>
-                
-                <div class="card" id="examContent" style="display: none;">
-                    <h3 id="examTitle">Examen</h3>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="examProgress" style="width: 0%">
-                            <span>0%</span>
-                        </div>
-                    </div>
-                    
-                    <div id="examQuestions" class="exam-questions"></div>
-                    
-                    <div class="form-actions">
-                        <button class="btn btn-primary" onclick="submitExam()">
-                            <i class="fas fa-paper-plane"></i> Enviar Respuestas
-                        </button>
-                    </div>
+                <h2 class="section-title"><i class="fas fa-clipboard-check"></i> Realizar Examen</h2>
+                <div class="card">
+                    <p style="text-align: center; padding: 2rem; color: #666;">
+                        Formulario de acceso a capacitaciones
+                    </p>
                 </div>
             </section>
 
-            <!-- Reports Tab -->
             <section id="reports" class="tab-content">
-                <h2 class="section-title">
-                    <i class="fas fa-chart-bar"></i> Reportes y Análisis
-                </h2>
-                
+                <h2 class="section-title"><i class="fas fa-chart-bar"></i> Reportes</h2>
                 <div class="card">
-                    <h3>Seleccionar Capacitación</h3>
-                    <div class="form-group">
-                        <select id="reportTraining" onchange="loadReport()">
-                            <option value="">Seleccione una capacitación...</option>
-                        </select>
-                    </div>
-                </div>
-                
-                <div id="reportContent" style="display: none;">
-                    <div class="stats-grid">
-                        <div class="stat-card blue">
-                            <div class="stat-info">
-                                <h3 id="reportParticipants">0</h3>
-                                <p>Participantes</p>
-                            </div>
-                        </div>
-                        
-                        <div class="stat-card green">
-                            <div class="stat-info">
-                                <h3 id="reportCompletion">0%</h3>
-                                <p>Tasa de Finalización</p>
-                            </div>
-                        </div>
-                        
-                        <div class="stat-card purple">
-                            <div class="stat-info">
-                                <h3 id="reportAvgPre">0</h3>
-                                <p>Promedio Pretest</p>
-                            </div>
-                        </div>
-                        
-                        <div class="stat-card orange">
-                            <div class="stat-info">
-                                <h3 id="reportAvgPost">0</h3>
-                                <p>Promedio Post-test</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="card">
-                        <h3>Comparación Pretest vs Post-test</h3>
-                        <canvas id="reportChart"></canvas>
-                    </div>
-                    
-                    <div class="card">
-                        <h3>Resultados Detallados</h3>
-                        <div class="table-responsive">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Participante</th>
-                                        <th>Cargo</th>
-                                        <th>Fecha</th>
-                                        <th>Pretest</th>
-                                        <th>Post-test</th>
-                                        <th>Mejora</th>
-                                        <th>Estado</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="resultsTableBody">
-                                    <tr>
-                                        <td colspan="7" class="text-center">No hay datos disponibles</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        
-                        <div class="form-actions">
-                            <button class="btn btn-success" onclick="exportReport('csv')">
-                                <i class="fas fa-file-csv"></i> Exportar CSV
-                            </button>
-                            <button class="btn btn-info" onclick="exportReport('pdf')">
-                                <i class="fas fa-file-pdf"></i> Exportar PDF
-                            </button>
-                            <button class="btn btn-primary" onclick="printReport()">
-                                <i class="fas fa-print"></i> Imprimir
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Settings Tab -->
-            <section id="settings" class="tab-content">
-                <h2 class="section-title">
-                    <i class="fas fa-cog"></i> Configuración
-                </h2>
-                
-                <div class="card">
-                    <h3>Estado del Sistema</h3>
-                    <div class="system-status">
-                        <div class="status-item">
-                            <i class="fas fa-database"></i>
-                            <span>Estado de Conexión:</span>
-                            <span id="connectionStatus" class="badge">
-                                <i class="fas fa-circle-notch fa-spin"></i> Verificando...
-                            </span>
-                        </div>
-                        
-                        <div class="form-actions" style="margin-top: 20px;">
-                            <button type="button" class="btn btn-secondary" onclick="testConnection()">
-                                <i class="fas fa-plug"></i> Verificar Conexión
-                            </button>
-                            <button type="button" class="btn btn-primary" onclick="syncData()">
-                                <i class="fas fa-sync"></i> Sincronizar Datos
-                            </button>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <h3>Preferencias del Sistema</h3>
-                    <div class="settings-options">
-                        <div class="setting-item">
-                            <label class="switch">
-                                <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
-                                <span class="slider"></span>
-                            </label>
-                            <span>Modo Oscuro</span>
-                        </div>
-                        
-                        <div class="setting-item">
-                            <label class="switch">
-                                <input type="checkbox" id="notificationsToggle" checked>
-                                <span class="slider"></span>
-                            </label>
-                            <span>Notificaciones</span>
-                        </div>
-                        
-                        <div class="setting-item">
-                            <label class="switch">
-                                <input type="checkbox" id="autoSaveToggle" checked>
-                                <span class="slider"></span>
-                            </label>
-                            <span>Guardado Automático</span>
-                        </div>
-                        
-                        <div class="setting-item">
-                            <label class="switch">
-                                <input type="checkbox" id="autoSyncToggle" checked>
-                                <span class="slider"></span>
-                            </label>
-                            <span>Sincronización Automática</span>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="card">
-                    <h3>Información del Sistema</h3>
-                    <div class="system-info">
-                        <p><strong>Versión:</strong> 1.0.0</p>
-                        <p><strong>Última Actualización:</strong> <span id="lastUpdate">Enero 2025</span></p>
-                        <p><strong>Registros en Base:</strong> <span id="recordCount">0</span></p>
-                        <p><strong>Espacio Utilizado:</strong> <span id="storageUsed">0 KB</span></p>
-                        <p><strong>Desarrollador:</strong> Ing. Paul Eduardo Muñoz Rodriguez</p>
-                        <p><strong>Licencia:</strong> Hospital Susana López de Valencia</p>
-                    </div>
-                    
-                    <div class="form-actions" style="margin-top: 20px;">
-                        <button type="button" class="btn btn-info" onclick="checkForUpdates()">
-                            <i class="fas fa-download"></i> Buscar Actualizaciones
-                        </button>
-                        <button type="button" class="btn btn-warning" onclick="clearCache()">
-                            <i class="fas fa-broom"></i> Limpiar Caché
-                        </button>
-                    </div>
+                    <p style="text-align: center; padding: 2rem; color: #666;">
+                        Estadísticas y reportes de capacitaciones
+                    </p>
                 </div>
             </section>
         </main>
 
         <!-- Footer -->
         <footer class="footer">
-            <p>&copy; 2025 Hospital Susana López de Valencia. Todos los derechos reservados.</p>
-            <p>Desarrollado con ❤️ para mejorar la capacitación hospitalaria</p>
+            <p>&copy; 2025 Hospital Susana López de Valencia</p>
+            <p>Desarrollado con ❤️ por Ing. Paul Eduardo Muñoz Rodriguez</p>
         </footer>
     </div>
 
     <!-- QR Modal -->
     <div id="qrModal" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="closeModal('qrModal')">&times;</span>
-            <h2>Código QR de Acceso</h2>
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>📱 Código QR de Acceso</h2>
             <div id="qrcode" class="qr-container"></div>
             <div class="access-info">
                 <p><strong>Código:</strong> <span id="modalAccessCode"></span></p>
@@ -752,84 +836,42 @@
             </div>
             <div class="modal-actions">
                 <button class="btn btn-primary" onclick="copyLink()">
-                    <i class="fas fa-copy"></i> Copiar Link
+                    <i class="fas fa-copy"></i> Copiar
                 </button>
                 <button class="btn btn-success" onclick="shareWhatsApp()">
-                    <i class="fab fa-whatsapp"></i> Compartir
+                    <i class="fab fa-whatsapp"></i> WhatsApp
                 </button>
                 <button class="btn btn-info" onclick="downloadQR()">
-                    <i class="fas fa-download"></i> Descargar QR
+                    <i class="fas fa-download"></i> Descargar
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Scripts -->
-    <script src="config.js"></script>
-    <script src="app.js"></script>
-    
     <script>
-        // Initialize on page load
+        // Variables globales
+        let pretestQuestionCount = 0;
+        let posttestQuestionCount = 0;
+        const MAX_QUESTIONS = 10;
+
+        // Inicialización
         document.addEventListener('DOMContentLoaded', function() {
-            // Asegurar que inicie con Dashboard
-            switchTab('dashboard');
             initializeApp();
-            
-            // Verificar conexión con Airtable
-            checkAirtableConnection();
-            
-            // Actualizar fecha y hora
             updateDateTime();
             setInterval(updateDateTime, 1000);
-            
-            // Cargar estadísticas del dashboard desde Airtable
-            updateDashboardStats();
-            
-            // Verificar conexión cada 30 segundos
-            setInterval(checkAirtableConnection, 30000);
         });
-        
-        // Función para verificar conexión con Airtable
-        async function checkAirtableConnection() {
-            const indicator = document.getElementById('airtableIndicator');
-            const dot = indicator.querySelector('.connection-dot');
-            const text = document.getElementById('connectionText');
-            const statusElement = document.getElementById('connectionStatus');
-            
-            try {
-                // Verificación real de conexión con Airtable
-                const config = await window.AIRTABLE_CONFIG.getConfig();
-                
-                if (config) {
-                    indicator.className = 'connection-indicator connected';
-                    dot.className = 'connection-dot connected';
-                    text.textContent = 'Airtable Conectado';
-                    
-                    if (statusElement) {
-                        statusElement.innerHTML = '<i class="fas fa-circle" style="color: #28a745;"></i> Conectado';
-                    }
-                } else {
-                    indicator.className = 'connection-indicator disconnected';
-                    dot.className = 'connection-dot disconnected';
-                    text.textContent = 'Airtable Desconectado';
-                    
-                    if (statusElement) {
-                        statusElement.innerHTML = '<i class="fas fa-circle" style="color: #dc3545;"></i> Desconectado';
-                    }
-                }
-            } catch (error) {
-                console.error('Error verificando conexión:', error);
-                indicator.className = 'connection-indicator disconnected';
-                dot.className = 'connection-dot disconnected';
-                text.textContent = 'Error de Conexión';
-                
-                if (statusElement) {
-                    statusElement.innerHTML = '<i class="fas fa-exclamation-triangle" style="color: #ffc107;"></i> Error';
-                }
-            }
+
+        function initializeApp() {
+            setTimeout(() => {
+                document.getElementById('loadingScreen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                }, 500);
+            }, 1500);
+
+            setTimeout(() => initializeCharts(), 2000);
         }
-        
-        // Función para actualizar fecha y hora
+
         function updateDateTime() {
             const now = new Date();
             const options = { 
@@ -840,116 +882,466 @@
                 hour: '2-digit',
                 minute: '2-digit'
             };
-            const dateTimeString = now.toLocaleDateString('es-ES', options);
             const element = document.getElementById('currentDateTime');
             if (element) {
-                element.textContent = dateTimeString;
+                element.textContent = now.toLocaleDateString('es-ES', options);
             }
         }
-        
-        // Función para actualizar estadísticas del dashboard desde Airtable
-        async function updateDashboardStats() {
-            try {
-                // Aquí se conectará con Airtable para obtener datos reales
-                // Por ahora inicializa en cero
-                document.getElementById('totalTrainings').textContent = '0';
-                document.getElementById('totalParticipants').textContent = '0';
-                document.getElementById('adherenceRate').textContent = '0%';
-                document.getElementById('avgImprovement').textContent = '0%';
-                
-                // Actualizar información del sistema
-                document.getElementById('recordCount').textContent = '0';
-                document.getElementById('storageUsed').textContent = '0 KB';
-            } catch (error) {
-                console.error('Error actualizando estadísticas:', error);
-            }
-        }
-        
-        // Función para cambiar entre pestañas
-        window.switchTab = function(tabName) {
-            // Ocultar todas las pestañas
+
+        function switchTab(tabName) {
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
             
-            // Desactivar todos los botones de navegación
             document.querySelectorAll('.nav-tab').forEach(btn => {
                 btn.classList.remove('active');
             });
             
-            // Mostrar la pestaña seleccionada
             const selectedTab = document.getElementById(tabName);
-            if (selectedTab) {
-                selectedTab.classList.add('active');
+            if (selectedTab) selectedTab.classList.add('active');
+            
+            event.target.closest('.nav-tab').classList.add('active');
+        }
+
+        // ==================== FUNCIONES DE PREGUNTAS ====================
+        
+        function addQuestion(type) {
+            const container = document.getElementById(`${type}Questions`);
+            const currentCount = type === 'pretest' ? pretestQuestionCount : posttestQuestionCount;
+            
+            if (currentCount >= MAX_QUESTIONS) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Límite Alcanzado',
+                    text: `Solo puedes agregar hasta ${MAX_QUESTIONS} preguntas por test`,
+                    confirmButtonText: 'Entendido'
+                });
+                return;
             }
             
-            // Activar el botón correspondiente
-            const selectedBtn = document.querySelector(`[data-tab="${tabName}"]`);
-            if (selectedBtn) {
-                selectedBtn.classList.add('active');
+            if (type === 'pretest') {
+                pretestQuestionCount++;
+            } else {
+                posttestQuestionCount++;
             }
             
-            // Si es dashboard, actualizar gráficas
-            if (tabName === 'dashboard') {
-                setTimeout(() => {
-                    initializeCharts();
-                }, 100);
+            const questionNumber = currentCount + 1;
+            const questionId = `${type}-q${questionNumber}`;
+            
+            const questionHTML = `
+                <div class="question-card" id="${questionId}" data-question-number="${questionNumber}">
+                    <div class="question-header">
+                        <h4>📝 Pregunta ${questionNumber}</h4>
+                        <button type="button" class="btn-remove" onclick="removeQuestion('${questionId}', '${type}')">
+                            <i class="fas fa-trash"></i> Eliminar
+                        </button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-question"></i> Pregunta *</label>
+                        <textarea id="${questionId}-text" class="question-text" rows="2" required 
+                                  placeholder="Escriba la pregunta aquí..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-list"></i> Opciones de Respuesta</label>
+                        <div class="options-container">
+                            <div class="option-item">
+                                <input type="radio" name="${questionId}-correct" value="a" id="${questionId}-option-a" required>
+                                <label for="${questionId}-option-a" class="radio-label">✓ Correcta</label>
+                                <input type="text" id="${questionId}-text-a" class="option-text" placeholder="Opción A" required>
+                            </div>
+                            
+                            <div class="option-item">
+                                <input type="radio" name="${questionId}-correct" value="b" id="${questionId}-option-b">
+                                <label for="${questionId}-option-b" class="radio-label">✓ Correcta</label>
+                                <input type="text" id="${questionId}-text-b" class="option-text" placeholder="Opción B" required>
+                            </div>
+                            
+                            <div class="option-item">
+                                <input type="radio" name="${questionId}-correct" value="c" id="${questionId}-option-c">
+                                <label for="${questionId}-option-c" class="radio-label">✓ Correcta</label>
+                                <input type="text" id="${questionId}-text-c" class="option-text" placeholder="Opción C" required>
+                            </div>
+                            
+                            <div class="option-item">
+                                <input type="radio" name="${questionId}-correct" value="d" id="${questionId}-option-d">
+                                <label for="${questionId}-option-d" class="radio-label">✓ Correcta</label>
+                                <input type="text" id="${questionId}-text-d" class="option-text" placeholder="Opción D" required>
+                            </div>
+                        </div>
+                        <small class="help-text">Marca la opción correcta</small>
+                    </div>
+                </div>
+            `;
+            
+            container.insertAdjacentHTML('beforeend', questionHTML);
+            updateQuestionCounter(type);
+            
+            // Animación
+            const newQuestion = document.getElementById(questionId);
+            newQuestion.style.opacity = '0';
+            setTimeout(() => {
+                newQuestion.style.transition = 'opacity 0.3s';
+                newQuestion.style.opacity = '1';
+            }, 10);
+        }
+
+        function removeQuestion(questionId, type) {
+            Swal.fire({
+                title: '¿Eliminar pregunta?',
+                text: 'Esta acción no se puede deshacer',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const element = document.getElementById(questionId);
+                    if (element) {
+                        element.style.transition = 'opacity 0.3s';
+                        element.style.opacity = '0';
+                        
+                        setTimeout(() => {
+                            element.remove();
+                            
+                            if (type === 'pretest') {
+                                pretestQuestionCount--;
+                            } else {
+                                posttestQuestionCount--;
+                            }
+                            
+                            renumberQuestions(type);
+                            updateQuestionCounter(type);
+                        }, 300);
+                    }
+                }
+            });
+        }
+
+        function renumberQuestions(type) {
+            const container = document.getElementById(`${type}Questions`);
+            const questions = container.querySelectorAll('.question-card');
+            
+            questions.forEach((question, index) => {
+                const newNumber = index + 1;
+                const header = question.querySelector('h4');
+                if (header) {
+                    header.textContent = `📝 Pregunta ${newNumber}`;
+                }
+                question.setAttribute('data-question-number', newNumber);
+            });
+        }
+
+        function updateQuestionCounter(type) {
+            const container = document.getElementById(`${type}Questions`);
+            const count = type === 'pretest' ? pretestQuestionCount : posttestQuestionCount;
+            
+            let counter = container.parentElement.querySelector('.question-counter');
+            if (!counter) {
+                counter = document.createElement('div');
+                counter.className = 'question-counter';
+                container.parentElement.insertBefore(counter, container);
             }
-        };
+            
+            counter.innerHTML = `
+                <i class="fas fa-list-ol"></i> 
+                <span>${count} de ${MAX_QUESTIONS} preguntas agregadas</span>
+            `;
+        }
+
+        function collectQuestions(type) {
+            const container = document.getElementById(`${type}Questions`);
+            const questionCards = container.querySelectorAll('.question-card');
+            const questions = [];
+            
+            for (let i = 0; i < questionCards.length; i++) {
+                const card = questionCards[i];
+                const questionId = card.id;
+                
+                const questionText = document.getElementById(`${questionId}-text`).value.trim();
+                if (!questionText) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Pregunta Vacía',
+                        text: `Complete la pregunta ${i + 1} del ${type === 'pretest' ? 'Pretest' : 'Post-test'}`,
+                    });
+                    return null;
+                }
+                
+                const options = {
+                    a: document.getElementById(`${questionId}-text-a`).value.trim(),
+                    b: document.getElementById(`${questionId}-text-b`).value.trim(),
+                    c: document.getElementById(`${questionId}-text-c`).value.trim(),
+                    d: document.getElementById(`${questionId}-text-d`).value.trim()
+                };
+                
+                if (!options.a || !options.b || !options.c || !options.d) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Opciones Incompletas',
+                        text: `Complete todas las opciones de la pregunta ${i + 1}`,
+                    });
+                    return null;
+                }
+                
+                const correctAnswer = document.querySelector(`input[name="${questionId}-correct"]:checked`);
+                if (!correctAnswer) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Respuesta Correcta',
+                        text: `Seleccione la respuesta correcta para la pregunta ${i + 1}`,
+                    });
+                    return null;
+                }
+                
+                questions.push({
+                    number: i + 1,
+                    question: questionText,
+                    options: options,
+                    correctAnswer: correctAnswer.value
+                });
+            }
+            
+            return questions;
+        }
+
+        function saveTraining() {
+            const title = document.getElementById('trainingTitle').value;
+            const description = document.getElementById('trainingDescription').value;
+            const department = document.getElementById('trainingDepartment').value;
+            const duration = document.getElementById('trainingDuration').value;
+            
+            if (!title || !department) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Campos Requeridos',
+                    text: 'Complete todos los campos obligatorios',
+                });
+                return;
+            }
+            
+            if (pretestQuestionCount === 0 || posttestQuestionCount === 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Preguntas Requeridas',
+                    text: 'Agregue al menos una pregunta en cada test',
+                });
+                return;
+            }
+            
+            const pretestQuestions = collectQuestions('pretest');
+            if (!pretestQuestions) return;
+            
+            const posttestQuestions = collectQuestions('posttest');
+            if (!posttestQuestions) return;
+            
+            const accessCode = generateAccessCode();
+            
+            const trainingData = {
+                title,
+                description,
+                department,
+                duration,
+                accessCode,
+                pretestQuestions,
+                posttestQuestions,
+                createdAt: new Date().toISOString(),
+                status: 'active'
+            };
+            
+            Swal.fire({
+                title: 'Guardando...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+            
+            setTimeout(() => {
+                const trainings = JSON.parse(localStorage.getItem('trainings') || '[]');
+                trainings.push(trainingData);
+                localStorage.setItem('trainings', JSON.stringify(trainings));
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Capacitación Guardada!',
+                    html: `
+                        <div style="margin: 20px 0;">
+                            <p>Código de Acceso:</p>
+                            <h2 style="color: #667eea; margin: 10px 0;">${accessCode}</h2>
+                            <p style="font-size: 0.9em; color: #666;">Comparte este código con los participantes</p>
+                        </div>
+                    `,
+                    confirmButtonText: 'Generar QR',
+                    showCancelButton: true,
+                    cancelButtonText: 'Cerrar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        showQRCode(accessCode, title);
+                    }
+                });
+                
+                resetForm();
+            }, 1500);
+        }
+
+        function generateAccessCode() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        function showQRCode(accessCode, title) {
+            const modal = document.getElementById('qrModal');
+            const qrContainer = document.getElementById('qrcode');
+            
+            qrContainer.innerHTML = '';
+            
+            const accessUrl = `${window.location.origin}?code=${accessCode}`;
+            new QRCode(qrContainer, {
+                text: accessUrl,
+                width: 256,
+                height: 256,
+                colorDark: '#667eea',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            
+            document.getElementById('modalAccessCode').textContent = accessCode;
+            document.getElementById('modalAccessLink').textContent = accessUrl;
+            
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('qrModal').style.display = 'none';
+        }
+
+        function copyLink() {
+            const link = document.getElementById('modalAccessLink').textContent;
+            const code = document.getElementById('modalAccessCode').textContent;
+            
+            const text = `🏥 Acceso a Capacitación\n\nCódigo: ${code}\nLink: ${link}\n\nHospital Susana López de Valencia`;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Copiado',
+                    text: 'Link copiado al portapapeles',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            });
+        }
+
+        function shareWhatsApp() {
+            const code = document.getElementById('modalAccessCode').textContent;
+            const link = document.getElementById('modalAccessLink').textContent;
+            
+            const message = `🏥 *Acceso a Capacitación*\nHospital Susana López de Valencia\n\n*Código:* ${code}\n*Link:* ${link}`;
+            const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+        }
+
+        function downloadQR() {
+            const canvas = document.querySelector('#qrcode canvas');
+            if (canvas) {
+                canvas.toBlob(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    const code = document.getElementById('modalAccessCode').textContent;
+                    link.download = `QR-${code}.png`;
+                    link.href = url;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Descargado',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                });
+            }
+        }
+
+        function resetForm() {
+            if (pretestQuestionCount > 0 || posttestQuestionCount > 0) {
+                Swal.fire({
+                    title: '¿Limpiar Formulario?',
+                    text: 'Se perderán todas las preguntas',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, limpiar',
+                    cancelButtonText: 'Cancelar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        performReset();
+                    }
+                });
+            } else {
+                performReset();
+            }
+        }
+
+        function performReset() {
+            document.getElementById('trainingForm').reset();
+            document.getElementById('pretestQuestions').innerHTML = '';
+            document.getElementById('posttestQuestions').innerHTML = '';
+            pretestQuestionCount = 0;
+            posttestQuestionCount = 0;
+            document.querySelectorAll('.question-counter').forEach(c => c.remove());
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Formulario Limpiado',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        }
+
+        // ==================== CHARTS ====================
         
-        // Variables globales para los gráficos
-        let participationsChartInstance = null;
-        let departmentChartInstance = null;
-        
-        // Función para inicializar gráficas del dashboard (con datos en cero)
+        let participationsChart = null;
+        let departmentChart = null;
+
         function initializeCharts() {
-            // Destruir gráficos existentes si existen
-            if (participationsChartInstance) {
-                participationsChartInstance.destroy();
-                participationsChartInstance = null;
-            }
+            if (participationsChart) participationsChart.destroy();
+            if (departmentChart) departmentChart.destroy();
             
-            if (departmentChartInstance) {
-                departmentChartInstance.destroy();
-                departmentChartInstance = null;
-            }
-            
-            // Gráfica de participaciones por día (vacía)
             const ctx1 = document.getElementById('participationsChart');
-            if (ctx1 && ctx1.getContext) {
-                participationsChartInstance = new Chart(ctx1.getContext('2d'), {
+            if (ctx1) {
+                participationsChart = new Chart(ctx1.getContext('2d'), {
                     type: 'line',
                     data: {
-                        labels: ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'],
+                        labels: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
                         datasets: [{
                             label: 'Participaciones',
                             data: [0, 0, 0, 0, 0, 0, 0],
-                            borderColor: 'rgb(102, 126, 234)',
+                            borderColor: '#667eea',
                             backgroundColor: 'rgba(102, 126, 234, 0.1)',
-                            tension: 0.1
+                            tension: 0.4
                         }]
                     },
                     options: {
                         responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            y: {
-                                beginAtZero: true
-                            }
-                        }
+                        maintainAspectRatio: false
                     }
                 });
             }
             
-            // Gráfica de rendimiento por departamento (vacía)
             const ctx2 = document.getElementById('departmentChart');
-            if (ctx2 && ctx2.getContext) {
-                departmentChartInstance = new Chart(ctx2.getContext('2d'), {
+            if (ctx2) {
+                departmentChart = new Chart(ctx2.getContext('2d'), {
                     type: 'bar',
                     data: {
                         labels: ['Enfermería', 'Medicina', 'Admin', 'Lab', 'Radiología'],
                         datasets: [{
-                            label: 'Promedio de Rendimiento',
+                            label: 'Rendimiento',
                             data: [0, 0, 0, 0, 0],
                             backgroundColor: [
                                 'rgba(102, 126, 234, 0.8)',
@@ -973,173 +1365,6 @@
                 });
             }
         }
-        
-        // Función para inicializar la aplicación
-        window.initializeApp = function() {
-            // Ocultar pantalla de carga después de 1.5 segundos
-            setTimeout(() => {
-                const loadingScreen = document.getElementById('loadingScreen');
-                if (loadingScreen) {
-                    loadingScreen.style.opacity = '0';
-                    setTimeout(() => {
-                        loadingScreen.style.display = 'none';
-                    }, 500);
-                }
-            }, 1500);
-            
-            // Inicializar gráficas del dashboard
-            setTimeout(() => {
-                initializeCharts();
-            }, 2000);
-        };
-        
-        // Función para probar conexión
-        window.testConnection = async function() {
-            await checkAirtableConnection();
-            Swal.fire({
-                icon: 'info',
-                title: 'Verificando Conexión',
-                text: 'La conexión con Airtable se está verificando...',
-                timer: 2000,
-                showConfirmButton: false
-            });
-        };
-        
-        // Función para sincronizar datos
-        window.syncData = async function() {
-            Swal.fire({
-                title: 'Sincronizando...',
-                text: 'Por favor espere mientras se sincronizan los datos',
-                allowOutsideClick: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                    
-                    // Aquí se implementará la sincronización real con Airtable
-                    setTimeout(() => {
-                        Swal.fire({
-                            icon: 'success',
-                            title: 'Sincronización Completa',
-                            text: 'Los datos se han sincronizado correctamente',
-                            timer: 2000,
-                            showConfirmButton: false
-                        });
-                        updateDashboardStats();
-                    }, 2000);
-                }
-            });
-        };
-        
-        // Función para buscar actualizaciones
-        window.checkForUpdates = function() {
-            Swal.fire({
-                icon: 'info',
-                title: 'Sistema Actualizado',
-                text: 'Ya tienes la última versión del sistema (v1.0.0)'
-            });
-        };
-        
-        // Función para limpiar caché
-        window.clearCache = function() {
-            Swal.fire({
-                title: '¿Limpiar Caché?',
-                text: 'Esto eliminará todos los datos temporales',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'Sí, limpiar',
-                cancelButtonText: 'Cancelar'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    localStorage.clear();
-                    sessionStorage.clear();
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Caché Limpiado',
-                        text: 'Los datos temporales han sido eliminados',
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
-                }
-            });
-        };
-        
-        // Función para modo oscuro
-        window.toggleDarkMode = function() {
-            document.body.classList.toggle('dark-mode');
-            const isDarkMode = document.body.classList.contains('dark-mode');
-            localStorage.setItem('darkMode', isDarkMode);
-            
-            const icon = document.getElementById('darkModeIcon');
-            if (icon) {
-                icon.className = isDarkMode ? 'fas fa-sun' : 'fas fa-moon';
-            }
-            
-            const toggle = document.getElementById('darkModeToggle');
-            if (toggle) {
-                toggle.checked = isDarkMode;
-            }
-        };
-        
-        // Funciones placeholder para las demás acciones
-        window.addQuestion = function(type) {
-            Swal.fire('Función en desarrollo', 'La función para agregar preguntas estará disponible pronto', 'info');
-        };
-        
-        window.saveTraining = function() {
-            Swal.fire('Función en desarrollo', 'La función para guardar capacitaciones estará disponible pronto', 'info');
-        };
-        
-        window.resetForm = function() {
-            document.getElementById('trainingForm').reset();
-            Swal.fire('Formulario limpiado', '', 'success');
-        };
-        
-        window.loadTrainings = function() {
-            Swal.fire('Cargando capacitaciones...', '', 'info');
-        };
-        
-        window.accessTraining = function() {
-            Swal.fire('Función en desarrollo', 'El acceso a capacitaciones estará disponible pronto', 'info');
-        };
-        
-        window.submitExam = function() {
-            Swal.fire('Función en desarrollo', 'El envío de exámenes estará disponible pronto', 'info');
-        };
-        
-        window.loadReport = function() {
-            const reportContent = document.getElementById('reportContent');
-            if (reportContent) {
-                reportContent.style.display = 'block';
-            }
-        };
-        
-        window.exportReport = function(format) {
-            Swal.fire('Exportando...', `Exportando reporte en formato ${format.toUpperCase()}`, 'info');
-        };
-        
-        window.printReport = function() {
-            window.print();
-        };
-        
-        window.closeModal = function(modalId) {
-            const modal = document.getElementById(modalId);
-            if (modal) {
-                modal.style.display = 'none';
-            }
-        };
-        
-        window.copyLink = function() {
-            Swal.fire('Link copiado', 'El enlace ha sido copiado al portapapeles', 'success');
-        };
-        
-        window.shareWhatsApp = function() {
-            Swal.fire('Compartiendo...', 'Abriendo WhatsApp para compartir', 'info');
-        };
-        
-        window.downloadQR = function() {
-            Swal.fire('Descargando...', 'Descargando código QR', 'info');
-        };
     </script>
 </body>
 </html>
