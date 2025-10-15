@@ -1,7 +1,6 @@
 /* ==========================================
-   SISTEMA DE CAPACITACIONES - LÓGICA PRINCIPAL ACTUALIZADA
+   SISTEMA DE CAPACITACIONES - LÓGICA PRINCIPAL
    Hospital Susana López de Valencia
-   Versión 1.1.0 - Con campo Profesional
    ========================================== */
 
 // ==========================================
@@ -23,14 +22,11 @@ let isConnected = false;
 // ==========================================
 
 function initializeApp() {
-    console.log('🚀 Iniciando Sistema de Capacitaciones v1.1.0...');
+    console.log('🚀 Iniciando Sistema de Capacitaciones...');
     
     // Ocultar pantalla de carga
     setTimeout(() => {
-        const loadingScreen = document.getElementById('loadingScreen');
-        if (loadingScreen) {
-            loadingScreen.classList.add('hidden');
-        }
+        document.getElementById('loadingScreen').classList.add('hidden');
     }, 1500);
     
     // Cargar configuración
@@ -75,17 +71,14 @@ function checkUrlParams() {
     const code = urlParams.get('code');
     
     if (code) {
-        const accessCodeInput = document.getElementById('accessCode');
-        if (accessCodeInput) {
-            accessCodeInput.value = code;
-            switchTab('exam');
-            // Intentar acceder automáticamente si hay código
-            setTimeout(() => {
-                if (isConnected) {
-                    accessTraining();
-                }
-            }, 2000);
-        }
+        document.getElementById('accessCode').value = code;
+        switchTab('exam');
+        // Intentar acceder automáticamente si hay código
+        setTimeout(() => {
+            if (isConnected) {
+                accessTraining();
+            }
+        }, 2000);
     }
 }
 
@@ -100,12 +93,8 @@ function loadConfiguration() {
     if (savedToken && savedBaseId) {
         CONFIG.AIRTABLE_TOKEN = savedToken;
         CONFIG.AIRTABLE_BASE_ID = savedBaseId;
-        
-        const tokenInput = document.getElementById('airtableToken');
-        const baseIdInput = document.getElementById('airtableBaseId');
-        
-        if (tokenInput) tokenInput.value = savedToken;
-        if (baseIdInput) baseIdInput.value = savedBaseId;
+        document.getElementById('airtableToken').value = savedToken;
+        document.getElementById('airtableBaseId').value = savedBaseId;
         
         // Probar conexión automáticamente
         testConnection(false);
@@ -117,16 +106,8 @@ function loadConfiguration() {
 }
 
 function saveSettings() {
-    const tokenInput = document.getElementById('airtableToken');
-    const baseIdInput = document.getElementById('airtableBaseId');
-    
-    if (!tokenInput || !baseIdInput) {
-        showAlert('Elementos del formulario no encontrados', 'error');
-        return;
-    }
-    
-    const token = tokenInput.value;
-    const baseId = baseIdInput.value;
+    const token = document.getElementById('airtableToken').value;
+    const baseId = document.getElementById('airtableBaseId').value;
     
     if (!token || !baseId) {
         showAlert('Por favor complete todos los campos', 'error');
@@ -153,11 +134,8 @@ async function testConnection(showMessage = true) {
         
         if (response) {
             isConnected = true;
-            const statusElement = document.getElementById('connectionStatus');
-            if (statusElement) {
-                statusElement.textContent = 'Conectado';
-                statusElement.className = 'badge success';
-            }
+            document.getElementById('connectionStatus').textContent = 'Conectado';
+            document.getElementById('connectionStatus').className = 'badge success';
             
             if (showMessage) {
                 showAlert('✅ Conexión exitosa con Airtable', 'success');
@@ -169,11 +147,8 @@ async function testConnection(showMessage = true) {
         }
     } catch (error) {
         isConnected = false;
-        const statusElement = document.getElementById('connectionStatus');
-        if (statusElement) {
-            statusElement.textContent = 'Desconectado';
-            statusElement.className = 'badge danger';
-        }
+        document.getElementById('connectionStatus').textContent = 'Desconectado';
+        document.getElementById('connectionStatus').className = 'badge danger';
         
         if (showMessage) {
             showAlert(`❌ Error de conexión: ${error.message}`, 'error');
@@ -198,10 +173,7 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.remove('active');
     });
-    const targetTab = document.getElementById(tabName);
-    if (targetTab) {
-        targetTab.classList.add('active');
-    }
+    document.getElementById(tabName).classList.add('active');
     
     // Ejecutar acciones específicas de cada tab
     switch(tabName) {
@@ -226,8 +198,6 @@ function switchTab(tabName) {
 
 function addQuestion(type) {
     const container = document.getElementById(type + 'Questions');
-    if (!container) return;
-    
     const questionCount = container.children.length;
     
     if (questionCount >= 10) {
@@ -253,16 +223,13 @@ function addQuestion(type) {
 }
 
 async function saveTraining() {
-    // ACTUALIZADO: Obtener todos los campos incluyendo el profesional
     const title = document.getElementById('trainingTitle').value;
     const description = document.getElementById('trainingDescription').value;
     const department = document.getElementById('trainingDepartment').value;
     const duration = document.getElementById('trainingDuration').value;
-    const instructor = document.getElementById('trainingInstructor').value; // NUEVO CAMPO
     
-    // ACTUALIZADO: Validar que incluya el profesional
-    if (!title || !department || !instructor) {
-        showAlert('Por favor complete todos los campos obligatorios (Título, Departamento y Profesional)', 'error');
+    if (!title || !department) {
+        showAlert('Por favor complete los campos obligatorios', 'error');
         return;
     }
     
@@ -290,14 +257,12 @@ async function saveTraining() {
     });
     
     try {
-        // ACTUALIZADO: Crear capacitación en Airtable con el campo Profesional
+        // Crear capacitación en Airtable
         const trainingData = {
             fields: {
                 "Título": title,
                 "Descripción": description,
                 "Departamento": department,
-                "Profesional": instructor, // NUEVO CAMPO
-                "Duración": duration,
                 "Activa": true
             }
         };
@@ -334,10 +299,7 @@ async function saveTraining() {
         Swal.fire({
             icon: 'success',
             title: '¡Éxito!',
-            html: `
-                <p>Capacitación creada correctamente</p>
-                <p><strong>Dictada por:</strong> ${instructor}</p>
-            `,
+            text: 'Capacitación creada correctamente',
             confirmButtonColor: '#667eea'
         });
         
@@ -355,16 +317,9 @@ async function saveTraining() {
 }
 
 function resetForm() {
-    const trainingForm = document.getElementById('trainingForm');
-    if (trainingForm) {
-        trainingForm.reset();
-    }
-    
-    const pretestContainer = document.getElementById('pretestQuestions');
-    const posttestContainer = document.getElementById('posttestQuestions');
-    
-    if (pretestContainer) pretestContainer.innerHTML = '';
-    if (posttestContainer) posttestContainer.innerHTML = '';
+    document.getElementById('trainingForm').reset();
+    document.getElementById('pretestQuestions').innerHTML = '';
+    document.getElementById('posttestQuestions').innerHTML = '';
 }
 
 // ==========================================
@@ -373,8 +328,6 @@ function resetForm() {
 
 async function loadTrainings() {
     const container = document.getElementById('trainingsList');
-    if (!container) return;
-    
     container.innerHTML = `
         <div class="loading-message">
             <i class="fas fa-spinner fa-spin"></i>
@@ -399,9 +352,6 @@ async function loadTrainings() {
                 `/Sesiones?filterByFormula=SEARCH('${training.id}', {Capacitación})`);
             const sessionCount = sessionsResponse.records ? sessionsResponse.records.length : 0;
             
-            // ACTUALIZADO: Mostrar el profesional en la interfaz
-            const profesional = training.fields['Profesional'] || 'No especificado';
-            
             const trainingDiv = document.createElement('div');
             trainingDiv.className = 'training-item';
             trainingDiv.innerHTML = `
@@ -409,7 +359,6 @@ async function loadTrainings() {
                     <h4>${training.fields['Título']}</h4>
                     <p>
                         <i class="fas fa-building"></i> ${training.fields['Departamento']} | 
-                        <i class="fas fa-user-md"></i> ${profesional} |
                         <i class="fas fa-link"></i> ${sessionCount} sesiones
                     </p>
                 </div>
@@ -434,8 +383,6 @@ async function loadTrainings() {
 
 async function generateSession(trainingId) {
     const training = trainings.find(t => t.id === trainingId);
-    if (!training) return;
-    
     const accessCode = generateAccessCode();
     const accessLink = `${window.location.origin}${window.location.pathname}?code=${accessCode}`;
     
@@ -466,20 +413,14 @@ function generateAccessCode() {
 }
 
 function showQRModal(code, link, title) {
-    const modalCodeElement = document.getElementById('modalAccessCode');
-    const modalLinkElement = document.getElementById('modalAccessLink');
-    const qrcodeElement = document.getElementById('qrcode');
-    
-    if (!modalCodeElement || !modalLinkElement || !qrcodeElement) return;
-    
-    modalCodeElement.textContent = code;
-    modalLinkElement.textContent = link;
+    document.getElementById('modalAccessCode').textContent = code;
+    document.getElementById('modalAccessLink').textContent = link;
     
     // Limpiar QR anterior
-    qrcodeElement.innerHTML = '';
+    document.getElementById('qrcode').innerHTML = '';
     
     // Generar nuevo QR
-    new QRCode(qrcodeElement, {
+    new QRCode(document.getElementById('qrcode'), {
         text: link,
         width: 256,
         height: 256,
@@ -489,34 +430,21 @@ function showQRModal(code, link, title) {
     });
     
     // Mostrar modal
-    const modal = document.getElementById('qrModal');
-    if (modal) {
-        modal.style.display = 'flex';
-    }
+    document.getElementById('qrModal').style.display = 'block';
     
     // Agregar título de la capacitación
     const modalTitle = document.querySelector('#qrModal h2');
-    if (modalTitle) {
-        modalTitle.innerHTML = `<i class="fas fa-qrcode"></i> QR: ${title}`;
-    }
+    modalTitle.innerHTML = `<i class="fas fa-qrcode"></i> QR: ${title}`;
 }
 
 function closeModal(modalId) {
-    const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.style.display = 'none';
-    }
+    document.getElementById(modalId).style.display = 'none';
 }
 
 function copyLink() {
-    const modalLinkElement = document.getElementById('modalAccessLink');
-    if (!modalLinkElement) return;
-    
-    const link = modalLinkElement.textContent;
+    const link = document.getElementById('modalAccessLink').textContent;
     navigator.clipboard.writeText(link).then(() => {
         showAlert('✅ Link copiado al portapapeles', 'success');
-    }).catch(() => {
-        showAlert('Error al copiar el link', 'error');
     });
 }
 
@@ -536,11 +464,8 @@ Por favor ingrese al link o use el código para acceder a la capacitación.
 
 function downloadQR() {
     const canvas = document.querySelector('#qrcode canvas');
-    if (!canvas) return;
-    
     const link = document.createElement('a');
-    const code = document.getElementById('modalAccessCode').textContent;
-    link.download = `QR_${code}.png`;
+    link.download = `QR_${document.getElementById('modalAccessCode').textContent}.png`;
     link.href = canvas.toDataURL();
     link.click();
 }
@@ -574,52 +499,725 @@ async function deleteTraining(trainingId) {
     }
 }
 
-async function viewTrainingDetails(trainingId) {
-    const training = trainings.find(t => t.id === trainingId);
+// ==========================================
+// FUNCIONES DE EXAMEN
+// ==========================================
+
+async function accessTraining() {
+    const code = document.getElementById('accessCode').value;
+    const name = document.getElementById('participantName').value;
+    const email = document.getElementById('participantEmail').value;
+    const cargo = document.getElementById('participantCargo').value;
     
-    if (!training) return;
+    if (!code || !name || !cargo) {
+        showAlert('Por favor complete todos los campos obligatorios', 'error');
+        return;
+    }
+    
+    Swal.fire({
+        title: 'Validando acceso...',
+        text: 'Por favor espere',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
     
     try {
-        // Obtener preguntas de la capacitación
-        const pretestResponse = await airtableRequest('GET',
-            `/Preguntas?filterByFormula=AND({Capacitación}='${trainingId}', {Tipo}='Pretest')&sort[0][field]=Número`);
+        // Buscar sesión por código
+        const sessionResponse = await airtableRequest('GET', 
+            `/Sesiones?filterByFormula=AND({Código Acceso}='${code}', Activa=TRUE())`);
         
-        const posttestResponse = await airtableRequest('GET',
-            `/Preguntas?filterByFormula=AND({Capacitación}='${trainingId}', {Tipo}='Post-test')&sort[0][field]=Número`);
+        if (!sessionResponse.records || sessionResponse.records.length === 0) {
+            throw new Error('Código inválido o sesión no activa');
+        }
         
-        const pretestQuestions = pretestResponse.records || [];
-        const posttestQuestions = posttestResponse.records || [];
+        currentSession = sessionResponse.records[0];
         
-        // ACTUALIZADO: Incluir el profesional en los detalles
-        const profesional = training.fields['Profesional'] || 'No especificado';
+        // Obtener información de la capacitación
+        const trainingId = currentSession.fields['Capacitación'][0];
+        const trainingResponse = await airtableRequest('GET', `/Capacitaciones/${trainingId}`);
+        currentTraining = trainingResponse;
         
-        let detailsHTML = `
-            <h3>${training.fields['Título']}</h3>
-            <p><strong>Departamento:</strong> ${training.fields['Departamento']}</p>
-            <p><strong>Profesional:</strong> <span style="color: #667eea;">${profesional}</span></p>
-            <p><strong>Descripción:</strong> ${training.fields['Descripción'] || 'Sin descripción'}</p>
+        // Verificar participación existente
+        const participationResponse = await airtableRequest('GET',
+            `/Participaciones?filterByFormula=AND({Sesión}='${currentSession.id}', {Nombre}='${name}')`);
+        
+        if (participationResponse.records && participationResponse.records.length > 0) {
+            currentParticipation = participationResponse.records[0];
             
-            <h4>Preguntas de Pretest (${pretestQuestions.length})</h4>
-            <ol>
-                ${pretestQuestions.map(q => `<li>${q.fields['Pregunta']}</li>`).join('')}
-            </ol>
+            if (currentParticipation.fields['Completado']) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Capacitación Completada',
+                    text: 'Ya has completado esta capacitación anteriormente',
+                    confirmButtonColor: '#667eea'
+                });
+                return;
+            }
             
-            <h4>Preguntas de Post-test (${posttestQuestions.length})</h4>
-            <ol>
-                ${posttestQuestions.map(q => `<li>${q.fields['Pregunta']}</li>`).join('')}
-            </ol>
-        `;
+            currentExamType = currentParticipation.fields['Pretest Score'] ? 'posttest' : 'pretest';
+        } else {
+            // Crear nueva participación
+            const participationData = {
+                fields: {
+                    "Sesión": [currentSession.id],
+                    "Usuario ID": 'user_' + Date.now(),
+                    "Nombre": name,
+                    "Email": email,
+                    "Cargo": cargo,
+                    "Fecha Inicio": new Date().toISOString().split('T')[0],
+                    "Completado": false
+                }
+            };
+            
+            const newParticipation = await airtableRequest('POST', '/Participaciones', participationData);
+            currentParticipation = newParticipation;
+            currentExamType = 'pretest';
+        }
         
         Swal.fire({
-            title: 'Detalles de la Capacitación',
-            html: detailsHTML,
-            width: '800px',
+            icon: 'success',
+            title: '¡Bienvenido!',
+            text: `Acceso concedido a: ${currentTraining.fields['Título']}`,
             confirmButtonColor: '#667eea'
+        }).then(() => {
+            loadExam();
         });
         
     } catch (error) {
-        showAlert('Error al cargar detalles: ' + error.message, 'error');
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de Acceso',
+            text: error.message,
+            confirmButtonColor: '#ef4444'
+        });
     }
+}
+
+async function loadExam() {
+    document.getElementById('examAccess').style.display = 'none';
+    document.getElementById('examContent').style.display = 'block';
+    
+    const examTitle = document.getElementById('examTitle');
+    examTitle.innerHTML = `
+        <i class="fas fa-clipboard-list"></i>
+        ${currentTraining.fields['Título']} - ${currentExamType === 'pretest' ? 'Evaluación Inicial' : 'Evaluación Final'}
+    `;
+    
+    const questionsContainer = document.getElementById('examQuestions');
+    questionsContainer.innerHTML = '';
+    
+    try {
+        // Obtener preguntas del examen
+        const questionsResponse = await airtableRequest('GET',
+            `/Preguntas?filterByFormula=AND({Capacitación}='${currentTraining.id}', {Tipo}='${currentExamType === 'pretest' ? 'Pretest' : 'Post-test'}')&sort[0][field]=Número`);
+        
+        questions = questionsResponse.records || [];
+        
+        if (questions.length === 0) {
+            throw new Error('No se encontraron preguntas para este examen');
+        }
+        
+        questions.forEach((question, index) => {
+            const questionDiv = document.createElement('div');
+            questionDiv.className = 'exam-question';
+            questionDiv.innerHTML = `
+                <h4>Pregunta ${index + 1} de ${questions.length}</h4>
+                <p>${question.fields['Pregunta']}</p>
+                <div class="rating-options">
+                    ${[1,2,3,4,5].map(rating => `
+                        <div class="rating-option">
+                            <input type="radio" name="q${question.id}" value="${rating}" 
+                                   id="q${question.id}r${rating}" data-question-id="${question.id}"
+                                   onchange="updateExamProgress()">
+                            <label for="q${question.id}r${rating}">
+                                ${rating} - ${getRatingLabel(rating)}
+                            </label>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+            questionsContainer.appendChild(questionDiv);
+        });
+        
+        updateExamProgress();
+        
+    } catch (error) {
+        showAlert('Error al cargar el examen: ' + error.message, 'error');
+    }
+}
+
+function getRatingLabel(rating) {
+    const labels = {
+        1: 'Totalmente en desacuerdo',
+        2: 'En desacuerdo',
+        3: 'Neutral',
+        4: 'De acuerdo',
+        5: 'Totalmente de acuerdo'
+    };
+    return labels[rating];
+}
+
+function updateExamProgress() {
+    const totalQuestions = questions.length;
+    const answeredQuestions = document.querySelectorAll('#examQuestions input[type="radio"]:checked').length;
+    const progress = totalQuestions > 0 ? (answeredQuestions / totalQuestions) * 100 : 0;
+    
+    const progressBar = document.getElementById('examProgress');
+    progressBar.style.width = progress + '%';
+    progressBar.innerHTML = `<span>${Math.round(progress)}%</span>`;
+}
+
+async function submitExam() {
+    const totalQuestions = questions.length;
+    const answeredQuestions = document.querySelectorAll('#examQuestions input[type="radio"]:checked').length;
+    
+    if (answeredQuestions < totalQuestions) {
+        showAlert(`Por favor responda todas las preguntas (${answeredQuestions}/${totalQuestions})`, 'warning');
+        return;
+    }
+    
+    const result = await Swal.fire({
+        title: '¿Enviar respuestas?',
+        text: 'Una vez enviadas no podrá modificarlas',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#667eea',
+        cancelButtonColor: '#6b7280',
+        confirmButtonText: 'Sí, enviar',
+        cancelButtonText: 'Revisar'
+    });
+    
+    if (!result.isConfirmed) return;
+    
+    Swal.fire({
+        title: 'Enviando respuestas...',
+        text: 'Por favor espere',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    try {
+        let totalScore = 0;
+        const answers = [];
+        
+        // Recopilar respuestas
+        questions.forEach(question => {
+            const selectedOption = document.querySelector(`input[name="q${question.id}"]:checked`);
+            if (selectedOption) {
+                const score = parseInt(selectedOption.value);
+                totalScore += score;
+                answers.push({
+                    questionId: question.id,
+                    score: score
+                });
+            }
+        });
+        
+        const averageScore = totalScore / questions.length;
+        
+        // Guardar respuestas en Airtable
+        for (const answer of answers) {
+            const answerData = {
+                fields: {
+                    "Participación": [currentParticipation.id],
+                    "Pregunta": [answer.questionId],
+                    "Calificación": answer.score
+                }
+            };
+            await airtableRequest('POST', '/Respuestas', answerData);
+        }
+        
+        // Actualizar participación
+        const updateData = { fields: {} };
+        
+        if (currentExamType === 'pretest') {
+            updateData.fields["Pretest Score"] = averageScore;
+            
+            await airtableRequest('PATCH', `/Participaciones/${currentParticipation.id}`, updateData);
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Evaluación Inicial Completada',
+                html: `
+                    <p>Puntuación: <strong>${averageScore.toFixed(1)}/5</strong></p>
+                    <p>Ahora procederá con la capacitación y luego la evaluación final.</p>
+                `,
+                confirmButtonColor: '#667eea',
+                confirmButtonText: 'Continuar con Post-test'
+            }).then(() => {
+                currentExamType = 'posttest';
+                loadExam();
+            });
+            
+        } else {
+            updateData.fields["Post-test Score"] = averageScore;
+            updateData.fields["Completado"] = true;
+            updateData.fields["Fecha Fin"] = new Date().toISOString().split('T')[0];
+            
+            await airtableRequest('PATCH', `/Participaciones/${currentParticipation.id}`, updateData);
+            
+            const pretestScore = currentParticipation.fields["Pretest Score"];
+            const improvement = ((averageScore - pretestScore) / pretestScore * 100).toFixed(1);
+            
+            Swal.fire({
+                icon: 'success',
+                title: '¡Capacitación Completada!',
+                html: `
+                    <div style="text-align: left;">
+                        <p><strong>Resultados:</strong></p>
+                        <p>📊 Evaluación Inicial: ${pretestScore.toFixed(1)}/5</p>
+                        <p>📈 Evaluación Final: ${averageScore.toFixed(1)}/5</p>
+                        <p>🎯 Mejora: ${improvement > 0 ? '+' : ''}${improvement}%</p>
+                    </div>
+                `,
+                confirmButtonColor: '#10b981',
+                confirmButtonText: 'Finalizar'
+            }).then(() => {
+                // Resetear formulario
+                document.getElementById('examContent').style.display = 'none';
+                document.getElementById('examAccess').style.display = 'block';
+                document.getElementById('accessForm').reset();
+                currentTraining = null;
+                currentSession = null;
+                currentParticipation = null;
+            });
+        }
+        
+    } catch (error) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'No se pudieron enviar las respuestas: ' + error.message,
+            confirmButtonColor: '#ef4444'
+        });
+    }
+}
+
+// ==========================================
+// FUNCIONES DE REPORTES
+// ==========================================
+
+async function loadReportOptions() {
+    const select = document.getElementById('reportTraining');
+    select.innerHTML = '<option value="">Cargando capacitaciones...</option>';
+    
+    try {
+        const response = await airtableRequest('GET', '/Capacitaciones?filterByFormula=Activa=TRUE()');
+        
+        select.innerHTML = '<option value="">Seleccione una capacitación...</option>';
+        
+        response.records.forEach(training => {
+            const option = document.createElement('option');
+            option.value = training.id;
+            option.textContent = training.fields['Título'];
+            select.appendChild(option);
+        });
+        
+    } catch (error) {
+        select.innerHTML = '<option value="">Error al cargar capacitaciones</option>';
+        console.error('Error loading report options:', error);
+    }
+}
+
+async function loadReport() {
+    const trainingId = document.getElementById('reportTraining').value;
+    
+    if (!trainingId) {
+        document.getElementById('reportContent').style.display = 'none';
+        return;
+    }
+    
+    document.getElementById('reportContent').style.display = 'block';
+    
+    Swal.fire({
+        title: 'Generando reporte...',
+        text: 'Por favor espere',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+    
+    try {
+        // Obtener sesiones de esta capacitación
+        const sessionsResponse = await airtableRequest('GET',
+            `/Sesiones?filterByFormula=SEARCH('${trainingId}', {Capacitación})`);
+        
+        const sessionIds = sessionsResponse.records.map(s => s.id);
+        
+        if (sessionIds.length === 0) {
+            Swal.close();
+            document.getElementById('resultsTableBody').innerHTML = 
+                '<tr><td colspan="7" class="text-center">No hay sesiones para esta capacitación</td></tr>';
+            return;
+        }
+        
+        // Obtener participaciones
+        const participationFilter = `OR(${sessionIds.map(id => `SEARCH('${id}', {Sesión})`).join(',')})`;
+        const participationsResponse = await airtableRequest('GET',
+            `/Participaciones?filterByFormula=${participationFilter}`);
+        
+        const allParticipations = participationsResponse.records || [];
+        const completed = allParticipations.filter(p => p.fields['Completado']);
+        
+        // Calcular estadísticas
+        const totalParticipants = allParticipations.length;
+        const completionRate = totalParticipants > 0 ? (completed.length / totalParticipants * 100) : 0;
+        
+        const avgPretest = completed.length > 0 
+            ? completed.reduce((sum, p) => sum + (p.fields['Pretest Score'] || 0), 0) / completed.length 
+            : 0;
+        
+        const avgPosttest = completed.length > 0 
+            ? completed.reduce((sum, p) => sum + (p.fields['Post-test Score'] || 0), 0) / completed.length 
+            : 0;
+        
+        // Actualizar estadísticas en la UI
+        document.getElementById('reportParticipants').textContent = totalParticipants;
+        document.getElementById('reportCompletion').textContent = completionRate.toFixed(1) + '%';
+        document.getElementById('reportAvgPre').textContent = avgPretest.toFixed(1);
+        document.getElementById('reportAvgPost').textContent = avgPosttest.toFixed(1);
+        
+        // Actualizar gráfico
+        updateReportChart(completed);
+        
+        // Actualizar tabla
+        const tbody = document.getElementById('resultsTableBody');
+        tbody.innerHTML = '';
+        
+        if (allParticipations.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center">No hay participantes registrados</td></tr>';
+        } else {
+            allParticipations.forEach(p => {
+                const row = tbody.insertRow();
+                const pretestScore = p.fields['Pretest Score'] || 0;
+                const posttestScore = p.fields['Post-test Score'] || 0;
+                const improvement = posttestScore && pretestScore
+                    ? ((posttestScore - pretestScore) / pretestScore * 100).toFixed(1) + '%'
+                    : '-';
+                
+                row.innerHTML = `
+                    <td>${p.fields['Nombre'] || 'Sin nombre'}</td>
+                    <td>${p.fields['Cargo'] || '-'}</td>
+                    <td>${p.fields['Fecha Inicio'] || '-'}</td>
+                    <td>${pretestScore ? pretestScore.toFixed(1) : '-'}</td>
+                    <td>${posttestScore ? posttestScore.toFixed(1) : '-'}</td>
+                    <td>${improvement}</td>
+                    <td>
+                        <span class="badge ${p.fields['Completado'] ? 'success' : 'warning'}">
+                            ${p.fields['Completado'] ? '✅ Completado' : '⏳ En proceso'}
+                        </span>
+                    </td>
+                `;
+            });
+        }
+        
+        Swal.close();
+        
+    } catch (error) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'No se pudo cargar el reporte: ' + error.message,
+            confirmButtonColor: '#ef4444'
+        });
+    }
+}
+
+function updateReportChart(completedParticipations) {
+    const ctx = document.getElementById('reportChart').getContext('2d');
+    
+    // Destruir gráfico anterior si existe
+    if (window.reportChartInstance) {
+        window.reportChartInstance.destroy();
+    }
+    
+    const labels = completedParticipations.map((p, i) => 
+        p.fields['Nombre'] || `Participante ${i + 1}`
+    );
+    
+    const pretestScores = completedParticipations.map(p => p.fields['Pretest Score'] || 0);
+    const posttestScores = completedParticipations.map(p => p.fields['Post-test Score'] || 0);
+    
+    window.reportChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Pretest',
+                data: pretestScores,
+                backgroundColor: 'rgba(102, 126, 234, 0.5)',
+                borderColor: 'rgba(102, 126, 234, 1)',
+                borderWidth: 2
+            }, {
+                label: 'Post-test',
+                data: posttestScores,
+                backgroundColor: 'rgba(16, 185, 129, 0.5)',
+                borderColor: 'rgba(16, 185, 129, 1)',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 5,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.dataset.label + ': ' + context.parsed.y.toFixed(1) + '/5';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function exportReport(format) {
+    if (format === 'csv') {
+        exportToCSV();
+    } else if (format === 'pdf') {
+        exportToPDF();
+    }
+}
+
+function exportToCSV() {
+    const table = document.querySelector('.data-table');
+    let csv = [];
+    
+    // Obtener encabezados
+    const headers = [];
+    table.querySelectorAll('thead th').forEach(th => {
+        headers.push('"' + th.textContent + '"');
+    });
+    csv.push(headers.join(','));
+    
+    // Obtener datos
+    table.querySelectorAll('tbody tr').forEach(row => {
+        const rowData = [];
+        row.querySelectorAll('td').forEach(td => {
+            rowData.push('"' + td.textContent.trim() + '"');
+        });
+        csv.push(rowData.join(','));
+    });
+    
+    // Crear y descargar archivo
+    const csvContent = '\ufeff' + csv.join('\n'); // UTF-8 BOM
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = `reporte_capacitacion_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    
+    showAlert('Reporte CSV descargado correctamente', 'success');
+}
+
+function exportToPDF() {
+    // Esta función requeriría una librería adicional como jsPDF
+    showAlert('La exportación a PDF estará disponible próximamente', 'info');
+}
+
+function printReport() {
+    window.print();
+}
+
+// ==========================================
+// FUNCIONES DE DASHBOARD
+// ==========================================
+
+async function initializeDashboard() {
+    if (!isConnected) return;
+    
+    try {
+        // Obtener capacitaciones activas
+        const trainingsResponse = await airtableRequest('GET', 
+            '/Capacitaciones?filterByFormula=Activa=TRUE()');
+        const totalTrainings = trainingsResponse.records ? trainingsResponse.records.length : 0;
+        
+        // Obtener todas las participaciones
+        const participationsResponse = await airtableRequest('GET', '/Participaciones');
+        const allParticipations = participationsResponse.records || [];
+        
+        // Calcular estadísticas
+        const uniqueParticipants = [...new Set(allParticipations.map(p => p.fields['Nombre']))];
+        const totalParticipants = uniqueParticipants.length;
+        
+        const completed = allParticipations.filter(p => p.fields['Completado']);
+        const adherenceRate = allParticipations.length > 0 
+            ? (completed.length / allParticipations.length * 100) 
+            : 0;
+        
+        const avgImprovement = completed.length > 0
+            ? completed.reduce((sum, p) => {
+                const pre = p.fields['Pretest Score'] || 0;
+                const post = p.fields['Post-test Score'] || 0;
+                return pre > 0 ? sum + ((post - pre) / pre * 100) : sum;
+            }, 0) / completed.length
+            : 0;
+        
+        // Actualizar UI
+        document.getElementById('totalTrainings').textContent = totalTrainings;
+        document.getElementById('totalParticipants').textContent = totalParticipants;
+        document.getElementById('adherenceRate').textContent = adherenceRate.toFixed(1) + '%';
+        document.getElementById('avgImprovement').textContent = 
+            (avgImprovement > 0 ? '+' : '') + avgImprovement.toFixed(1) + '%';
+        
+        // Actualizar gráficos
+        updateDashboardCharts(allParticipations);
+        
+        // Actualizar actividad reciente
+        updateRecentActivity(allParticipations);
+        
+    } catch (error) {
+        console.error('Error initializing dashboard:', error);
+    }
+}
+
+function updateDashboardCharts(participations) {
+    // Gráfico de participaciones por día
+    const ctx1 = document.getElementById('participationsChart').getContext('2d');
+    
+    if (window.participationsChartInstance) {
+        window.participationsChartInstance.destroy();
+    }
+    
+    // Agrupar participaciones por fecha (últimos 7 días)
+    const last7Days = [];
+    const participationsByDay = [];
+    
+    for (let i = 6; i >= 0; i--) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        const dateStr = date.toISOString().split('T')[0];
+        last7Days.push(dateStr);
+        
+        const dayParticipations = participations.filter(p => 
+            p.fields['Fecha Inicio'] === dateStr
+        );
+        participationsByDay.push(dayParticipations.length);
+    }
+    
+    window.participationsChartInstance = new Chart(ctx1, {
+        type: 'line',
+        data: {
+            labels: last7Days.map(d => {
+                const date = new Date(d);
+                return date.toLocaleDateString('es', { weekday: 'short', day: 'numeric' });
+            }),
+            datasets: [{
+                label: 'Participaciones',
+                data: participationsByDay,
+                borderColor: 'rgba(102, 126, 234, 1)',
+                backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: {
+                        stepSize: 1
+                    }
+                }
+            }
+        }
+    });
+    
+    // Gráfico de rendimiento por departamento
+    const ctx2 = document.getElementById('departmentChart').getContext('2d');
+    
+    if (window.departmentChartInstance) {
+        window.departmentChartInstance.destroy();
+    }
+    
+    // Aquí podrías agregar lógica para agrupar por departamento
+    // Por ahora mostramos un gráfico de ejemplo
+    window.departmentChartInstance = new Chart(ctx2, {
+        type: 'doughnut',
+        data: {
+            labels: ['Enfermería', 'Medicina', 'Administración', 'Laboratorio'],
+            datasets: [{
+                data: [30, 25, 20, 15],
+                backgroundColor: [
+                    'rgba(102, 126, 234, 0.8)',
+                    'rgba(16, 185, 129, 0.8)',
+                    'rgba(245, 158, 11, 0.8)',
+                    'rgba(239, 68, 68, 0.8)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom'
+                }
+            }
+        }
+    });
+}
+
+function updateRecentActivity(participations) {
+    const container = document.getElementById('recentActivity');
+    
+    // Ordenar por fecha más reciente
+    const recentParticipations = participations
+        .sort((a, b) => {
+            const dateA = new Date(a.fields['Fecha Inicio'] || '1900-01-01');
+            const dateB = new Date(b.fields['Fecha Inicio'] || '1900-01-01');
+            return dateB - dateA;
+        })
+        .slice(0, 5);
+    
+    if (recentParticipations.length === 0) {
+        container.innerHTML = '<p class="no-data">No hay actividad reciente</p>';
+        return;
+    }
+    
+    container.innerHTML = '';
+    
+    recentParticipations.forEach(p => {
+        const activityDiv = document.createElement('div');
+        activityDiv.className = 'activity-item';
+        
+        const status = p.fields['Completado'] ? '✅ Completó' : '⏳ Inició';
+        const date = p.fields['Fecha Inicio'] || 'Fecha desconocida';
+        
+        activityDiv.innerHTML = `
+            <p><strong>${p.fields['Nombre']}</strong> ${status} una capacitación</p>
+            <p class="time"><i class="fas fa-clock"></i> ${date}</p>
+        `;
+        
+        container.appendChild(activityDiv);
+    });
 }
 
 // ==========================================
@@ -655,29 +1253,27 @@ function toggleDarkMode() {
     document.body.setAttribute('data-theme', newTheme);
     localStorage.setItem('theme', newTheme);
     
+    // Actualizar icono
+    const icon = document.getElementById('darkModeIcon');
+    icon.className = newTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    
     // Actualizar toggle en settings
-    const darkModeToggle = document.getElementById('darkModeToggle');
-    if (darkModeToggle) {
-        darkModeToggle.checked = newTheme === 'dark';
-    }
+    document.getElementById('darkModeToggle').checked = newTheme === 'dark';
 }
 
 function loadTheme() {
     const savedTheme = localStorage.getItem('theme') || 'light';
     document.body.setAttribute('data-theme', savedTheme);
     
-    const darkModeToggle = document.getElementById('darkModeToggle');
-    if (darkModeToggle) {
-        darkModeToggle.checked = savedTheme === 'dark';
-    }
+    const icon = document.getElementById('darkModeIcon');
+    icon.className = savedTheme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+    
+    document.getElementById('darkModeToggle').checked = savedTheme === 'dark';
 }
 
 function updateSystemInfo() {
     // Actualizar fecha de última actualización
-    const lastUpdateElement = document.getElementById('lastUpdate');
-    if (lastUpdateElement) {
-        lastUpdateElement.textContent = new Date().toLocaleString('es-CO');
-    }
+    document.getElementById('lastUpdate').textContent = new Date().toLocaleString('es-CO');
     
     // Contar registros si hay conexión
     if (isConnected) {
@@ -696,57 +1292,55 @@ async function countRecords() {
             totalRecords += 10; // Estimación básica
         }
         
-        const recordCountElement = document.getElementById('recordCount');
-        if (recordCountElement) {
-            recordCountElement.textContent = totalRecords + '+';
-        }
+        document.getElementById('recordCount').textContent = totalRecords + '+';
         
     } catch (error) {
-        const recordCountElement = document.getElementById('recordCount');
-        if (recordCountElement) {
-            recordCountElement.textContent = 'Error';
-        }
+        document.getElementById('recordCount').textContent = 'Error';
     }
 }
 
-// Funciones stub para otras funcionalidades
-async function accessTraining() {
-    showAlert('Función en desarrollo', 'info');
-}
-
-async function loadReportOptions() {
-    const select = document.getElementById('reportTraining');
-    if (!select) return;
+async function viewTrainingDetails(trainingId) {
+    const training = trainings.find(t => t.id === trainingId);
     
-    select.innerHTML = '<option value="">Cargando capacitaciones...</option>';
+    if (!training) return;
     
     try {
-        const response = await airtableRequest('GET', '/Capacitaciones?filterByFormula=Activa=TRUE()');
+        // Obtener preguntas de la capacitación
+        const pretestResponse = await airtableRequest('GET',
+            `/Preguntas?filterByFormula=AND({Capacitación}='${trainingId}', {Tipo}='Pretest')&sort[0][field]=Número`);
         
-        select.innerHTML = '<option value="">Seleccione una capacitación...</option>';
+        const posttestResponse = await airtableRequest('GET',
+            `/Preguntas?filterByFormula=AND({Capacitación}='${trainingId}', {Tipo}='Post-test')&sort[0][field]=Número`);
         
-        response.records.forEach(training => {
-            const option = document.createElement('option');
-            option.value = training.id;
-            option.textContent = training.fields['Título'];
-            select.appendChild(option);
+        const pretestQuestions = pretestResponse.records || [];
+        const posttestQuestions = posttestResponse.records || [];
+        
+        let detailsHTML = `
+            <h3>${training.fields['Título']}</h3>
+            <p><strong>Departamento:</strong> ${training.fields['Departamento']}</p>
+            <p><strong>Descripción:</strong> ${training.fields['Descripción'] || 'Sin descripción'}</p>
+            
+            <h4>Preguntas de Pretest (${pretestQuestions.length})</h4>
+            <ol>
+                ${pretestQuestions.map(q => `<li>${q.fields['Pregunta']}</li>`).join('')}
+            </ol>
+            
+            <h4>Preguntas de Post-test (${posttestQuestions.length})</h4>
+            <ol>
+                ${posttestQuestions.map(q => `<li>${q.fields['Pregunta']}</li>`).join('')}
+            </ol>
+        `;
+        
+        Swal.fire({
+            title: 'Detalles de la Capacitación',
+            html: detailsHTML,
+            width: '800px',
+            confirmButtonColor: '#667eea'
         });
         
     } catch (error) {
-        select.innerHTML = '<option value="">Error al cargar capacitaciones</option>';
-        console.error('Error loading report options:', error);
+        showAlert('Error al cargar detalles: ' + error.message, 'error');
     }
-}
-
-async function loadReport() {
-    showAlert('Función de reportes en desarrollo', 'info');
-}
-
-async function initializeDashboard() {
-    if (!isConnected) return;
-    
-    console.log('Inicializando dashboard...');
-    // Función completa disponible en el archivo original
 }
 
 // ==========================================
@@ -764,5 +1358,3 @@ window.onclick = function(event) {
 document.addEventListener('submit', function(e) {
     e.preventDefault();
 });
-
-console.log('✅ app.js v1.1.0 cargado correctamente con soporte para Profesional');
