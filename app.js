@@ -44,11 +44,19 @@ async function initializeApp() {
 
 async function checkAirtableConnection() {
     try {
+        console.log('🔍 Verificando conexión con Airtable...');
+        
         const response = await airtableRequest('GET', '/config');
+        
+        console.log('📥 Respuesta de Airtable:', response);
+        
         if (response && response.configured) {
             isConnected = true;
             console.log('✅ Conectado a Airtable');
+            console.log('📊 Base ID:', response.baseId);
             showConnectionStatus(true);
+        } else {
+            throw new Error('Respuesta inválida de Airtable');
         }
     } catch (error) {
         isConnected = false;
@@ -74,11 +82,13 @@ function showConnectionStatus(connected) {
         indicator.style.borderColor = '#81c784';
         dot.style.background = '#4caf50';
         text.textContent = 'Airtable Conectado';
+        console.log('✨ Indicador actualizado a: CONECTADO');
     } else {
         indicator.style.background = 'linear-gradient(135deg, #ffebee 0%, #fff3e0 100%)';
         indicator.style.borderColor = '#ef5350';
         dot.style.background = '#f44336';
         text.textContent = 'Airtable Desconectado';
+        console.log('⚠️ Indicador actualizado a: DESCONECTADO');
     }
 }
 
@@ -177,7 +187,7 @@ function addQuestion(type) {
     const questionHTML = `
         <div class="question-card" id="${questionId}" data-question-number="${questionNumber}">
             <div class="question-header">
-                <h4>📝 Pregunta ${questionNumber}</h4>
+                <h4>🔍 Pregunta ${questionNumber}</h4>
                 <button type="button" class="btn-remove" onclick="removeQuestion('${questionId}', '${type}')">
                     <i class="fas fa-trash"></i> Eliminar
                 </button>
@@ -274,7 +284,7 @@ function renumberQuestions(type) {
         const newNumber = index + 1;
         const header = question.querySelector('h4');
         if (header) {
-            header.textContent = `📝 Pregunta ${newNumber}`;
+            header.textContent = `🔍 Pregunta ${newNumber}`;
         }
         question.setAttribute('data-question-number', newNumber);
     });
@@ -556,7 +566,7 @@ function copyLink() {
     const link = document.getElementById('modalAccessLink').textContent;
     const code = document.getElementById('modalAccessCode').textContent;
     
-    const text = `🏥 Acceso a Capacitación\n\nCódigo: ${code}\nLink: ${link}\n\nHospital Susana López de Valencia`;
+    const text = `🥇 Acceso a Capacitación\n\nCódigo: ${code}\nLink: ${link}\n\nHospital Susana López de Valencia`;
     
     navigator.clipboard.writeText(text).then(() => {
         Swal.fire({
@@ -573,7 +583,7 @@ function shareWhatsApp() {
     const code = document.getElementById('modalAccessCode').textContent;
     const link = document.getElementById('modalAccessLink').textContent;
     
-    const message = `🏥 *Acceso a Capacitación*\nHospital Susana López de Valencia\n\n*Código:* ${code}\n*Link:* ${link}`;
+    const message = `🥇 *Acceso a Capacitación*\nHospital Susana López de Valencia\n\n*Código:* ${code}\n*Link:* ${link}`;
     const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(whatsappUrl, '_blank');
 }
