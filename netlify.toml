@@ -1,18 +1,9 @@
 [build]
+  command = "npm run build"
   functions = "netlify/functions"
-  publish = "."
-  command = "echo 'No build required'"
-
-[build.environment]
-  NODE_VERSION = "18"
+  publish = "dist"
 
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/.netlify/functions/:name"
+  to = "/.netlify/functions/:name"
   status = 200
-
-[[headers]]
-  for = "/*"
-  [headers.values]
-    X-Frame-Options = "DENY"
-    X-Content-Type-Options = "nosniff"
