@@ -1,71 +1,86 @@
 const https = require('https');
+const url = require('url');
 
 exports.handler = async (event, context) => {
-  // CORS headers
+  console.log('Function called:', {
+    httpMethod: event.httpMethod,
+    path: event.path,
+    body: event.body ? event.body.substring(0, 100) : 'none'
+  });
+
   const headers = {
     'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH, OPTIONS',
     'Content-Type': 'application/json'
   };
 
-  // Handle OPTIONS
+  // Handle preflight requests
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
-
-  const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
-  const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-
-  if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ 
-        error: 'Missing Airtable configuration',
-        message: 'Please configure AIRTABLE_TOKEN and AIRTABLE_BASE_ID in Netlify environment variables'
-      })
+    return { 
+      statusCode: 200, 
+      headers, 
+      body: 'OK' 
     };
   }
 
   try {
-    let body;
-    try {
-      body = event.body ? JSON.parse(event.body) : {};
-    } catch (e) {
-      body = {};
-    }
+    const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
+    const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 
-    const method = body.method || 'GET';
-    const path = body.path || '';
-    const data = body.body || null;
+    console.log('Env check:', {
+      hasToken: !!AIRTABLE_TOKEN,
+      hasBaseId: !!AIRTABLE_BASE_ID
+    });
 
-    // Special endpoint for config check
-    if (path === '/config') {
+    if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) {
+      console.error('Missing env variables');
       return {
-        statusCode: 200,
+        statusCode: 500,
         headers,
-        body: JSON.stringify({ 
-          configured: true,
-          baseId: AIRTABLE_BASE_ID 
+        body: JSON.stringify({
+          error: 'Configuration Error',
+          message: 'AIRTABLE_TOKEN or AIRTABLE_BASE_ID not configured',
+          hasToken: !!AIRTABLE_TOKEN,
+          hasBaseId: !!AIRTABLE_BASE_ID
         })
       };
     }
 
-    // Make request to Airtable
+    let requestBody = {};
+    if (event.body) {
+      try {
+        requestBody = JSON.parse(event.body);
+      } catch (e) {
+        console.error('Parse error:', e.message);
+        requestBody = {};
+      }
+    }
+
+    const method = requestBody.method || event.httpMethod || 'GET';
+    const path = requestBody.path || event.path || '';
+    const data = requestBody.data || null;
+
+    console.log('Request:', { method, path, hasData: !!data });
+
+    // Build Airtable URL
     const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}${path}`;
-    
-    return new Promise((resolve, reject) => {
-      const url = new URL(airtableUrl);
+    console.log('Airtable URL:', airtableUrl);
+
+    return new Promise((resolve) => {
+      const parsedUrl = new url.URL(airtableUrl);
       const options = {
-        hostname: url.hostname,
-        path: url.pathname + url.search,
+        hostname: parsedUrl.hostname,
+        path: parsedUrl.pathname + parsedUrl.search,
         method: method,
         headers: {
           'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'User-Agent': 'Netlify-Function'
         }
       };
+
+      console.log('Making request:', { method, hostname: options.hostname });
 
       const req = https.request(options, (res) => {
         let responseData = '';
@@ -75,6 +90,8 @@ exports.handler = async (event, context) => {
         });
 
         res.on('end', () => {
+          console.log('Response:', { statusCode: res.statusCode });
+
           resolve({
             statusCode: res.statusCode,
             headers,
@@ -84,15 +101,18 @@ exports.handler = async (event, context) => {
       });
 
       req.on('error', (error) => {
+        console.error('Request error:', error.message);
         resolve({
           statusCode: 500,
           headers,
-          body: JSON.stringify({ 
-            error: error.message,
-            details: 'Failed to connect to Airtable API'
+          body: JSON.stringify({
+            error: 'Connection Error',
+            message: error.message
           })
         });
       });
+
+      req.setTimeout(30000);
 
       if (data) {
         req.write(JSON.stringify(data));
@@ -102,12 +122,16 @@ exports.handler = async (event, context) => {
     });
 
   } catch (error) {
+    console.error('Handler error:', error);
     return {
       statusCode: 500,
-      headers,
-      body: JSON.stringify({ 
-        error: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        error: 'Server Error',
+        message: error.message
       })
     };
   }

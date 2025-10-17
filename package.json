@@ -6,8 +6,11 @@
   "scripts": {
     "dev": "netlify dev",
     "deploy": "netlify deploy --prod",
-    "build": "echo 'Build completed' && exit 0"
+    "build": "echo 'Build completed successfully' && exit 0"
   },
   "dependencies": {},
-  "devDependencies": {}
+  "devDependencies": {},
+  "engines": {
+    "node": "18.x"
+  }
 }

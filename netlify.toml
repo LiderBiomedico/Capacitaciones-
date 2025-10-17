@@ -6,8 +6,14 @@
 [dev]
   command = "npm run dev"
   port = 8888
+  framework = "#static"
 
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+  force = false
+
+[functions]
+  node_bundler = "esbuild"
+  included_files = ["netlify/functions/**"]
