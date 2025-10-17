@@ -1,12 +1,94 @@
 {
-"name": "hospital-capacitaciones",
-"version": "1.0.0",
-"description": "Sistema de Capacitaciones HSLV",
-"scripts": {
-"dev": "python -m http.server 8080",
-"test": "echo 'Testing connection to Airtable'"
-},
-"dependencies": {
-"axios": "^1.6.0"
+  "name": "hospital-capacitaciones",
+  "version": "1.0.0",
+  "description": "Sistema de Capacitaciones HSLV",
+  "main": "index.html",
+  "scripts": {
+    "dev": "netlify dev",
+    "deploy": "netlify deploy --prod"
+  },
+  "dependencies": {},
+  "devDependencies": {}
 }
-}
+```
+
+## 6️⃣ **.gitignore**
+```
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+
+# Netlify
+.netlify/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+```
+
+---
+
+# 📊 ESTRUCTURA DE AIRTABLE
+
+Crea estas tablas en Airtable:
+
+### **Tabla: Capacitaciones**
+| Campo | Tipo |
+|-------|------|
+| ID | Number |
+| Capacitacion | Single line text |
+| Objetivo | Long text |
+| Temas | Long text |
+| Fecha | Date |
+| Expositor | Single line text |
+| Departamento | Single select |
+| Duracion | Single line text |
+| PersonalCapacitado | Long text |
+| Metodologia | Long text |
+| Planeacion | Long text |
+| ProcesoAtencion | Long text |
+| CodigoAcceso | Single line text |
+| Estado | Single select (Activa/Inactiva) |
+| FechaCreacion | Date |
+
+### **Tabla: Preguntas**
+| Campo | Tipo |
+|-------|------|
+| CapacitacionID | Link to Capacitaciones |
+| Tipo | Single select (Pretest/Posttest) |
+| Numero | Number |
+| Pregunta | Long text |
+| OpcionA | Long text |
+| OpcionB | Long text |
+| OpcionC | Long text |
+| OpcionD | Long text |
+| RespuestaCorrecta | Single select (A/B/C/D) |
+
+---
+
+# 🚀 PASOS DE IMPLEMENTACIÓN
+
+### 1️⃣ **Crear Estructura de Archivos**
+```
+hospital-capacitaciones/
+├── index.html (tu archivo existente)
+├── styles.css (tu archivo existente)
+├── config.js (archivo nuevo arriba)
+├── app.js (archivo nuevo arriba)
+├── logo-hospital.png
+├── netlify.toml
+├── package.json
+├── .gitignore
+└── netlify/
+    └── functions/
+        └── airtable-proxy.js
