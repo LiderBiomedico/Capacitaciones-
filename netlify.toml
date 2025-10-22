@@ -1,20 +1,25 @@
 [build]
-  functions = "netlify/functions"
-  publish = "."
+publish = "."
+functions = "netlify/functions"
+
+[functions]
+directory = "netlify/functions"
+node_bundler = "esbuild"
+external_node_modules = ["axios"]
 
 [build.environment]
-  NODE_VERSION = "18"
+NODE_VERSION = "18"
 
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
+from = "/api/*"
+to = "/.netlify/functions/:splat"
+status = 200
 
 [[headers]]
-  for = "/*"
+for = "/*"
   [headers.values]
-    X-Frame-Options = "DENY"
-    X-XSS-Protection = "1; mode=block"
-    X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
-    Access-Control-Allow-Origin = "*"
+  X-Frame-Options = "DENY"
+  X-XSS-Protection = "1; mode=block"
+  X-Content-Type-Options = "nosniff"
+  Referrer-Policy = "strict-origin-when-cross-origin"
+  Access-Control-Allow-Origin = "*"
