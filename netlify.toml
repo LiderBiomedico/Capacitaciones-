@@ -1,19 +1,20 @@
 [build]
-  command = "npm run build"
   functions = "netlify/functions"
   publish = "."
 
-[dev]
-  command = "npm run dev"
-  port = 8888
-  framework = "#static"
+[build.environment]
+  NODE_VERSION = "18"
 
 [[redirects]]
-  from = "/*"
-  to = "/index.html"
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
   status = 200
-  force = false
 
-[functions]
-  node_bundler = "esbuild"
-  included_files = ["netlify/functions/**"]
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Access-Control-Allow-Origin = "*"

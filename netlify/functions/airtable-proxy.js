@@ -1,113 +1,69 @@
-const https = require('https');
+// netlify/functions/airtable-proxy.js
+const axios = require('axios');
 
 exports.handler = async (event, context) => {
-  // CORS headers
+  // Configuración de CORS
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, PATCH',
-    'Content-Type': 'application/json'
+    'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE, OPTIONS'
   };
 
-  // Handle OPTIONS
+  // Manejar preflight OPTIONS
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
-
-  const AIRTABLE_TOKEN = process.env.AIRTABLE_TOKEN;
-  const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-
-  if (!AIRTABLE_TOKEN || !AIRTABLE_BASE_ID) {
     return {
-      statusCode: 500,
+      statusCode: 200,
       headers,
-      body: JSON.stringify({ 
-        error: 'Missing Airtable configuration',
-        message: 'Please configure AIRTABLE_TOKEN and AIRTABLE_BASE_ID in Netlify environment variables'
-      })
+      body: ''
     };
   }
 
-  try {
-    let body;
-    try {
-      body = event.body ? JSON.parse(event.body) : {};
-    } catch (e) {
-      body = {};
-    }
+  // Obtener las variables de entorno
+  const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
+  const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 
-    const method = body.method || 'GET';
-    const path = body.path || '';
-    const data = body.body || null;
-
-    // Special endpoint for config check
-    if (path === '/config') {
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({ 
-          configured: true,
-          baseId: AIRTABLE_BASE_ID 
-        })
-      };
-    }
-
-    // Make request to Airtable
-    const airtableUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}${path}`;
-    
-    return new Promise((resolve, reject) => {
-      const url = new URL(airtableUrl);
-      const options = {
-        hostname: url.hostname,
-        path: url.pathname + url.search,
-        method: method,
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_TOKEN}`,
-          'Content-Type': 'application/json'
-        }
-      };
-
-      const req = https.request(options, (res) => {
-        let responseData = '';
-
-        res.on('data', (chunk) => {
-          responseData += chunk;
-        });
-
-        res.on('end', () => {
-          resolve({
-            statusCode: res.statusCode,
-            headers,
-            body: responseData
-          });
-        });
-      });
-
-      req.on('error', (error) => {
-        resolve({
-          statusCode: 500,
-          headers,
-          body: JSON.stringify({ 
-            error: error.message,
-            details: 'Failed to connect to Airtable API'
-          })
-        });
-      });
-
-      if (data) {
-        req.write(JSON.stringify(data));
-      }
-
-      req.end();
-    });
-
-  } catch (error) {
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
     return {
       statusCode: 500,
       headers,
-      body: JSON.stringify({ 
+      body: JSON.stringify({ error: 'Configuración de Airtable faltante' })
+    };
+  }
+
+  // Parsear el path y método
+  const { path, method, body: requestBody } = JSON.parse(event.body || '{}');
+  
+  const url = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}${path}`;
+  
+  try {
+    const config = {
+      method: method,
+      url: url,
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+        'Content-Type': 'application/json'
+      }
+    };
+
+    if (requestBody) {
+      config.data = requestBody;
+    }
+
+    const response = await axios(config);
+
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(response.data)
+    };
+  } catch (error) {
+    console.error('Error en proxy de Airtable:', error);
+    return {
+      statusCode: error.response?.status || 500,
+      headers,
+      body: JSON.stringify({
         error: error.message,
-        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        details: error.response?.data
       })
     };
   }
