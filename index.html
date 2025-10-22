@@ -632,26 +632,25 @@
 
     <script>
         // ============================================
-        // CONFIGURACIÓN DE AIRTABLE
+        // CONFIGURACIÓN SEGURA - SIN CREDENCIALES
         // ============================================
-        // IMPORTANTE: Reemplaza estos valores con tus credenciales reales de Airtable
-        const AIRTABLE_CONFIG = {
-            apiKey: 'patlJL75BEpGZnaBz.e76a71ffd6fdd57d02850c0ad7dd9d5bc2e04541db65ce8d314bb3a9d750ccc8',  // Reemplaza con tu API Key de Airtable
-            baseId: 'appcazmz56GPqqqLG',            // Reemplaza con tu Base ID
-            tableNames: {
-                trainings: 'Capacitaciones',
-                participants: 'Participantes',
-                exams: 'Exámenes'
-            }
+        // Las credenciales de Airtable se almacenan de forma segura en variables
+        // de entorno en Netlify. El frontend comunica a través del proxy seguro.
+        
+        // Tabla de nombres (información pública, sin valores sensibles)
+        const TABLE_NAMES = {
+            trainings: 'Capacitaciones',
+            participants: 'Participantes',
+            exams: 'Exámenes'
         };
 
         // ============================================
-        // FUNCIONES DE CONEXIÓN A AIRTABLE
+        // FUNCIONES DE CONEXIÓN A AIRTABLE (VÍA PROXY SEGURO)
         // ============================================
 
         /**
-         * Verifica la conexión a Airtable
-         * Intenta hacer una solicitud simple a la API
+         * Verifica la conexión a Airtable a través del proxy seguro de Netlify
+         * Las credenciales permanecen en el servidor, nunca en el frontend
          */
         async function testAirtableConnection() {
             const indicator = document.getElementById('connectionIndicator');
@@ -669,31 +668,28 @@
             tooltip.textContent = 'Verificando conexión...';
 
             try {
-                // Validar que las credenciales estén configuradas
-                if (AIRTABLE_CONFIG.apiKey === 'YOUR_AIRTABLE_API_KEY' || 
-                    AIRTABLE_CONFIG.baseId === 'YOUR_BASE_ID') {
-                    throw new Error('Credenciales de Airtable no configuradas. Por favor, actualiza AIRTABLE_CONFIG con tus credenciales reales.');
-                }
-
-                // Realizar solicitud de prueba a Airtable
-                const response = await fetch(
-                    `https://api.airtable.com/v0/${AIRTABLE_CONFIG.baseId}/${AIRTABLE_CONFIG.tableNames.trainings}?maxRecords=1`,
-                    {
+                // Realizar solicitud de prueba a través del proxy seguro
+                const response = await fetch('/.netlify/functions/airtable-prov-v1', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
                         method: 'GET',
-                        headers: {
-                            'Authorization': `Bearer ${AIRTABLE_CONFIG.apiKey}`,
-                            'Content-Type': 'application/json'
-                        }
-                    }
-                );
+                        path: `/${TABLE_NAMES.trainings}?maxRecords=1`
+                    })
+                });
 
                 if (response.ok) {
                     // Conexión exitosa
                     setConnectionStatus(true, 'Conexión exitosa a Airtable');
                 } else if (response.status === 401) {
-                    throw new Error('API Key inválida o expirada');
+                    throw new Error('Credenciales de Airtable no configuradas en el servidor');
                 } else if (response.status === 404) {
-                    throw new Error('Base ID o tabla no encontrada');
+                    throw new Error('Tabla no encontrada');
+                } else if (response.status === 500) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.message || 'Error en el servidor');
                 } else {
                     throw new Error(`Error ${response.status}: ${response.statusText}`);
                 }
@@ -777,7 +773,7 @@
         // ============================================
 
         /**
-         * Guarda una capacitación
+         * Guarda una capacitación a través del proxy seguro
          */
         async function saveTraining() {
             const trainingName = document.getElementById('trainingName').value;
@@ -793,44 +789,38 @@
             }
 
             try {
-                // Validar credenciales
-                if (AIRTABLE_CONFIG.apiKey === 'YOUR_AIRTABLE_API_KEY') {
-                    Swal.fire('Error', 'Configura tus credenciales de Airtable primero', 'error');
-                    return;
-                }
-
                 // Crear objeto de capacitación
                 const trainingData = {
-                    fields: {
-                        "Nombre": trainingName,
-                        "Descripción": trainingDescription,
-                        "Fecha Inicio": trainingDate,
-                        "Expositor": trainingInstructor,
-                        "Lugar": trainingLocation,
-                        "Duración (horas)": parseFloat(trainingDuration),
-                        "Fecha Creación": new Date().toISOString()
-                    }
+                    "Nombre": trainingName,
+                    "Descripción": trainingDescription,
+                    "Fecha Inicio": trainingDate,
+                    "Expositor": trainingInstructor,
+                    "Lugar": trainingLocation,
+                    "Duración (horas)": parseFloat(trainingDuration),
+                    "Fecha Creación": new Date().toISOString()
                 };
 
-                // Enviar a Airtable
-                const response = await fetch(
-                    `https://api.airtable.com/v0/${AIRTABLE_CONFIG.baseId}/${AIRTABLE_CONFIG.tableNames.trainings}`,
-                    {
+                // Enviar a través del proxy seguro de Netlify
+                const response = await fetch('/.netlify/functions/airtable-prov-v1', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
                         method: 'POST',
-                        headers: {
-                            'Authorization': `Bearer ${AIRTABLE_CONFIG.apiKey}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(trainingData)
-                    }
-                );
+                        path: `/${TABLE_NAMES.trainings}`,
+                        data: {
+                            records: [{ fields: trainingData }]
+                        }
+                    })
+                });
 
                 if (response.ok) {
                     Swal.fire('¡Éxito!', 'Capacitación guardada correctamente', 'success');
                     resetForm();
                 } else {
                     const error = await response.json();
-                    throw new Error(error.error?.message || 'Error al guardar');
+                    throw new Error(error.message || 'Error al guardar');
                 }
             } catch (error) {
                 console.error('Error:', error);
