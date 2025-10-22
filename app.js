@@ -1,5 +1,5 @@
 /* ==========================================
-   SISTEMA DE CAPACITACIONES - VERSIÓN SEGURA
+   SISTEMA DE CAPACITACIONES - VERSIÓN CON AIRTABLE
    Hospital Susana López de Valencia
    
    ⚠️ SEGURIDAD:
@@ -9,47 +9,40 @@
    ========================================== */
 
 // Variables globales
-let currentTraining = null;
-let currentSession = null;
-let currentParticipation = null;
-let currentExamType = 'pretest';
-let trainings = [];
-let sessions = [];
-let participations = [];
-let questions = [];
-let isConnected = false;
+let pretestQuestionCount = 0;
+let posttestQuestionCount = 0;
+const MAX_QUESTIONS = 10;
+let airtableConnected = false;
+let connectionCheckInterval = null;
 
 // ==========================================
 // INICIALIZACIÓN
 // ==========================================
 
-function initializeApp() {
-    console.log('🚀 Iniciando Sistema de Capacitaciones (Versión Segura)...');
-    console.log('🔐 Modo: Netlify Functions - Credenciales en servidor');
-    
-    // Ocultar pantalla de carga
-    setTimeout(() => {
-        const loadingScreen = document.getElementById('loadingScreen');
-        if (loadingScreen) loadingScreen.classList.add('hidden');
-    }, 1500);
-    
-    // Actualizar fecha y hora
+document.addEventListener('DOMContentLoaded', function() {
+    initializeApp();
     updateDateTime();
-    setInterval(updateDateTime, 60000);
+    setInterval(updateDateTime, 1000);
+});
+
+function initializeApp() {
+    setTimeout(() => {
+        document.getElementById('loadingScreen').style.opacity = '0';
+        setTimeout(() => {
+            document.getElementById('loadingScreen').style.display = 'none';
+        }, 500);
+    }, 1500);
+
+    setTimeout(() => initializeCharts(), 2000);
     
-    // Verificar parámetros de URL
-    checkUrlParams();
+    // Verificar conexión con Airtable
+    testAirtableConnection();
     
-    // Cargar tema guardado
-    loadTheme();
-    
-    // Cargar configuración (sin credenciales)
-    loadConfiguration();
-    
-    // Inicializar dashboard
-    if (isConnected) {
-        initializeDashboard();
-    }
+    // Verificar conexión cada 30 segundos
+    if (connectionCheckInterval) clearInterval(connectionCheckInterval);
+    connectionCheckInterval = setInterval(() => {
+        testAirtableConnection();
+    }, 30000);
 }
 
 function updateDateTime() {
@@ -62,48 +55,36 @@ function updateDateTime() {
         hour: '2-digit',
         minute: '2-digit'
     };
-    const dateTimeString = now.toLocaleDateString('es-CO', options);
-    
-    const dateTimeElement = document.getElementById('currentDateTime');
-    if (dateTimeElement) {
-        dateTimeElement.textContent = dateTimeString;
-    }
-}
-
-function checkUrlParams() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-    
-    if (code) {
-        const accessCodeInput = document.getElementById('accessCode');
-        if (accessCodeInput) accessCodeInput.value = code;
-        switchTab('exam');
-        if (isConnected) accessTraining();
+    const element = document.getElementById('currentDateTime');
+    if (element) {
+        element.textContent = now.toLocaleDateString('es-ES', options);
     }
 }
 
 // ==========================================
-// CONFIGURACIÓN SEGURA (SIN CREDENCIALES)
+// NAVEGACIÓN
 // ==========================================
 
-function loadConfiguration() {
-    console.log('ℹ️ Sistema en modo seguro - Usando Netlify Functions');
-    console.log('ℹ️ Credenciales en variables de entorno del servidor');
+function switchTab(tabName) {
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
     
-    // No cargamos credenciales del localStorage
-    // Solo intentamos conectar a través del proxy
-    testConnection(false);
+    document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    
+    const selectedTab = document.getElementById(tabName);
+    if (selectedTab) selectedTab.classList.add('active');
+    
+    event.target.closest('.nav-tab').classList.add('active');
 }
 
 // ==========================================
-// FUNCIONES DE AIRTABLE (VÍA PROXY SEGURO)
+// CONEXIÓN AIRTABLE (VÍA NETLIFY PROXY)
 // ==========================================
 
-async function airtableRequest(method, endpoint, data = null) {
-    // ⚠️ IMPORTANTE: TODAS las peticiones pasan por Netlify Functions
-    // El servidor usa las credenciales de las variables de entorno
-    // El cliente NUNCA maneja credenciales
-    
+async function airtableRequest(method, path, body = null) {
     try {
         const response = await fetch('/.netlify/functions/airtable-proxy', {
             method: 'POST',
@@ -112,8 +93,8 @@ async function airtableRequest(method, endpoint, data = null) {
             },
             body: JSON.stringify({
                 method: method,
-                path: endpoint,
-                body: data
+                path: path,
+                body: body
             })
         });
         
@@ -129,546 +110,635 @@ async function airtableRequest(method, endpoint, data = null) {
     }
 }
 
-// ==========================================
-// TEST DE CONEXIÓN
-// ==========================================
+function updateConnectionIndicator(status) {
+    const indicator = document.getElementById('connectionIndicator');
+    const text = document.getElementById('connectionText');
+    
+    if (!indicator) return;
+    
+    indicator.classList.remove('connected', 'disconnected', 'checking');
+    
+    switch(status) {
+        case 'connected':
+            indicator.classList.add('connected');
+            text.textContent = '✓ Airtable Conectado';
+            airtableConnected = true;
+            break;
+        case 'disconnected':
+            indicator.classList.add('disconnected');
+            text.textContent = '✗ Airtable Desconectado';
+            airtableConnected = false;
+            break;
+        case 'checking':
+            indicator.classList.add('checking');
+            text.textContent = '⟳ Verificando...';
+            break;
+    }
+}
 
-async function testConnection(showMessage = true) {
+async function testAirtableConnection() {
     try {
-        if (showMessage) {
-            showAlert('Probando conexión...', 'info');
-        }
+        updateConnectionIndicator('checking');
         
         const response = await airtableRequest('GET', '/Capacitaciones?maxRecords=1');
         
         if (response) {
-            isConnected = true;
-            const connectionStatus = document.getElementById('connectionStatus');
-            if (connectionStatus) {
-                connectionStatus.textContent = 'Conectado';
-                connectionStatus.className = 'badge success';
-            }
-            
-            if (showMessage) {
-                showAlert('✅ Conexión exitosa con Airtable', 'success');
-            }
-            
-            // Inicializar dashboard después de conexión exitosa
-            initializeDashboard();
-            loadTrainings();
-            
+            updateConnectionIndicator('connected');
+            console.log('✅ Conexión exitosa con Airtable');
             return true;
         }
     } catch (error) {
-        isConnected = false;
-        const connectionStatus = document.getElementById('connectionStatus');
-        if (connectionStatus) {
-            connectionStatus.textContent = 'Desconectado';
-            connectionStatus.className = 'badge danger';
-        }
-        
-        if (showMessage) {
-            showAlert(`❌ Error de conexión: ${error.message}`, 'error');
-        }
-        
+        updateConnectionIndicator('disconnected');
+        console.error('❌ Error de conexión:', error.message);
         return false;
     }
 }
 
 // ==========================================
-// NAVEGACIÓN ENTRE TABS
+// FUNCIONES DE PREGUNTAS
 // ==========================================
 
-function switchTab(tabName) {
-    // Actualizar tabs activos
-    document.querySelectorAll('.nav-tab').forEach(tab => {
-        tab.classList.remove('active');
-        if (tab.dataset.tab === tabName) {
-            tab.classList.add('active');
-        }
-    });
+function addQuestion(type) {
+    const container = document.getElementById(`${type}Questions`);
+    const currentCount = type === 'pretest' ? pretestQuestionCount : posttestQuestionCount;
     
-    // Actualizar contenido visible
-    document.querySelectorAll('.tab-content').forEach(content => {
-        content.classList.remove('active');
-    });
-    
-    const tabContent = document.getElementById(tabName);
-    if (tabContent) tabContent.classList.add('active');
-    
-    // Ejecutar acciones específicas de cada tab
-    switch(tabName) {
-        case 'dashboard':
-            initializeDashboard();
-            break;
-        case 'manage':
-            if (isConnected) loadTrainings();
-            break;
-        case 'reports':
-            loadReportOptions();
-            break;
-    }
-}
-
-// ==========================================
-// CARGAR DATOS
-// ==========================================
-
-async function loadTrainings() {
-    try {
-        const response = await airtableRequest('GET', '/Capacitaciones');
-        if (response && response.records) {
-            trainings = response.records;
-            displayTrainings();
-        }
-    } catch (error) {
-        console.error('Error cargando capacitaciones:', error);
-        showAlert('Error al cargar capacitaciones', 'error');
-    }
-}
-
-function displayTrainings() {
-    console.log(`📊 Capacitaciones cargadas: ${trainings.length}`);
-    // Implementar visualización según necesidad
-}
-
-// ==========================================
-// FUNCIONES DE GUARDAR CAPACITACIONES
-// ==========================================
-
-// Variable para almacenar el formulario
-let trainingFormData = {};
-
-// ==========================================
-// CREAR NUEVA CAPACITACIÓN
-// ==========================================
-
-async function createNewTraining() {
-    const trainingName = document.getElementById('trainingName')?.value;
-    const trainingDescription = document.getElementById('trainingDescription')?.value;
-    const trainingDepartment = document.getElementById('trainingDepartment')?.value;
-    
-    // Validar datos
-    if (!trainingName) {
-        showAlert('Por favor ingrese el nombre de la capacitación', 'error');
+    if (currentCount >= MAX_QUESTIONS) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Límite Alcanzado',
+            text: `Solo puedes agregar hasta ${MAX_QUESTIONS} preguntas por test`,
+            confirmButtonText: 'Entendido'
+        });
         return;
     }
     
-    try {
-        showAlert('Guardando capacitación...', 'info');
-        
-        // Preparar datos para Airtable
-        const data = {
-            records: [
-                {
-                    fields: {
-                        'Título': trainingName,
-                        'Descripción': trainingDescription || '',
-                        'Departamento': trainingDepartment || 'General',
-                        'Activa': true,
-                        'Fecha Creación': new Date().toISOString().split('T')[0]
+    if (type === 'pretest') {
+        pretestQuestionCount++;
+    } else {
+        posttestQuestionCount++;
+    }
+    
+    const questionNumber = currentCount + 1;
+    const questionId = `${type}-q${questionNumber}`;
+    
+    const questionHTML = `
+        <div class="question-card" id="${questionId}" data-question-number="${questionNumber}">
+            <div class="question-header">
+                <h4>📝 Pregunta ${questionNumber}</h4>
+                <button type="button" class="btn-remove" onclick="removeQuestion('${questionId}', '${type}')">
+                    <i class="fas fa-trash"></i> Eliminar
+                </button>
+            </div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-question"></i> Pregunta *</label>
+                <textarea id="${questionId}-text" class="question-text" rows="2" required 
+                          placeholder="Escriba la pregunta aquí..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-list"></i> Opciones de Respuesta</label>
+                <div class="options-container">
+                    <div class="option-item">
+                        <input type="radio" name="${questionId}-correct" value="a" id="${questionId}-option-a" required>
+                        <label for="${questionId}-option-a" class="radio-label">✓ Correcta</label>
+                        <input type="text" id="${questionId}-text-a" class="option-text" placeholder="Opción A" required>
+                    </div>
+                    
+                    <div class="option-item">
+                        <input type="radio" name="${questionId}-correct" value="b" id="${questionId}-option-b">
+                        <label for="${questionId}-option-b" class="radio-label">✓ Correcta</label>
+                        <input type="text" id="${questionId}-text-b" class="option-text" placeholder="Opción B" required>
+                    </div>
+                    
+                    <div class="option-item">
+                        <input type="radio" name="${questionId}-correct" value="c" id="${questionId}-option-c">
+                        <label for="${questionId}-option-c" class="radio-label">✓ Correcta</label>
+                        <input type="text" id="${questionId}-text-c" class="option-text" placeholder="Opción C" required>
+                    </div>
+                    
+                    <div class="option-item">
+                        <input type="radio" name="${questionId}-correct" value="d" id="${questionId}-option-d">
+                        <label for="${questionId}-option-d" class="radio-label">✓ Correcta</label>
+                        <input type="text" id="${questionId}-text-d" class="option-text" placeholder="Opción D" required>
+                    </div>
+                </div>
+                <small class="help-text">Marca la opción correcta</small>
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('beforeend', questionHTML);
+    updateQuestionCounter(type);
+    
+    // Animación
+    const newQuestion = document.getElementById(questionId);
+    newQuestion.style.opacity = '0';
+    setTimeout(() => {
+        newQuestion.style.transition = 'opacity 0.3s';
+        newQuestion.style.opacity = '1';
+    }, 10);
+}
+
+function removeQuestion(questionId, type) {
+    Swal.fire({
+        title: '¿Eliminar pregunta?',
+        text: 'Esta acción no se puede deshacer',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#6c757d',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            const element = document.getElementById(questionId);
+            if (element) {
+                element.style.transition = 'opacity 0.3s';
+                element.style.opacity = '0';
+                
+                setTimeout(() => {
+                    element.remove();
+                    
+                    if (type === 'pretest') {
+                        pretestQuestionCount--;
+                    } else {
+                        posttestQuestionCount--;
                     }
-                }
-            ]
+                    
+                    renumberQuestions(type);
+                    updateQuestionCounter(type);
+                }, 300);
+            }
+        }
+    });
+}
+
+function renumberQuestions(type) {
+    const container = document.getElementById(`${type}Questions`);
+    const questions = container.querySelectorAll('.question-card');
+    
+    questions.forEach((question, index) => {
+        const newNumber = index + 1;
+        const header = question.querySelector('h4');
+        if (header) {
+            header.textContent = `📝 Pregunta ${newNumber}`;
+        }
+        question.setAttribute('data-question-number', newNumber);
+    });
+}
+
+function updateQuestionCounter(type) {
+    const container = document.getElementById(`${type}Questions`);
+    const count = type === 'pretest' ? pretestQuestionCount : posttestQuestionCount;
+    
+    let counter = container.parentElement.querySelector('.question-counter');
+    if (!counter) {
+        counter = document.createElement('div');
+        counter.className = 'question-counter';
+        container.parentElement.insertBefore(counter, container);
+    }
+    
+    counter.innerHTML = `
+        <i class="fas fa-list-ol"></i> 
+        <span>${count} de ${MAX_QUESTIONS} preguntas agregadas</span>
+    `;
+}
+
+function collectQuestions(type) {
+    const container = document.getElementById(`${type}Questions`);
+    const questionCards = container.querySelectorAll('.question-card');
+    const questions = [];
+    
+    for (let i = 0; i < questionCards.length; i++) {
+        const card = questionCards[i];
+        const questionId = card.id;
+        
+        const questionText = document.getElementById(`${questionId}-text`).value.trim();
+        if (!questionText) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Pregunta Vacía',
+                text: `Complete la pregunta ${i + 1} del ${type === 'pretest' ? 'Pretest' : 'Post-test'}`,
+            });
+            return null;
+        }
+        
+        const options = {
+            a: document.getElementById(`${questionId}-text-a`).value.trim(),
+            b: document.getElementById(`${questionId}-text-b`).value.trim(),
+            c: document.getElementById(`${questionId}-text-c`).value.trim(),
+            d: document.getElementById(`${questionId}-text-d`).value.trim()
         };
         
-        // Hacer petición POST a Airtable
-        const response = await airtableRequest('POST', '/Capacitaciones', data);
-        
-        if (response && response.records && response.records.length > 0) {
-            const newTraining = response.records[0];
-            showAlert('✅ Capacitación guardada exitosamente', 'success');
-            console.log('Capacitación creada:', newTraining);
-            
-            // Limpiar formulario
-            clearTrainingForm();
-            
-            // Recargar lista de capacitaciones
-            await loadTrainings();
-            
-            return newTraining;
+        if (!options.a || !options.b || !options.c || !options.d) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Opciones Incompletas',
+                text: `Complete todas las opciones de la pregunta ${i + 1}`,
+            });
+            return null;
         }
-    } catch (error) {
-        console.error('Error guardando capacitación:', error);
-        showAlert(`Error al guardar: ${error.message}`, 'error');
+        
+        const correctAnswer = document.querySelector(`input[name="${questionId}-correct"]:checked`);
+        if (!correctAnswer) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Respuesta Correcta',
+                text: `Seleccione la respuesta correcta para la pregunta ${i + 1}`,
+            });
+            return null;
+        }
+        
+        questions.push({
+            number: i + 1,
+            question: questionText,
+            options: options,
+            correctAnswer: correctAnswer.value
+        });
     }
+    
+    return questions;
 }
 
 // ==========================================
-// GUARDAR PREGUNTAS DE CAPACITACIÓN
+// GUARDAR CAPACITACIÓN EN AIRTABLE
 // ==========================================
 
-async function saveTrainingQuestions(trainingId, questions) {
-    if (!trainingId || !questions || questions.length === 0) {
-        showAlert('Faltan datos: ID de capacitación o preguntas', 'error');
-        return false;
+async function saveTraining() {
+    // Verificar conexión
+    if (!airtableConnected) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Sin Conexión',
+            text: 'No hay conexión con Airtable. Verifica la configuración.',
+        });
+        return;
     }
     
+    // Recolectar datos del formulario
+    const title = document.getElementById('trainingTitle').value.trim();
+    const description = document.getElementById('trainingDescription').value.trim();
+    const trainingDate = document.getElementById('trainingDate').value;
+    const department = document.getElementById('trainingDepartment').value;
+    const duration = document.getElementById('trainingDuration').value.trim();
+    
+    // Obtener personal capacitado seleccionado
+    const staffCheckboxes = document.querySelectorAll('.trainingStaff:checked');
+    const selectedStaff = Array.from(staffCheckboxes).map(cb => cb.value);
+    
+    // Validaciones
+    if (!title || !department || !trainingDate || selectedStaff.length === 0) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Campos Requeridos',
+            text: 'Complete todos los campos obligatorios, incluyendo fecha y personal capacitado',
+        });
+        return;
+    }
+    
+    if (pretestQuestionCount === 0 || posttestQuestionCount === 0) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Preguntas Requeridas',
+            text: 'Agregue al menos una pregunta en cada test',
+        });
+        return;
+    }
+    
+    const pretestQuestions = collectQuestions('pretest');
+    if (!pretestQuestions) return;
+    
+    const posttestQuestions = collectQuestions('posttest');
+    if (!posttestQuestions) return;
+    
+    // Generar código de acceso
+    const accessCode = generateAccessCode();
+    const accessUrl = `${window.location.origin}${window.location.pathname}?code=${accessCode}`;
+    
+    // Mostrar loading
+    Swal.fire({
+        title: 'Guardando en Airtable...',
+        html: 'Por favor espera mientras se guardan los datos',
+        allowOutsideClick: false,
+        didOpen: () => Swal.showLoading()
+    });
+    
     try {
-        showAlert('Guardando preguntas...', 'info');
+        // 1. Crear el registro de Capacitación
+        console.log('📝 Creando capacitación en Airtable...');
+        const trainingResponse = await airtableRequest('POST', '/Capacitaciones', {
+            records: [{
+                fields: {
+                    'Título': title,
+                    'Descripción': description || '',
+                    'Departamento': department,
+                    'Duración': duration || '',
+                    'Personal Capacitado': selectedStaff.join(', '),
+                    'Fecha Creación': trainingDate,
+                    'Activa': true,
+                    'Fecha Creación Sistema': new Date().toISOString()
+                }
+            }]
+        });
         
-        // Preparar array de records para batch insert
-        const records = questions.map((question, index) => ({
+        const trainingRecordId = trainingResponse.records[0].id;
+        console.log('✅ Capacitación creada:', trainingRecordId);
+        
+        // 2. Crear la sesión con código de acceso
+        console.log('🔐 Creando sesión...');
+        const sessionResponse = await airtableRequest('POST', '/Sesiones', {
+            records: [{
+                fields: {
+                    'Capacitación': [trainingRecordId],
+                    'Código Acceso': accessCode,
+                    'Link Acceso': accessUrl,
+                    'Fecha Inicio': new Date().toISOString(),
+                    'Activa': true
+                }
+            }]
+        });
+        
+        const sessionRecordId = sessionResponse.records[0].id;
+        console.log('✅ Sesión creada:', sessionRecordId);
+        
+        // 3. Guardar preguntas del Pretest
+        console.log('❓ Guardando preguntas de Pretest...');
+        const pretestRecords = pretestQuestions.map(q => ({
             fields: {
-                'Capacitación': [trainingId], // Airtable usa array para links
-                'Número': index + 1,
-                'Pregunta': question.text,
-                'Tipo': question.type || 'pretest', // pretest o post-test
-                'Respuestas': question.answers ? JSON.stringify(question.answers) : ''
+                'Capacitación': [trainingRecordId],
+                'Tipo': 'Pretest',
+                'Número': q.number,
+                'Pregunta': q.question,
+                'Opción A': q.options.a,
+                'Opción B': q.options.b,
+                'Opción C': q.options.c,
+                'Opción D': q.options.d,
+                'Respuesta Correcta': q.correctAnswer.toUpperCase()
             }
         }));
         
-        // Guardar en lotes (Airtable permite hasta 10 por request)
-        const batchSize = 10;
-        for (let i = 0; i < records.length; i += batchSize) {
-            const batch = records.slice(i, i + batchSize);
-            const response = await airtableRequest('POST', '/Preguntas', {
-                records: batch
-            });
-            
-            if (!response || !response.records) {
-                throw new Error('Error en respuesta de Airtable');
+        // Airtable permite máximo 10 registros por request
+        await airtableRequest('POST', '/Preguntas', {
+            records: pretestRecords
+        });
+        console.log(`✅ ${pretestQuestions.length} preguntas de Pretest guardadas`);
+        
+        // 4. Guardar preguntas del Post-test
+        console.log('✅ Guardando preguntas de Post-test...');
+        const posttestRecords = posttestQuestions.map(q => ({
+            fields: {
+                'Capacitación': [trainingRecordId],
+                'Tipo': 'Post-test',
+                'Número': q.number,
+                'Pregunta': q.question,
+                'Opción A': q.options.a,
+                'Opción B': q.options.b,
+                'Opción C': q.options.c,
+                'Opción D': q.options.d,
+                'Respuesta Correcta': q.correctAnswer.toUpperCase()
             }
-        }
+        }));
         
-        showAlert(`✅ ${questions.length} preguntas guardadas`, 'success');
-        return true;
+        await airtableRequest('POST', '/Preguntas', {
+            records: posttestRecords
+        });
+        console.log(`✅ ${posttestQuestions.length} preguntas de Post-test guardadas`);
         
-    } catch (error) {
-        console.error('Error guardando preguntas:', error);
-        showAlert(`Error al guardar preguntas: ${error.message}`, 'error');
-        return false;
-    }
-}
-
-// ==========================================
-// CREAR SESIÓN DE CAPACITACIÓN
-// ==========================================
-
-async function createTrainingSession(trainingId) {
-    if (!trainingId) {
-        showAlert('ID de capacitación no válido', 'error');
-        return false;
-    }
-    
-    try {
-        // Generar código de acceso único
-        const accessCode = generateAccessCode();
-        const currentDate = new Date().toISOString().split('T')[0];
-        
-        const data = {
-            records: [
-                {
-                    fields: {
-                        'Capacitación': [trainingId],
-                        'Código Acceso': accessCode,
-                        'Fecha Inicio': currentDate,
-                        'Activa': true,
-                        'Link Acceso': `${window.location.origin}?code=${accessCode}`
-                    }
-                }
-            ]
-        };
-        
-        const response = await airtableRequest('POST', '/Sesiones', data);
-        
-        if (response && response.records && response.records.length > 0) {
-            const session = response.records[0];
-            showAlert('✅ Sesión creada', 'success');
-            console.log('Sesión creada:', session);
-            return session;
-        }
-        
-    } catch (error) {
-        console.error('Error creando sesión:', error);
-        showAlert(`Error al crear sesión: ${error.message}`, 'error');
-        return false;
-    }
-}
-
-// ==========================================
-// GUARDAR RESPUESTA DE PARTICIPANTE
-// ==========================================
-
-async function saveParticipantAnswer(participationId, questionId, rating) {
-    if (!participationId || !questionId || !rating) {
-        console.warn('Datos incompletos para guardar respuesta');
-        return false;
-    }
-    
-    try {
-        const data = {
-            records: [
-                {
-                    fields: {
-                        'Participación': [participationId],
-                        'Pregunta': [questionId],
-                        'Calificación': parseInt(rating),
-                        'Fecha Respuesta': new Date().toISOString().split('T')[0]
-                    }
-                }
-            ]
-        };
-        
-        const response = await airtableRequest('POST', '/Respuestas', data);
-        return response && response.records && response.records.length > 0;
-        
-    } catch (error) {
-        console.error('Error guardando respuesta:', error);
-        return false;
-    }
-}
-
-// ==========================================
-// REGISTRAR PARTICIPANTE
-// ==========================================
-
-async function registerParticipant(sessionId, participantData) {
-    if (!sessionId || !participantData.name || !participantData.email) {
-        showAlert('Datos incompletos del participante', 'error');
-        return false;
-    }
-    
-    try {
-        const data = {
-            records: [
-                {
-                    fields: {
-                        'Sesión': [sessionId],
-                        'Nombre': participantData.name,
-                        'Email': participantData.email,
-                        'Cargo': participantData.position || 'No especificado',
-                        'Departamento': participantData.department || 'General',
-                        'Fecha Registro': new Date().toISOString().split('T')[0],
-                        'Completado': false
-                    }
-                }
-            ]
-        };
-        
-        const response = await airtableRequest('POST', '/Participaciones', data);
-        
-        if (response && response.records && response.records.length > 0) {
-            const participation = response.records[0];
-            console.log('Participante registrado:', participation);
-            return participation;
-        }
-        
-    } catch (error) {
-        console.error('Error registrando participante:', error);
-        showAlert(`Error al registrar: ${error.message}`, 'error');
-        return false;
-    }
-}
-
-// ==========================================
-// ACTUALIZAR CAPACITACIÓN EXISTENTE
-// ==========================================
-
-async function updateTraining(trainingId, updatedData) {
-    if (!trainingId) {
-        showAlert('ID de capacitación no válido', 'error');
-        return false;
-    }
-    
-    try {
-        showAlert('Actualizando capacitación...', 'info');
-        
-        const data = {
-            records: [
-                {
-                    id: trainingId,
-                    fields: updatedData
-                }
-            ]
-        };
-        
-        const response = await airtableRequest('PATCH', '/Capacitaciones', data);
-        
-        if (response && response.records && response.records.length > 0) {
-            showAlert('✅ Capacitación actualizada', 'success');
-            await loadTrainings();
-            return response.records[0];
-        }
-        
-    } catch (error) {
-        console.error('Error actualizando capacitación:', error);
-        showAlert(`Error al actualizar: ${error.message}`, 'error');
-        return false;
-    }
-}
-
-// ==========================================
-// FINALIZAR PARTICIPACIÓN
-// ==========================================
-
-async function completeParticipation(participationId, postTestScore) {
-    if (!participationId) {
-        showAlert('ID de participación no válido', 'error');
-        return false;
-    }
-    
-    try {
-        const data = {
-            records: [
-                {
-                    id: participationId,
-                    fields: {
-                        'Post-test Score': postTestScore,
-                        'Completado': true,
-                        'Fecha Finalización': new Date().toISOString().split('T')[0]
-                    }
-                }
-            ]
-        };
-        
-        const response = await airtableRequest('PATCH', '/Participaciones', data);
-        
-        if (response && response.records && response.records.length > 0) {
-            showAlert('✅ Evaluación completada', 'success');
-            return response.records[0];
-        }
-        
-    } catch (error) {
-        console.error('Error completando participación:', error);
-        showAlert(`Error: ${error.message}`, 'error');
-        return false;
-    }
-}
-
-// ==========================================
-// GENERAR CÓDIGO DE ACCESO ÚNICO
-// ==========================================
-
-function generateAccessCode() {
-    return 'CAP-' + Date.now().toString(36).toUpperCase() + 
-           '-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-}
-
-// ==========================================
-// LIMPIAR FORMULARIO DE CAPACITACIÓN
-// ==========================================
-
-function clearTrainingForm() {
-    const inputs = document.querySelectorAll('#trainingForm input, #trainingForm textarea, #trainingForm select');
-    inputs.forEach(input => input.value = '');
-    trainingFormData = {};
-}
-
-// ==========================================
-// UTILIDADES
-// ==========================================
-
-function loadTheme() {
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme === 'dark') {
-        document.body.classList.add('dark-mode');
-    }
-}
-
-function saveTheme(theme) {
-    localStorage.setItem('theme', theme);
-}
-
-function showAlert(message, type = 'info') {
-    console.log(`[${type.toUpperCase()}] ${message}`);
-    
-    // Usar SweetAlert2 si está disponible
-    if (typeof Swal !== 'undefined') {
+        // 5. Mostrar éxito
         Swal.fire({
-            icon: type,
-            title: type === 'success' ? 'Éxito' : type === 'error' ? 'Error' : 'Información',
-            text: message,
-            timer: 3000,
-            showConfirmButton: false
+            icon: 'success',
+            title: '¡Capacitación Guardada en Airtable!',
+            html: `
+                <div style="margin: 20px 0;">
+                    <p><strong>Título:</strong> ${title}</p>
+                    <p><strong>Departamento:</strong> ${department}</p>
+                    <p style="margin-top: 15px;">Código de Acceso:</p>
+                    <h2 style="color: #667eea; margin: 10px 0;">${accessCode}</h2>
+                    <p style="font-size: 0.9em; color: #666;">Comparte este código con los participantes</p>
+                </div>
+            `,
+            confirmButtonText: 'Generar QR',
+            showCancelButton: true,
+            cancelButtonText: 'Cerrar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                showQRCode(accessCode, title);
+            }
+        });
+        
+        // Limpiar formulario
+        resetForm();
+        
+    } catch (error) {
+        console.error('❌ Error guardando en Airtable:', error);
+        Swal.fire({
+            icon: 'error',
+            title: 'Error al Guardar',
+            html: `
+                <p>No se pudo guardar la capacitación en Airtable</p>
+                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">
+                    Error: ${error.message}
+                </p>
+                <p style="font-size: 0.85em; color: #999; margin-top: 10px;">
+                    Verifica las credenciales en Netlify y la estructura de las tablas en Airtable
+                </p>
+            `,
         });
     }
 }
 
-function initializeDashboard() {
-    console.log('📊 Dashboard inicializado');
-    // Implementar lógica del dashboard
+function generateAccessCode() {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+        code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
 }
 
-function loadReportOptions() {
-    console.log('📈 Opciones de reportes cargadas');
-    // Implementar lógica de reportes
+// ==========================================
+// CÓDIGO QR Y COMPARTIR
+// ==========================================
+
+function showQRCode(accessCode, title) {
+    const modal = document.getElementById('qrModal');
+    const qrContainer = document.getElementById('qrcode');
+    
+    qrContainer.innerHTML = '';
+    
+    const accessUrl = `${window.location.origin}${window.location.pathname}?code=${accessCode}`;
+    new QRCode(qrContainer, {
+        text: accessUrl,
+        width: 256,
+        height: 256,
+        colorDark: '#667eea',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.H
+    });
+    
+    document.getElementById('modalAccessCode').textContent = accessCode;
+    document.getElementById('modalAccessLink').textContent = accessUrl;
+    
+    modal.style.display = 'flex';
 }
 
-async function accessTraining() {
-    const code = document.getElementById('accessCode').value;
-    if (!code) {
-        showAlert('Por favor ingrese un código de acceso', 'error');
-        return;
+function closeModal() {
+    document.getElementById('qrModal').style.display = 'none';
+}
+
+function copyLink() {
+    const link = document.getElementById('modalAccessLink').textContent;
+    const code = document.getElementById('modalAccessCode').textContent;
+    
+    const text = `🏥 Acceso a Capacitación\n\nCódigo: ${code}\nLink: ${link}\n\nHospital Susana López de Valencia`;
+    
+    navigator.clipboard.writeText(text).then(() => {
+        Swal.fire({
+            icon: 'success',
+            title: 'Copiado',
+            text: 'Link copiado al portapapeles',
+            timer: 2000,
+            showConfirmButton: false
+        });
+    });
+}
+
+function shareWhatsApp() {
+    const code = document.getElementById('modalAccessCode').textContent;
+    const link = document.getElementById('modalAccessLink').textContent;
+    
+    const message = `🏥 *Acceso a Capacitación*\nHospital Susana López de Valencia\n\n*Código:* ${code}\n*Link:* ${link}`;
+    const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    window.open(whatsappUrl, '_blank');
+}
+
+function downloadQR() {
+    const canvas = document.querySelector('#qrcode canvas');
+    if (canvas) {
+        canvas.toBlob(blob => {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const code = document.getElementById('modalAccessCode').textContent;
+            link.download = `QR-${code}.png`;
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+            
+            Swal.fire({
+                icon: 'success',
+                title: 'Descargado',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        });
+    }
+}
+
+// ==========================================
+// LIMPIAR FORMULARIO
+// ==========================================
+
+function resetForm() {
+    if (pretestQuestionCount > 0 || posttestQuestionCount > 0) {
+        Swal.fire({
+            title: '¿Limpiar Formulario?',
+            text: 'Se perderán todas las preguntas',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Sí, limpiar',
+            cancelButtonText: 'Cancelar'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                performReset();
+            }
+        });
+    } else {
+        performReset();
+    }
+}
+
+function performReset() {
+    document.getElementById('trainingForm').reset();
+    document.getElementById('pretestQuestions').innerHTML = '';
+    document.getElementById('posttestQuestions').innerHTML = '';
+    pretestQuestionCount = 0;
+    posttestQuestionCount = 0;
+    document.querySelectorAll('.question-counter').forEach(c => c.remove());
+    
+    Swal.fire({
+        icon: 'success',
+        title: 'Formulario Limpiado',
+        timer: 1500,
+        showConfirmButton: false
+    });
+}
+
+// ==========================================
+// GRÁFICOS
+// ==========================================
+
+let participationsChart = null;
+let departmentChart = null;
+
+function initializeCharts() {
+    if (participationsChart) participationsChart.destroy();
+    if (departmentChart) departmentChart.destroy();
+    
+    const ctx1 = document.getElementById('participationsChart');
+    if (ctx1) {
+        participationsChart = new Chart(ctx1.getContext('2d'), {
+            type: 'line',
+            data: {
+                labels: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
+                datasets: [{
+                    label: 'Participaciones',
+                    data: [0, 0, 0, 0, 0, 0, 0],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false
+            }
+        });
     }
     
-    try {
-        showAlert('Buscando capacitación...', 'info');
-        // Aquí iría la lógica para buscar el código en Airtable
-        console.log('Accediendo a capacitación con código:', code);
-    } catch (error) {
-        showAlert('Error al acceder a la capacitación', 'error');
+    const ctx2 = document.getElementById('departmentChart');
+    if (ctx2) {
+        departmentChart = new Chart(ctx2.getContext('2d'), {
+            type: 'bar',
+            data: {
+                labels: ['Enfermería', 'Medicina', 'Admin', 'Lab', 'Radiología'],
+                datasets: [{
+                    label: 'Rendimiento',
+                    data: [0, 0, 0, 0, 0],
+                    backgroundColor: [
+                        'rgba(102, 126, 234, 0.8)',
+                        'rgba(100, 210, 80, 0.8)',
+                        'rgba(217, 65, 244, 0.8)',
+                        'rgba(248, 150, 30, 0.8)',
+                        'rgba(52, 172, 224, 0.8)'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100
+                    }
+                }
+            }
+        });
     }
 }
 
-// ==========================================
-// INICIAR AL CARGAR LA PÁGINA
-// ==========================================
-
-document.addEventListener('DOMContentLoaded', initializeApp);
-
-// ==========================================
-// NOTAS DE SEGURIDAD
-// ==========================================
-
-/*
-🔐 SEGURIDAD EN ESTA VERSIÓN:
-
-1. ✅ NO se guardan credenciales en localStorage
-2. ✅ NO se envían credenciales desde el navegador
-3. ✅ Todas las peticiones pasan por Netlify Functions
-4. ✅ Las credenciales están en variables de entorno del servidor
-5. ✅ Comunicación cliente-servidor encriptada (HTTPS)
-6. ✅ El proxy verifica credenciales en el servidor
-7. ✅ Si una sesión se compromete, las credenciales no se exponen
-
-CONFIGURACIÓN EN NETLIFY:
-
-Site settings → Build & deploy → Environment
-
-AIRTABLE_API_KEY=patXXXXXXXXXXXXXXXXXXXXXX
-AIRTABLE_BASE_ID=appXXXXXXXXXXXXXX
-
-Estas variables NUNCA están en el código, solo en el servidor.
-
-ESTRUCTURA DE AIRTABLE REQUERIDA:
-
-Tablas necesarias:
-1. Capacitaciones (Título, Descripción, Departamento, Activa, Fecha Creación)
-2. Preguntas (Capacitación, Tipo, Número, Pregunta, Respuestas)
-3. Sesiones (Capacitación, Código Acceso, Fecha Inicio, Activa, Link Acceso)
-4. Participaciones (Sesión, Nombre, Email, Cargo, Departamento, Completado)
-5. Respuestas (Participación, Pregunta, Calificación, Fecha Respuesta)
-
-EJEMPLO DE USO:
-
-// Crear nueva capacitación
-await createNewTraining();
-
-// Crear sesión (requiere ID de capacitación)
-await createTrainingSession(trainingId);
-
-// Registrar participante
-await registerParticipant(sessionId, {
-    name: 'Juan Pérez',
-    email: 'juan@hospital.com',
-    position: 'Enfermero',
-    department: 'Enfermería'
+// Limpiar intervalo al descargar
+window.addEventListener('beforeunload', () => {
+    if (connectionCheckInterval) clearInterval(connectionCheckInterval);
 });
-
-// Guardar respuesta
-await saveParticipantAnswer(participationId, questionId, 4);
-
-// Completar participación
-await completeParticipation(participationId, postTestScore);
-*/
