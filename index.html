@@ -6,7 +6,7 @@
     <title>Sistema de Capacitaciones - Hospital Susana López de Valencia</title>
     
     <meta name="description" content="Sistema integral de gestión de capacitaciones hospitalarias">
-    <meta name="theme-color" content="#00897B">
+    <meta name="theme-color" content="#667eea">
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -28,8 +28,8 @@
         }
 
         :root {
-            --primary: #00897B;
-            --secondary: #004D40;
+            --primary: #667eea;
+            --secondary: #764ba2;
             --success: #28a745;
             --danger: #dc3545;
             --warning: #ffc107;
@@ -98,80 +98,22 @@
             gap: 8px;
             padding: 8px 16px;
             background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
-            border: 2px solid #81c784;
+            border: 1px solid #81c784;
             border-radius: 20px;
             font-size: 0.85em;
-            font-weight: 500;
-            transition: all 0.3s;
-            cursor: pointer;
-            position: relative;
-        }
-
-        .connection-indicator.connected {
-            background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
-            border-color: #81c784;
-            color: #2e7d32;
-        }
-
-        .connection-indicator.disconnected {
-            background: linear-gradient(135deg, #ffebee 0%, #fff3e0 100%);
-            border-color: #ef5350;
-            color: #c62828;
-        }
-
-        .connection-indicator.checking {
-            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-            border-color: #ffa726;
-            color: #e65100;
         }
 
         .connection-dot {
-            width: 10px;
-            height: 10px;
+            width: 8px;
+            height: 8px;
             border-radius: 50%;
             background: #4caf50;
             animation: pulse 2s infinite;
         }
 
-        .connection-dot.error {
-            background: #f44336;
-            animation: none;
-        }
-
-        .connection-dot.checking {
-            background: #ffa726;
-            animation: spin 1s linear infinite;
-        }
-
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
-        }
-
-        @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-
-        .connection-tooltip {
-            position: absolute;
-            bottom: -35px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #333;
-            color: white;
-            padding: 6px 12px;
-            border-radius: 4px;
-            font-size: 0.75em;
-            white-space: nowrap;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s;
-            z-index: 1;
-        }
-
-        .connection-indicator:hover .connection-tooltip {
-            opacity: 1;
         }
 
         /* Navigation */
@@ -206,162 +148,19 @@
         }
 
         .nav-tab:hover {
-            background: #f5f5f5;
+            background: #f8f9fa;
             color: var(--primary);
         }
 
         .nav-tab.active {
-            border-bottom-color: var(--primary);
             color: var(--primary);
-            background: #f9f9f9;
+            border-bottom-color: var(--primary);
+            background: #f8f9ff;
         }
 
         /* Main Content */
-        main {
+        .main-content {
             padding: 2rem;
-        }
-
-        .section-title {
-            color: var(--primary);
-            font-size: 1.8rem;
-            margin-bottom: 2rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .card {
-            background: white;
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-            border: 1px solid #e0e0e0;
-            transition: all 0.3s;
-        }
-
-        .card:hover {
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-
-        .card h3 {
-            color: var(--primary);
-            margin-bottom: 1rem;
-        }
-
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 6px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: var(--secondary);
-        }
-
-        .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
-        }
-
-        .btn-secondary:hover {
-            background: #e0e0e0;
-        }
-
-        .btn-success {
-            background: var(--success);
-            color: white;
-        }
-
-        .btn-success:hover {
-            background: #1e7e34;
-        }
-
-        .btn-danger {
-            background: var(--danger);
-            color: white;
-        }
-
-        .btn-danger:hover {
-            background: #bb2d3b;
-        }
-
-        .btn-info {
-            background: var(--info);
-            color: white;
-        }
-
-        .btn-info:hover {
-            background: #0f6674;
-        }
-
-        .dashboard-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .metric-card {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
-            padding: 2rem;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        .metric-card .number {
-            font-size: 2.5rem;
-            font-weight: bold;
-            margin: 1rem 0;
-        }
-
-        .metric-card .label {
-            font-size: 0.95rem;
-            opacity: 0.9;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #333;
-            font-weight: 500;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 6px;
-            font-family: inherit;
-            font-size: 1rem;
-        }
-
-        .form-group textarea {
-            resize: vertical;
-            min-height: 100px;
-        }
-
-        .form-actions {
-            display: flex;
-            gap: 1rem;
-            margin-top: 2rem;
         }
 
         .tab-content {
@@ -374,105 +173,470 @@
         }
 
         @keyframes fadeIn {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
-        /* Footer */
-        .footer {
-            background: var(--secondary);
+        .section-title {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1.8rem;
+        }
+
+        /* Cards */
+        .card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .card h3 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        /* Stats Grid */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
             color: white;
-            text-align: center;
-            padding: 2rem;
-            margin-top: 4rem;
+            border-radius: 12px;
+            padding: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
 
-        .footer p {
-            margin: 0.5rem 0;
+        .stat-icon {
+            font-size: 3rem;
+            opacity: 0.8;
+        }
+
+        .stat-info h3 {
+            font-size: 2rem;
+            margin: 0;
+            color: white;
+        }
+
+        .stat-info p {
+            margin: 0;
+            opacity: 0.9;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+        }
+
+        /* Questions Container */
+        .questions-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .question-counter {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+        }
+
+        .question-card {
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 1.5rem;
+            transition: all 0.3s;
+        }
+
+        .question-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 4px 12px rgba(102,126,234,0.15);
+        }
+
+        .question-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .question-header h4 {
+            color: var(--primary);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-remove {
+            background: var(--danger);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-remove:hover {
+            background: #c82333;
+            transform: scale(1.05);
+        }
+
+        .question-text {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1rem;
+            resize: vertical;
+            transition: all 0.3s;
+        }
+
+        .question-text:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+        }
+
+        .options-container {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-top: 0.5rem;
+        }
+
+        .option-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: white;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            transition: all 0.3s;
+        }
+
+        .option-item:hover {
+            border-color: var(--primary);
+            background: #f8f9ff;
+        }
+
+        .option-item input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            accent-color: var(--primary);
+        }
+
+        .radio-label {
+            font-size: 0.85rem;
+            color: #666;
+            min-width: 70px;
+            font-weight: 500;
+        }
+
+        .option-text {
+            flex: 1;
+            padding: 0.5rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 0.95rem;
+        }
+
+        .option-text:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .help-text {
+            display: block;
+            margin-top: 0.5rem;
+            font-size: 0.85rem;
+            color: #666;
+            font-style: italic;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-info {
+            background: var(--info);
+            color: white;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
         }
 
         /* Modal */
         .modal {
             display: none;
             position: fixed;
-            z-index: 2000;
+            z-index: 10000;
             left: 0;
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0,0,0,0.4);
+            background: rgba(0,0,0,0.5);
+            justify-content: center;
+            align-items: center;
         }
 
         .modal-content {
-            background-color: #fefefe;
-            margin: 10% auto;
+            background: white;
             padding: 2rem;
-            border-radius: 8px;
+            border-radius: 16px;
+            max-width: 500px;
             width: 90%;
-            max-width: 600px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+        }
+
+        .modal-content h2 {
+            color: var(--primary);
+            margin-bottom: 1.5rem;
+            text-align: center;
         }
 
         .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+            font-size: 2rem;
             cursor: pointer;
+            color: #666;
         }
 
         .close:hover {
-            color: black;
+            color: var(--danger);
         }
 
-        .help-text {
-            display: block;
-            margin-top: 0.5rem;
-            color: #999;
-            font-size: 0.85rem;
+        .qr-container {
+            display: flex;
+            justify-content: center;
+            margin: 1.5rem 0;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 12px;
         }
 
+        .access-info {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin: 1rem 0;
+        }
+
+        .access-info p {
+            margin: 0.5rem 0;
+        }
+
+        .access-info strong {
+            color: var(--primary);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .modal-actions button {
+            flex: 1;
+        }
+
+        /* Charts */
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .charts-container canvas {
+            max-height: 300px;
+        }
+
+        /* Loading Screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: opacity 0.5s;
+        }
+
+        .loader {
+            text-align: center;
+            color: white;
+        }
+
+        .loader i {
+            font-size: 4rem;
+            animation: pulse 1.5s infinite;
+        }
+
+        /* Footer */
+        .footer {
+            background: #f8f9fa;
+            padding: 2rem;
+            text-align: center;
+            border-top: 2px solid #e0e0e0;
+        }
+
+        .footer p {
+            margin: 0.5rem 0;
+            color: #666;
+        }
+
+        /* Responsive */
         @media (max-width: 768px) {
             .header-content {
                 flex-direction: column;
                 align-items: flex-start;
             }
 
-            .nav-tab {
-                min-width: 100px;
-                padding: 0.8rem;
+            .stats-grid {
+                grid-template-columns: 1fr;
             }
 
-            main {
-                padding: 1rem;
+            .charts-container {
+                grid-template-columns: 1fr;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .form-actions .btn {
+                width: 100%;
             }
         }
     </style>
 </head>
 <body>
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="loading-screen">
+        <div class="loader">
+            <i class="fas fa-heartbeat"></i>
+            <p>Cargando Sistema de Capacitaciones...</p>
+        </div>
+    </div>
+
+    <!-- Main Container -->
     <div class="container">
         <!-- Header -->
         <header class="header">
             <div class="header-content">
                 <div class="logo-section">
                     <div>
-                        <h1>Sistema de Capacitaciones</h1>
+                        <h1>🏥 Sistema de Capacitaciones</h1>
                         <p>Hospital Susana López de Valencia</p>
-                        <p style="font-size: 0.8rem; color: #999;">Desarrollado por Ing. Paul Eduardo Muñoz Rodriguez</p>
+                        <p style="font-size: 0.8em; font-style: italic;">Desarrollado por Ing. Paul Eduardo Muñoz Rodriguez</p>
                     </div>
                 </div>
                 <div class="header-actions">
-                    <div class="connection-indicator" id="connectionIndicator" onclick="testAirtableConnection()">
-                        <div class="connection-dot" id="connectionDot"></div>
-                        <span id="connectionText">Verificando...</span>
-                        <div class="connection-tooltip" id="connectionTooltip">Haz clic para reintentar</div>
+                    <div class="connection-indicator">
+                        <div class="connection-dot"></div>
+                        <span>Airtable Conectado</span>
                     </div>
+                    <span id="currentDateTime"></span>
                 </div>
             </div>
         </header>
@@ -481,105 +645,215 @@
         <nav class="navigation">
             <button class="nav-tab active" onclick="switchTab('dashboard')">
                 <i class="fas fa-chart-line"></i>
-                Dashboard
+                <span>Dashboard</span>
             </button>
             <button class="nav-tab" onclick="switchTab('create')">
                 <i class="fas fa-plus-circle"></i>
-                Crear
+                <span>Crear</span>
             </button>
             <button class="nav-tab" onclick="switchTab('manage')">
                 <i class="fas fa-tasks"></i>
-                Gestionar
+                <span>Gestionar</span>
             </button>
             <button class="nav-tab" onclick="switchTab('exam')">
                 <i class="fas fa-clipboard-check"></i>
-                Examen
+                <span>Examen</span>
             </button>
             <button class="nav-tab" onclick="switchTab('reports')">
                 <i class="fas fa-chart-bar"></i>
-                Reportes
+                <span>Reportes</span>
             </button>
         </nav>
 
         <!-- Main Content -->
-        <main>
+        <main class="main-content">
+            
             <!-- Dashboard Tab -->
             <section id="dashboard" class="tab-content active">
-                <h2 class="section-title"><i class="fas fa-chart-line"></i> Panel de Control</h2>
+                <h2 class="section-title">
+                    <i class="fas fa-chart-line"></i> Panel de Control
+                </h2>
                 
-                <div class="dashboard-grid">
-                    <div class="metric-card">
-                        <i class="fas fa-graduation-cap" style="font-size: 2rem;"></i>
-                        <div class="number" id="activeTrainingsCount">0</div>
-                        <div class="label">Capacitaciones Activas</div>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-graduation-cap"></i></div>
+                        <div class="stat-info">
+                            <h3 id="totalTrainings">0</h3>
+                            <p>Capacitaciones Activas</p>
+                        </div>
                     </div>
-                    <div class="metric-card">
-                        <i class="fas fa-users" style="font-size: 2rem;"></i>
-                        <div class="number" id="totalParticipantsCount">0</div>
-                        <div class="label">Participantes Totales</div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-users"></i></div>
+                        <div class="stat-info">
+                            <h3 id="totalParticipants">0</h3>
+                            <p>Participantes Totales</p>
+                        </div>
                     </div>
-                    <div class="metric-card">
-                        <i class="fas fa-check-circle" style="font-size: 2rem;"></i>
-                        <div class="number" id="attendanceRateCount">0%</div>
-                        <div class="label">Tasa de Asistencia</div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+                        <div class="stat-info">
+                            <h3 id="adherenceRate">0%</h3>
+                            <p>Tasa de Adherencia</p>
+                        </div>
                     </div>
-                    <div class="metric-card">
-                        <i class="fas fa-star" style="font-size: 2rem;"></i>
-                        <div class="number" id="averageRatingCount">0%</div>
-                        <div class="label">Mejora Promedio</div>
+                    
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                        <div class="stat-info">
+                            <h3 id="avgImprovement">0%</h3>
+                            <p>Mejora Promedio</p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="card">
-                    <h3><i class="fas fa-info-circle"></i> Estado del Sistema</h3>
-                    <div style="padding: 1rem;">
-                        <p><strong>Estado de Airtable:</strong> <span id="airtableStatus" style="color: #f44336;">Desconectado</span></p>
-                        <p><strong>Última actualización:</strong> <span id="lastUpdateTime">—</span></p>
-                        <p><strong>Descripción:</strong> <span id="statusDescription">Haz clic en el indicador de conexión arriba para verificar la conexión a Airtable.</span></p>
-                        <button class="btn btn-primary" onclick="testAirtableConnection()" style="margin-top: 1rem;">
-                            <i class="fas fa-sync-alt"></i> Verificar Conexión
-                        </button>
+                <div class="charts-container">
+                    <div class="card">
+                        <h3>Participaciones por Día</h3>
+                        <canvas id="participationsChart"></canvas>
+                    </div>
+                    
+                    <div class="card">
+                        <h3>Rendimiento por Departamento</h3>
+                        <canvas id="departmentChart"></canvas>
                     </div>
                 </div>
             </section>
 
             <!-- Create Tab -->
             <section id="create" class="tab-content">
-                <h2 class="section-title"><i class="fas fa-plus-circle"></i> Crear Capacitación</h2>
+                <h2 class="section-title">
+                    <i class="fas fa-plus-circle"></i> Crear Nueva Capacitación
+                </h2>
                 
                 <div class="card">
                     <h3>📋 Información General</h3>
                     <form id="trainingForm">
                         <div class="form-group">
-                            <label><i class="fas fa-heading"></i> Nombre de la Capacitación *</label>
-                            <input type="text" id="trainingName" required placeholder="Ejemplo: Uso de Desfibrilador Externo Automático">
+                            <label><i class="fas fa-graduation-cap"></i> Capacitación *</label>
+                            <input type="text" id="trainingTitle" required placeholder="Ej: Protocolo de Higiene de Manos">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label><i class="fas fa-align-left"></i> Descripción</label>
+                            <textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos..."></textarea>
+                        </div>
+                        
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label><i class="fas fa-calendar"></i> Fecha de Creación *</label>
+                                <input type="date" id="trainingDate" required>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label><i class="fas fa-building"></i> Departamento *</label>
+                                <select id="trainingDepartment" required>
+                                    <option value="">Seleccione...</option>
+                                    <option value="General">General</option>
+                                    <option value="Enfermería">Enfermería</option>
+                                    <option value="Medicina">Medicina</option>
+                                    <option value="Administración">Administración</option>
+                                    <option value="Laboratorio">Laboratorio</option>
+                                    <option value="Radiología">Radiología</option>
+                                </select>
+                            </div>
+                            
+                            <div class="form-group">
+                                <label><i class="fas fa-clock"></i> Duración</label>
+                                <input type="text" id="trainingDuration" placeholder="Ej: 30 minutos">
+                            </div>
                         </div>
 
                         <div class="form-group">
-                            <label><i class="fas fa-align-left"></i> Descripción *</label>
-                            <textarea id="trainingDescription" required placeholder="Descripción detallada de la capacitación"></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <label><i class="fas fa-calendar"></i> Fecha de Inicio *</label>
-                            <input type="date" id="trainingDate" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label><i class="fas fa-user-tie"></i> Expositor Responsable *</label>
-                            <input type="text" id="trainingInstructor" required placeholder="Nombre del expositor">
-                        </div>
-
-                        <div class="form-group">
-                            <label><i class="fas fa-location-dot"></i> Lugar de la Capacitación *</label>
-                            <input type="text" id="trainingLocation" required placeholder="Ejemplo: Auditorio Principal">
-                        </div>
-
-                        <div class="form-group">
-                            <label><i class="fas fa-clock"></i> Duración (horas) *</label>
-                            <input type="number" id="trainingDuration" min="0.5" step="0.5" required placeholder="Ejemplo: 2">
+                            <label><i class="fas fa-users-cog"></i> Personal Capacitado *</label>
+                            <div id="trainingStaffContainer" style="background: #f8f9fa; border: 2px solid #e0e0e0; border-radius: 8px; padding: 1rem; max-height: 300px; overflow-y: auto;">
+                                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem;">
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Jefe de Enfermería" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Jefe de Enfermería</span>
+                                    </label>
+                                    
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Médico General" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Médico General</span>
+                                    </label>
+                                    
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Médico Especialista" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Médico Especialista</span>
+                                    </label>
+                                    
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Ingeniero Biomédico" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Ingeniero Biomédico</span>
+                                    </label>
+                                    
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Estudiante" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Estudiante</span>
+                                    </label>
+                                    
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Auxiliar de Enfermería" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Auxiliar de Enfermería</span>
+                                    </label>
+                                    
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Terapeuta Respiratorio" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Terapeuta Respiratorio</span>
+                                    </label>
+                                    
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Fisioterapeuta" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Fisioterapeuta</span>
+                                    </label>
+                                    
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Conductor" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Conductor</span>
+                                    </label>
+                                    
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Técnico de Rayos X" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Técnico de Rayos X</span>
+                                    </label>
+                                    
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Fonoaudiólogo" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Fonoaudiólogo</span>
+                                    </label>
+                                    
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Instrumentador Quirúrgico" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Instrumentador Quirúrgico</span>
+                                    </label>
+                                    
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Administrativo" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Administrativo</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <small class="help-text">Selecciona el personal que recibirá esta capacitación</small>
                         </div>
                     </form>
+                </div>
+
+                <div class="card">
+                    <h3>❓ Pretest (Evaluación Inicial)</h3>
+                    <div id="pretestQuestions" class="questions-container"></div>
+                    <button class="btn btn-secondary" onclick="addQuestion('pretest')">
+                        <i class="fas fa-plus"></i> Agregar Pregunta
+                    </button>
+                </div>
+
+                <div class="card">
+                    <h3>✅ Post-test (Evaluación Final)</h3>
+                    <div id="posttestQuestions" class="questions-container"></div>
+                    <button class="btn btn-secondary" onclick="addQuestion('posttest')">
+                        <i class="fas fa-plus"></i> Agregar Pregunta
+                    </button>
                 </div>
 
                 <div class="form-actions">
@@ -592,32 +866,30 @@
                 </div>
             </section>
 
-            <!-- Manage Tab -->
+            <!-- Other tabs... -->
             <section id="manage" class="tab-content">
                 <h2 class="section-title"><i class="fas fa-tasks"></i> Gestionar Capacitaciones</h2>
                 <div class="card">
                     <p style="text-align: center; padding: 2rem; color: #666;">
-                        <i class="fas fa-info-circle"></i> Las capacitaciones aparecerán aquí una vez se conecte a Airtable correctamente.
+                        Aquí aparecerán las capacitaciones creadas
                     </p>
                 </div>
             </section>
 
-            <!-- Exam Tab -->
             <section id="exam" class="tab-content">
                 <h2 class="section-title"><i class="fas fa-clipboard-check"></i> Realizar Examen</h2>
                 <div class="card">
                     <p style="text-align: center; padding: 2rem; color: #666;">
-                        <i class="fas fa-info-circle"></i> Formulario de acceso a capacitaciones
+                        Formulario de acceso a capacitaciones
                     </p>
                 </div>
             </section>
 
-            <!-- Reports Tab -->
             <section id="reports" class="tab-content">
                 <h2 class="section-title"><i class="fas fa-chart-bar"></i> Reportes</h2>
                 <div class="card">
                     <p style="text-align: center; padding: 2rem; color: #666;">
-                        <i class="fas fa-info-circle"></i> Estadísticas y reportes de capacitaciones
+                        Estadísticas y reportes de capacitaciones
                     </p>
                 </div>
             </section>
@@ -626,241 +898,558 @@
         <!-- Footer -->
         <footer class="footer">
             <p>&copy; 2025 Hospital Susana López de Valencia</p>
-            <p>Desarrollado por Ing. Paul Eduardo Muñoz Rodriguez</p>
+            <p>Desarrollado con ❤️ por Ing. Paul Eduardo Muñoz Rodriguez</p>
         </footer>
     </div>
 
+    <!-- QR Modal -->
+    <div id="qrModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>📱 Código QR de Acceso</h2>
+            <div id="qrcode" class="qr-container"></div>
+            <div class="access-info">
+                <p><strong>Código:</strong> <span id="modalAccessCode"></span></p>
+                <p><strong>Link:</strong> <span id="modalAccessLink"></span></p>
+            </div>
+            <div class="modal-actions">
+                <button class="btn btn-primary" onclick="copyLink()">
+                    <i class="fas fa-copy"></i> Copiar
+                </button>
+                <button class="btn btn-success" onclick="shareWhatsApp()">
+                    <i class="fab fa-whatsapp"></i> WhatsApp
+                </button>
+                <button class="btn btn-info" onclick="downloadQR()">
+                    <i class="fas fa-download"></i> Descargar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // ============================================
-        // CONFIGURACIÓN SEGURA - SIN CREDENCIALES
-        // ============================================
-        // Las credenciales de Airtable se almacenan de forma segura en variables
-        // de entorno en Netlify. El frontend comunica a través del proxy seguro.
-        
-        // Tabla de nombres (información pública, sin valores sensibles)
-        const TABLE_NAMES = {
-            trainings: 'Capacitaciones',
-            participants: 'Participantes',
-            exams: 'Exámenes'
-        };
+        // Variables globales
+        let pretestQuestionCount = 0;
+        let posttestQuestionCount = 0;
+        const MAX_QUESTIONS = 10;
 
-        // ============================================
-        // FUNCIONES DE CONEXIÓN A AIRTABLE (VÍA PROXY SEGURO)
-        // ============================================
+        // Inicialización
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+            updateDateTime();
+            setInterval(updateDateTime, 1000);
+        });
 
-        /**
-         * Verifica la conexión a Airtable a través del proxy seguro de Netlify
-         * Las credenciales permanecen en el servidor, nunca en el frontend
-         */
-        async function testAirtableConnection() {
-            const indicator = document.getElementById('connectionIndicator');
-            const dot = document.getElementById('connectionDot');
-            const text = document.getElementById('connectionText');
-            const tooltip = document.getElementById('connectionTooltip');
-            const statusDesc = document.getElementById('statusDescription');
+        function initializeApp() {
+            setTimeout(() => {
+                document.getElementById('loadingScreen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                }, 500);
+            }, 1500);
 
-            // Cambiar estado a "verificando"
-            indicator.classList.remove('connected', 'disconnected');
-            indicator.classList.add('checking');
-            dot.classList.remove('error');
-            dot.classList.add('checking');
-            text.textContent = 'Verificando...';
-            tooltip.textContent = 'Verificando conexión...';
-
-            try {
-                // Realizar solicitud de prueba a través del proxy seguro
-                const response = await fetch('/.netlify/functions/airtable-prov-v1', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: `/${TABLE_NAMES.trainings}?maxRecords=1`
-                    })
-                });
-
-                if (response.ok) {
-                    // Conexión exitosa
-                    setConnectionStatus(true, 'Conexión exitosa a Airtable');
-                } else if (response.status === 401) {
-                    throw new Error('Credenciales de Airtable no configuradas en el servidor');
-                } else if (response.status === 404) {
-                    throw new Error('Tabla no encontrada');
-                } else if (response.status === 500) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.message || 'Error en el servidor');
-                } else {
-                    throw new Error(`Error ${response.status}: ${response.statusText}`);
-                }
-            } catch (error) {
-                console.error('Error de conexión a Airtable:', error);
-                setConnectionStatus(false, error.message);
-            }
+            setTimeout(() => initializeCharts(), 2000);
         }
 
-        /**
-         * Actualiza el estado visual de la conexión
-         */
-        function setConnectionStatus(isConnected, message) {
-            const indicator = document.getElementById('connectionIndicator');
-            const dot = document.getElementById('connectionDot');
-            const text = document.getElementById('connectionText');
-            const statusText = document.getElementById('airtableStatus');
-            const statusDesc = document.getElementById('statusDescription');
-            const lastUpdate = document.getElementById('lastUpdateTime');
-
-            indicator.classList.remove('checking');
-            dot.classList.remove('checking');
-
-            if (isConnected) {
-                indicator.classList.add('connected');
-                indicator.classList.remove('disconnected');
-                dot.classList.remove('error');
-                text.textContent = '✓ Airtable Conectado';
-                statusText.textContent = 'Conectado';
-                statusText.style.color = '#28a745';
-                statusDesc.textContent = '✓ ' + message;
-                statusDesc.style.color = '#28a745';
-            } else {
-                indicator.classList.add('disconnected');
-                indicator.classList.remove('connected');
-                dot.classList.add('error');
-                text.textContent = '✗ Airtable Desconectado';
-                statusText.textContent = 'Desconectado';
-                statusText.style.color = '#f44336';
-                statusDesc.textContent = '✗ ' + message;
-                statusDesc.style.color = '#f44336';
-            }
-
-            // Actualizar hora
+        function updateDateTime() {
             const now = new Date();
-            lastUpdate.textContent = now.toLocaleTimeString('es-CO', { 
-                hour: '2-digit', 
-                minute: '2-digit', 
-                second: '2-digit' 
-            });
+            const options = { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            };
+            const element = document.getElementById('currentDateTime');
+            if (element) {
+                element.textContent = now.toLocaleDateString('es-ES', options);
+            }
         }
 
-        // ============================================
-        // FUNCIONES DE NAVEGACIÓN
-        // ============================================
-
-        /**
-         * Cambia entre pestañas
-         */
         function switchTab(tabName) {
-            // Ocultar todos los tabs
-            const tabs = document.querySelectorAll('.tab-content');
-            tabs.forEach(tab => tab.classList.remove('active'));
-
-            // Remover clase active de todos los botones de navegación
-            const navTabs = document.querySelectorAll('.nav-tab');
-            navTabs.forEach(tab => tab.classList.remove('active'));
-
-            // Mostrar el tab seleccionado
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            
+            document.querySelectorAll('.nav-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
             const selectedTab = document.getElementById(tabName);
-            if (selectedTab) {
-                selectedTab.classList.add('active');
-            }
-
-            // Marcar el botón de navegación como activo
+            if (selectedTab) selectedTab.classList.add('active');
+            
             event.target.closest('.nav-tab').classList.add('active');
         }
 
-        // ============================================
-        // FUNCIONES DE FORMULARIO
-        // ============================================
-
-        /**
-         * Guarda una capacitación a través del proxy seguro
-         */
-        async function saveTraining() {
-            const trainingName = document.getElementById('trainingName').value;
-            const trainingDescription = document.getElementById('trainingDescription').value;
-            const trainingDate = document.getElementById('trainingDate').value;
-            const trainingInstructor = document.getElementById('trainingInstructor').value;
-            const trainingLocation = document.getElementById('trainingLocation').value;
-            const trainingDuration = document.getElementById('trainingDuration').value;
-
-            if (!trainingName || !trainingDescription || !trainingDate || !trainingInstructor) {
-                Swal.fire('Error', 'Por favor completa todos los campos requeridos', 'error');
+        // ==================== FUNCIONES DE PREGUNTAS ====================
+        
+        function addQuestion(type) {
+            const container = document.getElementById(`${type}Questions`);
+            const currentCount = type === 'pretest' ? pretestQuestionCount : posttestQuestionCount;
+            
+            if (currentCount >= MAX_QUESTIONS) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Límite Alcanzado',
+                    text: `Solo puedes agregar hasta ${MAX_QUESTIONS} preguntas por test`,
+                    confirmButtonText: 'Entendido'
+                });
                 return;
             }
+            
+            if (type === 'pretest') {
+                pretestQuestionCount++;
+            } else {
+                posttestQuestionCount++;
+            }
+            
+            const questionNumber = currentCount + 1;
+            const questionId = `${type}-q${questionNumber}`;
+            
+            const questionHTML = `
+                <div class="question-card" id="${questionId}" data-question-number="${questionNumber}">
+                    <div class="question-header">
+                        <h4>📝 Pregunta ${questionNumber}</h4>
+                        <button type="button" class="btn-remove" onclick="removeQuestion('${questionId}', '${type}')">
+                            <i class="fas fa-trash"></i> Eliminar
+                        </button>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-question"></i> Pregunta *</label>
+                        <textarea id="${questionId}-text" class="question-text" rows="2" required 
+                                  placeholder="Escriba la pregunta aquí..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-list"></i> Opciones de Respuesta</label>
+                        <div class="options-container">
+                            <div class="option-item">
+                                <input type="radio" name="${questionId}-correct" value="a" id="${questionId}-option-a" required>
+                                <label for="${questionId}-option-a" class="radio-label">✓ Correcta</label>
+                                <input type="text" id="${questionId}-text-a" class="option-text" placeholder="Opción A" required>
+                            </div>
+                            
+                            <div class="option-item">
+                                <input type="radio" name="${questionId}-correct" value="b" id="${questionId}-option-b">
+                                <label for="${questionId}-option-b" class="radio-label">✓ Correcta</label>
+                                <input type="text" id="${questionId}-text-b" class="option-text" placeholder="Opción B" required>
+                            </div>
+                            
+                            <div class="option-item">
+                                <input type="radio" name="${questionId}-correct" value="c" id="${questionId}-option-c">
+                                <label for="${questionId}-option-c" class="radio-label">✓ Correcta</label>
+                                <input type="text" id="${questionId}-text-c" class="option-text" placeholder="Opción C" required>
+                            </div>
+                            
+                            <div class="option-item">
+                                <input type="radio" name="${questionId}-correct" value="d" id="${questionId}-option-d">
+                                <label for="${questionId}-option-d" class="radio-label">✓ Correcta</label>
+                                <input type="text" id="${questionId}-text-d" class="option-text" placeholder="Opción D" required>
+                            </div>
+                        </div>
+                        <small class="help-text">Marca la opción correcta</small>
+                    </div>
+                </div>
+            `;
+            
+            container.insertAdjacentHTML('beforeend', questionHTML);
+            updateQuestionCounter(type);
+            
+            // Animación
+            const newQuestion = document.getElementById(questionId);
+            newQuestion.style.opacity = '0';
+            setTimeout(() => {
+                newQuestion.style.transition = 'opacity 0.3s';
+                newQuestion.style.opacity = '1';
+            }, 10);
+        }
 
-            try {
-                // Crear objeto de capacitación
-                const trainingData = {
-                    "Nombre": trainingName,
-                    "Descripción": trainingDescription,
-                    "Fecha Inicio": trainingDate,
-                    "Expositor": trainingInstructor,
-                    "Lugar": trainingLocation,
-                    "Duración (horas)": parseFloat(trainingDuration),
-                    "Fecha Creación": new Date().toISOString()
-                };
-
-                // Enviar a través del proxy seguro de Netlify
-                const response = await fetch('/.netlify/functions/airtable-prov-v1', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        method: 'POST',
-                        path: `/${TABLE_NAMES.trainings}`,
-                        data: {
-                            records: [{ fields: trainingData }]
-                        }
-                    })
-                });
-
-                if (response.ok) {
-                    Swal.fire('¡Éxito!', 'Capacitación guardada correctamente', 'success');
-                    resetForm();
-                } else {
-                    const error = await response.json();
-                    throw new Error(error.message || 'Error al guardar');
+        function removeQuestion(questionId, type) {
+            Swal.fire({
+                title: '¿Eliminar pregunta?',
+                text: 'Esta acción no se puede deshacer',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const element = document.getElementById(questionId);
+                    if (element) {
+                        element.style.transition = 'opacity 0.3s';
+                        element.style.opacity = '0';
+                        
+                        setTimeout(() => {
+                            element.remove();
+                            
+                            if (type === 'pretest') {
+                                pretestQuestionCount--;
+                            } else {
+                                posttestQuestionCount--;
+                            }
+                            
+                            renumberQuestions(type);
+                            updateQuestionCounter(type);
+                        }, 300);
+                    }
                 }
-            } catch (error) {
-                console.error('Error:', error);
-                Swal.fire('Error', 'No se pudo guardar la capacitación: ' + error.message, 'error');
+            });
+        }
+
+        function renumberQuestions(type) {
+            const container = document.getElementById(`${type}Questions`);
+            const questions = container.querySelectorAll('.question-card');
+            
+            questions.forEach((question, index) => {
+                const newNumber = index + 1;
+                const header = question.querySelector('h4');
+                if (header) {
+                    header.textContent = `📝 Pregunta ${newNumber}`;
+                }
+                question.setAttribute('data-question-number', newNumber);
+            });
+        }
+
+        function updateQuestionCounter(type) {
+            const container = document.getElementById(`${type}Questions`);
+            const count = type === 'pretest' ? pretestQuestionCount : posttestQuestionCount;
+            
+            let counter = container.parentElement.querySelector('.question-counter');
+            if (!counter) {
+                counter = document.createElement('div');
+                counter.className = 'question-counter';
+                container.parentElement.insertBefore(counter, container);
+            }
+            
+            counter.innerHTML = `
+                <i class="fas fa-list-ol"></i> 
+                <span>${count} de ${MAX_QUESTIONS} preguntas agregadas</span>
+            `;
+        }
+
+        function collectQuestions(type) {
+            const container = document.getElementById(`${type}Questions`);
+            const questionCards = container.querySelectorAll('.question-card');
+            const questions = [];
+            
+            for (let i = 0; i < questionCards.length; i++) {
+                const card = questionCards[i];
+                const questionId = card.id;
+                
+                const questionText = document.getElementById(`${questionId}-text`).value.trim();
+                if (!questionText) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Pregunta Vacía',
+                        text: `Complete la pregunta ${i + 1} del ${type === 'pretest' ? 'Pretest' : 'Post-test'}`,
+                    });
+                    return null;
+                }
+                
+                const options = {
+                    a: document.getElementById(`${questionId}-text-a`).value.trim(),
+                    b: document.getElementById(`${questionId}-text-b`).value.trim(),
+                    c: document.getElementById(`${questionId}-text-c`).value.trim(),
+                    d: document.getElementById(`${questionId}-text-d`).value.trim()
+                };
+                
+                if (!options.a || !options.b || !options.c || !options.d) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Opciones Incompletas',
+                        text: `Complete todas las opciones de la pregunta ${i + 1}`,
+                    });
+                    return null;
+                }
+                
+                const correctAnswer = document.querySelector(`input[name="${questionId}-correct"]:checked`);
+                if (!correctAnswer) {
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Respuesta Correcta',
+                        text: `Seleccione la respuesta correcta para la pregunta ${i + 1}`,
+                    });
+                    return null;
+                }
+                
+                questions.push({
+                    number: i + 1,
+                    question: questionText,
+                    options: options,
+                    correctAnswer: correctAnswer.value
+                });
+            }
+            
+            return questions;
+        }
+
+        function saveTraining() {
+            const title = document.getElementById('trainingTitle').value;
+            const description = document.getElementById('trainingDescription').value;
+            const trainingDate = document.getElementById('trainingDate').value;
+            const department = document.getElementById('trainingDepartment').value;
+            const duration = document.getElementById('trainingDuration').value;
+            
+            // Obtener personal capacitado seleccionado
+            const staffCheckboxes = document.querySelectorAll('.trainingStaff:checked');
+            const selectedStaff = Array.from(staffCheckboxes).map(cb => cb.value);
+            
+            if (!title || !department || !trainingDate || selectedStaff.length === 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Campos Requeridos',
+                    text: 'Complete todos los campos obligatorios, incluyendo fecha y personal capacitado',
+                });
+                return;
+            }
+            
+            if (pretestQuestionCount === 0 || posttestQuestionCount === 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Preguntas Requeridas',
+                    text: 'Agregue al menos una pregunta en cada test',
+                });
+                return;
+            }
+            
+            const pretestQuestions = collectQuestions('pretest');
+            if (!pretestQuestions) return;
+            
+            const posttestQuestions = collectQuestions('posttest');
+            if (!posttestQuestions) return;
+            
+            const accessCode = generateAccessCode();
+            
+            const trainingData = {
+                title,
+                description,
+                trainingDate,
+                department,
+                duration,
+                selectedStaff,
+                accessCode,
+                pretestQuestions,
+                posttestQuestions,
+                createdAt: new Date().toISOString(),
+                status: 'active'
+            };
+            
+            Swal.fire({
+                title: 'Guardando...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+            
+            setTimeout(() => {
+                const trainings = JSON.parse(localStorage.getItem('trainings') || '[]');
+                trainings.push(trainingData);
+                localStorage.setItem('trainings', JSON.stringify(trainings));
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Capacitación Guardada!',
+                    html: `
+                        <div style="margin: 20px 0;">
+                            <p>Código de Acceso:</p>
+                            <h2 style="color: #667eea; margin: 10px 0;">${accessCode}</h2>
+                            <p style="font-size: 0.9em; color: #666;">Comparte este código con los participantes</p>
+                        </div>
+                    `,
+                    confirmButtonText: 'Generar QR',
+                    showCancelButton: true,
+                    cancelButtonText: 'Cerrar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        showQRCode(accessCode, title);
+                    }
+                });
+                
+                resetForm();
+            }, 1500);
+        }
+
+        function generateAccessCode() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+
+        function showQRCode(accessCode, title) {
+            const modal = document.getElementById('qrModal');
+            const qrContainer = document.getElementById('qrcode');
+            
+            qrContainer.innerHTML = '';
+            
+            const accessUrl = `${window.location.origin}?code=${accessCode}`;
+            new QRCode(qrContainer, {
+                text: accessUrl,
+                width: 256,
+                height: 256,
+                colorDark: '#667eea',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.H
+            });
+            
+            document.getElementById('modalAccessCode').textContent = accessCode;
+            document.getElementById('modalAccessLink').textContent = accessUrl;
+            
+            modal.style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('qrModal').style.display = 'none';
+        }
+
+        function copyLink() {
+            const link = document.getElementById('modalAccessLink').textContent;
+            const code = document.getElementById('modalAccessCode').textContent;
+            
+            const text = `🏥 Acceso a Capacitación\n\nCódigo: ${code}\nLink: ${link}\n\nHospital Susana López de Valencia`;
+            
+            navigator.clipboard.writeText(text).then(() => {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Copiado',
+                    text: 'Link copiado al portapapeles',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+            });
+        }
+
+        function shareWhatsApp() {
+            const code = document.getElementById('modalAccessCode').textContent;
+            const link = document.getElementById('modalAccessLink').textContent;
+            
+            const message = `🏥 *Acceso a Capacitación*\nHospital Susana López de Valencia\n\n*Código:* ${code}\n*Link:* ${link}`;
+            const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
+            window.open(whatsappUrl, '_blank');
+        }
+
+        function downloadQR() {
+            const canvas = document.querySelector('#qrcode canvas');
+            if (canvas) {
+                canvas.toBlob(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    const code = document.getElementById('modalAccessCode').textContent;
+                    link.download = `QR-${code}.png`;
+                    link.href = url;
+                    link.click();
+                    URL.revokeObjectURL(url);
+                    
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Descargado',
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                });
             }
         }
 
-        /**
-         * Limpia el formulario
-         */
         function resetForm() {
-            document.getElementById('trainingForm').reset();
-            document.getElementById('trainingName').focus();
+            if (pretestQuestionCount > 0 || posttestQuestionCount > 0) {
+                Swal.fire({
+                    title: '¿Limpiar Formulario?',
+                    text: 'Se perderán todas las preguntas',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, limpiar',
+                    cancelButtonText: 'Cancelar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        performReset();
+                    }
+                });
+            } else {
+                performReset();
+            }
         }
 
-        // ============================================
-        // INICIALIZACIÓN
-        // ============================================
-
-        /**
-         * Se ejecuta al cargar la página
-         */
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('Sistema de Capacitaciones cargado');
+        function performReset() {
+            document.getElementById('trainingForm').reset();
+            document.getElementById('pretestQuestions').innerHTML = '';
+            document.getElementById('posttestQuestions').innerHTML = '';
+            pretestQuestionCount = 0;
+            posttestQuestionCount = 0;
+            document.querySelectorAll('.question-counter').forEach(c => c.remove());
             
-            // Verificar conexión a Airtable al cargar
-            testAirtableConnection();
+            Swal.fire({
+                icon: 'success',
+                title: 'Formulario Limpiado',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        }
 
-            // Establecer fecha actual como valor por defecto
-            const today = new Date().toISOString().split('T')[0];
-            document.getElementById('trainingDate').value = today;
+        // ==================== CHARTS ====================
+        
+        let participationsChart = null;
+        let departmentChart = null;
 
-            // Re-verificar conexión cada 30 segundos
-            setInterval(testAirtableConnection, 30000);
-        });
-
-        // Manejo de errores global
-        window.addEventListener('error', function(event) {
-            console.error('Error global:', event.error);
-        });
+        function initializeCharts() {
+            if (participationsChart) participationsChart.destroy();
+            if (departmentChart) departmentChart.destroy();
+            
+            const ctx1 = document.getElementById('participationsChart');
+            if (ctx1) {
+                participationsChart = new Chart(ctx1.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'],
+                        datasets: [{
+                            label: 'Participaciones',
+                            data: [0, 0, 0, 0, 0, 0, 0],
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false
+                    }
+                });
+            }
+            
+            const ctx2 = document.getElementById('departmentChart');
+            if (ctx2) {
+                departmentChart = new Chart(ctx2.getContext('2d'), {
+                    type: 'bar',
+                    data: {
+                        labels: ['Enfermería', 'Medicina', 'Admin', 'Lab', 'Radiología'],
+                        datasets: [{
+                            label: 'Rendimiento',
+                            data: [0, 0, 0, 0, 0],
+                            backgroundColor: [
+                                'rgba(102, 126, 234, 0.8)',
+                                'rgba(100, 210, 80, 0.8)',
+                                'rgba(217, 65, 244, 0.8)',
+                                'rgba(248, 150, 30, 0.8)',
+                                'rgba(52, 172, 224, 0.8)'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100
+                            }
+                        }
+                    }
+                });
+            }
+        }
     </script>
 </body>
 </html>
