@@ -25,7 +25,7 @@ let isConnected = false;
 
 function initializeApp() {
     console.log('🚀 Iniciando Sistema de Capacitaciones (Versión Segura)...');
-    console.log('🔒 Modo: Netlify Functions - Credenciales en servidor');
+    console.log('🔐 Modo: Netlify Functions - Credenciales en servidor');
     
     // Ocultar pantalla de carga
     setTimeout(() => {
@@ -233,6 +233,329 @@ function displayTrainings() {
 }
 
 // ==========================================
+// FUNCIONES DE GUARDAR CAPACITACIONES
+// ==========================================
+
+// Variable para almacenar el formulario
+let trainingFormData = {};
+
+// ==========================================
+// CREAR NUEVA CAPACITACIÓN
+// ==========================================
+
+async function createNewTraining() {
+    const trainingName = document.getElementById('trainingName')?.value;
+    const trainingDescription = document.getElementById('trainingDescription')?.value;
+    const trainingDepartment = document.getElementById('trainingDepartment')?.value;
+    
+    // Validar datos
+    if (!trainingName) {
+        showAlert('Por favor ingrese el nombre de la capacitación', 'error');
+        return;
+    }
+    
+    try {
+        showAlert('Guardando capacitación...', 'info');
+        
+        // Preparar datos para Airtable
+        const data = {
+            records: [
+                {
+                    fields: {
+                        'Título': trainingName,
+                        'Descripción': trainingDescription || '',
+                        'Departamento': trainingDepartment || 'General',
+                        'Activa': true,
+                        'Fecha Creación': new Date().toISOString().split('T')[0]
+                    }
+                }
+            ]
+        };
+        
+        // Hacer petición POST a Airtable
+        const response = await airtableRequest('POST', '/Capacitaciones', data);
+        
+        if (response && response.records && response.records.length > 0) {
+            const newTraining = response.records[0];
+            showAlert('✅ Capacitación guardada exitosamente', 'success');
+            console.log('Capacitación creada:', newTraining);
+            
+            // Limpiar formulario
+            clearTrainingForm();
+            
+            // Recargar lista de capacitaciones
+            await loadTrainings();
+            
+            return newTraining;
+        }
+    } catch (error) {
+        console.error('Error guardando capacitación:', error);
+        showAlert(`Error al guardar: ${error.message}`, 'error');
+    }
+}
+
+// ==========================================
+// GUARDAR PREGUNTAS DE CAPACITACIÓN
+// ==========================================
+
+async function saveTrainingQuestions(trainingId, questions) {
+    if (!trainingId || !questions || questions.length === 0) {
+        showAlert('Faltan datos: ID de capacitación o preguntas', 'error');
+        return false;
+    }
+    
+    try {
+        showAlert('Guardando preguntas...', 'info');
+        
+        // Preparar array de records para batch insert
+        const records = questions.map((question, index) => ({
+            fields: {
+                'Capacitación': [trainingId], // Airtable usa array para links
+                'Número': index + 1,
+                'Pregunta': question.text,
+                'Tipo': question.type || 'pretest', // pretest o post-test
+                'Respuestas': question.answers ? JSON.stringify(question.answers) : ''
+            }
+        }));
+        
+        // Guardar en lotes (Airtable permite hasta 10 por request)
+        const batchSize = 10;
+        for (let i = 0; i < records.length; i += batchSize) {
+            const batch = records.slice(i, i + batchSize);
+            const response = await airtableRequest('POST', '/Preguntas', {
+                records: batch
+            });
+            
+            if (!response || !response.records) {
+                throw new Error('Error en respuesta de Airtable');
+            }
+        }
+        
+        showAlert(`✅ ${questions.length} preguntas guardadas`, 'success');
+        return true;
+        
+    } catch (error) {
+        console.error('Error guardando preguntas:', error);
+        showAlert(`Error al guardar preguntas: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+// ==========================================
+// CREAR SESIÓN DE CAPACITACIÓN
+// ==========================================
+
+async function createTrainingSession(trainingId) {
+    if (!trainingId) {
+        showAlert('ID de capacitación no válido', 'error');
+        return false;
+    }
+    
+    try {
+        // Generar código de acceso único
+        const accessCode = generateAccessCode();
+        const currentDate = new Date().toISOString().split('T')[0];
+        
+        const data = {
+            records: [
+                {
+                    fields: {
+                        'Capacitación': [trainingId],
+                        'Código Acceso': accessCode,
+                        'Fecha Inicio': currentDate,
+                        'Activa': true,
+                        'Link Acceso': `${window.location.origin}?code=${accessCode}`
+                    }
+                }
+            ]
+        };
+        
+        const response = await airtableRequest('POST', '/Sesiones', data);
+        
+        if (response && response.records && response.records.length > 0) {
+            const session = response.records[0];
+            showAlert('✅ Sesión creada', 'success');
+            console.log('Sesión creada:', session);
+            return session;
+        }
+        
+    } catch (error) {
+        console.error('Error creando sesión:', error);
+        showAlert(`Error al crear sesión: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+// ==========================================
+// GUARDAR RESPUESTA DE PARTICIPANTE
+// ==========================================
+
+async function saveParticipantAnswer(participationId, questionId, rating) {
+    if (!participationId || !questionId || !rating) {
+        console.warn('Datos incompletos para guardar respuesta');
+        return false;
+    }
+    
+    try {
+        const data = {
+            records: [
+                {
+                    fields: {
+                        'Participación': [participationId],
+                        'Pregunta': [questionId],
+                        'Calificación': parseInt(rating),
+                        'Fecha Respuesta': new Date().toISOString().split('T')[0]
+                    }
+                }
+            ]
+        };
+        
+        const response = await airtableRequest('POST', '/Respuestas', data);
+        return response && response.records && response.records.length > 0;
+        
+    } catch (error) {
+        console.error('Error guardando respuesta:', error);
+        return false;
+    }
+}
+
+// ==========================================
+// REGISTRAR PARTICIPANTE
+// ==========================================
+
+async function registerParticipant(sessionId, participantData) {
+    if (!sessionId || !participantData.name || !participantData.email) {
+        showAlert('Datos incompletos del participante', 'error');
+        return false;
+    }
+    
+    try {
+        const data = {
+            records: [
+                {
+                    fields: {
+                        'Sesión': [sessionId],
+                        'Nombre': participantData.name,
+                        'Email': participantData.email,
+                        'Cargo': participantData.position || 'No especificado',
+                        'Departamento': participantData.department || 'General',
+                        'Fecha Registro': new Date().toISOString().split('T')[0],
+                        'Completado': false
+                    }
+                }
+            ]
+        };
+        
+        const response = await airtableRequest('POST', '/Participaciones', data);
+        
+        if (response && response.records && response.records.length > 0) {
+            const participation = response.records[0];
+            console.log('Participante registrado:', participation);
+            return participation;
+        }
+        
+    } catch (error) {
+        console.error('Error registrando participante:', error);
+        showAlert(`Error al registrar: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+// ==========================================
+// ACTUALIZAR CAPACITACIÓN EXISTENTE
+// ==========================================
+
+async function updateTraining(trainingId, updatedData) {
+    if (!trainingId) {
+        showAlert('ID de capacitación no válido', 'error');
+        return false;
+    }
+    
+    try {
+        showAlert('Actualizando capacitación...', 'info');
+        
+        const data = {
+            records: [
+                {
+                    id: trainingId,
+                    fields: updatedData
+                }
+            ]
+        };
+        
+        const response = await airtableRequest('PATCH', '/Capacitaciones', data);
+        
+        if (response && response.records && response.records.length > 0) {
+            showAlert('✅ Capacitación actualizada', 'success');
+            await loadTrainings();
+            return response.records[0];
+        }
+        
+    } catch (error) {
+        console.error('Error actualizando capacitación:', error);
+        showAlert(`Error al actualizar: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+// ==========================================
+// FINALIZAR PARTICIPACIÓN
+// ==========================================
+
+async function completeParticipation(participationId, postTestScore) {
+    if (!participationId) {
+        showAlert('ID de participación no válido', 'error');
+        return false;
+    }
+    
+    try {
+        const data = {
+            records: [
+                {
+                    id: participationId,
+                    fields: {
+                        'Post-test Score': postTestScore,
+                        'Completado': true,
+                        'Fecha Finalización': new Date().toISOString().split('T')[0]
+                    }
+                }
+            ]
+        };
+        
+        const response = await airtableRequest('PATCH', '/Participaciones', data);
+        
+        if (response && response.records && response.records.length > 0) {
+            showAlert('✅ Evaluación completada', 'success');
+            return response.records[0];
+        }
+        
+    } catch (error) {
+        console.error('Error completando participación:', error);
+        showAlert(`Error: ${error.message}`, 'error');
+        return false;
+    }
+}
+
+// ==========================================
+// GENERAR CÓDIGO DE ACCESO ÚNICO
+// ==========================================
+
+function generateAccessCode() {
+    return 'CAP-' + Date.now().toString(36).toUpperCase() + 
+           '-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+}
+
+// ==========================================
+// LIMPIAR FORMULARIO DE CAPACITACIÓN
+// ==========================================
+
+function clearTrainingForm() {
+    const inputs = document.querySelectorAll('#trainingForm input, #trainingForm textarea, #trainingForm select');
+    inputs.forEach(input => input.value = '');
+    trainingFormData = {};
+}
+
+// ==========================================
 // UTILIDADES
 // ==========================================
 
@@ -299,7 +622,7 @@ document.addEventListener('DOMContentLoaded', initializeApp);
 // ==========================================
 
 /*
-🔒 SEGURIDAD EN ESTA VERSIÓN:
+🔐 SEGURIDAD EN ESTA VERSIÓN:
 
 1. ✅ NO se guardan credenciales en localStorage
 2. ✅ NO se envían credenciales desde el navegador
@@ -317,4 +640,35 @@ AIRTABLE_API_KEY=patXXXXXXXXXXXXXXXXXXXXXX
 AIRTABLE_BASE_ID=appXXXXXXXXXXXXXX
 
 Estas variables NUNCA están en el código, solo en el servidor.
+
+ESTRUCTURA DE AIRTABLE REQUERIDA:
+
+Tablas necesarias:
+1. Capacitaciones (Título, Descripción, Departamento, Activa, Fecha Creación)
+2. Preguntas (Capacitación, Tipo, Número, Pregunta, Respuestas)
+3. Sesiones (Capacitación, Código Acceso, Fecha Inicio, Activa, Link Acceso)
+4. Participaciones (Sesión, Nombre, Email, Cargo, Departamento, Completado)
+5. Respuestas (Participación, Pregunta, Calificación, Fecha Respuesta)
+
+EJEMPLO DE USO:
+
+// Crear nueva capacitación
+await createNewTraining();
+
+// Crear sesión (requiere ID de capacitación)
+await createTrainingSession(trainingId);
+
+// Registrar participante
+await registerParticipant(sessionId, {
+    name: 'Juan Pérez',
+    email: 'juan@hospital.com',
+    position: 'Enfermero',
+    department: 'Enfermería'
+});
+
+// Guardar respuesta
+await saveParticipantAnswer(participationId, questionId, 4);
+
+// Completar participación
+await completeParticipation(participationId, postTestScore);
 */
