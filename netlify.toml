@@ -1,25 +1,26 @@
 [build]
-publish = "."
-functions = "netlify/functions"
-
-[functions]
-directory = "netlify/functions"
-node_bundler = "esbuild"
-external_node_modules = ["axios"]
+  functions = "netlify/functions"
+  publish = "."
 
 [build.environment]
-NODE_VERSION = "18"
+  NODE_VERSION = "18"
 
 [[redirects]]
-from = "/api/*"
-to = "/.netlify/functions/:splat"
-status = 200
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
 
 [[headers]]
-for = "/*"
+  for = "/*"
   [headers.values]
-  X-Frame-Options = "DENY"
-  X-XSS-Protection = "1; mode=block"
-  X-Content-Type-Options = "nosniff"
-  Referrer-Policy = "strict-origin-when-cross-origin"
-  Access-Control-Allow-Origin = "*"
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Access-Control-Allow-Origin = "*"
+
+# Alias para evitar 404 si Netlify no publica nombres con guiones
+[[redirects]]
+from = "/.netlify/functions/airtable-proxy"
+to = "/.netlify/functions/airtableproxy"
+status = 200
