@@ -1471,41 +1471,51 @@
         }
         
         // Función para verificar conexión con Airtable (SEGURA - via Netlify)
-        async function testAirtableConnection() {
-            try {
-                updateConnectionIndicator('checking');
-                
-                // IMPORTANTE: NUNCA guardamos credenciales en el cliente
-                // Todo se maneja en el servidor (Netlify Functions)
-                
-                // Hacer petición al proxy de Netlify para verificar conexión
-                const response = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: '/Capacitaciones?maxRecords=1',
-                        body: null
-                    })
-                });
-                
-                if (response.ok) {
-                    updateConnectionIndicator('connected');
-                    console.log('✅ Conexión exitosa con Airtable (Netlify Proxy)');
-                    return true;
-                } else {
-                    updateConnectionIndicator('disconnected');
-                    console.log('❌ Error de conexión con Airtable:', response.status);
-                    return false;
-                }
-            } catch (error) {
-                updateConnectionIndicator('disconnected');
-                console.error('❌ Error al verificar conexión:', error.message);
-                return false;
-            }
+ async function testAirtableConnection() {
+    try {
+        updateConnectionIndicator('checking');
+
+        const response = await fetch('/.netlify/functions/airtable-proxy', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                method: 'GET',
+                path: '/Capacitaciones?maxRecords=1',
+                body: null
+            })
+        });
+
+        // Si la función ni respondió bien en HTTP
+        if (!response.ok) {
+            updateConnectionIndicator('disconnected');
+            console.error('❌ Error HTTP al verificar conexión:', response.status);
+            return false;
         }
+
+        // Leemos el JSON que devuelve tu función
+        const data = await response.json();
+        console.log('🔎 Respuesta airtable-proxy:', data);
+
+        // Aquí asumimos que airtable-proxy nos devuelve algo así:
+        // { success: true, records: [...] }
+        if (data && data.success === true && Array.isArray(data.records)) {
+            updateConnectionIndicator('connected');
+            return true;
+        } else {
+            updateConnectionIndicator('disconnected');
+            console.error('❌ Proxy respondió pero sin datos válidos');
+            return false;
+        }
+
+    } catch (error) {
+        updateConnectionIndicator('disconnected');
+        console.error('❌ Error al verificar conexión:', error.message);
+        return false;
+    }
+}
+
         
         // Verificar conexión al cargar la página
         document.addEventListener('DOMContentLoaded', () => {
