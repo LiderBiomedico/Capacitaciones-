@@ -1234,14 +1234,12 @@
             return questions;
         }
 
-async function saveTraining() {
-    // 1. Capturar valores del formulario principal
+        async function saveTraining() {
     const titleInput = document.getElementById('trainingTitle');
     const descInput = document.getElementById('trainingDescription');
     const dateInput = document.getElementById('trainingDate');
     const deptInput = document.getElementById('trainingDepartment');
     const durationInput = document.getElementById('trainingDuration');
-    const staffSelect = document.getElementById('trainingStaff'); // este puede ser null si no está renderizado
 
     const title = titleInput ? titleInput.value.trim() : '';
     const description = descInput ? descInput.value.trim() : '';
@@ -1249,81 +1247,51 @@ async function saveTraining() {
     const department = deptInput ? deptInput.value : '';
     const duration = durationInput ? durationInput.value : '';
 
-    // Si el select existe, saca el personal. Si no existe, deja []
-    const selectedStaff = staffSelect
-        ? Array.from(staffSelect.selectedOptions).map(opt => opt.value)
-        : [];
+    // Solo el personal marcado (checkboxes)
+    const selectedStaff = getSelectedStaff();
 
-    // 2. Validación clara
-    // Nota: requerimos todos los campos obligatorios *y* al menos una persona
-    // Si quieres permitir guardar aunque no selecciones personal todavía,
-    // cambia la condición de selectedStaff.length === 0.
     if (!title || !description || !trainingDate || !department || !duration || selectedStaff.length === 0) {
-
-        // mensaje más específico para el usuario
         let missingMsg = 'Por favor completa todos los campos requeridos (*)';
-
-        if (!staffSelect) {
-            // Esto significa que el select de personal NO está en el DOM.
-            // le damos una pista clara al usuario:
-            missingMsg += ' (falta seleccionar el personal en la sección Información General).';
-        } else if (selectedStaff.length === 0) {
-            missingMsg += ' y selecciona al menos una persona en "Personal que Asiste".';
+        if (selectedStaff.length === 0) {
+            missingMsg += ' y marca al menos una casilla en "Personal Capacitado".';
         }
-
-        Swal.fire({
-            icon: 'warning',
-            title: 'Campos Incompletos',
-            text: missingMsg
-        });
-
-        // además hacemos scroll hacia arriba donde están los datos básicos,
-        // para que no se queden al final en la parte del examen perdidos
-        if (titleInput) {
-            titleInput.scrollIntoView({ behavior: 'smooth' });
-        }
-
+        Swal.fire({ icon: 'warning', title: 'Campos Incompletos', text: missingMsg });
+        if (titleInput) titleInput.scrollIntoView({ behavior: 'smooth' });
         return;
     }
 
-    // 3. Generar código de acceso
     const accessCode = generateAccessCode();
-
-    // 4. Construir objeto interno
     const createdAtISO = new Date().toISOString();
+
     const trainingData = {
-        title: title,
-        description: description,
-        trainingDate: trainingDate,
-        department: department,
-        duration: duration,
-        staffList: selectedStaff,
-        accessCode: accessCode,
+        title,
+        description,
+        trainingDate,
+        department,
+        duration,
+        staffList: selectedStaff, // << sólo lo marcado
+        accessCode,
         status: 'active',
-        createdAtISO: createdAtISO
+        createdAtISO
     };
 
-    // 5. Intentar enviar a Airtable por el proxy
-    let airtableOK = await sendTrainingToAirtable(trainingData);
+    // Enviar a Airtable
+    const airtableOK = await sendTrainingToAirtable(trainingData);
 
-    // 6. Guardar respaldo local
+    // Respaldo local
     const trainings = JSON.parse(localStorage.getItem('trainings') || '[]');
     trainings.push(trainingData);
     localStorage.setItem('trainings', JSON.stringify(trainings));
 
-    // 7. Limpiar formulario visible
+    // Limpiar campos
     if (titleInput) titleInput.value = '';
     if (descInput) descInput.value = '';
     if (dateInput) dateInput.value = '';
     if (deptInput) deptInput.value = '';
     if (durationInput) durationInput.value = '';
-    if (staffSelect) {
-        Array.from(staffSelect.options).forEach(opt => opt.selected = false);
-    }
+    document.querySelectorAll('input.trainingStaff:checked, .trainingStaff:checked, input[name="personalCapacitado[]"]:checked').forEach(cb => cb.checked = false);
 
-    // TODO: si también quieres limpiar las preguntas del examen, aquí iría esa limpieza
-
-    // 8. Mostrar alerta final con QR
+    // Alerta final + QR
     Swal.fire({
         icon: 'success',
         title: '¡Capacitación Guardada!',
@@ -1333,9 +1301,7 @@ async function saveTraining() {
                 <h2 style="color: #667eea; margin: 10px 0;">${accessCode}</h2>
                 <p style="font-size: 0.9em; color: #666;">Comparte este código con los participantes</p>
                 <p style="font-size: 0.8em; color:${airtableOK ? '#28a745' : '#c62828'};">
-                    ${airtableOK 
-                        ? '✅ La capacitación también fue guardada en Airtable.' 
-                        : '⚠ No se pudo guardar en Airtable. Se guardó sólo en este navegador.'}
+                    ${airtableOK ? '✅ La capacitación también fue guardada en Airtable.' : '⚠ No se pudo guardar en Airtable. Se guardó sólo en este navegador.'}
                 </p>
             </div>
         `,
@@ -1348,13 +1314,141 @@ async function saveTraining() {
         }
     });
 
-    // 9. Refrescar la lista en la pestaña "Gestionar"
     if (typeof renderTrainingList === 'function') {
         renderTrainingList();
     }
 }
 
+// Envía la capacitación a Airtable a través del proxy Netlify
+async function sendTrainingToAirtable(trainingData) {
+    try {
+        const airtableRecord = {
+            records: [
+                {
+                    fields: {
+                        Titulo: trainingData.title,
+                        Descripcion: trainingData.description,
+                        Fecha: trainingData.trainingDate,
+                        Departamento: trainingData.department,
+                        Duracion: trainingData.duration,
+                        Personal: Array.isArray(trainingData.staffList) ? trainingData.staffList.join(', ') : '',
+                        CodigoAcceso: trainingData.accessCode,
+                        Estado: trainingData.status,
+                        CreadoEn: trainingData.createdAtISO
+                    }
+                }
+            ]
+        };
 
+        const response = await fetch('/.netlify/functions/airtable-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                method: 'POST',
+                path: '/Capacitaciones',
+                body: airtableRecord
+            })
+        });
+
+        if (!response.ok) {
+            console.error('❌ Airtable devolvió HTTP no OK:', response.status);
+            return false;
+        }
+
+        const data = await response.json();
+        console.log('📤 Respuesta al guardar en Airtable:', data);
+
+        return !!(data && data.success === true);
+    } catch (err) {
+        console.error('❌ Error enviando a Airtable:', err.message);
+        return false;
+    }
+}
+
+function saveTraining() {
+            const title = document.getElementById('trainingTitle').value;
+            const description = document.getElementById('trainingDescription').value;
+            const trainingDate = document.getElementById('trainingDate').value;
+            const department = document.getElementById('trainingDepartment').value;
+            const duration = document.getElementById('trainingDuration').value;
+            
+            // Obtener personal capacitado seleccionado
+            const staffCheckboxes = document.querySelectorAll('.trainingStaff:checked');
+            const selectedStaff = Array.from(staffCheckboxes).map(cb => cb.value);
+            
+            if (!title || !department || !trainingDate || selectedStaff.length === 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Campos Requeridos',
+                    text: 'Complete todos los campos obligatorios, incluyendo fecha y personal capacitado',
+                });
+                return;
+            }
+            
+            if (pretestQuestionCount === 0 || posttestQuestionCount === 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Preguntas Requeridas',
+                    text: 'Agregue al menos una pregunta en cada test',
+                });
+                return;
+            }
+            
+            const pretestQuestions = collectQuestions('pretest');
+            if (!pretestQuestions) return;
+            
+            const posttestQuestions = collectQuestions('posttest');
+            if (!posttestQuestions) return;
+            
+            const accessCode = generateAccessCode();
+            
+            const trainingData = {
+                title,
+                description,
+                trainingDate,
+                department,
+                duration,
+                selectedStaff,
+                accessCode,
+                pretestQuestions,
+                posttestQuestions,
+                createdAt: new Date().toISOString(),
+                status: 'active'
+            };
+            
+            Swal.fire({
+                title: 'Guardando...',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+            
+            setTimeout(() => {
+                const trainings = JSON.parse(localStorage.getItem('trainings') || '[]');
+                trainings.push(trainingData);
+                localStorage.setItem('trainings', JSON.stringify(trainings));
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Capacitación Guardada!',
+                    html: `
+                        <div style="margin: 20px 0;">
+                            <p>Código de Acceso:</p>
+                            <h2 style="color: #667eea; margin: 10px 0;">${accessCode}</h2>
+                            <p style="font-size: 0.9em; color: #666;">Comparte este código con los participantes</p>
+                        </div>
+                    `,
+                    confirmButtonText: 'Generar QR',
+                    showCancelButton: true,
+                    cancelButtonText: 'Cerrar'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        showQRCode(accessCode, title);
+                    }
+                });
+                
+                resetForm();
+            }, 1500);
+        }
 
         function generateAccessCode() {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -1506,70 +1600,15 @@ async function saveTraining() {
                     break;
             }
         }
-    // Enviar la capacitación a Airtable por medio del proxy seguro
-async function sendTrainingToAirtable(trainingData) {
-    try {
-        // mapeo de campos -> usa los mismos nombres de cabeceras que tengas en Airtable
-        // Ajusta estos nombres "Titulo", "Descripcion", etc. para que coincidan EXACTO con tus columnas en Airtable.
-        const airtableRecord = {
-            records: [
-                {
-                    fields: {
-                        Titulo: trainingData.title,
-                        Descripcion: trainingData.description,
-                        Fecha: trainingData.trainingDate,
-                        Departamento: trainingData.department,
-                        Duracion: trainingData.duration,
-                        Personal: trainingData.staffList.join(', '),
-                        CodigoAcceso: trainingData.accessCode,
-                        Estado: trainingData.status,                 // ej. "active"
-                        CreadoEn: trainingData.createdAtISO          // timestamp ISO
-                    }
-                }
-            ]
-        };
-
-        const response = await fetch('/.netlify/functions/airtable-proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                method: 'POST',
-                path: '/Capacitaciones', // nombre de tabla en Airtable
-                body: airtableRecord
-            })
-        });
-
-        if (!response.ok) {
-            console.error('❌ Airtable devolvió HTTP no OK:', response.status);
-            return false;
-        }
-
-        const data = await response.json();
-        console.log('📤 Respuesta al guardar en Airtable:', data);
-
-        // Nuestro proxy devuelve { success:true, records:[...] } cuando todo sale bien
-        if (data && data.success === true && Array.isArray(data.records)) {
-            return true;
-        } else {
-            console.error('⚠ Proxy respondió pero sin success:true');
-            return false;
-        }
-    } catch (err) {
-        console.error('❌ Error enviando a Airtable:', err.message);
-        return false;
-    }
-}
-    
+        
         // Función para verificar conexión con Airtable (SEGURA - via Netlify)
- async function testAirtableConnection() {
+        async function testAirtableConnection() {
     try {
         updateConnectionIndicator('checking');
 
         const response = await fetch('/.netlify/functions/airtable-proxy', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 method: 'GET',
                 path: '/Capacitaciones?maxRecords=1',
@@ -1577,19 +1616,15 @@ async function sendTrainingToAirtable(trainingData) {
             })
         });
 
-        // Si la función ni respondió bien en HTTP
         if (!response.ok) {
             updateConnectionIndicator('disconnected');
             console.error('❌ Error HTTP al verificar conexión:', response.status);
             return false;
         }
 
-        // Leemos el JSON que devuelve tu función
         const data = await response.json();
         console.log('🔎 Respuesta airtable-proxy:', data);
 
-        // Aquí asumimos que airtable-proxy nos devuelve algo así:
-        // { success: true, records: [...] }
         if (data && data.success === true && Array.isArray(data.records)) {
             updateConnectionIndicator('connected');
             return true;
@@ -1598,14 +1633,12 @@ async function sendTrainingToAirtable(trainingData) {
             console.error('❌ Proxy respondió pero sin datos válidos');
             return false;
         }
-
     } catch (error) {
         updateConnectionIndicator('disconnected');
         console.error('❌ Error al verificar conexión:', error.message);
         return false;
     }
-}
-
+}}
         
         // Verificar conexión al cargar la página
         document.addEventListener('DOMContentLoaded', () => {
