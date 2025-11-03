@@ -10,7 +10,6 @@
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>">
-    <link rel="shortcut icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>">
     
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -24,690 +23,60 @@
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --primary: #667eea;
-            --secondary: #764ba2;
-            --success: #28a745;
-            --danger: #dc3545;
-            --warning: #ffc107;
-            --info: #17a2b8;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
-            min-height: 100vh;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            box-shadow: 0 0 30px rgba(0,0,0,0.08);
-        }
-
-        /* Header */
-        .header {
-            background: white;
-            padding: 1.5rem 2rem;
-            border-bottom: 2px solid #f0f0f0;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-        }
-
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 1rem;
-        }
-
-        .logo-section {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .logo-section h1 {
-            color: var(--primary);
-            font-size: 1.5rem;
-            margin: 0;
-        }
-
-        .logo-section p {
-            color: #666;
-            font-size: 0.9rem;
-            margin: 0.25rem 0;
-        }
-
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .connection-indicator {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 16px;
-            background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
-            border: 1px solid #81c784;
-            border-radius: 20px;
-            font-size: 0.85em;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            position: relative;
-            user-select: none;
-        }
-
-        .connection-indicator:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-
-        .connection-indicator.connected {
-            background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
-            border-color: #4caf50;
-            color: #2e7d32;
-        }
-
-        .connection-indicator.disconnected {
-            background: linear-gradient(135deg, #ffebee 0%, #fce4ec 100%);
-            border-color: #ef5350;
-            color: #c62828;
-        }
-
-        .connection-indicator.checking {
-            background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-            border-color: #ffa726;
-            color: #e65100;
-        }
-
-        .connection-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #4caf50;
-            animation: pulse 2s infinite;
-            display: inline-block;
-        }
-
-        .connection-indicator.disconnected .connection-dot {
-            background: #ef5350;
-            animation: none;
-            box-shadow: none;
-        }
-
-        .connection-indicator.checking .connection-dot {
-            background: #ffa726;
-            animation: pulse-fast 1s infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
-            50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(76, 175, 80, 0); }
-        }
-
-        @keyframes pulse-fast {
-            0%, 100% { opacity: 1; box-shadow: 0 0 0 0 rgba(255, 167, 38, 0.7); }
-            50% { opacity: 0.7; box-shadow: 0 0 0 4px rgba(255, 167, 38, 0); }
-        }
-
-        /* Navigation */
-        .navigation {
-            display: flex;
-            background: white;
-            border-bottom: 2px solid #e0e0e0;
-            overflow-x: auto;
-            position: sticky;
-            top: 100px;
-            z-index: 999;
-        }
-
-        .nav-tab {
-            flex: 1;
-            min-width: 120px;
-            padding: 1rem;
-            background: white;
-            border: none;
-            border-bottom: 3px solid transparent;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.5rem;
-            color: #666;
-        }
-
-        .nav-tab i {
-            font-size: 1.3rem;
-        }
-
-        .nav-tab:hover {
-            background: #f8f9fa;
-            color: var(--primary);
-        }
-
-        .nav-tab.active {
-            color: var(--primary);
-            border-bottom-color: var(--primary);
-            background: #f8f9ff;
-        }
-
-        /* Main Content */
-        .main-content {
-            padding: 2rem;
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-            animation: fadeIn 0.3s;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .section-title {
-            color: var(--primary);
-            margin-bottom: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-size: 1.8rem;
-        }
-
-        /* Cards */
-        .card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin-bottom: 1.5rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-        }
-
-        .card h3 {
-            color: var(--primary);
-            margin-bottom: 1rem;
-        }
-
-        /* Stats Grid */
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-        }
-
-        .stat-card {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-        }
-
-        .stat-icon {
-            font-size: 3rem;
-            opacity: 0.8;
-        }
-
-        .stat-info h3 {
-            font-size: 2rem;
-            margin: 0;
-            color: white;
-        }
-
-        .stat-info p {
-            margin: 0;
-            opacity: 0.9;
-        }
-
-        /* Forms */
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            margin-bottom: 0.5rem;
-            font-weight: 500;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 0.75rem;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 1rem;
-            transition: all 0.3s;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1rem;
-        }
-
-        /* Questions Container */
-        .questions-container {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .question-counter {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
-            padding: 0.75rem 1.25rem;
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-weight: 500;
-        }
-
-        .question-card {
-            background: #f8f9fa;
-            border: 2px solid #e0e0e0;
-            border-radius: 12px;
-            padding: 1.5rem;
-            transition: all 0.3s;
-        }
-
-        .question-card:hover {
-            border-color: var(--primary);
-            box-shadow: 0 4px 12px rgba(102,126,234,0.15);
-        }
-
-        .question-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 2px solid #e0e0e0;
-        }
-
-        .question-header h4 {
-            color: var(--primary);
-            margin: 0;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn-remove {
-            background: var(--danger);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .btn-remove:hover {
-            background: #c82333;
-            transform: scale(1.05);
-        }
-
-        .question-text {
-            width: 100%;
-            padding: 0.75rem;
-            border: 2px solid #e0e0e0;
-            border-radius: 8px;
-            font-size: 1rem;
-            resize: vertical;
-            transition: all 0.3s;
-        }
-
-        .question-text:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
-        }
-
-        .options-container {
-            display: flex;
-            flex-direction: column;
-            gap: 0.75rem;
-            margin-top: 0.5rem;
-        }
-
-        .option-item {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            background: white;
-            padding: 0.75rem;
-            border-radius: 8px;
-            border: 2px solid #e0e0e0;
-            transition: all 0.3s;
-        }
-
-        .option-item:hover {
-            border-color: var(--primary);
-            background: #f8f9ff;
-        }
-
-        .option-item input[type="radio"] {
-            width: 20px;
-            height: 20px;
-            cursor: pointer;
-            accent-color: var(--primary);
-        }
-
-        .radio-label {
-            font-size: 0.85rem;
-            color: #666;
-            min-width: 70px;
-            font-weight: 500;
-        }
-
-        .option-text {
-            flex: 1;
-            padding: 0.5rem;
-            border: 1px solid #e0e0e0;
-            border-radius: 6px;
-            font-size: 0.95rem;
-        }
-
-        .option-text:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        .help-text {
-            display: block;
-            margin-top: 0.5rem;
-            font-size: 0.85rem;
-            color: #666;
-            font-style: italic;
-        }
-
-        /* Buttons */
-        .btn {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: 8px;
-            font-size: 1rem;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            color: white;
-        }
-
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-
-        .btn-success {
-            background: var(--success);
-            color: white;
-        }
-
-        .btn-info {
-            background: var(--info);
-            color: white;
-        }
-
-        .form-actions {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 10000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-        }
-
-        .modal-content {
-            background: white;
-            padding: 2rem;
-            border-radius: 16px;
-            max-width: 500px;
-            width: 90%;
-            position: relative;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-        }
-
-        .modal-content h2 {
-            color: var(--primary);
-            margin-bottom: 1.5rem;
-            text-align: center;
-        }
-
-        .close {
-            position: absolute;
-            right: 1rem;
-            top: 1rem;
-            font-size: 2rem;
-            cursor: pointer;
-            color: #666;
-        }
-
-        .close:hover {
-            color: var(--danger);
-        }
-
-        .qr-container {
-            display: flex;
-            justify-content: center;
-            margin: 1.5rem 0;
-            padding: 1rem;
-            background: #f8f9fa;
-            border-radius: 12px;
-        }
-
-        .access-info {
-            background: #f8f9fa;
-            padding: 1rem;
-            border-radius: 8px;
-            margin: 1rem 0;
-        }
-
-        .access-info p {
-            margin: 0.5rem 0;
-        }
-
-        .access-info strong {
-            color: var(--primary);
-        }
-
-        .modal-actions {
-            display: flex;
-            gap: 0.75rem;
-            margin-top: 1.5rem;
-            flex-wrap: wrap;
-        }
-
-        .modal-actions button {
-            flex: 1;
-        }
-
-        /* Charts */
-        .charts-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 1rem;
-            margin: 1rem 0;
-        }
-
-        .charts-container canvas {
-            max-height: 300px;
-        }
-
-        /* Loading Screen */
-        .loading-screen {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 9999;
-            transition: opacity 0.5s;
-        }
-
-        .loader {
-            text-align: center;
-            color: white;
-        }
-
-        .loader i {
-            font-size: 4rem;
-            animation: pulse 1.5s infinite;
-        }
-
-        /* Footer */
-        .footer {
-            background: #f8f9fa;
-            padding: 2rem;
-            text-align: center;
-            border-top: 2px solid #e0e0e0;
-        }
-
-        .footer p {
-            margin: 0.5rem 0;
-            color: #666;
-        }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .header-content {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .stats-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .charts-container {
-                grid-template-columns: 1fr;
-            }
-
-            .form-actions {
-                flex-direction: column;
-            }
-
-            .form-actions .btn {
-                width: 100%;
-            }
-        }
-    </style>
+    <!-- External Styles -->
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <!-- Loading Screen -->
     <div id="loadingScreen" class="loading-screen">
-        <div class="loader">
-            <i class="fas fa-heartbeat"></i>
-            <p>Cargando Sistema de Capacitaciones...</p>
+        <div class="loading-content">
+            <img src="logo-hospital.png" alt="Logo Hospital" class="loading-logo">
+            <div class="loading-spinner"></div>
+            <p>Cargando Sistema...</p>
         </div>
     </div>
 
-    <!-- Main Container -->
     <div class="container">
         <!-- Header -->
         <header class="header">
             <div class="header-content">
                 <div class="logo-section">
+                    <img src="logo-hospital.png" alt="Logo Hospital" style="height: 60px;">
                     <div>
-                        <h1>🏥 Sistema de Capacitaciones</h1>
+                        <h1>Sistema de Capacitaciones</h1>
                         <p>Hospital Susana López de Valencia</p>
-                        <p style="font-size: 0.8em; font-style: italic;">Desarrollado por Ing. Paul Eduardo Muñoz Rodriguez</p>
                     </div>
                 </div>
+                
                 <div class="header-actions">
-                    <div id="connectionIndicator" class="connection-indicator connected" onclick="testAirtableConnection()" title="Click para reconectar">
-                        <div class="connection-dot"></div>
-                        <span id="connectionText">Airtable Conectado</span>
+                    <div id="connectionIndicator" class="connection-indicator disconnected" onclick="testAirtableConnection()">
+                        <span class="connection-dot"></span>
+                        <span id="connectionText">✗ Airtable Desconectado</span>
                     </div>
-                    <span id="currentDateTime"></span>
+                    <div class="datetime" id="currentDateTime"></div>
                 </div>
             </div>
         </header>
 
         <!-- Navigation -->
         <nav class="navigation">
-            <button class="nav-tab active" onclick="switchTab('dashboard')">
+            <button class="nav-tab active" data-tab="dashboard" onclick="switchTab('dashboard')">
                 <i class="fas fa-chart-line"></i>
                 <span>Dashboard</span>
             </button>
-            <button class="nav-tab" onclick="switchTab('create')">
+            <button class="nav-tab" data-tab="create" onclick="switchTab('create')">
                 <i class="fas fa-plus-circle"></i>
                 <span>Crear</span>
             </button>
-            <button class="nav-tab" onclick="switchTab('manage')">
+            <button class="nav-tab" data-tab="manage" onclick="switchTab('manage')">
                 <i class="fas fa-tasks"></i>
                 <span>Gestionar</span>
             </button>
-            <button class="nav-tab" onclick="switchTab('exam')">
+            <button class="nav-tab" data-tab="exam" onclick="switchTab('exam')">
                 <i class="fas fa-clipboard-check"></i>
                 <span>Examen</span>
             </button>
-            <button class="nav-tab" onclick="switchTab('reports')">
+            <button class="nav-tab" data-tab="reports" onclick="switchTab('reports')">
                 <i class="fas fa-chart-bar"></i>
                 <span>Reportes</span>
             </button>
@@ -918,9 +287,11 @@
             <section id="manage" class="tab-content">
                 <h2 class="section-title"><i class="fas fa-tasks"></i> Gestionar Capacitaciones</h2>
                 <div class="card">
-                    <p style="text-align: center; padding: 2rem; color: #666;">
-                        Aquí aparecerán las capacitaciones creadas
-                    </p>
+                    <div id="trainingsList">
+                        <p style="text-align: center; padding: 2rem; color: #666;">
+                            Cargando capacitaciones...
+                        </p>
+                    </div>
                 </div>
             </section>
 
@@ -957,6 +328,7 @@
             <h2>📱 Código QR de Acceso</h2>
             <div id="qrcode" class="qr-container"></div>
             <div class="access-info">
+                <p><strong>Capacitación:</strong> <span id="modalTrainingTitle"></span></p>
                 <p><strong>Código:</strong> <span id="modalAccessCode"></span></p>
                 <p><strong>Link:</strong> <span id="modalAccessLink"></span></p>
             </div>
@@ -979,23 +351,45 @@
         let pretestQuestionCount = 0;
         let posttestQuestionCount = 0;
         const MAX_QUESTIONS = 10;
+        let airtableConnected = false;
+        let connectionCheckInterval = null;
 
-        // Inicialización
+        // ==================== INICIALIZACIÓN ====================
+        
         document.addEventListener('DOMContentLoaded', function() {
             initializeApp();
             updateDateTime();
-            setInterval(updateDateTime, 1000);
+            setInterval(updateDateTime, 60000);
         });
 
         function initializeApp() {
+            // Ocultar pantalla de carga
             setTimeout(() => {
-                document.getElementById('loadingScreen').style.opacity = '0';
-                setTimeout(() => {
-                    document.getElementById('loadingScreen').style.display = 'none';
-                }, 500);
+                const loadingScreen = document.getElementById('loadingScreen');
+                if (loadingScreen) {
+                    loadingScreen.style.opacity = '0';
+                    setTimeout(() => {
+                        loadingScreen.style.display = 'none';
+                    }, 500);
+                }
             }, 1500);
 
+            // Inicializar gráficos
             setTimeout(() => initializeCharts(), 2000);
+            
+            // Verificar conexión con Airtable
+            console.log('🔄 Iniciando verificación de conexión...');
+            testAirtableConnection();
+            
+            // Verificar conexión cada 30 segundos
+            if (connectionCheckInterval) clearInterval(connectionCheckInterval);
+            connectionCheckInterval = setInterval(() => {
+                testAirtableConnection();
+            }, 30000);
+            
+            // Establecer fecha de hoy por defecto
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('trainingDate').value = today;
         }
 
         function updateDateTime() {
@@ -1008,39 +402,133 @@
                 hour: '2-digit',
                 minute: '2-digit'
             };
-            const element = document.getElementById('currentDateTime');
-            if (element) {
-                element.textContent = now.toLocaleDateString('es-ES', options);
+            const dateTimeString = now.toLocaleDateString('es-CO', options);
+            
+            const dateTimeElement = document.getElementById('currentDateTime');
+            if (dateTimeElement) {
+                dateTimeElement.textContent = dateTimeString;
             }
         }
 
         function switchTab(tabName) {
-            document.querySelectorAll('.tab-content').forEach(tab => {
+            // Actualizar tabs activos
+            document.querySelectorAll('.nav-tab').forEach(tab => {
                 tab.classList.remove('active');
+                if (tab.dataset.tab === tabName) {
+                    tab.classList.add('active');
+                }
             });
             
-            document.querySelectorAll('.nav-tab').forEach(btn => {
-                btn.classList.remove('active');
+            // Actualizar contenido visible
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
             });
             
-            const selectedTab = document.getElementById(tabName);
-            if (selectedTab) selectedTab.classList.add('active');
+            const tabContent = document.getElementById(tabName);
+            if (tabContent) tabContent.classList.add('active');
             
-            event.target.closest('.nav-tab').classList.add('active');
+            // Ejecutar acciones específicas de cada tab
+            if (tabName === 'manage' && airtableConnected) {
+                loadTrainingsForManagement();
+            }
         }
 
-        // ==================== FUNCIONES DE PREGUNTAS ====================
+        // ==================== CONEXIÓN AIRTABLE ====================
         
-        function addQuestion(type) {
-            const container = document.getElementById(`${type}Questions`);
-            const currentCount = type === 'pretest' ? pretestQuestionCount : posttestQuestionCount;
+        function updateConnectionIndicator(status) {
+            const indicator = document.getElementById('connectionIndicator');
+            const text = document.getElementById('connectionText');
             
-            if (currentCount >= MAX_QUESTIONS) {
+            if (!indicator) return;
+            
+            indicator.classList.remove('connected', 'disconnected', 'checking');
+            
+            switch(status) {
+                case 'connected':
+                    indicator.classList.add('connected');
+                    text.textContent = '✓ Airtable Conectado';
+                    airtableConnected = true;
+                    break;
+                case 'disconnected':
+                    indicator.classList.add('disconnected');
+                    text.textContent = '✗ Airtable Desconectado';
+                    airtableConnected = false;
+                    break;
+                case 'checking':
+                    indicator.classList.add('checking');
+                    text.textContent = '⟳ Verificando...';
+                    break;
+            }
+        }
+        
+        async function testAirtableConnection() {
+            try {
+                updateConnectionIndicator('checking');
+                
+                const response = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: '/Capacitaciones?maxRecords=1',
+                        body: null
+                    })
+                });
+                
+                if (response.ok) {
+                    updateConnectionIndicator('connected');
+                    console.log('✅ Conexión exitosa con Airtable');
+                    return true;
+                } else {
+                    updateConnectionIndicator('disconnected');
+                    console.log('❌ Error de conexión con Airtable:', response.status);
+                    return false;
+                }
+            } catch (error) {
+                updateConnectionIndicator('disconnected');
+                console.error('❌ Error al verificar conexión:', error.message);
+                return false;
+            }
+        }
+
+        async function airtableRequest(method, endpoint, data = null) {
+            try {
+                const response = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        method: method,
+                        path: endpoint,
+                        body: data
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `Error ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('❌ Error en petición Airtable:', error.message);
+                throw error;
+            }
+        }
+
+        // ==================== GESTIÓN DE PREGUNTAS ====================
+
+        function addQuestion(type) {
+            const count = type === 'pretest' ? pretestQuestionCount : posttestQuestionCount;
+            
+            if (count >= MAX_QUESTIONS) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Límite Alcanzado',
-                    text: `Solo puedes agregar hasta ${MAX_QUESTIONS} preguntas por test`,
-                    confirmButtonText: 'Entendido'
+                    text: `Máximo ${MAX_QUESTIONS} preguntas por test`,
                 });
                 return;
             }
@@ -1051,53 +539,61 @@
                 posttestQuestionCount++;
             }
             
-            const questionNumber = currentCount + 1;
-            const questionId = `${type}-q${questionNumber}`;
+            const container = document.getElementById(`${type}Questions`);
+            const questionId = `${type}-q-${Date.now()}`;
+            const questionNumber = count + 1;
             
             const questionHTML = `
                 <div class="question-card" id="${questionId}" data-question-number="${questionNumber}">
                     <div class="question-header">
                         <h4>📝 Pregunta ${questionNumber}</h4>
-                        <button type="button" class="btn-remove" onclick="removeQuestion('${questionId}', '${type}')">
-                            <i class="fas fa-trash"></i> Eliminar
+                        <button class="btn-icon btn-danger" onclick="removeQuestion('${questionId}', '${type}')" title="Eliminar">
+                            <i class="fas fa-trash"></i>
                         </button>
                     </div>
                     
                     <div class="form-group">
-                        <label><i class="fas fa-question"></i> Pregunta *</label>
-                        <textarea id="${questionId}-text" class="question-text" rows="2" required 
-                                  placeholder="Escriba la pregunta aquí..."></textarea>
+                        <label>Pregunta *</label>
+                        <textarea id="${questionId}-text" rows="2" placeholder="Escribe la pregunta..." required></textarea>
                     </div>
                     
-                    <div class="form-group">
-                        <label><i class="fas fa-list"></i> Opciones de Respuesta</label>
-                        <div class="options-container">
-                            <div class="option-item">
-                                <input type="radio" name="${questionId}-correct" value="a" id="${questionId}-option-a" required>
-                                <label for="${questionId}-option-a" class="radio-label">✓ Correcta</label>
-                                <input type="text" id="${questionId}-text-a" class="option-text" placeholder="Opción A" required>
+                    <div class="options-grid">
+                        <div class="option-group">
+                            <div class="option-label">
+                                <input type="radio" name="${questionId}-correct" value="a" required>
+                                <label>A)</label>
                             </div>
-                            
-                            <div class="option-item">
-                                <input type="radio" name="${questionId}-correct" value="b" id="${questionId}-option-b">
-                                <label for="${questionId}-option-b" class="radio-label">✓ Correcta</label>
-                                <input type="text" id="${questionId}-text-b" class="option-text" placeholder="Opción B" required>
-                            </div>
-                            
-                            <div class="option-item">
-                                <input type="radio" name="${questionId}-correct" value="c" id="${questionId}-option-c">
-                                <label for="${questionId}-option-c" class="radio-label">✓ Correcta</label>
-                                <input type="text" id="${questionId}-text-c" class="option-text" placeholder="Opción C" required>
-                            </div>
-                            
-                            <div class="option-item">
-                                <input type="radio" name="${questionId}-correct" value="d" id="${questionId}-option-d">
-                                <label for="${questionId}-option-d" class="radio-label">✓ Correcta</label>
-                                <input type="text" id="${questionId}-text-d" class="option-text" placeholder="Opción D" required>
-                            </div>
+                            <input type="text" id="${questionId}-text-a" placeholder="Opción A" required>
                         </div>
-                        <small class="help-text">Marca la opción correcta</small>
+                        
+                        <div class="option-group">
+                            <div class="option-label">
+                                <input type="radio" name="${questionId}-correct" value="b">
+                                <label>B)</label>
+                            </div>
+                            <input type="text" id="${questionId}-text-b" placeholder="Opción B" required>
+                        </div>
+                        
+                        <div class="option-group">
+                            <div class="option-label">
+                                <input type="radio" name="${questionId}-correct" value="c">
+                                <label>C)</label>
+                            </div>
+                            <input type="text" id="${questionId}-text-c" placeholder="Opción C" required>
+                        </div>
+                        
+                        <div class="option-group">
+                            <div class="option-label">
+                                <input type="radio" name="${questionId}-correct" value="d">
+                                <label>D)</label>
+                            </div>
+                            <input type="text" id="${questionId}-text-d" placeholder="Opción D" required>
+                        </div>
                     </div>
+                    
+                    <small class="help-text">
+                        <i class="fas fa-info-circle"></i> Selecciona el radio button de la respuesta correcta
+                    </small>
                 </div>
             `;
             
@@ -1234,17 +730,31 @@
             return questions;
         }
 
-        function saveTraining() {
-            const title = document.getElementById('trainingTitle').value;
-            const description = document.getElementById('trainingDescription').value;
+        // ==================== GUARDAR CAPACITACIÓN EN AIRTABLE ====================
+
+        async function saveTraining() {
+            // Validar conexión
+            if (!airtableConnected) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Sin Conexión',
+                    text: 'No hay conexión con Airtable. Verifica la configuración.',
+                });
+                return;
+            }
+
+            // Recolectar datos del formulario
+            const title = document.getElementById('trainingTitle').value.trim();
+            const description = document.getElementById('trainingDescription').value.trim();
             const trainingDate = document.getElementById('trainingDate').value;
             const department = document.getElementById('trainingDepartment').value;
-            const duration = document.getElementById('trainingDuration').value;
+            const duration = document.getElementById('trainingDuration').value.trim();
             
             // Obtener personal capacitado seleccionado
             const staffCheckboxes = document.querySelectorAll('.trainingStaff:checked');
             const selectedStaff = Array.from(staffCheckboxes).map(cb => cb.value);
             
+            // Validaciones
             if (!title || !department || !trainingDate || selectedStaff.length === 0) {
                 Swal.fire({
                     icon: 'error',
@@ -1263,64 +773,128 @@
                 return;
             }
             
+            // Recolectar preguntas
             const pretestQuestions = collectQuestions('pretest');
             if (!pretestQuestions) return;
             
             const posttestQuestions = collectQuestions('posttest');
             if (!posttestQuestions) return;
             
+            // Generar código de acceso
             const accessCode = generateAccessCode();
+            const accessLink = `${window.location.origin}${window.location.pathname}?code=${accessCode}`;
             
-            const trainingData = {
-                title,
-                description,
-                trainingDate,
-                department,
-                duration,
-                selectedStaff,
-                accessCode,
-                pretestQuestions,
-                posttestQuestions,
-                createdAt: new Date().toISOString(),
-                status: 'active'
-            };
-            
+            // Mostrar loading
             Swal.fire({
-                title: 'Guardando...',
+                title: 'Guardando Capacitación',
+                html: 'Por favor espere...<br><small>Guardando en Airtable</small>',
                 allowOutsideClick: false,
                 didOpen: () => Swal.showLoading()
             });
             
-            setTimeout(() => {
-                const trainings = JSON.parse(localStorage.getItem('trainings') || '[]');
-                trainings.push(trainingData);
-                localStorage.setItem('trainings', JSON.stringify(trainings));
+            try {
+                // 1. Crear registro de capacitación en Airtable
+                console.log('📝 Creando capacitación en Airtable...');
+                const trainingRecord = await airtableRequest('POST', '/Capacitaciones', {
+                    fields: {
+                        'Titulo': title,
+                        'Descripcion': description || '',
+                        'Fecha': trainingDate,
+                        'Departamento': department,
+                        'Duracion': duration || '',
+                        'PersonalCapacitado': selectedStaff.join(', '),
+                        'Activa': true,
+                        'FechaCreacion': new Date().toISOString()
+                    }
+                });
                 
+                const trainingId = trainingRecord.id;
+                console.log('✅ Capacitación creada:', trainingId);
+                
+                // 2. Crear sesión activa
+                console.log('📝 Creando sesión...');
+                const sessionRecord = await airtableRequest('POST', '/Sesiones', {
+                    fields: {
+                        'Capacitacion': [trainingId],
+                        'CodigoAcceso': accessCode,
+                        'LinkAcceso': accessLink,
+                        'FechaInicio': new Date().toISOString(),
+                        'Activa': true
+                    }
+                });
+                
+                console.log('✅ Sesión creada:', sessionRecord.id);
+                
+                // 3. Guardar preguntas de pretest
+                console.log('📝 Guardando preguntas de pretest...');
+                for (const q of pretestQuestions) {
+                    await airtableRequest('POST', '/Preguntas', {
+                        fields: {
+                            'Capacitacion': [trainingId],
+                            'Tipo': 'Pretest',
+                            'Numero': q.number,
+                            'Pregunta': q.question,
+                            'OpcionA': q.options.a,
+                            'OpcionB': q.options.b,
+                            'OpcionC': q.options.c,
+                            'OpcionD': q.options.d,
+                            'RespuestaCorrecta': q.correctAnswer.toUpperCase()
+                        }
+                    });
+                }
+                console.log(`✅ ${pretestQuestions.length} preguntas de pretest guardadas`);
+                
+                // 4. Guardar preguntas de post-test
+                console.log('📝 Guardando preguntas de post-test...');
+                for (const q of posttestQuestions) {
+                    await airtableRequest('POST', '/Preguntas', {
+                        fields: {
+                            'Capacitacion': [trainingId],
+                            'Tipo': 'Post-test',
+                            'Numero': q.number,
+                            'Pregunta': q.question,
+                            'OpcionA': q.options.a,
+                            'OpcionB': q.options.b,
+                            'OpcionC': q.options.c,
+                            'OpcionD': q.options.d,
+                            'RespuestaCorrecta': q.correctAnswer.toUpperCase()
+                        }
+                    });
+                }
+                console.log(`✅ ${posttestQuestions.length} preguntas de post-test guardadas`);
+                
+                // Todo guardado exitosamente
                 Swal.fire({
                     icon: 'success',
-                    title: '¡Capacitación Guardada!',
+                    title: '¡Capacitación Creada!',
                     html: `
-                        <div style="margin: 20px 0;">
-                            <p>Código de Acceso:</p>
-                            <h2 style="color: #667eea; margin: 10px 0;">${accessCode}</h2>
-                            <p style="font-size: 0.9em; color: #666;">Comparte este código con los participantes</p>
-                        </div>
+                        <p><strong>${title}</strong> ha sido guardada exitosamente.</p>
+                        <p>Código de acceso: <strong>${accessCode}</strong></p>
                     `,
-                    confirmButtonText: 'Generar QR',
+                    confirmButtonText: 'Ver Código QR',
                     showCancelButton: true,
                     cancelButtonText: 'Cerrar'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        showQRCode(accessCode, title);
+                        showQRModal(title, accessCode, accessLink);
                     }
+                    
+                    // Limpiar formulario
+                    performReset();
                 });
                 
-                resetForm();
-            }, 1500);
+            } catch (error) {
+                console.error('❌ Error al guardar:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error al Guardar',
+                    text: `No se pudo guardar la capacitación: ${error.message}`,
+                });
+            }
         }
 
         function generateAccessCode() {
-            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
             let code = '';
             for (let i = 0; i < 6; i++) {
                 code += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -1328,15 +902,20 @@
             return code;
         }
 
-        function showQRCode(accessCode, title) {
-            const modal = document.getElementById('qrModal');
-            const qrContainer = document.getElementById('qrcode');
+        // ==================== MODAL QR ====================
+
+        function showQRModal(title, code, link) {
+            document.getElementById('modalTrainingTitle').textContent = title;
+            document.getElementById('modalAccessCode').textContent = code;
+            document.getElementById('modalAccessLink').textContent = link;
             
+            // Limpiar QR anterior
+            const qrContainer = document.getElementById('qrcode');
             qrContainer.innerHTML = '';
             
-            const accessUrl = `${window.location.origin}?code=${accessCode}`;
+            // Generar nuevo QR
             new QRCode(qrContainer, {
-                text: accessUrl,
+                text: link,
                 width: 256,
                 height: 256,
                 colorDark: '#667eea',
@@ -1344,10 +923,8 @@
                 correctLevel: QRCode.CorrectLevel.H
             });
             
-            document.getElementById('modalAccessCode').textContent = accessCode;
-            document.getElementById('modalAccessLink').textContent = accessUrl;
-            
-            modal.style.display = 'flex';
+            // Mostrar modal
+            document.getElementById('qrModal').style.display = 'flex';
         }
 
         function closeModal() {
@@ -1372,10 +949,11 @@
         }
 
         function shareWhatsApp() {
+            const title = document.getElementById('modalTrainingTitle').textContent;
             const code = document.getElementById('modalAccessCode').textContent;
             const link = document.getElementById('modalAccessLink').textContent;
             
-            const message = `🏥 *Acceso a Capacitación*\nHospital Susana López de Valencia\n\n*Código:* ${code}\n*Link:* ${link}`;
+            const message = `🏥 *Acceso a Capacitación*\n\n*${title}*\n\nHospital Susana López de Valencia\n\n*Código:* ${code}\n*Link:* ${link}`;
             const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
             window.open(whatsappUrl, '_blank');
         }
@@ -1401,6 +979,8 @@
                 });
             }
         }
+
+        // ==================== LIMPIAR FORMULARIO ====================
 
         function resetForm() {
             if (pretestQuestionCount > 0 || posttestQuestionCount > 0) {
@@ -1429,6 +1009,10 @@
             posttestQuestionCount = 0;
             document.querySelectorAll('.question-counter').forEach(c => c.remove());
             
+            // Establecer fecha de hoy
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('trainingDate').value = today;
+            
             Swal.fire({
                 icon: 'success',
                 title: 'Formulario Limpiado',
@@ -1437,96 +1021,43 @@
             });
         }
 
-        // ==================== CONEXIÓN AIRTABLE SEGURA ====================
-        
-        // Variables globales para conexión
-        let airtableConnected = false;
-        let connectionCheckInterval = null;
-        
-        // Función para actualizar el indicador de conexión
-        function updateConnectionIndicator(status) {
-            const indicator = document.getElementById('connectionIndicator');
-            const text = document.getElementById('connectionText');
+        // ==================== CARGAR CAPACITACIONES (GESTIÓN) ====================
+
+        async function loadTrainingsForManagement() {
+            const listContainer = document.getElementById('trainingsList');
             
-            if (!indicator) return;
+            listContainer.innerHTML = '<p style="text-align: center; padding: 2rem;">Cargando capacitaciones...</p>';
             
-            indicator.classList.remove('connected', 'disconnected', 'checking');
-            
-            switch(status) {
-                case 'connected':
-                    indicator.classList.add('connected');
-                    text.textContent = '✓ Airtable Conectado';
-                    airtableConnected = true;
-                    break;
-                case 'disconnected':
-                    indicator.classList.add('disconnected');
-                    text.textContent = '✗ Airtable Desconectado';
-                    airtableConnected = false;
-                    break;
-                case 'checking':
-                    indicator.classList.add('checking');
-                    text.textContent = '⟳ Verificando...';
-                    break;
-            }
-        }
-        
-        // Función para verificar conexión con Airtable (SEGURA - via Netlify)
-        async function testAirtableConnection() {
             try {
-                updateConnectionIndicator('checking');
+                const response = await airtableRequest('GET', '/Capacitaciones?sort%5B0%5D%5Bfield%5D=FechaCreacion&sort%5B0%5D%5Bdirection%5D=desc');
                 
-                // IMPORTANTE: NUNCA guardamos credenciales en el cliente
-                // Todo se maneja en el servidor (Netlify Functions)
-                
-                // Hacer petición al proxy de Netlify para verificar conexión
-                const response = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: '/Capacitaciones?maxRecords=1',
-                        body: null
-                    })
-                });
-                
-                if (response.ok) {
-                    updateConnectionIndicator('connected');
-                    console.log('✅ Conexión exitosa con Airtable (Netlify Proxy)');
-                    return true;
+                if (response.records && response.records.length > 0) {
+                    let html = '<div class="trainings-grid">';
+                    
+                    response.records.forEach(record => {
+                        const fields = record.fields;
+                        html += `
+                            <div class="training-item">
+                                <h4>${fields.Titulo || 'Sin título'}</h4>
+                                <p><strong>Departamento:</strong> ${fields.Departamento || 'N/A'}</p>
+                                <p><strong>Fecha:</strong> ${fields.Fecha || 'N/A'}</p>
+                                <p><strong>Estado:</strong> <span class="badge ${fields.Activa ? 'success' : 'danger'}">${fields.Activa ? 'Activa' : 'Inactiva'}</span></p>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    listContainer.innerHTML = html;
                 } else {
-                    updateConnectionIndicator('disconnected');
-                    console.log('❌ Error de conexión con Airtable:', response.status);
-                    return false;
+                    listContainer.innerHTML = '<p style="text-align: center; padding: 2rem; color: #666;">No hay capacitaciones creadas aún.</p>';
                 }
             } catch (error) {
-                updateConnectionIndicator('disconnected');
-                console.error('❌ Error al verificar conexión:', error.message);
-                return false;
+                console.error('Error cargando capacitaciones:', error);
+                listContainer.innerHTML = '<p style="text-align: center; padding: 2rem; color: #dc3545;">Error al cargar capacitaciones</p>';
             }
         }
-        
-        // Verificar conexión al cargar la página
-        document.addEventListener('DOMContentLoaded', () => {
-            console.log('🔄 Iniciando verificación de conexión...');
-            testAirtableConnection();
-            
-            // Verificar conexión cada 30 segundos
-            if (connectionCheckInterval) clearInterval(connectionCheckInterval);
-            connectionCheckInterval = setInterval(() => {
-                testAirtableConnection();
-            }, 30000);
-        });
-        
-        // Limpiar intervalo al descargar
-        window.addEventListener('beforeunload', () => {
-            if (connectionCheckInterval) clearInterval(connectionCheckInterval);
-        });
-        
-        // ==================== FIN CONEXIÓN AIRTABLE ====================
 
-        // ==================== CHARTS ====================
+        // ==================== GRÁFICOS ====================
         
         let participationsChart = null;
         let departmentChart = null;
@@ -1587,6 +1118,19 @@
                 });
             }
         }
+
+        // Cerrar modal al hacer clic fuera
+        window.onclick = function(event) {
+            const modal = document.getElementById('qrModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        // Limpiar intervalo al salir
+        window.addEventListener('beforeunload', () => {
+            if (connectionCheckInterval) clearInterval(connectionCheckInterval);
+        });
     </script>
 </body>
 </html>
