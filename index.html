@@ -1233,6 +1233,15 @@
             
             return questions;
         }
+// Lee SOLO el personal marcado en "Personal Capacitado"
+function getSelectedStaff() {
+  // Busca checkboxes marcados dentro del contenedor de personal
+  const checks = document.querySelectorAll('#trainingStaffContainer input.trainingStaff:checked');
+  // Devuelve un array de valores limpios
+  return Array.from(checks)
+    .map(cb => (cb.value || '').trim())
+    .filter(Boolean);
+}
 
         async function saveTraining() {
     const titleInput = document.getElementById('trainingTitle');
