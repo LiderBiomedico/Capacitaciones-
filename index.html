@@ -1365,90 +1365,6 @@ async function sendTrainingToAirtable(trainingData) {
     }
 }
 
-function saveTraining() {
-            const title = document.getElementById('trainingTitle').value;
-            const description = document.getElementById('trainingDescription').value;
-            const trainingDate = document.getElementById('trainingDate').value;
-            const department = document.getElementById('trainingDepartment').value;
-            const duration = document.getElementById('trainingDuration').value;
-            
-            // Obtener personal capacitado seleccionado
-            const staffCheckboxes = document.querySelectorAll('.trainingStaff:checked');
-            const selectedStaff = Array.from(staffCheckboxes).map(cb => cb.value);
-            
-            if (!title || !department || !trainingDate || selectedStaff.length === 0) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Campos Requeridos',
-                    text: 'Complete todos los campos obligatorios, incluyendo fecha y personal capacitado',
-                });
-                return;
-            }
-            
-            if (pretestQuestionCount === 0 || posttestQuestionCount === 0) {
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Preguntas Requeridas',
-                    text: 'Agregue al menos una pregunta en cada test',
-                });
-                return;
-            }
-            
-            const pretestQuestions = collectQuestions('pretest');
-            if (!pretestQuestions) return;
-            
-            const posttestQuestions = collectQuestions('posttest');
-            if (!posttestQuestions) return;
-            
-            const accessCode = generateAccessCode();
-            
-            const trainingData = {
-                title,
-                description,
-                trainingDate,
-                department,
-                duration,
-                selectedStaff,
-                accessCode,
-                pretestQuestions,
-                posttestQuestions,
-                createdAt: new Date().toISOString(),
-                status: 'active'
-            };
-            
-            Swal.fire({
-                title: 'Guardando...',
-                allowOutsideClick: false,
-                didOpen: () => Swal.showLoading()
-            });
-            
-            setTimeout(() => {
-                const trainings = JSON.parse(localStorage.getItem('trainings') || '[]');
-                trainings.push(trainingData);
-                localStorage.setItem('trainings', JSON.stringify(trainings));
-                
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Capacitación Guardada!',
-                    html: `
-                        <div style="margin: 20px 0;">
-                            <p>Código de Acceso:</p>
-                            <h2 style="color: #667eea; margin: 10px 0;">${accessCode}</h2>
-                            <p style="font-size: 0.9em; color: #666;">Comparte este código con los participantes</p>
-                        </div>
-                    `,
-                    confirmButtonText: 'Generar QR',
-                    showCancelButton: true,
-                    cancelButtonText: 'Cerrar'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        showQRCode(accessCode, title);
-                    }
-                });
-                
-                resetForm();
-            }, 1500);
-        }
 
         function generateAccessCode() {
             const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
@@ -1638,7 +1554,7 @@ function saveTraining() {
         console.error('❌ Error al verificar conexión:', error.message);
         return false;
     }
-}}
+}
         
         // Verificar conexión al cargar la página
         document.addEventListener('DOMContentLoaded', () => {
