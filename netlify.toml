@@ -18,9 +18,3 @@
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
     Access-Control-Allow-Origin = "*"
-
-# Alias para evitar 404 si Netlify no publica nombres con guiones
-[[redirects]]
-from = "/.netlify/functions/airtable-proxy"
-to = "/.netlify/functions/airtableproxy"
-status = 200
