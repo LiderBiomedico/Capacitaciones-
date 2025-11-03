@@ -1,13 +1,11 @@
-# Netlify Configuration File
-
 [build]
   functions = "netlify/functions"
   publish = "."
 
-[[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
-  status = 200
+# Esto habilita CORS básico para dev rápido;
+# en producción puedes restringirlo a tu dominio
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
 
-[dev]
-  functions = "netlify/functions"
