@@ -1234,30 +1234,62 @@
             return questions;
         }
 
-  async function saveTraining() {
-    // 1. Capturamos los datos del formulario (esto replica lo que ya haces)
-    const title = document.getElementById('trainingTitle').value.trim();
-    const description = document.getElementById('trainingDescription').value.trim();
-    const trainingDate = document.getElementById('trainingDate').value;
-    const department = document.getElementById('trainingDepartment').value;
-    const duration = document.getElementById('trainingDuration').value;
-    const staffSelect = document.getElementById('trainingStaff');
-    const selectedStaff = Array.from(staffSelect.selectedOptions).map(opt => opt.value);
+async function saveTraining() {
+    // 1. Capturar valores del formulario principal
+    const titleInput = document.getElementById('trainingTitle');
+    const descInput = document.getElementById('trainingDescription');
+    const dateInput = document.getElementById('trainingDate');
+    const deptInput = document.getElementById('trainingDepartment');
+    const durationInput = document.getElementById('trainingDuration');
+    const staffSelect = document.getElementById('trainingStaff'); // este puede ser null si no está renderizado
 
-    // Validación básica igual que antes
+    const title = titleInput ? titleInput.value.trim() : '';
+    const description = descInput ? descInput.value.trim() : '';
+    const trainingDate = dateInput ? dateInput.value : '';
+    const department = deptInput ? deptInput.value : '';
+    const duration = durationInput ? durationInput.value : '';
+
+    // Si el select existe, saca el personal. Si no existe, deja []
+    const selectedStaff = staffSelect
+        ? Array.from(staffSelect.selectedOptions).map(opt => opt.value)
+        : [];
+
+    // 2. Validación clara
+    // Nota: requerimos todos los campos obligatorios *y* al menos una persona
+    // Si quieres permitir guardar aunque no selecciones personal todavía,
+    // cambia la condición de selectedStaff.length === 0.
     if (!title || !description || !trainingDate || !department || !duration || selectedStaff.length === 0) {
+
+        // mensaje más específico para el usuario
+        let missingMsg = 'Por favor completa todos los campos requeridos (*)';
+
+        if (!staffSelect) {
+            // Esto significa que el select de personal NO está en el DOM.
+            // le damos una pista clara al usuario:
+            missingMsg += ' (falta seleccionar el personal en la sección Información General).';
+        } else if (selectedStaff.length === 0) {
+            missingMsg += ' y selecciona al menos una persona en "Personal que Asiste".';
+        }
+
         Swal.fire({
             icon: 'warning',
             title: 'Campos Incompletos',
-            text: 'Por favor completa todos los campos requeridos (*) y selecciona al menos una persona.'
+            text: missingMsg
         });
+
+        // además hacemos scroll hacia arriba donde están los datos básicos,
+        // para que no se queden al final en la parte del examen perdidos
+        if (titleInput) {
+            titleInput.scrollIntoView({ behavior: 'smooth' });
+        }
+
         return;
     }
 
-    // 2. Generar código de acceso como ya hacías
+    // 3. Generar código de acceso
     const accessCode = generateAccessCode();
 
-    // 3. Estructuramos el objeto interno de la capacitación
+    // 4. Construir objeto interno
     const createdAtISO = new Date().toISOString();
     const trainingData = {
         title: title,
@@ -1265,29 +1297,33 @@
         trainingDate: trainingDate,
         department: department,
         duration: duration,
-        staffList: selectedStaff,   // array de personal
+        staffList: selectedStaff,
         accessCode: accessCode,
-        status: 'active',           // o el estado que manejes
+        status: 'active',
         createdAtISO: createdAtISO
     };
 
-    // 4. Intentar mandar a Airtable por medio del proxy
+    // 5. Intentar enviar a Airtable por el proxy
     let airtableOK = await sendTrainingToAirtable(trainingData);
 
-    // 5. Guardar copia local (respaldo offline / auditoría local)
+    // 6. Guardar respaldo local
     const trainings = JSON.parse(localStorage.getItem('trainings') || '[]');
     trainings.push(trainingData);
     localStorage.setItem('trainings', JSON.stringify(trainings));
 
-    // 6. Limpiar el formulario visualmente si quieres
-    document.getElementById('trainingTitle').value = '';
-    document.getElementById('trainingDescription').value = '';
-    document.getElementById('trainingDate').value = '';
-    document.getElementById('trainingDepartment').value = '';
-    document.getElementById('trainingDuration').value = '';
-    Array.from(staffSelect.options).forEach(opt => opt.selected = false);
+    // 7. Limpiar formulario visible
+    if (titleInput) titleInput.value = '';
+    if (descInput) descInput.value = '';
+    if (dateInput) dateInput.value = '';
+    if (deptInput) deptInput.value = '';
+    if (durationInput) durationInput.value = '';
+    if (staffSelect) {
+        Array.from(staffSelect.options).forEach(opt => opt.selected = false);
+    }
 
-    // 7. Mostrar SweetAlert con QR opcional, igual que tu flujo anterior
+    // TODO: si también quieres limpiar las preguntas del examen, aquí iría esa limpieza
+
+    // 8. Mostrar alerta final con QR
     Swal.fire({
         icon: 'success',
         title: '¡Capacitación Guardada!',
@@ -1312,9 +1348,12 @@
         }
     });
 
-    // 8. Actualizar cualquier lista/tabla que muestres en la pestaña "Gestionar"
-    renderTrainingList();
+    // 9. Refrescar la lista en la pestaña "Gestionar"
+    if (typeof renderTrainingList === 'function') {
+        renderTrainingList();
+    }
 }
+
 
 
         function generateAccessCode() {
