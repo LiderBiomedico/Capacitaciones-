@@ -47,7 +47,28 @@ export async function handler(event) {
     // Variables secretas que debes poner en Netlify
     const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
     const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+    
+    if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+      return {
+        statusCode: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({
+          success: false,
+          error: 'Variables de entorno no configuradas en Netlify (AIRTABLE_API_KEY o AIRTABLE_BASE_ID)'
+        })
+      };
+    }
+    
     const AIRTABLE_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}${path}`;
+
+    // Log para debugging (se puede quitar en producción)
+    console.log('🔄 Llamando a Airtable:', method, path);
+    if (body) {
+      console.log('📤 Body:', JSON.stringify(body, null, 2));
+    }
 
     // Hacemos la llamada real a Airtable
     const airtableRes = await fetch(AIRTABLE_URL, {
@@ -63,14 +84,17 @@ export async function handler(event) {
     });
 
     const airtableText = await airtableRes.text(); // primero como texto bruto
+    console.log('📥 Respuesta Airtable (status ' + airtableRes.status + '):', airtableText.substring(0, 500));
+    
     let airtableJSON = null;
     try {
       airtableJSON = JSON.parse(airtableText);
     } catch (e) {
       // la respuesta NO es JSON válido (por ejemplo, HTML de error)
+      console.error('❌ Respuesta no es JSON:', airtableText.substring(0, 200));
     }
 
-    // Caso 1: Airtable respondió error tipo 401, 403, 404, etc.
+    // Caso 1: Airtable respondió error tipo 401, 403, 404, 422, etc.
     if (!airtableRes.ok) {
       return {
         statusCode: airtableRes.status,
@@ -81,8 +105,10 @@ export async function handler(event) {
         body: JSON.stringify({
           success: false,
           status: airtableRes.status,
-          error: 'Airtable devolvió un estado no OK',
-          airtableRaw: airtableText
+          error: airtableJSON?.error?.message || 'Airtable devolvió un estado no OK',
+          errorType: airtableJSON?.error?.type || 'UNKNOWN_ERROR',
+          // Incluir detalles del error para debugging
+          airtableResponse: airtableJSON || airtableText
         })
       };
     }
@@ -106,6 +132,8 @@ export async function handler(event) {
     // Caso 3: todo bien → Devolvemos un formato consistente
     // En un GET a /Capacitaciones, Airtable responde algo tipo:
     // { "records":[ { "id":"rec123", "fields":{...}, "createdTime":... }, ... ] }
+    // En un POST, Airtable responde:
+    // { "id":"rec123", "fields":{...}, "createdTime":... }
     return {
       statusCode: 200,
       headers: {
@@ -114,8 +142,7 @@ export async function handler(event) {
       },
       body: JSON.stringify({
         success: true,
-        records: airtableJSON.records || [],
-        raw: airtableJSON
+        ...airtableJSON // Devuelve todo: records, id, fields, etc.
       })
     };
 
@@ -130,7 +157,8 @@ export async function handler(event) {
       body: JSON.stringify({
         success: false,
         error: 'Excepción en airtable-proxy',
-        details: err.message
+        details: err.message,
+        stack: err.stack
       })
     };
   }

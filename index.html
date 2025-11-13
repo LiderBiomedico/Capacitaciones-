@@ -1331,45 +1331,144 @@ function getSelectedStaff() {
 // Envía la capacitación a Airtable a través del proxy Netlify
 async function sendTrainingToAirtable(trainingData) {
     try {
+        console.log('📤 Enviando capacitación a Airtable...');
+        console.log('Datos originales:', trainingData);
+
+        // ⚠️ IMPORTANTE: Ajusta estos nombres según tu tabla Airtable
+        // Los nombres deben coincidir EXACTAMENTE (incluyendo tildes, mayúsculas, espacios)
+        
         const airtableRecord = {
-            records: [
-                {
-                    fields: {
-                        Titulo: trainingData.title,
-                        Descripcion: trainingData.description,
-                        Fecha: trainingData.trainingDate,
-                        Departamento: trainingData.department,
-                        Duracion: trainingData.duration,
-                        Personal: Array.isArray(trainingData.staffList) ? trainingData.staffList.join(', ') : '',
-                        CodigoAcceso: trainingData.accessCode,
-                        Estado: trainingData.status,
-                        CreadoEn: trainingData.createdAtISO
-                    }
-                }
-            ]
+            fields: {
+                // OPCIÓN A: Si tus campos tienen tildes (más común en español)
+                "Título": trainingData.title,
+                "Descripción": trainingData.description,
+                "Fecha": trainingData.trainingDate,
+                "Departamento": trainingData.department,
+                "Duración": trainingData.duration,
+                "Personal": Array.isArray(trainingData.staffList) 
+                    ? trainingData.staffList.join(', ') 
+                    : '',
+                "Código de Acceso": trainingData.accessCode,
+                "Estado": trainingData.status,
+                "Creado En": trainingData.createdAtISO
+                
+                // OPCIÓN B: Si tus campos NO tienen tildes (descomenta si es tu caso):
+                /*
+                "Titulo": trainingData.title,
+                "Descripcion": trainingData.description,
+                "Fecha": trainingData.trainingDate,
+                "Departamento": trainingData.department,
+                "Duracion": trainingData.duration,
+                "Personal": Array.isArray(trainingData.staffList) 
+                    ? trainingData.staffList.join(', ') 
+                    : '',
+                "CodigoAcceso": trainingData.accessCode,
+                "Estado": trainingData.status,
+                "CreadoEn": trainingData.createdAtISO
+                */
+            }
         };
 
+        console.log('📋 Record a enviar:', JSON.stringify(airtableRecord, null, 2));
+
+        // Llamada al proxy de Netlify
         const response = await fetch('/.netlify/functions/airtable-proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 method: 'POST',
                 path: '/Capacitaciones',
-                body: airtableRecord
+                body: airtableRecord // Envía un solo record
             })
         });
 
+        // Obtener respuesta como texto primero
+        const responseText = await response.text();
+        console.log(`📥 Respuesta HTTP ${response.status}:`, responseText);
+
+        // Si la respuesta no es OK (404, 422, 500, etc.)
         if (!response.ok) {
-            console.error('❌ Airtable devolvió HTTP no OK:', response.status);
+            console.error('❌ Error HTTP:', response.status);
+            
+            let errorMessage = 'Error desconocido';
+            let errorDetails = '';
+            
+            try {
+                const errorData = JSON.parse(responseText);
+                errorMessage = errorData.error || errorMessage;
+                errorDetails = errorData.errorType || '';
+                
+                // Si es error 422, probablemente es problema de nombres de campos
+                if (response.status === 422) {
+                    errorMessage = 'Error de validación en Airtable. Verifica que los nombres de los campos coincidan exactamente.';
+                    errorDetails = errorData.airtableResponse?.error?.message || '';
+                }
+                
+                console.error('Error detallado:', errorData);
+            } catch (e) {
+                console.error('No se pudo parsear el error');
+            }
+            
+            // Mostrar error al usuario con detalles
+            Swal.fire({
+                icon: 'error',
+                title: 'Error al Guardar en Airtable',
+                html: `
+                    <p><strong>Código HTTP:</strong> ${response.status}</p>
+                    <p><strong>Mensaje:</strong> ${errorMessage}</p>
+                    ${errorDetails ? `<p style="font-size:0.9em; color:#666;"><strong>Detalle:</strong> ${errorDetails}</p>` : ''}
+                    <hr style="margin:15px 0;">
+                    <p style="font-size:0.85em; color:#666; text-align:left;">
+                        <strong>¿Cómo solucionar?</strong><br>
+                        1. Abre la consola del navegador (F12)<br>
+                        2. Busca el mensaje "📋 Record a enviar"<br>
+                        3. Compara los nombres con tu tabla Airtable<br>
+                        4. Los nombres deben coincidir EXACTAMENTE (tildes, mayúsculas, espacios)
+                    </p>
+                `,
+                width: 600,
+                confirmButtonText: 'Entendido'
+            });
+            
             return false;
         }
 
-        const data = await response.json();
-        console.log('📤 Respuesta al guardar en Airtable:', data);
+        // Si la respuesta es OK, parsear JSON
+        const data = JSON.parse(responseText);
+        console.log('✅ Respuesta exitosa:', data);
 
-        return !!(data && data.success === true);
+        // Verificar si realmente se guardó
+        if (data && (data.success === true || data.id)) {
+            console.log('✅ Capacitación guardada exitosamente en Airtable');
+            console.log('ID del registro:', data.id);
+            return true;
+        } else {
+            console.warn('⚠️ Respuesta OK pero sin confirmar guardado:', data);
+            return false;
+        }
+
     } catch (err) {
-        console.error('❌ Error enviando a Airtable:', err.message);
+        console.error('❌ Excepción al enviar a Airtable:', err);
+        console.error('Stack trace:', err.stack);
+        
+        Swal.fire({
+            icon: 'error',
+            title: 'Error de Conexión',
+            html: `
+                <p>No se pudo conectar con Airtable</p>
+                <p style="font-size:0.9em; color:#666;">${err.message}</p>
+                <hr style="margin:15px 0;">
+                <p style="font-size:0.85em; color:#666; text-align:left;">
+                    <strong>Posibles causas:</strong><br>
+                    • Variables de entorno no configuradas en Netlify<br>
+                    • Problema de conectividad de red<br>
+                    • Proxy de Netlify no desplegado correctamente
+                </p>
+            `,
+            width: 600,
+            confirmButtonText: 'Entendido'
+        });
+        
         return false;
     }
 }
