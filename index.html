@@ -1269,6 +1269,33 @@ function getSelectedStaff() {
         return;
     }
 
+    // NUEVO: Recopilar preguntas del pretest y postest
+    const pretestQuestions = collectQuestions('pretest');
+    const posttestQuestions = collectQuestions('posttest');
+    
+    // Validar que hay al menos algunas preguntas
+    if (!pretestQuestions || pretestQuestions.length === 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Sin Preguntas de Pretest',
+            text: 'Debes agregar al menos una pregunta al pretest',
+            confirmButtonText: 'Entendido'
+        });
+        document.getElementById('pretestQuestions').scrollIntoView({ behavior: 'smooth' });
+        return;
+    }
+
+    if (!posttestQuestions || posttestQuestions.length === 0) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Sin Preguntas de Postest',
+            text: 'Debes agregar al menos una pregunta al post-test',
+            confirmButtonText: 'Entendido'
+        });
+        document.getElementById('posttestQuestions').scrollIntoView({ behavior: 'smooth' });
+        return;
+    }
+
     const accessCode = generateAccessCode();
     const createdAtISO = new Date().toISOString();
 
@@ -1278,29 +1305,74 @@ function getSelectedStaff() {
         trainingDate,
         department,
         duration,
-        staffList: selectedStaff, // << sólo lo marcado
+        staffList: selectedStaff,
         accessCode,
         status: 'active',
-        createdAtISO
+        createdAtISO,
+        pretestQuestions: pretestQuestions,
+        posttestQuestions: posttestQuestions
     };
 
-    // Enviar a Airtable
-    const airtableOK = await sendTrainingToAirtable(trainingData);
+    // Mostrar indicador de carga
+    Swal.fire({
+        title: 'Guardando Capacitación...',
+        html: 'Por favor espera mientras se guarda la capacitación y las preguntas',
+        allowOutsideClick: false,
+        didOpen: () => {
+            Swal.showLoading();
+        }
+    });
+
+    // PASO 1: Guardar la capacitación
+    const trainingResult = await sendTrainingToAirtable(trainingData);
+    
+    if (!trainingResult || !trainingResult.id) {
+        Swal.fire({
+            icon: 'error',
+            title: 'Error al Guardar',
+            text: 'No se pudo guardar la capacitación en Airtable. Verifica la conexión y los campos.'
+        });
+        return;
+    }
+
+    console.log('✅ Capacitación guardada con ID:', trainingResult.id);
+
+    // PASO 2: Guardar preguntas del pretest
+    const pretestSaved = await saveQuestionsToAirtable(
+        pretestQuestions, 
+        trainingResult.id, 
+        'pretest'
+    );
+
+    // PASO 3: Guardar preguntas del postest
+    const posttestSaved = await saveQuestionsToAirtable(
+        posttestQuestions, 
+        trainingResult.id, 
+        'posttest'
+    );
 
     // Respaldo local
     const trainings = JSON.parse(localStorage.getItem('trainings') || '[]');
     trainings.push(trainingData);
     localStorage.setItem('trainings', JSON.stringify(trainings));
 
-    // Limpiar campos
+    // Limpiar formulario
     if (titleInput) titleInput.value = '';
     if (descInput) descInput.value = '';
     if (dateInput) dateInput.value = '';
     if (deptInput) deptInput.value = '';
     if (durationInput) durationInput.value = '';
-    document.querySelectorAll('input.trainingStaff:checked, .trainingStaff:checked, input[name="personalCapacitado[]"]:checked').forEach(cb => cb.checked = false);
+    document.querySelectorAll('input.trainingStaff:checked, .trainingStaff:checked, input[name="personalCapacitado[]"]:checked')
+        .forEach(cb => cb.checked = false);
+    
+    // Limpiar preguntas
+    document.getElementById('pretestQuestions').innerHTML = '';
+    document.getElementById('posttestQuestions').innerHTML = '';
+    pretestQuestionCount = 0;
+    posttestQuestionCount = 0;
+    document.querySelectorAll('.question-counter').forEach(c => c.remove());
 
-    // Alerta final + QR
+    // Mensaje final
     Swal.fire({
         icon: 'success',
         title: '¡Capacitación Guardada!',
@@ -1309,8 +1381,11 @@ function getSelectedStaff() {
                 <p>Código de Acceso:</p>
                 <h2 style="color: #667eea; margin: 10px 0;">${accessCode}</h2>
                 <p style="font-size: 0.9em; color: #666;">Comparte este código con los participantes</p>
-                <p style="font-size: 0.8em; color:${airtableOK ? '#28a745' : '#c62828'};">
-                    ${airtableOK ? '✅ La capacitación también fue guardada en Airtable.' : '⚠ No se pudo guardar en Airtable. Se guardó sólo en este navegador.'}
+                <hr style="margin: 15px 0;">
+                <p style="font-size: 0.85em;">
+                    ✅ Capacitación guardada en Airtable<br>
+                    ${pretestSaved ? '✅' : '⚠️'} ${pretestQuestions.length} preguntas de pretest ${pretestSaved ? 'guardadas' : 'con error'}<br>
+                    ${posttestSaved ? '✅' : '⚠️'} ${posttestQuestions.length} preguntas de postest ${posttestSaved ? 'guardadas' : 'con error'}
                 </p>
             </div>
         `,
@@ -1334,141 +1409,112 @@ async function sendTrainingToAirtable(trainingData) {
         console.log('📤 Enviando capacitación a Airtable...');
         console.log('Datos originales:', trainingData);
 
-        // ⚠️ IMPORTANTE: Ajusta estos nombres según tu tabla Airtable
-        // Los nombres deben coincidir EXACTAMENTE (incluyendo tildes, mayúsculas, espacios)
-        
+        // Usar solo los campos que existen en Airtable
         const airtableRecord = {
             fields: {
-                // OPCIÓN A: Si tus campos tienen tildes (más común en español)
                 "Título": trainingData.title,
                 "Descripción": trainingData.description,
                 "Fecha": trainingData.trainingDate,
                 "Departamento": trainingData.department,
                 "Duración": trainingData.duration,
-                "Personal": Array.isArray(trainingData.staffList) 
-                    ? trainingData.staffList.join(', ') 
-                    : '',
                 "Código de Acceso": trainingData.accessCode,
-                "Estado": trainingData.status,
-                "Creado En": trainingData.createdAtISO
-                
-                // OPCIÓN B: Si tus campos NO tienen tildes (descomenta si es tu caso):
-                /*
-                "Titulo": trainingData.title,
-                "Descripcion": trainingData.description,
-                "Fecha": trainingData.trainingDate,
-                "Departamento": trainingData.department,
-                "Duracion": trainingData.duration,
-                "Personal": Array.isArray(trainingData.staffList) 
-                    ? trainingData.staffList.join(', ') 
-                    : '',
-                "CodigoAcceso": trainingData.accessCode,
-                "Estado": trainingData.status,
-                "CreadoEn": trainingData.createdAtISO
-                */
+                "Estado": trainingData.status
+                // Campos "Personal" y "Creado En" omitidos (no existen o causan errores)
             }
         };
 
         console.log('📋 Record a enviar:', JSON.stringify(airtableRecord, null, 2));
 
-        // Llamada al proxy de Netlify
         const response = await fetch('/.netlify/functions/airtable-proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 method: 'POST',
                 path: '/Capacitaciones',
-                body: airtableRecord // Envía un solo record
+                body: airtableRecord
             })
         });
 
-        // Obtener respuesta como texto primero
         const responseText = await response.text();
         console.log(`📥 Respuesta HTTP ${response.status}:`, responseText);
 
-        // Si la respuesta no es OK (404, 422, 500, etc.)
         if (!response.ok) {
             console.error('❌ Error HTTP:', response.status);
-            
-            let errorMessage = 'Error desconocido';
-            let errorDetails = '';
-            
-            try {
-                const errorData = JSON.parse(responseText);
-                errorMessage = errorData.error || errorMessage;
-                errorDetails = errorData.errorType || '';
-                
-                // Si es error 422, probablemente es problema de nombres de campos
-                if (response.status === 422) {
-                    errorMessage = 'Error de validación en Airtable. Verifica que los nombres de los campos coincidan exactamente.';
-                    errorDetails = errorData.airtableResponse?.error?.message || '';
-                }
-                
-                console.error('Error detallado:', errorData);
-            } catch (e) {
-                console.error('No se pudo parsear el error');
-            }
-            
-            // Mostrar error al usuario con detalles
-            Swal.fire({
-                icon: 'error',
-                title: 'Error al Guardar en Airtable',
-                html: `
-                    <p><strong>Código HTTP:</strong> ${response.status}</p>
-                    <p><strong>Mensaje:</strong> ${errorMessage}</p>
-                    ${errorDetails ? `<p style="font-size:0.9em; color:#666;"><strong>Detalle:</strong> ${errorDetails}</p>` : ''}
-                    <hr style="margin:15px 0;">
-                    <p style="font-size:0.85em; color:#666; text-align:left;">
-                        <strong>¿Cómo solucionar?</strong><br>
-                        1. Abre la consola del navegador (F12)<br>
-                        2. Busca el mensaje "📋 Record a enviar"<br>
-                        3. Compara los nombres con tu tabla Airtable<br>
-                        4. Los nombres deben coincidir EXACTAMENTE (tildes, mayúsculas, espacios)
-                    </p>
-                `,
-                width: 600,
-                confirmButtonText: 'Entendido'
-            });
-            
+            console.error('Detalle:', responseText);
             return false;
         }
 
-        // Si la respuesta es OK, parsear JSON
         const data = JSON.parse(responseText);
         console.log('✅ Respuesta exitosa:', data);
 
-        // Verificar si realmente se guardó
-        if (data && (data.success === true || data.id)) {
-            console.log('✅ Capacitación guardada exitosamente en Airtable');
-            console.log('ID del registro:', data.id);
+        // IMPORTANTE: Retornar el ID del registro creado
+        if (data && data.id) {
+            console.log('✅ Capacitación guardada con ID:', data.id);
+            return { success: true, id: data.id };
+        }
+
+        return false;
+    } catch (err) {
+        console.error('❌ Error enviando a Airtable:', err.message);
+        console.error('Stack:', err.stack);
+        return false;
+    }
+}
+
+// NUEVA FUNCIÓN: Guarda las preguntas en Airtable
+async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
+    try {
+        console.log(`📝 Guardando ${questions.length} preguntas de ${type}...`);
+        
+        if (!questions || questions.length === 0) {
+            console.log(`⚠️ No hay preguntas de ${type} para guardar`);
             return true;
-        } else {
-            console.warn('⚠️ Respuesta OK pero sin confirmar guardado:', data);
+        }
+
+        // Convertir las preguntas al formato de Airtable
+        const records = questions.map(q => ({
+            fields: {
+                "Capacitación": [trainingRecordId],  // Link al registro de la capacitación
+                "Tipo": type === 'pretest' ? 'Pretest' : 'Postest',
+                "Número": q.number,
+                "Pregunta": q.question,
+                "Opción A": q.options.a,
+                "Opción B": q.options.b,
+                "Opción C": q.options.c,
+                "Opción D": q.options.d,
+                "Respuesta Correcta": q.correctAnswer
+            }
+        }));
+
+        console.log(`📋 Preguntas a guardar:`, records);
+
+        // Guardar todas las preguntas en un solo request
+        const response = await fetch('/.netlify/functions/airtable-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                method: 'POST',
+                path: '/Preguntas',
+                body: { records: records }  // Airtable acepta múltiples records
+            })
+        });
+
+        const responseText = await response.text();
+        console.log(`📥 Respuesta guardado de preguntas HTTP ${response.status}:`, responseText);
+
+        if (!response.ok) {
+            console.error(`❌ Error guardando preguntas de ${type}:`, response.status);
+            console.error('Detalle:', responseText);
             return false;
         }
 
+        const data = JSON.parse(responseText);
+        console.log(`✅ ${questions.length} preguntas de ${type} guardadas exitosamente`);
+        
+        return true;
+
     } catch (err) {
-        console.error('❌ Excepción al enviar a Airtable:', err);
-        console.error('Stack trace:', err.stack);
-        
-        Swal.fire({
-            icon: 'error',
-            title: 'Error de Conexión',
-            html: `
-                <p>No se pudo conectar con Airtable</p>
-                <p style="font-size:0.9em; color:#666;">${err.message}</p>
-                <hr style="margin:15px 0;">
-                <p style="font-size:0.85em; color:#666; text-align:left;">
-                    <strong>Posibles causas:</strong><br>
-                    • Variables de entorno no configuradas en Netlify<br>
-                    • Problema de conectividad de red<br>
-                    • Proxy de Netlify no desplegado correctamente
-                </p>
-            `,
-            width: 600,
-            confirmButtonText: 'Entendido'
-        });
-        
+        console.error(`❌ Error guardando preguntas de ${type}:`, err);
         return false;
     }
 }
