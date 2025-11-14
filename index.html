@@ -656,6 +656,309 @@
                 width: 100%;
             }
         }
+
+        /* ==================== GESTIONAR CAPACITACIONES ==================== */
+        
+        .trainings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .training-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            border: 2px solid #e0e0e0;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .training-card:hover {
+            border-color: var(--primary);
+            box-shadow: 0 8px 16px rgba(102, 126, 234, 0.2);
+            transform: translateY(-5px);
+        }
+
+        .training-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+        }
+
+        .training-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .training-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .training-status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .training-status.active {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .training-status.inactive {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .training-info {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin: 1rem 0;
+            padding: 1rem;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .training-info-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+            color: #555;
+        }
+
+        .training-info-item i {
+            width: 20px;
+            color: var(--primary);
+        }
+
+        .training-code {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            margin: 1rem 0;
+        }
+
+        .training-code-label {
+            font-size: 0.8rem;
+            opacity: 0.9;
+            margin-bottom: 0.25rem;
+        }
+
+        .training-code-value {
+            font-size: 1.5rem;
+            font-weight: bold;
+            letter-spacing: 3px;
+        }
+
+        .training-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .btn-action {
+            flex: 1;
+            padding: 0.6rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .btn-view {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .btn-view:hover {
+            background: #1976d2;
+            color: white;
+        }
+
+        .btn-qr {
+            background: #f3e5f5;
+            color: #7b1fa2;
+        }
+
+        .btn-qr:hover {
+            background: #7b1fa2;
+            color: white;
+        }
+
+        .btn-delete {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .btn-delete:hover {
+            background: #c62828;
+            color: white;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: #999;
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            opacity: 0.3;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: #666;
+        }
+
+        .empty-state p {
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Modal de detalles */
+        .details-modal {
+            display: none;
+            position: fixed;
+            z-index: 10000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .details-modal.active {
+            display: flex;
+        }
+
+        .details-content {
+            background: white;
+            border-radius: 12px;
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .details-header {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            color: white;
+            padding: 2rem;
+            border-radius: 12px 12px 0 0;
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+
+        .details-body {
+            padding: 2rem;
+        }
+
+        .details-section {
+            margin-bottom: 2rem;
+        }
+
+        .details-section h3 {
+            color: var(--primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .questions-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .question-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .question-number {
+            font-weight: bold;
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .question-text {
+            font-weight: 500;
+            margin-bottom: 0.75rem;
+            color: #333;
+        }
+
+        .question-options {
+            display: grid;
+            gap: 0.5rem;
+            margin-left: 1rem;
+        }
+
+        .question-option {
+            padding: 0.5rem;
+            background: white;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .question-option.correct {
+            background: #e8f5e9;
+            border-left: 3px solid #4caf50;
+            font-weight: 500;
+        }
+
+        .loading-spinner {
+            text-align: center;
+            padding: 3rem;
+            color: var(--primary);
+        }
+
+        .loading-spinner i {
+            font-size: 3rem;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
@@ -917,11 +1220,25 @@
             <!-- Other tabs... -->
             <section id="manage" class="tab-content">
                 <h2 class="section-title"><i class="fas fa-tasks"></i> Gestionar Capacitaciones</h2>
-                <div class="card">
-                    <p style="text-align: center; padding: 2rem; color: #666;">
-                        Aquí aparecerán las capacitaciones creadas
-                    </p>
+                
+                <!-- Loading State -->
+                <div id="trainingsLoading" class="loading-spinner" style="display: none;">
+                    <i class="fas fa-spinner"></i>
+                    <p>Cargando capacitaciones...</p>
                 </div>
+
+                <!-- Empty State -->
+                <div id="trainingsEmpty" class="empty-state" style="display: none;">
+                    <i class="fas fa-inbox"></i>
+                    <h3>No hay capacitaciones creadas</h3>
+                    <p>Las capacitaciones que crees aparecerán aquí</p>
+                    <button class="btn btn-primary" onclick="switchTab('create')">
+                        <i class="fas fa-plus"></i> Crear Primera Capacitación
+                    </button>
+                </div>
+
+                <!-- Trainings Grid -->
+                <div id="trainingsGrid" class="trainings-grid"></div>
             </section>
 
             <section id="exam" class="tab-content">
@@ -974,6 +1291,21 @@
         </div>
     </div>
 
+    <!-- Details Modal -->
+    <div id="detailsModal" class="details-modal">
+        <div class="details-content">
+            <div class="details-header">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2 style="margin: 0;"><i class="fas fa-info-circle"></i> Detalles de Capacitación</h2>
+                    <button class="close" onclick="closeDetailsModal()" style="background: rgba(255,255,255,0.2); color: white; border: none; font-size: 2rem; cursor: pointer; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">&times;</button>
+                </div>
+            </div>
+            <div class="details-body" id="detailsBody">
+                <!-- Se llenará dinámicamente -->
+            </div>
+        </div>
+    </div>
+
     <script>
         // Variables globales
         let pretestQuestionCount = 0;
@@ -996,6 +1328,9 @@
             }, 1500);
 
             setTimeout(() => initializeCharts(), 2000);
+            
+            // Cargar capacitaciones al inicio (sin mostrar, solo en background)
+            setTimeout(() => loadTrainings(), 2500);
         }
 
         function updateDateTime() {
@@ -1398,8 +1733,8 @@ function getSelectedStaff() {
         }
     });
 
-    if (typeof renderTrainingList === 'function') {
-        renderTrainingList();
+    if (typeof renderTrainingsList === 'function') {
+        renderTrainingsList();
     }
 }
 
@@ -1728,6 +2063,342 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         });
         
         // ==================== FIN CONEXIÓN AIRTABLE ====================
+
+
+        // ==================== GESTIONAR CAPACITACIONES ====================
+        
+        // Variable global para almacenar las capacitaciones
+        let allTrainings = [];
+        
+        // Cargar capacitaciones desde Airtable
+        async function loadTrainings() {
+            try {
+                console.log('📋 Cargando capacitaciones desde Airtable...');
+                
+                // Mostrar loading
+                document.getElementById('trainingsLoading').style.display = 'block';
+                document.getElementById('trainingsEmpty').style.display = 'none';
+                document.getElementById('trainingsGrid').innerHTML = '';
+                
+                const response = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: '/Capacitaciones?sort[0][field]=Creado%20En&sort[0][direction]=desc',
+                        body: null
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Error HTTP: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('✅ Respuesta de Airtable:', data);
+                
+                // Ocultar loading
+                document.getElementById('trainingsLoading').style.display = 'none';
+                
+                if (data.success && data.records && data.records.length > 0) {
+                    allTrainings = data.records;
+                    renderTrainingsList();
+                    updateDashboardStats();
+                } else {
+                    document.getElementById('trainingsEmpty').style.display = 'block';
+                }
+                
+            } catch (error) {
+                console.error('❌ Error cargando capacitaciones:', error);
+                document.getElementById('trainingsLoading').style.display = 'none';
+                document.getElementById('trainingsEmpty').style.display = 'block';
+                
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error al Cargar',
+                    text: 'No se pudieron cargar las capacitaciones. Verifica tu conexión.',
+                    confirmButtonText: 'Reintentar'
+                }).then(() => loadTrainings());
+            }
+        }
+        
+        // Renderizar lista de capacitaciones
+        function renderTrainingsList() {
+            const grid = document.getElementById('trainingsGrid');
+            grid.innerHTML = '';
+            
+            if (allTrainings.length === 0) {
+                document.getElementById('trainingsEmpty').style.display = 'block';
+                return;
+            }
+            
+            allTrainings.forEach(training => {
+                const fields = training.fields;
+                const card = createTrainingCard(training.id, fields);
+                grid.innerHTML += card;
+            });
+        }
+        
+        // Crear tarjeta de capacitación
+        function createTrainingCard(id, fields) {
+            const title = fields['Título'] || 'Sin título';
+            const description = fields['Descripción'] || 'Sin descripción';
+            const date = fields['Fecha'] || '';
+            const department = fields['Departamento'] || '';
+            const duration = fields['Duración'] || '';
+            const accessCode = fields['Código de Acceso'] || '';
+            const status = fields['Estado'] || 'active';
+            
+            const formattedDate = date ? new Date(date).toLocaleDateString('es-ES', { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            }) : 'Sin fecha';
+            
+            return `
+                <div class="training-card">
+                    <div class="training-card-header">
+                        <div>
+                            <h3 class="training-title">${title}</h3>
+                            <span class="training-status ${status}">${status === 'active' ? 'Activa' : 'Inactiva'}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="training-info">
+                        <div class="training-info-item">
+                            <i class="fas fa-calendar"></i>
+                            <span>${formattedDate}</span>
+                        </div>
+                        <div class="training-info-item">
+                            <i class="fas fa-building"></i>
+                            <span>${department}</span>
+                        </div>
+                        <div class="training-info-item">
+                            <i class="fas fa-clock"></i>
+                            <span>${duration}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="training-code">
+                        <div class="training-code-label">Código de Acceso</div>
+                        <div class="training-code-value">${accessCode}</div>
+                    </div>
+                    
+                    <div class="training-actions">
+                        <button class="btn-action btn-view" onclick="viewTrainingDetails('${id}')">
+                            <i class="fas fa-eye"></i> Ver
+                        </button>
+                        <button class="btn-action btn-qr" onclick="showTrainingQR('${accessCode}', '${title}')">
+                            <i class="fas fa-qrcode"></i> QR
+                        </button>
+                        <button class="btn-action btn-delete" onclick="deleteTraining('${id}', '${title}')">
+                            <i class="fas fa-trash"></i> Eliminar
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Ver detalles de capacitación
+        async function viewTrainingDetails(trainingId) {
+            try {
+                console.log('👁️ Cargando detalles de capacitación:', trainingId);
+                
+                // Buscar la capacitación en el array
+                const training = allTrainings.find(t => t.id === trainingId);
+                if (!training) {
+                    throw new Error('Capacitación no encontrada');
+                }
+                
+                const fields = training.fields;
+                
+                // Cargar preguntas de la capacitación
+                const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Preguntas?filterByFormula=SEARCH("${trainingId}",{Capacitacion (from Capacitación)})`,
+                        body: null
+                    })
+                });
+                
+                const questionsData = await questionsResponse.json();
+                const questions = questionsData.success ? questionsData.records : [];
+                
+                // Renderizar detalles
+                const detailsBody = document.getElementById('detailsBody');
+                detailsBody.innerHTML = `
+                    <div class="details-section">
+                        <h3><i class="fas fa-info-circle"></i> Información General</h3>
+                        <div class="training-info">
+                            <div class="training-info-item">
+                                <i class="fas fa-heading"></i>
+                                <strong>Título:</strong> ${fields['Título'] || 'N/A'}
+                            </div>
+                            <div class="training-info-item">
+                                <i class="fas fa-align-left"></i>
+                                <strong>Descripción:</strong> ${fields['Descripción'] || 'N/A'}
+                            </div>
+                            <div class="training-info-item">
+                                <i class="fas fa-calendar"></i>
+                                <strong>Fecha:</strong> ${fields['Fecha'] ? new Date(fields['Fecha']).toLocaleDateString('es-ES') : 'N/A'}
+                            </div>
+                            <div class="training-info-item">
+                                <i class="fas fa-building"></i>
+                                <strong>Departamento:</strong> ${fields['Departamento'] || 'N/A'}
+                            </div>
+                            <div class="training-info-item">
+                                <i class="fas fa-clock"></i>
+                                <strong>Duración:</strong> ${fields['Duración'] || 'N/A'}
+                            </div>
+                            <div class="training-info-item">
+                                <i class="fas fa-key"></i>
+                                <strong>Código de Acceso:</strong> ${fields['Código de Acceso'] || 'N/A'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="details-section">
+                        <h3><i class="fas fa-question-circle"></i> Preguntas (${questions.length} total)</h3>
+                        ${questions.length > 0 ? `
+                            <div class="questions-list">
+                                ${questions.map((q, index) => {
+                                    const qFields = q.fields;
+                                    const correctAnswer = qFields['Respuesta Corecta'] || '';
+                                    return `
+                                        <div class="question-item">
+                                            <div class="question-number">Pregunta ${index + 1}</div>
+                                            <div class="question-text">${qFields['name'] || 'Sin pregunta'}</div>
+                                            <div class="question-options">
+                                                <div class="question-option ${correctAnswer === 'B' ? 'correct' : ''}">
+                                                    <strong>B)</strong> ${qFields['Opción B'] || 'N/A'}
+                                                    ${correctAnswer === 'B' ? '<i class="fas fa-check-circle" style="color: #4caf50; margin-left: auto;"></i>' : ''}
+                                                </div>
+                                                <div class="question-option ${correctAnswer === 'C' ? 'correct' : ''}">
+                                                    <strong>C)</strong> ${qFields['Opción C'] || 'N/A'}
+                                                    ${correctAnswer === 'C' ? '<i class="fas fa-check-circle" style="color: #4caf50; margin-left: auto;"></i>' : ''}
+                                                </div>
+                                                <div class="question-option ${correctAnswer === 'D' ? 'correct' : ''}">
+                                                    <strong>D)</strong> ${qFields['Opción D'] || 'N/A'}
+                                                    ${correctAnswer === 'D' ? '<i class="fas fa-check-circle" style="color: #4caf50; margin-left: auto;"></i>' : ''}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        ` : '<p style="text-align: center; color: #999;">No hay preguntas registradas</p>'}
+                    </div>
+                `;
+                
+                // Mostrar modal
+                document.getElementById('detailsModal').classList.add('active');
+                
+            } catch (error) {
+                console.error('❌ Error cargando detalles:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudieron cargar los detalles de la capacitación'
+                });
+            }
+        }
+        
+        // Cerrar modal de detalles
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').classList.remove('active');
+        }
+        
+        // Cerrar modal al hacer clic fuera
+        window.onclick = function(event) {
+            const detailsModal = document.getElementById('detailsModal');
+            if (event.target === detailsModal) {
+                closeDetailsModal();
+            }
+            const qrModal = document.getElementById('qrModal');
+            if (event.target === qrModal) {
+                closeModal();
+            }
+        };
+        
+        // Mostrar QR de capacitación específica
+        function showTrainingQR(accessCode, title) {
+            showQRCode(accessCode, title);
+        }
+        
+        // Eliminar capacitación
+        async function deleteTraining(trainingId, title) {
+            const result = await Swal.fire({
+                title: '¿Eliminar Capacitación?',
+                html: `Se eliminará la capacitación:<br><strong>${title}</strong><br><br>Esta acción no se puede deshacer.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar'
+            });
+            
+            if (!result.isConfirmed) return;
+            
+            try {
+                Swal.fire({
+                    title: 'Eliminando...',
+                    text: 'Por favor espera',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                
+                // Eliminar de Airtable
+                const response = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'DELETE',
+                        path: `/Capacitaciones/${trainingId}`,
+                        body: null
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Error al eliminar');
+                }
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Eliminada!',
+                    text: 'La capacitación ha sido eliminada',
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                
+                // Recargar lista
+                loadTrainings();
+                
+            } catch (error) {
+                console.error('❌ Error eliminando:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo eliminar la capacitación'
+                });
+            }
+        }
+        
+        // Actualizar estadísticas del dashboard
+        function updateDashboardStats() {
+            document.getElementById('totalTrainings').textContent = allTrainings.length;
+        }
+        
+        // Cargar capacitaciones cuando se cambia a la pestaña "Gestionar"
+        const originalSwitchTab = switchTab;
+        window.switchTab = function(tabName) {
+            originalSwitchTab(tabName);
+            if (tabName === 'manage') {
+                loadTrainings();
+            }
+        };
 
         // ==================== CHARTS ====================
         
