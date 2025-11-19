@@ -1241,6 +1241,63 @@
                 <div id="trainingsGrid" class="trainings-grid"></div>
             </section>
 
+            <!-- Modal para mostrar QR generado -->
+            <div id="qrModal" class="modal" style="display: none;">
+                <div class="modal-content" style="max-width: 500px; padding: 2rem; text-align: center;">
+                    <button class="modal-close" onclick="closeQRModal()">&times;</button>
+                    
+                    <h3 style="margin-bottom: 1.5rem;">
+                        <i class="fas fa-qrcode"></i> Código QR Generado
+                    </h3>
+                    
+                    <p style="color: #666; margin-bottom: 1.5rem;">
+                        Captura este código QR o comparte el enlace con tu personal
+                    </p>
+                    
+                    <!-- Contenedor para el QR -->
+                    <div id="qrCodeContainer" style="background: white; padding: 1.5rem; border-radius: 8px; border: 2px solid #e0e0e0; margin-bottom: 1.5rem; display: flex; justify-content: center;">
+                        <div id="qrCode"></div>
+                    </div>
+                    
+                    <!-- URL para compartir -->
+                    <div style="margin-bottom: 1.5rem;">
+                        <label style="font-weight: bold; color: #333; display: block; margin-bottom: 0.5rem;">
+                            <i class="fas fa-link"></i> Enlace de Acceso
+                        </label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="qrUrl" readonly style="flex: 1; padding: 0.75rem; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 0.85rem; background: #f8f9fa;">
+                            <button class="btn btn-secondary" onclick="copyQRUrl()" style="padding: 0.75rem 1rem; white-space: nowrap;">
+                                <i class="fas fa-copy"></i> Copiar
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Instrucciones -->
+                    <div style="background: #f0f8ff; padding: 1rem; border-radius: 6px; text-align: left; margin-bottom: 1.5rem;">
+                        <h4 style="margin: 0 0 0.75rem 0; color: #2196F3;">
+                            <i class="fas fa-info-circle"></i> Instrucciones
+                        </h4>
+                        <ol style="margin: 0; padding-left: 1.25rem; color: #555; font-size: 0.9rem;">
+                            <li>Imprime este código QR</li>
+                            <li>Colócalo en el hospital (carteles, pasillos)</li>
+                            <li>O comparte el enlace por WhatsApp/Email</li>
+                            <li>Cuando alguien lo escanee, se abrirá automáticamente</li>
+                            <li>✅ La sesión se creará automáticamente en Airtable</li>
+                        </ol>
+                    </div>
+                    
+                    <!-- Botones de acción -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                        <button class="btn btn-primary" onclick="downloadQRCode()" style="margin: 0;">
+                            <i class="fas fa-download"></i> Descargar
+                        </button>
+                        <button class="btn btn-secondary" onclick="closeQRModal()" style="margin: 0;">
+                            <i class="fas fa-times"></i> Cerrar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <section id="exam" class="tab-content">
                 <h2 class="section-title"><i class="fas fa-clipboard-check"></i> Realizar Examen</h2>
                 
@@ -3013,6 +3070,152 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         }
                     }
                 });
+            }
+        }
+        
+        // ==================== FUNCIONES PARA GENERAR QR ====================
+        
+        /**
+         * Genera un código único de 6 caracteres alfanuméricos
+         */
+        function generateAccessCode() {
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            let code = '';
+            for (let i = 0; i < 6; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        }
+        
+        /**
+         * Muestra el modal con el QR generado
+         */
+        async function showTrainingQR(accessCode, trainingTitle) {
+            try {
+                console.log(`📱 Generando QR para: ${trainingTitle} (${accessCode})`);
+                
+                // Generar código único si es necesario
+                const finalCode = accessCode && accessCode.trim() ? accessCode : generateAccessCode();
+                
+                // Construir URL con parámetros
+                const baseUrl = window.location.origin + window.location.pathname;
+                const qrUrl = `${baseUrl}?code=${finalCode}&auto=true`;
+                
+                console.log(`🔗 URL QR: ${qrUrl}`);
+                
+                // Limpiar contenedor anterior
+                const qrContainer = document.getElementById('qrCode');
+                qrContainer.innerHTML = '';
+                
+                // Generar QR usando QRCode.js
+                new QRCode(qrContainer, {
+                    text: qrUrl,
+                    width: 300,
+                    height: 300,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+                
+                // Llenar la URL en el campo de texto
+                document.getElementById('qrUrl').value = qrUrl;
+                
+                // Guardar datos para descargar después
+                window.currentQRData = {
+                    url: qrUrl,
+                    code: finalCode,
+                    title: trainingTitle
+                };
+                
+                // Mostrar modal
+                document.getElementById('qrModal').style.display = 'flex';
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡QR Generado!',
+                    text: `Código: ${finalCode}\n\nCompartir este enlace o escanear el QR`,
+                    timer: 2000,
+                    showConfirmButton: false
+                });
+                
+            } catch (error) {
+                console.error('❌ Error generando QR:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo generar el código QR: ' + error.message
+                });
+            }
+        }
+        
+        /**
+         * Cierra el modal del QR
+         */
+        function closeQRModal() {
+            document.getElementById('qrModal').style.display = 'none';
+        }
+        
+        /**
+         * Copia la URL del QR al portapapeles
+         */
+        function copyQRUrl() {
+            const qrUrlInput = document.getElementById('qrUrl');
+            qrUrlInput.select();
+            document.execCommand('copy');
+            
+            Swal.fire({
+                icon: 'success',
+                title: '¡Copiado!',
+                text: 'El enlace ha sido copiado al portapapeles',
+                timer: 1500,
+                showConfirmButton: false
+            });
+        }
+        
+        /**
+         * Descarga la imagen del QR
+         */
+        function downloadQRCode() {
+            try {
+                const qrContainer = document.getElementById('qrCode');
+                const qrImage = qrContainer.querySelector('img');
+                
+                if (!qrImage) {
+                    throw new Error('No se encontró la imagen del QR');
+                }
+                
+                // Crear elemento de descarga
+                const link = document.createElement('a');
+                link.href = qrImage.src;
+                link.download = `QR-${window.currentQRData.code}-${window.currentQRData.title.replace(/\s+/g, '-')}.png`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Descargado',
+                    text: 'El código QR ha sido descargado',
+                    timer: 1500,
+                    showConfirmButton: false
+                });
+                
+            } catch (error) {
+                console.error('❌ Error descargando QR:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo descargar el QR'
+                });
+            }
+        }
+        
+        /**
+         * Abre el enlace del QR en una nueva pestaña (para pruebas)
+         */
+        function testQRCode() {
+            if (window.currentQRData) {
+                window.open(window.currentQRData.url, '_blank');
             }
         }
     </script>
