@@ -1405,86 +1405,108 @@
 
         // ==================== FUNCIONES DE PARTICIPANTE ====================
         
-        async function validateAndStartTraining() {
-            const code = document.getElementById('accessCode').value.toUpperCase().trim();
-            
-            if (!code) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Código Requerido',
-                    text: 'Por favor ingresa el código de acceso',
-                    confirmButtonText: 'Entendido'
-                });
-                return;
-            }
-            
-            try {
-                Swal.fire({
-                    title: 'Buscando capacitación...',
-                    text: 'Por favor espera',
-                    allowOutsideClick: false,
-                    didOpen: () => Swal.showLoading()
-                });
-                
-                // Buscar la sesión con este código de acceso
-                const response = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: `/Sesiones?filterByFormula=AND({Código Acceso}='${code}',{Activa}=TRUE())`
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (!data.success || !data.records || data.records.length === 0) {
-                    Swal.close();
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Código Inválido',
-                        text: 'El código de acceso no es válido o la sesión ha finalizado'
-                    });
-                    return;
-                }
-                
-                const session = data.records[0];
-                const trainingId = session.fields['Capacitación'][0];
-                
-                // Obtener datos de la capacitación
-                const trainingResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: `/Capacitaciones/${trainingId}`
-                    })
-                });
-                
-                const trainingData = await trainingResponse.json();
-                
-                if (!trainingData.success || !trainingData.fields) {
-                    throw new Error('No se pudieron obtener los datos de la capacitación');
-                }
-                
-                // Guardar datos actuales
-                currentAccessCode = code;
-                currentTrainingRecord = trainingData;
-                
-                Swal.close();
-                
-                // Mostrar modal de registro
-                showParticipantRegistrationModal();
-                
-            } catch (error) {
-                console.error('Error:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error',
-                    text: 'Hubo un error al validar el código: ' + error.message
-                });
-            }
+async function validateAndStartTraining() {
+    const code = document.getElementById('accessCode').value.toUpperCase().trim();
+    
+    if (!code) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Código Requerido',
+            text: 'Por favor ingresa el código de acceso',
+            confirmButtonText: 'Entendido'
+        });
+        return;
+    }
+    
+    try {
+        Swal.fire({
+            title: 'Buscando capacitación...',
+            text: 'Por favor espera',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
+        
+        // Buscar la sesión con este código de acceso
+        const response = await fetch('/.netlify/functions/airtable-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                method: 'GET',
+                path: `/Sesiones?filterByFormula=AND({Código Acceso}='${code}',{Activa}=TRUE())`
+            })
+        });
+        
+        const data = await response.json();
+        
+        console.log('🔍 Respuesta Airtable:', data); // Para debugging
+        
+        if (!data.success || !data.records || data.records.length === 0) {
+            Swal.close();
+            Swal.fire({
+                icon: 'error',
+                title: 'Código Inválido',
+                text: 'El código de acceso no es válido o la sesión ha finalizado. Verifica que el código exista en la tabla Sesiones y esté activo.'
+            });
+            return;
         }
+        
+        const session = data.records[0];
+        console.log('📌 Sesión encontrada:', session); // Para debugging
+        
+        // Verificar que Capacitaciones tenga datos
+        if (!session.fields['Capacitaciones'] || !Array.isArray(session.fields['Capacitaciones']) || session.fields['Capacitaciones'].length === 0) {
+            Swal.close();
+            Swal.fire({
+                icon: 'error',
+                title: 'Error de Configuración',
+                text: 'Esta sesión no tiene una capacitación enlazada. Verifica en Airtable que el campo "Capacitaciones" esté completo.'
+            });
+            console.error('❌ Capacitaciones vacío o mal configurado:', session.fields['Capacitaciones']);
+            return;
+        }
+        
+        const trainingId = session.fields['Capacitaciones'][0];
+        console.log('🎓 ID de Capacitación:', trainingId); // Para debugging
+        
+        // Obtener datos de la capacitación
+        const trainingResponse = await fetch('/.netlify/functions/airtable-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                method: 'GET',
+                path: `/Capacitaciones/${trainingId}`
+            })
+        });
+        
+        const trainingData = await trainingResponse.json();
+        
+        console.log('📚 Datos Capacitación:', trainingData); // Para debugging
+        
+        if (!trainingData.success || !trainingData.fields) {
+            throw new Error('No se pudieron obtener los datos de la capacitación');
+        }
+        
+        // Guardar datos actuales
+        currentAccessCode = code;
+        currentTrainingRecord = trainingData;
+        
+        console.log('✅ Preparado para registro'); // Para debugging
+        
+        Swal.close();
+        
+        // Mostrar modal de registro
+        showParticipantRegistrationModal();
+        
+    } catch (error) {
+        console.error('❌ Error completo:', error); // Para debugging
+        Swal.close();
+        Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'Hubo un error: ' + error.message + '\n\nAbre DevTools (F12) → Console para más detalles.'
+        });
+    }
+}
         
         function showParticipantRegistrationModal() {
             document.getElementById('participantRegistrationModal').style.display = 'flex';
