@@ -1405,108 +1405,135 @@
 
         // ==================== FUNCIONES DE PARTICIPANTE ====================
         
-async function validateAndStartTraining() {
-    const code = document.getElementById('accessCode').value.toUpperCase().trim();
-    
-    if (!code) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Código Requerido',
-            text: 'Por favor ingresa el código de acceso',
-            confirmButtonText: 'Entendido'
-        });
-        return;
-    }
-    
-    try {
-        Swal.fire({
-            title: 'Buscando capacitación...',
-            text: 'Por favor espera',
-            allowOutsideClick: false,
-            didOpen: () => Swal.showLoading()
-        });
-        
-        // Buscar la sesión con este código de acceso
-        const response = await fetch('/.netlify/functions/airtable-proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                method: 'GET',
-                path: `/Sesiones?filterByFormula=AND({Código Acceso}='${code}',{Activa}=TRUE())`
-            })
-        });
-        
-        const data = await response.json();
-        
-        console.log('🔍 Respuesta Airtable:', data); // Para debugging
-        
-        if (!data.success || !data.records || data.records.length === 0) {
-            Swal.close();
-            Swal.fire({
-                icon: 'error',
-                title: 'Código Inválido',
-                text: 'El código de acceso no es válido o la sesión ha finalizado. Verifica que el código exista en la tabla Sesiones y esté activo.'
-            });
-            return;
+        async function validateAndStartTraining() {
+            const code = document.getElementById('accessCode').value.toUpperCase().trim();
+            
+            if (!code) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Código Requerido',
+                    text: 'Por favor ingresa el código de acceso',
+                    confirmButtonText: 'Entendido'
+                });
+                return;
+            }
+            
+            try {
+                Swal.fire({
+                    title: 'Buscando capacitación...',
+                    text: 'Por favor espera',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                
+                // Buscar todas las sesiones para debugging
+                const allResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Sesiones`
+                    })
+                });
+                
+                const allData = await allResponse.json();
+                console.log('📋 Todas las sesiones:', allData.records);
+                
+                // Buscar la sesión específica
+                let session = null;
+                
+                if (allData.success && allData.records) {
+                    session = allData.records.find(s => {
+                        const codigoAcceso = s.fields['Código Acceso'] || '';
+                        const activa = s.fields['Activa'] !== false;
+                        return codigoAcceso.toUpperCase() === code && activa;
+                    });
+                }
+                
+                if (!session) {
+                    Swal.close();
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Código Inválido',
+                        text: 'El código "' + code + '" no existe o la sesión no está activa.\n\nVerifica en Airtable que:\n1. El código exista en la tabla Sesiones\n2. El campo "Activa" esté marcado ✅\n3. El código sea exactamente: ' + code
+                    });
+                    return;
+                }
+                
+                console.log('✅ Sesión encontrada:', session);
+                
+                // Obtener ID de capacitación - probar múltiples nombres de campos
+                let trainingId = null;
+                
+                // Intentar diferentes nombres de campo
+                if (session.fields['Capacitaciones'] && Array.isArray(session.fields['Capacitaciones']) && session.fields['Capacitaciones'].length > 0) {
+                    trainingId = session.fields['Capacitaciones'][0];
+                    console.log('✅ Campo "Capacitaciones" encontrado');
+                } else if (session.fields['Capacitación'] && Array.isArray(session.fields['Capacitación']) && session.fields['Capacitación'].length > 0) {
+                    trainingId = session.fields['Capacitación'][0];
+                    console.log('✅ Campo "Capacitación" encontrado');
+                } else if (session.fields['capacitacion'] && Array.isArray(session.fields['capacitacion']) && session.fields['capacitacion'].length > 0) {
+                    trainingId = session.fields['capacitacion'][0];
+                    console.log('✅ Campo "capacitacion" encontrado');
+                }
+                
+                if (!trainingId) {
+                    Swal.close();
+                    console.error('❌ Campo de capacitación vacío:', session.fields);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error de Configuración',
+                        html: `<p>La sesión con código <strong>${code}</strong> no tiene capacitación enlazada.</p>
+                               <p><strong>En Airtable:</strong></p>
+                               <p>1. Abre tabla "Sesiones"</p>
+                               <p>2. Busca el registro con código "${code}"</p>
+                               <p>3. En el campo "Capacitaciones" (o "Capacitación"), haz click y selecciona una capacitación</p>
+                               <p>4. Guarda y vuelve a intentar</p>`
+                    });
+                    return;
+                }
+                
+                console.log('🎓 ID de Capacitación:', trainingId);
+                
+                // Obtener datos de la capacitación
+                const trainingResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Capacitaciones/${trainingId}`
+                    })
+                });
+                
+                const trainingData = await trainingResponse.json();
+                
+                console.log('📚 Datos de Capacitación:', trainingData);
+                
+                if (!trainingData.success || !trainingData.fields) {
+                    throw new Error('No se pudieron obtener los datos de la capacitación');
+                }
+                
+                // Guardar datos actuales
+                currentAccessCode = code;
+                currentTrainingRecord = trainingData;
+                
+                console.log('✅ Listo para proceder al registro');
+                
+                Swal.close();
+                
+                // Mostrar modal de registro
+                showParticipantRegistrationModal();
+                
+            } catch (error) {
+                console.error('❌ Error:', error);
+                Swal.close();
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error del Sistema',
+                    text: 'Hubo un error: ' + error.message + '\n\nAbre DevTools (F12) para ver detalles'
+                });
+            }
         }
-        
-        const session = data.records[0];
-        console.log('📌 Sesión encontrada:', session); // Para debugging
-        
-        // Verificar que Capacitaciones tenga datos
-        if (!session.fields['Capacitaciones'] || !Array.isArray(session.fields['Capacitaciones']) || session.fields['Capacitaciones'].length === 0) {
-            Swal.close();
-            Swal.fire({
-                icon: 'error',
-                title: 'Error de Configuración',
-                text: 'Esta sesión no tiene una capacitación enlazada. Verifica en Airtable que el campo "Capacitaciones" esté completo.'
-            });
-            console.error('❌ Capacitaciones vacío o mal configurado:', session.fields['Capacitaciones']);
-            return;
-        }
-        
-        const trainingId = session.fields['Capacitaciones'][0];
-        console.log('🎓 ID de Capacitación:', trainingId); // Para debugging
-        
-        // Obtener datos de la capacitación
-        const trainingResponse = await fetch('/.netlify/functions/airtable-proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                method: 'GET',
-                path: `/Capacitaciones/${trainingId}`
-            })
-        });
-        
-        const trainingData = await trainingResponse.json();
-        
-        console.log('📚 Datos Capacitación:', trainingData); // Para debugging
-        
-        if (!trainingData.success || !trainingData.fields) {
-            throw new Error('No se pudieron obtener los datos de la capacitación');
-        }
-        
-        // Guardar datos actuales
-        currentAccessCode = code;
-        currentTrainingRecord = trainingData;
-        
-        console.log('✅ Preparado para registro'); // Para debugging
-        
-        Swal.close();
-        
-        // Mostrar modal de registro
-        showParticipantRegistrationModal();
-        
-    } catch (error) {
-        console.error('❌ Error completo:', error); // Para debugging
-        Swal.close();
-        Swal.fire({
-            icon: 'error',
-            title: 'Error',
-            text: 'Hubo un error: ' + error.message + '\n\nAbre DevTools (F12) → Console para más detalles.'
-        });
-    }
-}
         
         function showParticipantRegistrationModal() {
             document.getElementById('participantRegistrationModal').style.display = 'flex';
