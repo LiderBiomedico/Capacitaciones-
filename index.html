@@ -1646,44 +1646,77 @@
                 });
                 
                 const trainingId = currentTrainingRecord.id;
+                const trainingTitle = currentTrainingRecord.fields['name'] || currentTrainingRecord.fields['Título'] || 'Capacitación';
                 
-                // Obtener preguntas del pretest
-                const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                console.log(`🔍 Buscando preguntas para entrenamiento: ${trainingId} (${trainingTitle})`);
+                
+                // Obtener TODAS las preguntas primero
+                const allQuestionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         method: 'GET',
-                        path: `/Preguntas?filterByFormula=AND({Capacitación}='${trainingId}',{Tipo}='Pretest')`
+                        path: `/Preguntas`
                     })
                 });
                 
-                const questionsData = await questionsResponse.json();
+                const allQuestionsData = await allQuestionsResponse.json();
                 
-                if (!questionsData.success || !questionsData.records) {
+                console.log('📚 Todas las preguntas disponibles:', allQuestionsData.records?.length || 0);
+                
+                if (!allQuestionsData.success || !allQuestionsData.records) {
                     throw new Error('No se pudieron cargar las preguntas');
                 }
+                
+                // Filtrar preguntas en JavaScript - más robusto
+                const pretestQuestions = allQuestionsData.records.filter(q => {
+                    const fields = q.fields;
+                    
+                    // Obtener el tipo de pregunta (intentar diferentes nombres)
+                    const tipo = fields['Tipo'] || fields['tipo'] || fields['Type'] || '';
+                    
+                    // Verificar si es pretest (case-insensitive)
+                    const isPretest = tipo.toLowerCase() === 'pretest' || tipo.toLowerCase() === 'pre-test' || tipo.toLowerCase() === 'pre test';
+                    
+                    // Obtener capacitación (intentar diferentes nombres)
+                    let capacitacionId = null;
+                    
+                    if (fields['Capacitación'] && Array.isArray(fields['Capacitación'])) {
+                        capacitacionId = fields['Capacitación'][0];
+                    } else if (fields['Capacitaciones'] && Array.isArray(fields['Capacitaciones'])) {
+                        capacitacionId = fields['Capacitaciones'][0];
+                    } else if (fields['capacitacion'] && Array.isArray(fields['capacitacion'])) {
+                        capacitacionId = fields['capacitacion'][0];
+                    } else if (fields['capacitaciones'] && Array.isArray(fields['capacitaciones'])) {
+                        capacitacionId = fields['capacitaciones'][0];
+                    }
+                    
+                    console.log(`✓ Pregunta: ${fields['name'] || 'Sin nombre'} | Tipo: ${tipo} | CapID: ${capacitacionId} | Match: ${isPretest && capacitacionId === trainingId}`);
+                    
+                    return isPretest && capacitacionId === trainingId;
+                });
+                
+                console.log(`✅ Preguntas de pretest encontradas: ${pretestQuestions.length}`);
                 
                 Swal.close();
                 
                 // Mostrar interfaz de pretest
-                displayPretestQuestions(questionsData.records);
+                displayPretestQuestions(pretestQuestions);
                 
                 // Ocultar sección de acceso, mostrar pretest
                 document.getElementById('accessSection').style.display = 'none';
                 document.getElementById('pretestSection').style.display = 'block';
                 
                 // Actualizar información de capacitación
-                document.getElementById('currentTrainingTitle').textContent = 
-                    currentTrainingRecord.fields['name'] || 'Capacitación';
-                document.getElementById('currentAccessCode').textContent = 
-                    currentAccessCode;
+                document.getElementById('currentTrainingTitle').textContent = trainingTitle;
+                document.getElementById('currentAccessCode').textContent = currentAccessCode;
                 
             } catch (error) {
-                console.error('Error cargando pretest:', error);
+                console.error('❌ Error cargando pretest:', error);
                 Swal.fire({
                     icon: 'error',
-                    title: 'Error',
-                    text: 'No se pudieron cargar las preguntas del pretest: ' + error.message
+                    title: 'Error Cargando Pretest',
+                    text: 'No se pudieron cargar las preguntas del pretest: ' + error.message + '\n\nAbre DevTools (F12) para ver detalles'
                 });
             }
         }
@@ -1692,8 +1725,18 @@
             const container = document.getElementById('pretestQuestionsContainer');
             container.innerHTML = '';
             
-            if (questions.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #999;">No hay preguntas de pretest configuradas</p>';
+            if (!questions || questions.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; background: #fff3cd; border-radius: 8px; border: 2px solid #ffc107;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #ff9800; margin-bottom: 1rem; display: block;"></i>
+                        <p style="color: #666; margin: 0; font-size: 1.1rem;">
+                            <strong>⚠️ No hay preguntas de pretest configuradas</strong>
+                        </p>
+                        <p style="color: #999; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                            En Airtable, crea preguntas con Tipo = "Pretest" enlazadas a esta capacitación
+                        </p>
+                    </div>
+                `;
                 return;
             }
             
@@ -1702,35 +1745,44 @@
                 const questionNumber = index + 1;
                 const questionId = `pretest-q${question.id}`;
                 
+                // Buscar el nombre de la pregunta (intentar diferentes campos)
+                const questionText = fields['name'] || fields['Nombre'] || fields['Pregunta'] || fields['Título'] || 'Sin pregunta';
+                
+                // Obtener opciones (intentar variaciones de nombres)
                 const options = [
-                    { letter: 'A', text: fields['Opción A'] || '' },
-                    { letter: 'B', text: fields['Opción B'] || '' },
-                    { letter: 'C', text: fields['Opción C'] || '' },
-                    { letter: 'D', text: fields['Opción D'] || '' }
-                ].filter(opt => opt.text);
+                    { letter: 'A', text: fields['Opción A'] || fields['opción a'] || fields['Option A'] || fields['A'] || '' },
+                    { letter: 'B', text: fields['Opción B'] || fields['opción b'] || fields['Option B'] || fields['B'] || '' },
+                    { letter: 'C', text: fields['Opción C'] || fields['opción c'] || fields['Option C'] || fields['C'] || '' },
+                    { letter: 'D', text: fields['Opción D'] || fields['opción d'] || fields['Option D'] || fields['D'] || '' }
+                ].filter(opt => opt.text && opt.text.trim());
+                
+                // Si no hay opciones, intentar búsqueda más amplia
+                if (options.length === 0) {
+                    console.warn(`⚠️ Pregunta ${questionNumber} no tiene opciones configuradas:`, fields);
+                }
                 
                 const questionHTML = `
                     <div class="question-card" style="margin-bottom: 1.5rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid var(--primary);">
                         <h4 style="margin-top: 0; color: var(--primary); margin-bottom: 0.75rem;">
-                            Pregunta ${questionNumber}
+                            <i class="fas fa-question-circle"></i> Pregunta ${questionNumber} / ${questions.length}
                         </h4>
-                        <p style="margin: 0 0 1rem 0; font-weight: 500; color: #333;">
-                            ${fields['name'] || 'Sin pregunta'}
+                        <p style="margin: 0 0 1rem 0; font-weight: 500; color: #333; font-size: 1.05rem;">
+                            ${questionText}
                         </p>
                         
                         <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                            ${options.map(option => `
-                                <label style="display: flex; align-items: center; padding: 0.75rem; background: white; border-radius: 6px; cursor: pointer; transition: all 0.3s; border: 2px solid transparent;">
+                            ${options.length > 0 ? options.map(option => `
+                                <label style="display: flex; align-items: flex-start; padding: 0.75rem; background: white; border-radius: 6px; cursor: pointer; transition: all 0.3s; border: 2px solid #e0e0e0; hover: border-color: var(--primary);">
                                     <input type="radio" 
                                            name="${questionId}" 
                                            value="${option.letter}" 
                                            onchange="pretestAnswers['${question.id}'] = this.value"
-                                           style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary);">
+                                           style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); margin-top: 2px; flex-shrink: 0;">
                                     <span style="margin-left: 0.75rem; flex: 1;">
-                                        <strong>${option.letter})</strong> ${option.text}
+                                        <strong style="color: var(--primary);">${option.letter})</strong> <span style="color: #333;">${option.text}</span>
                                     </span>
                                 </label>
-                            `).join('')}
+                            `).join('') : '<p style="color: #f44336; font-weight: bold;">⚠️ Sin opciones de respuesta</p>'}
                         </div>
                     </div>
                 `;
