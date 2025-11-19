@@ -1784,13 +1784,106 @@
         function checkForAccessCode() {
             const urlParams = new URLSearchParams(window.location.search);
             const code = urlParams.get('code');
+            const auto = urlParams.get('auto'); // Parámetro para crear sesión automáticamente
             
             if (code) {
-                // Auto-llenar el código y cambiar a pestaña exam
                 setTimeout(() => {
+                    // Si tiene parámetro auto=true, intentar crear sesión automáticamente
+                    if (auto === 'true') {
+                        createSessionAutomatically(code);
+                    } else {
+                        // Comportamiento normal: solo auto-llenar el código
+                        document.getElementById('accessCode').value = code;
+                        switchTab('exam');
+                    }
+                }, 1000);
+            }
+        }
+
+        // ==================== NUEVA FUNCIÓN: CREAR SESIÓN AUTOMÁTICAMENTE ====================
+        
+        async function createSessionAutomatically(code) {
+            try {
+                Swal.fire({
+                    title: 'Preparando capacitación...',
+                    text: 'Por favor espera',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+
+                console.log(`📱 Intentando crear sesión automáticamente para código: ${code}`);
+
+                // Paso 1: Obtener la primera capacitación disponible
+                const trainingResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Capacitaciones?maxRecords=1`
+                    })
+                });
+
+                const trainingData = await trainingResponse.json();
+
+                if (!trainingData.success || !trainingData.records || trainingData.records.length === 0) {
+                    throw new Error('No hay capacitaciones disponibles en el sistema');
+                }
+
+                const trainingId = trainingData.records[0].id;
+                console.log(`🎓 Capacitación encontrada: ${trainingId}`);
+
+                // Paso 2: Llamar a la función serverless para crear sesión
+                const createResponse = await fetch('/.netlify/functions/create-session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        code: code,
+                        trainingId: trainingId
+                    })
+                });
+
+                const createData = await createResponse.json();
+
+                console.log(`📝 Respuesta del servidor:`, createData);
+
+                if (!createData.success) {
+                    throw new Error(createData.error || 'No se pudo crear la sesión');
+                }
+
+                Swal.close();
+
+                // Mostrar mensaje de éxito
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Sesión Creada!',
+                    text: `La sesión con código ${code} ha sido creada automáticamente`,
+                    timer: 2000,
+                    showConfirmButton: false
+                }).then(() => {
+                    // Proceder con el flujo normal
                     document.getElementById('accessCode').value = code;
                     switchTab('exam');
-                }, 500);
+                    
+                    // Esperar a que se vea el input actualizado
+                    setTimeout(() => {
+                        validateAndStartTraining();
+                    }, 500);
+                });
+
+            } catch (error) {
+                console.error('❌ Error creando sesión automáticamente:', error);
+                Swal.close();
+                
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Crear Sesión Manualmente',
+                    text: 'La sesión no pudo crearse automáticamente.\n\n' + error.message + '\n\nPor favor, ingresa el código manualmente o contacta al coordinador.',
+                    confirmButtonText: 'Continuar'
+                }).then(() => {
+                    // Volver a flujo manual
+                    document.getElementById('accessCode').value = code;
+                    switchTab('exam');
+                });
             }
         }
 
