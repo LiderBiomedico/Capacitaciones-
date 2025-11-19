@@ -1243,10 +1243,50 @@
 
             <section id="exam" class="tab-content">
                 <h2 class="section-title"><i class="fas fa-clipboard-check"></i> Realizar Examen</h2>
-                <div class="card">
-                    <p style="text-align: center; padding: 2rem; color: #666;">
-                        Formulario de acceso a capacitaciones
-                    </p>
+                
+                <!-- Acceso con código -->
+                <div class="card" id="accessSection">
+                    <h3><i class="fas fa-key"></i> Acceso a Capacitación</h3>
+                    <p style="color: #666; margin-bottom: 1.5rem;">Ingresa el código de acceso que recibiste para acceder a la capacitación</p>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-barcode"></i> Código de Acceso *</label>
+                        <input type="text" id="accessCode" placeholder="Ej: 3LZ5RV" style="text-transform: uppercase;">
+                    </div>
+                    
+                    <button class="btn btn-primary" onclick="validateAndStartTraining()" style="width: 100%;">
+                        <i class="fas fa-arrow-right"></i> Acceder a Capacitación
+                    </button>
+                </div>
+                
+                <!-- Área de pretest (oculta inicialmente) -->
+                <div id="pretestSection" style="display: none;">
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                            <h3><i class="fas fa-book"></i> Evaluación Previa (Pre-Test)</h3>
+                            <button class="btn btn-light" onclick="cancelTraining()" style="margin: 0;">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Información de capacitación -->
+                        <div style="background: #e3f2fd; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem; border-left: 4px solid #2196F3;">
+                            <p style="margin: 0;"><strong>Capacitación:</strong> <span id="currentTrainingTitle">-</span></p>
+                            <p style="margin: 0.5rem 0 0 0;"><strong>Código:</strong> <span id="currentAccessCode">-</span></p>
+                        </div>
+                        
+                        <!-- Preguntas -->
+                        <div id="pretestQuestionsContainer">
+                            <!-- Se llena dinámicamente -->
+                        </div>
+                        
+                        <!-- Botón enviar -->
+                        <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e0e0e0;">
+                            <button class="btn btn-success" onclick="submitPretest()" style="width: 100%;">
+                                <i class="fas fa-check"></i> Enviar Pre-Test
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -1291,6 +1331,51 @@
         </div>
     </div>
 
+    <!-- Modal de Registro de Participante -->
+    <div id="participantRegistrationModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close" onclick="closeParticipantModal()">&times;</span>
+            <h2 style="text-align: center; margin-bottom: 0.5rem; color: var(--primary);">
+                <i class="fas fa-user-plus"></i> Registro de Participante
+            </h2>
+            <p style="text-align: center; color: #666; margin-bottom: 1.5rem;">
+                Por favor completa tu información para acceder a la capacitación
+            </p>
+            
+            <div class="form-group">
+                <label><i class="fas fa-user"></i> Nombre Completo *</label>
+                <input type="text" id="participantName" placeholder="Ej: Juan García López" required>
+            </div>
+            
+            <div class="form-group">
+                <label><i class="fas fa-hospital"></i> Servicio Médico (Departamento) *</label>
+                <select id="participantDepartment" required>
+                    <option value="">Seleccione su departamento...</option>
+                    <option value="General">General</option>
+                    <option value="Enfermería">Enfermería</option>
+                    <option value="Medicina">Medicina</option>
+                    <option value="Administración">Administración</option>
+                    <option value="Laboratorio">Laboratorio</option>
+                    <option value="Radiología">Radiología</option>
+                    <option value="Urgencias">Urgencias</option>
+                    <option value="UCI">UCI</option>
+                    <option value="Quirófano">Quirófano</option>
+                    <option value="Pediatría">Pediatría</option>
+                    <option value="Otro">Otro</option>
+                </select>
+            </div>
+            
+            <div class="modal-actions" style="flex-direction: column; gap: 0.75rem;">
+                <button class="btn btn-success" onclick="proceedToPretest()" style="width: 100%;">
+                    <i class="fas fa-check"></i> Continuar al Pre-Test
+                </button>
+                <button class="btn btn-light" onclick="closeParticipantModal()" style="width: 100%;">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Details Modal -->
     <div id="detailsModal" class="details-modal">
         <div class="details-content">
@@ -1307,11 +1392,322 @@
     </div>
 
     <script>
-        // Variables globales
+        // ==================== VARIABLES GLOBALES ====================
         let pretestQuestionCount = 0;
         let posttestQuestionCount = 0;
         const MAX_QUESTIONS = 10;
+        
+        // Variables para el flujo de pretest
+        let currentAccessCode = null;
+        let currentTrainingRecord = null;
+        let currentParticipantData = {};
+        let pretestAnswers = {};
 
+        // ==================== FUNCIONES DE PARTICIPANTE ====================
+        
+        async function validateAndStartTraining() {
+            const code = document.getElementById('accessCode').value.toUpperCase().trim();
+            
+            if (!code) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Código Requerido',
+                    text: 'Por favor ingresa el código de acceso',
+                    confirmButtonText: 'Entendido'
+                });
+                return;
+            }
+            
+            try {
+                Swal.fire({
+                    title: 'Buscando capacitación...',
+                    text: 'Por favor espera',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                
+                // Buscar la sesión con este código de acceso
+                const response = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Sesiones?filterByFormula=AND({Código Acceso}='${code}',{Activa}=TRUE())`
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success || !data.records || data.records.length === 0) {
+                    Swal.close();
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Código Inválido',
+                        text: 'El código de acceso no es válido o la sesión ha finalizado'
+                    });
+                    return;
+                }
+                
+                const session = data.records[0];
+                const trainingId = session.fields['Capacitación'][0];
+                
+                // Obtener datos de la capacitación
+                const trainingResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Capacitaciones/${trainingId}`
+                    })
+                });
+                
+                const trainingData = await trainingResponse.json();
+                
+                if (!trainingData.success || !trainingData.fields) {
+                    throw new Error('No se pudieron obtener los datos de la capacitación');
+                }
+                
+                // Guardar datos actuales
+                currentAccessCode = code;
+                currentTrainingRecord = trainingData;
+                
+                Swal.close();
+                
+                // Mostrar modal de registro
+                showParticipantRegistrationModal();
+                
+            } catch (error) {
+                console.error('Error:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'Hubo un error al validar el código: ' + error.message
+                });
+            }
+        }
+        
+        function showParticipantRegistrationModal() {
+            document.getElementById('participantRegistrationModal').style.display = 'flex';
+        }
+        
+        function closeParticipantModal() {
+            document.getElementById('participantRegistrationModal').style.display = 'none';
+        }
+        
+        async function proceedToPretest() {
+            const name = document.getElementById('participantName').value.trim();
+            const department = document.getElementById('participantDepartment').value;
+            
+            if (!name) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Nombre Requerido',
+                    text: 'Por favor ingresa tu nombre completo',
+                    confirmButtonText: 'Entendido'
+                });
+                return;
+            }
+            
+            if (!department) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Departamento Requerido',
+                    text: 'Por favor selecciona tu departamento/servicio',
+                    confirmButtonText: 'Entendido'
+                });
+                return;
+            }
+            
+            // Guardar datos del participante
+            currentParticipantData = {
+                name: name,
+                department: department,
+                accessCode: currentAccessCode
+            };
+            
+            // Cerrar modal y cargar pretest
+            closeParticipantModal();
+            loadAndDisplayPretest();
+        }
+        
+        async function loadAndDisplayPretest() {
+            try {
+                Swal.fire({
+                    title: 'Cargando evaluación...',
+                    text: 'Por favor espera',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                
+                const trainingId = currentTrainingRecord.id;
+                
+                // Obtener preguntas del pretest
+                const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Preguntas?filterByFormula=AND({Capacitación}='${trainingId}',{Tipo}='Pretest')`
+                    })
+                });
+                
+                const questionsData = await questionsResponse.json();
+                
+                if (!questionsData.success || !questionsData.records) {
+                    throw new Error('No se pudieron cargar las preguntas');
+                }
+                
+                Swal.close();
+                
+                // Mostrar interfaz de pretest
+                displayPretestQuestions(questionsData.records);
+                
+                // Ocultar sección de acceso, mostrar pretest
+                document.getElementById('accessSection').style.display = 'none';
+                document.getElementById('pretestSection').style.display = 'block';
+                
+                // Actualizar información de capacitación
+                document.getElementById('currentTrainingTitle').textContent = 
+                    currentTrainingRecord.fields['name'] || 'Capacitación';
+                document.getElementById('currentAccessCode').textContent = 
+                    currentAccessCode;
+                
+            } catch (error) {
+                console.error('Error cargando pretest:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudieron cargar las preguntas del pretest: ' + error.message
+                });
+            }
+        }
+        
+        function displayPretestQuestions(questions) {
+            const container = document.getElementById('pretestQuestionsContainer');
+            container.innerHTML = '';
+            
+            if (questions.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: #999;">No hay preguntas de pretest configuradas</p>';
+                return;
+            }
+            
+            questions.forEach((question, index) => {
+                const fields = question.fields;
+                const questionNumber = index + 1;
+                const questionId = `pretest-q${question.id}`;
+                
+                const options = [
+                    { letter: 'A', text: fields['Opción A'] || '' },
+                    { letter: 'B', text: fields['Opción B'] || '' },
+                    { letter: 'C', text: fields['Opción C'] || '' },
+                    { letter: 'D', text: fields['Opción D'] || '' }
+                ].filter(opt => opt.text);
+                
+                const questionHTML = `
+                    <div class="question-card" style="margin-bottom: 1.5rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid var(--primary);">
+                        <h4 style="margin-top: 0; color: var(--primary); margin-bottom: 0.75rem;">
+                            Pregunta ${questionNumber}
+                        </h4>
+                        <p style="margin: 0 0 1rem 0; font-weight: 500; color: #333;">
+                            ${fields['name'] || 'Sin pregunta'}
+                        </p>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                            ${options.map(option => `
+                                <label style="display: flex; align-items: center; padding: 0.75rem; background: white; border-radius: 6px; cursor: pointer; transition: all 0.3s; border: 2px solid transparent;">
+                                    <input type="radio" 
+                                           name="${questionId}" 
+                                           value="${option.letter}" 
+                                           onchange="pretestAnswers['${question.id}'] = this.value"
+                                           style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary);">
+                                    <span style="margin-left: 0.75rem; flex: 1;">
+                                        <strong>${option.letter})</strong> ${option.text}
+                                    </span>
+                                </label>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                
+                container.innerHTML += questionHTML;
+            });
+        }
+        
+        async function submitPretest() {
+            const answers = Object.keys(pretestAnswers).length;
+            const questions = document.querySelectorAll('.question-card').length;
+            
+            if (answers === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Respuestas Incompletas',
+                    text: 'Por favor responde todas las preguntas antes de enviar'
+                });
+                return;
+            }
+            
+            if (answers < questions) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Respuestas Incompletas',
+                    text: `Has respondido ${answers} de ${questions} preguntas. Por favor completa todas antes de enviar`
+                });
+                return;
+            }
+            
+            try {
+                Swal.fire({
+                    title: 'Enviando Pre-Test...',
+                    text: 'Por favor espera',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                
+                // Aquí iría la lógica para guardar el pretest en Airtable
+                // Por ahora, mostrar confirmación
+                
+                Swal.close();
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Pre-Test Enviado!',
+                    html: `<p>Gracias <strong>${currentParticipantData.name}</strong></p>
+                           <p>Tu evaluación previa ha sido registrada exitosamente.</p>
+                           <p style="font-size: 0.9em; color: #666;">Ahora puedes acceder al contenido de la capacitación.</p>`,
+                    confirmButtonText: 'Continuar'
+                }).then(() => {
+                    // Limpiar y volver a inicio
+                    cancelTraining();
+                });
+                
+            } catch (error) {
+                console.error('Error enviando pretest:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo enviar el pretest: ' + error.message
+                });
+            }
+        }
+        
+        function cancelTraining() {
+            // Limpiar datos
+            currentAccessCode = null;
+            currentTrainingRecord = null;
+            currentParticipantData = {};
+            pretestAnswers = {};
+            
+            // Limpiar formulario
+            document.getElementById('accessCode').value = '';
+            document.getElementById('participantName').value = '';
+            document.getElementById('participantDepartment').value = '';
+            
+            // Mostrar/ocultar secciones
+            document.getElementById('accessSection').style.display = 'block';
+            document.getElementById('pretestSection').style.display = 'none';
+        }
+
+        // ==================== INICIALIZACIÓN ====================
+        
         // Inicialización
         document.addEventListener('DOMContentLoaded', function() {
             initializeApp();
@@ -1331,6 +1727,22 @@
             
             // Cargar capacitaciones al inicio (sin mostrar, solo en background)
             setTimeout(() => loadTrainings(), 2500);
+            
+            // Verificar si viene con código QR en la URL
+            checkForAccessCode();
+        }
+        
+        function checkForAccessCode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const code = urlParams.get('code');
+            
+            if (code) {
+                // Auto-llenar el código y cambiar a pestaña exam
+                setTimeout(() => {
+                    document.getElementById('accessCode').value = code;
+                    switchTab('exam');
+                }, 500);
+            }
         }
 
         function updateDateTime() {
