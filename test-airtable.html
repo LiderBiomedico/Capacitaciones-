@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Airtable - Preguntas</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            background: white;
+            border-radius: 6px;
+            border: 1px solid #ddd;
+        }
+        .success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .info {
+            color: #17a2b8;
+            font-weight: bold;
+        }
+        pre {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+        }
+        .log-entry {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+        }
+        .log-success { background: #d4edda; color: #155724; }
+        .log-error { background: #f8d7da; color: #721c24; }
+        .log-info { background: #d1ecf1; color: #0c5460; }
+        input[type="text"] {
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            width: 300px;
+            font-size: 14px;
+        }
+        .field-info {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔬 Test de Conexión Airtable - Preguntas</h1>
+        
+        <div class="field-info">
+            <strong>⚠️ IMPORTANTE:</strong> Antes de probar, verifica en tu Airtable:
+            <ul>
+                <li>Nombre exacto del campo de enlace a Capacitación: <code>___________</code></li>
+                <li>Nombre exacto del campo de pregunta: <code>___________</code></li>
+                <li>Nombre exacto del campo de tipo: <code>___________</code></li>
+            </ul>
+        </div>
+
+        <!-- Test 1: Conexión Básica -->
+        <div class="test-section">
+            <h3>📡 Test 1: Conexión con Netlify Function</h3>
+            <p>Verifica que la función Netlify esté funcionando correctamente.</p>
+            <button onclick="testConnection()">▶️ Probar Conexión</button>
+            <div id="connectionResult" class="result" style="display:none;"></div>
+        </div>
+
+        <!-- Test 2: Listar Capacitaciones -->
+        <div class="test-section">
+            <h3>📋 Test 2: Listar Capacitaciones</h3>
+            <p>Obtiene todas las capacitaciones y sus IDs.</p>
+            <button onclick="listTrainings()">▶️ Listar Capacitaciones</button>
+            <div id="trainingsResult" class="result" style="display:none;"></div>
+        </div>
+
+        <!-- Test 3: Listar TODAS las Preguntas -->
+        <div class="test-section">
+            <h3>❓ Test 3: Listar TODAS las Preguntas</h3>
+            <p>Obtiene todas las preguntas sin filtro para ver la estructura.</p>
+            <button onclick="listAllQuestions()">▶️ Listar Todas las Preguntas</button>
+            <div id="allQuestionsResult" class="result" style="display:none;"></div>
+        </div>
+
+        <!-- Test 4: Buscar Preguntas por ID -->
+        <div class="test-section">
+            <h3>🔍 Test 4: Buscar Preguntas por ID de Capacitación</h3>
+            <p>Ingresa el ID de una capacitación (cópialo del Test 2):</p>
+            <input type="text" id="trainingIdInput" placeholder="Ej: recXXXXXXXXXXXXXX">
+            <br><br>
+            <button onclick="searchQuestionsByTraining()">▶️ Buscar Preguntas</button>
+            <div id="searchResult" class="result" style="display:none;"></div>
+        </div>
+
+        <!-- Test 5: Pruebas de Filtros Alternativos -->
+        <div class="test-section">
+            <h3>🧪 Test 5: Pruebas de Filtros Alternativos</h3>
+            <p>Prueba diferentes sintaxis de filtros para encontrar la correcta.</p>
+            <button onclick="testFilterVariants()">▶️ Probar Filtros</button>
+            <div id="filterResult" class="result" style="display:none;"></div>
+        </div>
+
+        <!-- Logs -->
+        <div class="test-section">
+            <h3>📝 Logs de Ejecución</h3>
+            <button onclick="clearLogs()">🗑️ Limpiar Logs</button>
+            <div id="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        // Función auxiliar para logs
+        function addLog(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log-entry log-${type}`;
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsDiv.insertBefore(logEntry, logsDiv.firstChild);
+        }
+
+        function clearLogs() {
+            document.getElementById('logs').innerHTML = '';
+        }
+
+        // Test 1: Conexión básica
+        async function testConnection() {
+            addLog('Iniciando test de conexión...', 'info');
+            const resultDiv = document.getElementById('connectionResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<p>⏳ Probando conexión...</p>';
+
+            try {
+                const response = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: '/Capacitaciones?maxRecords=1',
+                        body: null
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ Conexión exitosa con Netlify Function</p>
+                        <p>Estado HTTP: ${response.status}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    addLog('Conexión exitosa', 'success');
+                } else {
+                    resultDiv.innerHTML = `
+                        <p class="error">❌ Error en la respuesta</p>
+                        <p>Estado HTTP: ${response.status}</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    addLog('Error en la respuesta', 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <p class="error">❌ Error de conexión: ${error.message}</p>
+                `;
+                addLog(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test 2: Listar capacitaciones
+        async function listTrainings() {
+            addLog('Listando capacitaciones...', 'info');
+            const resultDiv = document.getElementById('trainingsResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<p>⏳ Cargando capacitaciones...</p>';
+
+            try {
+                const response = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: '/Capacitaciones',
+                        body: null
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success && data.records) {
+                    const trainings = data.records.map(t => ({
+                        id: t.id,
+                        title: t.fields['Título'] || 'Sin título'
+                    }));
+
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ ${trainings.length} capacitaciones encontradas</p>
+                        <h4>Lista de Capacitaciones (copia el ID para usar en Test 4):</h4>
+                        ${trainings.map(t => `
+                            <div style="margin: 10px 0; padding: 10px; background: #f0f0f0; border-radius: 4px;">
+                                <strong>${t.title}</strong><br>
+                                <code style="background: #333; color: #0f0; padding: 4px 8px; border-radius: 3px;">${t.id}</code>
+                            </div>
+                        `).join('')}
+                        <details>
+                            <summary>Ver datos completos</summary>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </details>
+                    `;
+                    addLog(`${trainings.length} capacitaciones encontradas`, 'success');
+                } else {
+                    resultDiv.innerHTML = `
+                        <p class="error">❌ No se pudieron cargar las capacitaciones</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    addLog('Error cargando capacitaciones', 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+                addLog(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test 3: Listar todas las preguntas
+        async function listAllQuestions() {
+            addLog('Listando todas las preguntas...', 'info');
+            const resultDiv = document.getElementById('allQuestionsResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<p>⏳ Cargando preguntas...</p>';
+
+            try {
+                const response = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: '/Preguntas?maxRecords=100',
+                        body: null
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success && data.records) {
+                    const questions = data.records;
+
+                    // Analizar estructura de campos
+                    const fieldNames = questions.length > 0 ? Object.keys(questions[0].fields) : [];
+
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ ${questions.length} preguntas encontradas</p>
+                        <div class="field-info">
+                            <strong>📋 Nombres de campos detectados:</strong>
+                            <ul>
+                                ${fieldNames.map(name => `<li><code>${name}</code></li>`).join('')}
+                            </ul>
+                        </div>
+                        <h4>Preguntas:</h4>
+                        ${questions.map((q, i) => {
+                            const fields = q.fields;
+                            const linkField = Object.keys(fields).find(k => Array.isArray(fields[k]));
+                            return `
+                                <div style="margin: 10px 0; padding: 15px; background: #f8f9fa; border-radius: 6px; border-left: 4px solid #667eea;">
+                                    <strong>Pregunta ${i + 1}</strong><br>
+                                    <small>ID: <code>${q.id}</code></small><br>
+                                    ${linkField ? `<small>Enlace a Capacitación: <code>${fields[linkField]}</code></small><br>` : ''}
+                                    <details>
+                                        <summary>Ver campos completos</summary>
+                                        <pre>${JSON.stringify(fields, null, 2)}</pre>
+                                    </details>
+                                </div>
+                            `;
+                        }).join('')}
+                        <details>
+                            <summary>Ver respuesta completa</summary>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </details>
+                    `;
+                    addLog(`${questions.length} preguntas encontradas`, 'success');
+                } else {
+                    resultDiv.innerHTML = `
+                        <p class="error">❌ No se pudieron cargar las preguntas</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    addLog('Error cargando preguntas', 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+                addLog(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test 4: Buscar preguntas por ID
+        async function searchQuestionsByTraining() {
+            const trainingId = document.getElementById('trainingIdInput').value.trim();
+            
+            if (!trainingId) {
+                alert('Por favor ingresa un ID de capacitación');
+                return;
+            }
+
+            addLog(`Buscando preguntas para capacitación: ${trainingId}`, 'info');
+            const resultDiv = document.getElementById('searchResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<p>⏳ Buscando preguntas...</p>';
+
+            try {
+                // Filtro básico
+                const response = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Preguntas?filterByFormula={Capacitación}="${trainingId}"`,
+                        body: null
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    const questions = data.records || [];
+                    
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ Búsqueda completada: ${questions.length} preguntas encontradas</p>
+                        ${questions.length > 0 ? `
+                            <h4>Preguntas encontradas:</h4>
+                            ${questions.map((q, i) => `
+                                <div style="margin: 10px 0; padding: 10px; background: #e7f3ff; border-radius: 4px;">
+                                    <strong>Pregunta ${i + 1}</strong><br>
+                                    <pre>${JSON.stringify(q.fields, null, 2)}</pre>
+                                </div>
+                            `).join('')}
+                        ` : '<p class="info">ℹ️ No se encontraron preguntas con ese ID</p>'}
+                        <details>
+                            <summary>Ver respuesta completa</summary>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </details>
+                    `;
+                    addLog(`${questions.length} preguntas encontradas para ${trainingId}`, questions.length > 0 ? 'success' : 'info');
+                } else {
+                    resultDiv.innerHTML = `
+                        <p class="error">❌ Error en la búsqueda</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                    addLog('Error en la búsqueda', 'error');
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+                addLog(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Test 5: Probar filtros alternativos
+        async function testFilterVariants() {
+            const trainingId = document.getElementById('trainingIdInput').value.trim();
+            
+            if (!trainingId) {
+                alert('Por favor ingresa un ID de capacitación en el Test 4 primero');
+                return;
+            }
+
+            addLog('Probando diferentes variantes de filtros...', 'info');
+            const resultDiv = document.getElementById('filterResult');
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<p>⏳ Probando filtros...</p>';
+
+            const filters = [
+                { name: 'Filtro básico', formula: `{Capacitación}="${trainingId}"` },
+                { name: 'Filtro alternativo 1', formula: `{Capacitacion}="${trainingId}"` },
+                { name: 'Filtro con SEARCH', formula: `SEARCH("${trainingId}",ARRAYJOIN({Capacitación}))` },
+                { name: 'Filtro con SEARCH alt', formula: `SEARCH("${trainingId}",ARRAYJOIN({Capacitacion}))` }
+            ];
+
+            let results = '<h4>Resultados de pruebas:</h4>';
+
+            for (const filter of filters) {
+                try {
+                    const response = await fetch('/.netlify/functions/airtable-proxy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            method: 'GET',
+                            path: `/Preguntas?filterByFormula=${encodeURIComponent(filter.formula)}`,
+                            body: null
+                        })
+                    });
+
+                    const data = await response.json();
+                    const count = data.records ? data.records.length : 0;
+                    const status = response.ok && data.success ? '✅' : '❌';
+                    
+                    results += `
+                        <div style="margin: 10px 0; padding: 10px; background: ${response.ok ? '#d4edda' : '#f8d7da'}; border-radius: 4px;">
+                            ${status} <strong>${filter.name}</strong><br>
+                            Fórmula: <code>${filter.formula}</code><br>
+                            Resultados: ${count} preguntas<br>
+                            <small>${response.ok ? 'Funcionó correctamente' : 'Error en la petición'}</small>
+                        </div>
+                    `;
+                    
+                    addLog(`${filter.name}: ${count} preguntas`, response.ok ? 'success' : 'error');
+                } catch (error) {
+                    results += `
+                        <div style="margin: 10px 0; padding: 10px; background: #f8d7da; border-radius: 4px;">
+                            ❌ <strong>${filter.name}</strong><br>
+                            Error: ${error.message}
+                        </div>
+                    `;
+                    addLog(`${filter.name}: Error - ${error.message}`, 'error');
+                }
+            }
+
+            resultDiv.innerHTML = results;
+        }
+
+        // Auto-ejecutar test de conexión al cargar
+        window.addEventListener('DOMContentLoaded', () => {
+            addLog('Página de pruebas cargada', 'info');
+            testConnection();
+        });
+    </script>
+</body>
+</html>
