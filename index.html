@@ -1793,8 +1793,10 @@
         
         async function submitPretest() {
             const answers = Object.keys(pretestAnswers).length;
-            const questions = document.querySelectorAll('.question-card').length;
+            const questionCards = document.querySelectorAll('.question-card');
+            const totalQuestions = questionCards.length;
             
+            // Validar que se hayan respondido todas las preguntas
             if (answers === 0) {
                 Swal.fire({
                     icon: 'warning',
@@ -1804,11 +1806,11 @@
                 return;
             }
             
-            if (answers < questions) {
+            if (answers < totalQuestions) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Respuestas Incompletas',
-                    text: `Has respondido ${answers} de ${questions} preguntas. Por favor completa todas antes de enviar`
+                    text: `Has respondido ${answers} de ${totalQuestions} preguntas. Por favor completa todas antes de enviar`
                 });
                 return;
             }
@@ -1816,33 +1818,262 @@
             try {
                 Swal.fire({
                     title: 'Enviando Pre-Test...',
-                    text: 'Por favor espera',
+                    text: 'Por favor espera mientras guardamos tu evaluación',
                     allowOutsideClick: false,
                     didOpen: () => Swal.showLoading()
                 });
                 
-                // Aquí iría la lógica para guardar el pretest en Airtable
-                // Por ahora, mostrar confirmación
+                console.log('📝 Iniciando proceso de guardado del pretest...');
+                console.log('👤 Participante:', currentParticipantData);
+                console.log('📋 Respuestas:', pretestAnswers);
                 
-                Swal.close();
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡Pre-Test Enviado!',
-                    html: `<p>Gracias <strong>${currentParticipantData.name}</strong></p>
-                           <p>Tu evaluación previa ha sido registrada exitosamente.</p>
-                           <p style="font-size: 0.9em; color: #666;">Ahora puedes acceder al contenido de la capacitación.</p>`,
-                    confirmButtonText: 'Continuar'
-                }).then(() => {
-                    // Limpiar y volver a inicio
-                    cancelTraining();
+                // ==========================================
+                // PASO 1: Buscar la sesión actual
+                // ==========================================
+                
+                const sessionResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Sesiones`
+                    })
                 });
                 
+                const sessionData = await sessionResponse.json();
+                
+                if (!sessionData.success || !sessionData.records) {
+                    throw new Error('No se pudieron obtener las sesiones');
+                }
+                
+                // Encontrar la sesión por código de acceso
+                const currentSession = sessionData.records.find(s => {
+                    const codigo = s.fields['Código Acceso'] || '';
+                    return codigo.toUpperCase() === currentAccessCode.toUpperCase();
+                });
+                
+                if (!currentSession) {
+                    throw new Error('No se encontró la sesión con código: ' + currentAccessCode);
+                }
+                
+                console.log('✅ Sesión encontrada:', currentSession.id);
+                
+                // ==========================================
+                // PASO 2: Obtener preguntas para calcular score
+                // ==========================================
+                
+                const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Preguntas`
+                    })
+                });
+                
+                const questionsData = await questionsResponse.json();
+                
+                if (!questionsData.success || !questionsData.records) {
+                    throw new Error('No se pudieron obtener las preguntas');
+                }
+                
+                // ==========================================
+                // PASO 3: Calcular el score del pretest
+                // ==========================================
+                
+                let correctAnswers = 0;
+                let totalAnswered = 0;
+                const answersToSave = [];
+                
+                for (const [questionId, userAnswer] of Object.entries(pretestAnswers)) {
+                    // Buscar la pregunta en los registros
+                    const question = questionsData.records.find(q => q.id === questionId);
+                    
+                    if (question) {
+                        totalAnswered++;
+                        
+                        // Obtener la respuesta correcta (intentar diferentes nombres de campo)
+                        const correctAnswer = question.fields['Respuesta Correcta'] || 
+                                             question.fields['Respuesta correcta'] || 
+                                             question.fields['RespuestaCorrecta'] ||
+                                             question.fields['Correct Answer'] ||
+                                             question.fields['correct_answer'] || '';
+                        
+                        // Comparar respuestas (case-insensitive)
+                        const isCorrect = userAnswer.toUpperCase() === correctAnswer.toUpperCase();
+                        
+                        if (isCorrect) {
+                            correctAnswers++;
+                        }
+                        
+                        console.log(`Pregunta ${questionId}: Usuario=${userAnswer}, Correcta=${correctAnswer}, ✓=${isCorrect}`);
+                        
+                        // Preparar respuesta para guardar
+                        answersToSave.push({
+                            questionId: questionId,
+                            userAnswer: userAnswer,
+                            isCorrect: isCorrect
+                        });
+                    }
+                }
+                
+                // Calcular porcentaje de score (escala de 0 a 100)
+                const pretestScore = totalAnswered > 0 
+                    ? Math.round((correctAnswers / totalAnswered) * 100) 
+                    : 0;
+                
+                console.log(`📊 Score calculado: ${correctAnswers}/${totalAnswered} = ${pretestScore}%`);
+                
+                // ==========================================
+                // PASO 4: Crear registro de participación (LISTA DE ASISTENCIA)
+                // ==========================================
+                
+                const participationData = {
+                    fields: {
+                        'Nombre': currentParticipantData.name,
+                        'Departamento': currentParticipantData.department,
+                        'Sesión': [currentSession.id],
+                        'Pretest Score': pretestScore,
+                        'Fecha Registro': new Date().toISOString().split('T')[0],
+                        'Hora Registro': new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
+                        'Completado Pretest': true,
+                        'Completado Posttest': false
+                    }
+                };
+                
+                console.log('📤 Creando participación:', participationData);
+                
+                const createParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'POST',
+                        path: `/Participaciones`,
+                        body: participationData
+                    })
+                });
+                
+                const participationResult = await createParticipationResponse.json();
+                
+                if (!participationResult.success) {
+                    console.error('❌ Error creando participación:', participationResult);
+                    throw new Error(participationResult.error || 'No se pudo crear el registro de participación');
+                }
+                
+                console.log('✅ Participación creada:', participationResult.id);
+                
+                // ==========================================
+                // PASO 5: Guardar respuestas individuales (opcional)
+                // ==========================================
+                
+                const participationId = participationResult.id;
+                
+                // Guardar cada respuesta en la tabla Respuestas
+                for (const answer of answersToSave) {
+                    try {
+                        const answerData = {
+                            fields: {
+                                'Participación': [participationId],
+                                'Pregunta': [answer.questionId],
+                                'Respuesta Usuario': answer.userAnswer,
+                                'Es Correcta': answer.isCorrect,
+                                'Tipo Examen': 'Pretest'
+                            }
+                        };
+                        
+                        await fetch('/.netlify/functions/airtable-proxy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                method: 'POST',
+                                path: `/Respuestas`,
+                                body: answerData
+                            })
+                        });
+                        
+                        console.log(`✅ Respuesta guardada para pregunta: ${answer.questionId}`);
+                        
+                    } catch (answerError) {
+                        console.warn(`⚠️ No se pudo guardar respuesta individual:`, answerError);
+                        // Continuar con las demás respuestas aunque una falle
+                    }
+                }
+                
+                // ==========================================
+                // PASO 6: Mostrar resultado al usuario
+                // ==========================================
+                
+                Swal.close();
+                
+                // Determinar el mensaje según el score
+                let scoreMessage = '';
+                let scoreIcon = 'success';
+                
+                if (pretestScore >= 80) {
+                    scoreMessage = '¡Excelente conocimiento previo!';
+                } else if (pretestScore >= 60) {
+                    scoreMessage = 'Buen nivel de conocimiento';
+                } else if (pretestScore >= 40) {
+                    scoreMessage = 'Conocimiento básico';
+                } else {
+                    scoreMessage = 'Esta capacitación será muy útil para ti';
+                    scoreIcon = 'info';
+                }
+                
+                Swal.fire({
+                    icon: scoreIcon,
+                    title: '¡Pre-Test Enviado!',
+                    html: `
+                        <div style="text-align: center;">
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                        color: white; 
+                                        padding: 1.5rem; 
+                                        border-radius: 12px; 
+                                        margin-bottom: 1rem;">
+                                <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Tu calificación</p>
+                                <p style="margin: 0.5rem 0; font-size: 2.5rem; font-weight: bold;">${pretestScore}%</p>
+                                <p style="margin: 0; font-size: 0.85rem;">${correctAnswers} de ${totalAnswered} correctas</p>
+                            </div>
+                            
+                            <p style="margin: 0.5rem 0;"><strong>${currentParticipantData.name}</strong></p>
+                            <p style="margin: 0; color: #666; font-size: 0.9rem;">${currentParticipantData.department}</p>
+                            <p style="margin: 1rem 0 0 0; color: #666; font-size: 0.9rem;">${scoreMessage}</p>
+                            <p style="margin: 0.5rem 0 0 0; color: #999; font-size: 0.8rem;">
+                                Tu asistencia y calificación han sido registradas
+                            </p>
+                        </div>
+                    `,
+                    confirmButtonText: 'Continuar a la Capacitación',
+                    showCancelButton: true,
+                    cancelButtonText: 'Volver al Inicio',
+                    confirmButtonColor: '#667eea'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        // Aquí podrías redirigir al contenido de la capacitación
+                        Swal.fire({
+                            icon: 'info',
+                            title: 'Contenido de Capacitación',
+                            text: 'El coordinador compartirá el contenido de la capacitación. Una vez finalizado, podrás realizar el Post-Test.',
+                            confirmButtonText: 'Entendido'
+                        }).then(() => {
+                            cancelTraining();
+                        });
+                    } else {
+                        // Volver al inicio
+                        cancelTraining();
+                    }
+                });
+                
+                console.log('✅ Proceso de pretest completado exitosamente');
+                
             } catch (error) {
-                console.error('Error enviando pretest:', error);
+                console.error('❌ Error enviando pretest:', error);
+                Swal.close();
                 Swal.fire({
                     icon: 'error',
                     title: 'Error',
-                    text: 'No se pudo enviar el pretest: ' + error.message
+                    text: 'No se pudo enviar el pretest: ' + error.message,
+                    footer: '<small>Revisa la consola (F12) para más detalles</small>'
                 });
             }
         }
@@ -2876,18 +3107,27 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const fields = training.fields;
                 
                 // Cargar preguntas de la capacitación
+                console.log('📝 Buscando preguntas para capacitación:', trainingId);
+                
                 const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         method: 'GET',
-                        path: `/Preguntas?filterByFormula=SEARCH("${trainingId}",{Capacitacion (from Capacitación)})`,
+                        // ✅ CORRECCIÓN: Filtro simplificado que busca en el campo de enlace
+                        path: `/Preguntas?filterByFormula={Capacitación}="${trainingId}"`,
                         body: null
                     })
                 });
                 
                 const questionsData = await questionsResponse.json();
-                const questions = questionsData.success ? questionsData.records : [];
+                
+                // ✅ Log para debugging
+                console.log('📊 Respuesta de preguntas:', questionsData);
+                
+                const questions = questionsData.success && questionsData.records ? questionsData.records : [];
+                
+                console.log(`✅ ${questions.length} preguntas encontradas`);
                 
                 // Renderizar detalles
                 const detailsBody = document.getElementById('detailsBody');
@@ -2928,12 +3168,21 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                             <div class="questions-list">
                                 ${questions.map((q, index) => {
                                     const qFields = q.fields;
-                                    const correctAnswer = qFields['Respuesta Corecta'] || '';
+                                    const correctAnswer = qFields['Respuesta Correcta'] || qFields['Respuesta Corecta'] || '';
+                                    
+                                    // ✅ CORRECCIÓN: Usar el campo correcto de pregunta
+                                    const questionText = qFields['Pregunta'] || qFields['Texto'] || qFields['name'] || 'Sin pregunta';
+                                    const questionType = qFields['Tipo'] || 'N/A';
+                                    
                                     return `
                                         <div class="question-item">
-                                            <div class="question-number">Pregunta ${index + 1}</div>
-                                            <div class="question-text">${qFields['name'] || 'Sin pregunta'}</div>
+                                            <div class="question-number">Pregunta ${index + 1} <span style="font-size: 0.8em; color: #666;">(${questionType})</span></div>
+                                            <div class="question-text">${questionText}</div>
                                             <div class="question-options">
+                                                <div class="question-option ${correctAnswer === 'A' ? 'correct' : ''}">
+                                                    <strong>A)</strong> ${qFields['Opción A'] || 'N/A'}
+                                                    ${correctAnswer === 'A' ? '<i class="fas fa-check-circle" style="color: #4caf50; margin-left: auto;"></i>' : ''}
+                                                </div>
                                                 <div class="question-option ${correctAnswer === 'B' ? 'correct' : ''}">
                                                     <strong>B)</strong> ${qFields['Opción B'] || 'N/A'}
                                                     ${correctAnswer === 'B' ? '<i class="fas fa-check-circle" style="color: #4caf50; margin-left: auto;"></i>' : ''}
@@ -2960,10 +3209,15 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 
             } catch (error) {
                 console.error('❌ Error cargando detalles:', error);
+                console.error('Stack trace:', error.stack);
                 Swal.fire({
                     icon: 'error',
-                    title: 'Error',
-                    text: 'No se pudieron cargar los detalles de la capacitación'
+                    title: 'Error al Cargar Detalles',
+                    html: `
+                        No se pudieron cargar los detalles de la capacitación.<br>
+                        <small style="color: #666;">Error: ${error.message}</small><br><br>
+                        <small>Por favor, revisa la consola del navegador (F12) para más detalles.</small>
+                    `
                 });
             }
         }
