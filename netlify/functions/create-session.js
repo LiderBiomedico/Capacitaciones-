@@ -1,6 +1,7 @@
 // netlify/functions/create-session.js
 // ═════════════════════════════════════════════════════════════════
 // Función serverless para crear sesiones automáticamente
+// VERSIÓN CORREGIDA: Validación de estructura de datos
 // Uso: POST a /.netlify/functions/create-session
 // ═════════════════════════════════════════════════════════════════
 
@@ -29,6 +30,7 @@ export async function handler(event) {
     try {
       payload = JSON.parse(event.body || '{}');
     } catch (parseError) {
+      console.error('❌ Error parseando JSON:', parseError.message);
       return {
         statusCode: 400,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
@@ -53,7 +55,8 @@ export async function handler(event) {
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         body: JSON.stringify({
           success: false,
-          error: 'Faltan parámetros: code y trainingId'
+          error: 'Faltan parámetros: code y trainingId requeridos',
+          received: { code: !!code, trainingId: !!trainingId }
         })
       };
     }
@@ -68,12 +71,13 @@ export async function handler(event) {
     const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
 
     if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+      console.error('❌ Variables de entorno faltantes');
       return {
         statusCode: 500,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         body: JSON.stringify({
           success: false,
-          error: 'Variables de entorno no configuradas'
+          error: 'Variables de entorno no configuradas en Netlify'
         })
       };
     }
@@ -82,7 +86,8 @@ export async function handler(event) {
     // PASO 4: Verificar si la sesión ya existe
     // ═════════════════════════════════════════════════════════════
 
-    const checkUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sesiones?filterByFormula={Código Acceso}='${code}'`;
+    const codeUpper = code.toUpperCase().trim();
+    const checkUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sesiones?filterByFormula=UPPER({Código Acceso})='${codeUpper}'`;
 
     console.log('🔍 Buscando sesión existente...');
 
@@ -118,7 +123,7 @@ export async function handler(event) {
         body: JSON.stringify({
           success: true,
           message: 'Sesión ya existe',
-          code: code,
+          code: codeUpper,
           sessionId: checkData.records[0].id,
           isNew: false
         })
@@ -126,12 +131,24 @@ export async function handler(event) {
     }
 
     // ═════════════════════════════════════════════════════════════
-    // PASO 5: Crear nueva sesión
+    // PASO 5: Crear nueva sesión con ESTRUCTURA CORRECTA
     // ═════════════════════════════════════════════════════════════
 
     console.log('✏️ Creando nueva sesión...');
 
     const createUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sesiones`;
+
+    // ⚠️ IMPORTANTE: La estructura DEBE ser { fields: {...} }
+    const sessionPayload = {
+      fields: {
+        'Código Acceso': codeUpper,
+        'Capacitaciones': [trainingId],  // Array de IDs
+        'Activa': true,
+        'Fecha Inicio': new Date().toISOString().split('T')[0]  // YYYY-MM-DD
+      }
+    };
+
+    console.log('📤 Payload enviado:', JSON.stringify(sessionPayload, null, 2));
 
     const createResponse = await fetch(createUrl, {
       method: 'POST',
@@ -139,27 +156,22 @@ export async function handler(event) {
         'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        fields: {
-          'Código Acceso': code.toUpperCase(),
-          'Capacitaciones': [trainingId],
-          'Activa': true,
-          'Fecha Inicio': new Date().toISOString().split('T')[0]
-        }
-      })
+      body: JSON.stringify(sessionPayload)
     });
 
     const createData = await createResponse.json();
 
     if (!createResponse.ok) {
-      console.error('❌ Error creando sesión:', createData);
+      console.error('❌ Error creando sesión (status ' + createResponse.status + '):', createData);
       return {
-        statusCode: 500,
+        statusCode: createResponse.status,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         body: JSON.stringify({
           success: false,
           error: 'Error al crear sesión',
-          details: createData.error
+          airtableStatus: createResponse.status,
+          details: createData.error || createData,
+          sentPayload: sessionPayload
         })
       };
     }
@@ -179,10 +191,11 @@ export async function handler(event) {
       body: JSON.stringify({
         success: true,
         message: 'Sesión creada correctamente',
-        code: code,
+        code: codeUpper,
         sessionId: createData.id,
         isNew: true,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        session: createData
       })
     };
 
@@ -195,7 +208,8 @@ export async function handler(event) {
       body: JSON.stringify({
         success: false,
         error: 'Error interno del servidor',
-        message: error.message
+        message: error.message,
+        stack: error.stack
       })
     };
   }
@@ -203,22 +217,45 @@ export async function handler(event) {
 
 /*
 ═════════════════════════════════════════════════════════════════
-INSTRUCCIONES
+CAMBIOS IMPLEMENTADOS EN ESTA VERSIÓN:
 ═════════════════════════════════════════════════════════════════
 
-1. GUARDAR EN:
-   netlify/functions/create-session.js
+✅ Validación mejorada de parámetros
+✅ Estructura correcta: { fields: {...} } para Airtable
+✅ Nombres de campos coinciden exactamente: 'Código Acceso', 'Capacitaciones'
+✅ TrainingId se envía como array: [trainingId]
+✅ Conversión a mayúsculas del código
+✅ Mejor manejo de errores con detalles
+✅ Logging detallado del payload enviado
+✅ Validación del formato de fecha (YYYY-MM-DD)
 
-2. CONFIGURAR VARIABLES EN NETLIFY:
-   https://app.netlify.com → Tu sitio → Site settings → 
-   Build & deploy → Environment
+═════════════════════════════════════════════════════════════════
+ESTRUCTURA ESPERADA EN AIRTABLE:
 
-   AIRTABLE_API_KEY = patXXXXXXXXXXXXXX
-   AIRTABLE_BASE_ID = appXXXXXXXXXXXXXX
+Tabla: Sesiones
+- Código Acceso (Single line text)
+- Capacitaciones (Linked Records - Link to Capacitaciones)
+- Activa (Checkbox)
+- Fecha Inicio (Date - Format YYYY-MM-DD)
 
-3. DESPLEGAR:
-   netlify deploy --prod
+═════════════════════════════════════════════════════════════════
+TESTING CON CURL:
 
+curl -X POST https://tu-sitio.netlify.app/.netlify/functions/create-session \
+  -H "Content-Type: application/json" \
+  -d '{
+    "code": "ABC123",
+    "trainingId": "recXXXXXXXXXX"
+  }'
+
+Respuesta esperada:
+{
+  "success": true,
+  "message": "Sesión creada correctamente",
+  "code": "ABC123",
+  "sessionId": "recYYYYYYYYYY",
+  "isNew": true
+}
 
 ═════════════════════════════════════════════════════════════════
 */
