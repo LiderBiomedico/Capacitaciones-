@@ -1935,7 +1935,7 @@
                         'Sesión': [currentSession.id],
                         'Pretest Score': pretestScore,
                         'Fecha Registro': new Date().toISOString().split('T')[0],
-                        'Hora Registro': new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }),
+                        'Hora Registro': new Date().toISOString().split('T')[1].split('.')[0],
                         'Completado Pretest': true,
                         'Completado Posttest': false
                     }
@@ -2243,7 +2243,7 @@
             }
         }
 
-        function switchTab(tabName) {
+        function switchTab(tabName, event = null) {
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
@@ -2255,7 +2255,15 @@
             const selectedTab = document.getElementById(tabName);
             if (selectedTab) selectedTab.classList.add('active');
             
-            event.target.closest('.nav-tab').classList.add('active');
+            // Si hay un evento, marcar el botón clickeado como activo
+            if (event && event.target) {
+                const navTab = event.target.closest('.nav-tab');
+                if (navTab) navTab.classList.add('active');
+            } else {
+                // Si no hay evento, buscar el botón correspondiente por data-tab
+                const navTab = document.querySelector(`[data-tab="${tabName}"]`);
+                if (navTab) navTab.classList.add('active');
+            }
         }
 
         // ==================== FUNCIONES DE PREGUNTAS ====================
@@ -3107,27 +3115,18 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const fields = training.fields;
                 
                 // Cargar preguntas de la capacitación
-                console.log('📝 Buscando preguntas para capacitación:', trainingId);
-                
                 const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         method: 'GET',
-                        // ✅ CORRECCIÓN: Filtro simplificado que busca en el campo de enlace
-                        path: `/Preguntas?filterByFormula={Capacitación}="${trainingId}"`,
+                        path: `/Preguntas?filterByFormula=SEARCH("${trainingId}",{Capacitacion (from Capacitación)})`,
                         body: null
                     })
                 });
                 
                 const questionsData = await questionsResponse.json();
-                
-                // ✅ Log para debugging
-                console.log('📊 Respuesta de preguntas:', questionsData);
-                
-                const questions = questionsData.success && questionsData.records ? questionsData.records : [];
-                
-                console.log(`✅ ${questions.length} preguntas encontradas`);
+                const questions = questionsData.success ? questionsData.records : [];
                 
                 // Renderizar detalles
                 const detailsBody = document.getElementById('detailsBody');
@@ -3168,21 +3167,12 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                             <div class="questions-list">
                                 ${questions.map((q, index) => {
                                     const qFields = q.fields;
-                                    const correctAnswer = qFields['Respuesta Correcta'] || qFields['Respuesta Corecta'] || '';
-                                    
-                                    // ✅ CORRECCIÓN: Usar el campo correcto de pregunta
-                                    const questionText = qFields['Pregunta'] || qFields['Texto'] || qFields['name'] || 'Sin pregunta';
-                                    const questionType = qFields['Tipo'] || 'N/A';
-                                    
+                                    const correctAnswer = qFields['Respuesta Corecta'] || '';
                                     return `
                                         <div class="question-item">
-                                            <div class="question-number">Pregunta ${index + 1} <span style="font-size: 0.8em; color: #666;">(${questionType})</span></div>
-                                            <div class="question-text">${questionText}</div>
+                                            <div class="question-number">Pregunta ${index + 1}</div>
+                                            <div class="question-text">${qFields['name'] || 'Sin pregunta'}</div>
                                             <div class="question-options">
-                                                <div class="question-option ${correctAnswer === 'A' ? 'correct' : ''}">
-                                                    <strong>A)</strong> ${qFields['Opción A'] || 'N/A'}
-                                                    ${correctAnswer === 'A' ? '<i class="fas fa-check-circle" style="color: #4caf50; margin-left: auto;"></i>' : ''}
-                                                </div>
                                                 <div class="question-option ${correctAnswer === 'B' ? 'correct' : ''}">
                                                     <strong>B)</strong> ${qFields['Opción B'] || 'N/A'}
                                                     ${correctAnswer === 'B' ? '<i class="fas fa-check-circle" style="color: #4caf50; margin-left: auto;"></i>' : ''}
@@ -3209,15 +3199,10 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 
             } catch (error) {
                 console.error('❌ Error cargando detalles:', error);
-                console.error('Stack trace:', error.stack);
                 Swal.fire({
                     icon: 'error',
-                    title: 'Error al Cargar Detalles',
-                    html: `
-                        No se pudieron cargar los detalles de la capacitación.<br>
-                        <small style="color: #666;">Error: ${error.message}</small><br><br>
-                        <small>Por favor, revisa la consola del navegador (F12) para más detalles.</small>
-                    `
+                    title: 'Error',
+                    text: 'No se pudieron cargar los detalles de la capacitación'
                 });
             }
         }
