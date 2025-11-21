@@ -1928,14 +1928,28 @@
                 // PASO 4: Crear registro de participación (LISTA DE ASISTENCIA)
                 // ==========================================
                 
+                // ✅ CORREGIDO: Generar fecha y hora en formato correcto
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                
+                // Formato: YYYY-MM-DD HH:mm:ss (compatible con campos Date en Airtable)
+                const fechaFormato = `${year}-${month}-${day}`;
+                const horaFormato = `${hours}:${minutes}:${seconds}`;
+                const fechaHoraCompleta = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+                
                 const participationData = {
                     fields: {
                         'Nombre': currentParticipantData.name,
                         'Departamento': currentParticipantData.department,
                         'Sesión': [currentSession.id],
                         'Pretest Score': pretestScore,
-                        'Fecha Registro': new Date().toISOString().split('T')[0],
-                        'Hora Registro': new Date().toISOString().split('T')[1].split('.')[0],
+                        'Fecha Registro': fechaFormato,  // Solo fecha: 2025-11-20
+                        'Hora Registro': fechaHoraCompleta,  // ✅ CORREGIDO: Fecha y hora completa
                         'Completado Pretest': true,
                         'Completado Posttest': false
                     }
