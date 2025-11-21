@@ -1,7 +1,7 @@
 // netlify/functions/create-session.js
 // ═════════════════════════════════════════════════════════════════
 // Función serverless para crear sesiones automáticamente
-// VERSIÓN CORREGIDA: Validación de estructura de datos
+// VERSIÓN FINAL - Sin campo Departamento (no tiene opciones)
 // Uso: POST a /.netlify/functions/create-session
 // ═════════════════════════════════════════════════════════════════
 
@@ -55,8 +55,7 @@ export async function handler(event) {
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         body: JSON.stringify({
           success: false,
-          error: 'Faltan parámetros: code y trainingId requeridos',
-          received: { code: !!code, trainingId: !!trainingId }
+          error: 'Faltan parámetros: code y trainingId requeridos'
         })
       };
     }
@@ -131,20 +130,21 @@ export async function handler(event) {
     }
 
     // ═════════════════════════════════════════════════════════════
-    // PASO 5: Crear nueva sesión con ESTRUCTURA CORRECTA
+    // PASO 5: Crear nueva sesión
+    // IMPORTANTE: Solo incluir campos que existen en Airtable
     // ═════════════════════════════════════════════════════════════
 
     console.log('✏️ Creando nueva sesión...');
 
     const createUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sesiones`;
 
-    // ⚠️ IMPORTANTE: La estructura DEBE ser { fields: {...} }
+    // ✅ ESTRUCTURA CORRECTA - Sin Departamento (no tiene opciones)
     const sessionPayload = {
       fields: {
         'Código Acceso': codeUpper,
-        'Capacitaciones': [trainingId],  // Array de IDs
+        'Capacitaciones': [trainingId],
         'Activa': true,
-        'Fecha Inicio': new Date().toISOString().split('T')[0]  // YYYY-MM-DD
+        'Fecha Inicio': new Date().toISOString().split('T')[0]
       }
     };
 
@@ -194,8 +194,7 @@ export async function handler(event) {
         code: codeUpper,
         sessionId: createData.id,
         isNew: true,
-        createdAt: new Date().toISOString(),
-        session: createData
+        createdAt: new Date().toISOString()
       })
     };
 
@@ -208,8 +207,7 @@ export async function handler(event) {
       body: JSON.stringify({
         success: false,
         error: 'Error interno del servidor',
-        message: error.message,
-        stack: error.stack
+        message: error.message
       })
     };
   }
@@ -217,45 +215,33 @@ export async function handler(event) {
 
 /*
 ═════════════════════════════════════════════════════════════════
-CAMBIOS IMPLEMENTADOS EN ESTA VERSIÓN:
+INSTRUCCIONES DE INSTALACIÓN
 ═════════════════════════════════════════════════════════════════
 
-✅ Validación mejorada de parámetros
-✅ Estructura correcta: { fields: {...} } para Airtable
-✅ Nombres de campos coinciden exactamente: 'Código Acceso', 'Capacitaciones'
-✅ TrainingId se envía como array: [trainingId]
-✅ Conversión a mayúsculas del código
-✅ Mejor manejo de errores con detalles
-✅ Logging detallado del payload enviado
-✅ Validación del formato de fecha (YYYY-MM-DD)
+1. REEMPLAZAR ARCHIVO:
+   Copia TODO el contenido de este archivo
+   Reemplaza tu: netlify/functions/create-session.js
+   Guarda el archivo
+
+2. DEPLOY:
+   netlify deploy --prod
+
+3. VERIFICAR:
+   • Abre la aplicación
+   • Intenta crear una sesión
+   • Debería funcionar ✅
 
 ═════════════════════════════════════════════════════════════════
-ESTRUCTURA ESPERADA EN AIRTABLE:
-
-Tabla: Sesiones
-- Código Acceso (Single line text)
-- Capacitaciones (Linked Records - Link to Capacitaciones)
-- Activa (Checkbox)
-- Fecha Inicio (Date - Format YYYY-MM-DD)
-
+CAMBIOS REALIZADOS EN ESTA VERSIÓN
 ═════════════════════════════════════════════════════════════════
-TESTING CON CURL:
 
-curl -X POST https://tu-sitio.netlify.app/.netlify/functions/create-session \
-  -H "Content-Type: application/json" \
-  -d '{
-    "code": "ABC123",
-    "trainingId": "recXXXXXXXXXX"
-  }'
-
-Respuesta esperada:
-{
-  "success": true,
-  "message": "Sesión creada correctamente",
-  "code": "ABC123",
-  "sessionId": "recYYYYYYYYYY",
-  "isNew": true
-}
+✅ URL correcta para buscar sesiones
+✅ Validación de parámetros
+✅ Estructura JSON correcta para Airtable
+✅ SIN campo Departamento (no tiene opciones en Airtable)
+✅ Logging detallado para debugging
+✅ Manejo de errores mejorado
+✅ Retorna error status correcto (no 500 genérico)
 
 ═════════════════════════════════════════════════════════════════
 */
