@@ -2193,21 +2193,23 @@
                 
                 console.log('🎓 Total de preguntas:', questionsData.records.length);
                 
-                // NUEVA ESTRATEGIA: Filtrar SOLO por tipo Posttest
-                // Ignorar el ID de capacitación por ahora
+                // NUEVA ESTRATEGIA: Filtrar por tipo "Postest" O "Posttest"
+                // Aceptar ambas variaciones
                 const allPosttestQuestions = questionsData.records.filter(q => {
                     const tipoExamen = q.fields['Tipo Examen'] || '';
-                    return tipoExamen.toLowerCase() === 'posttest';
+                    const tipoLower = tipoExamen.toLowerCase();
+                    return tipoLower === 'postest' || tipoLower === 'posttest' || 
+                           tipoLower === 'post-test' || tipoLower === 'post test';
                 });
                 
-                console.log('🎓 Preguntas de tipo POSTTEST encontradas:', allPosttestQuestions.length);
+                console.log('🎓 Preguntas de tipo POSTTEST/POSTEST encontradas:', allPosttestQuestions.length);
                 
                 if (allPosttestQuestions.length === 0) {
                     console.error('❌ NO HAY PREGUNTAS DE POSTTEST EN AIRTABLE');
                     throw new Error('No hay preguntas de posttest configuradas');
                 }
                 
-                // Usar todas las preguntas de posttest (sin filtrar por capacitación)
+                // Usar todas las preguntas de posttest
                 const posttestQuestions = allPosttestQuestions;
                 
                 console.log(`✅ Usando ${posttestQuestions.length} preguntas de posttest`);
