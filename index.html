@@ -2265,25 +2265,38 @@
             
             questions.forEach((question, index) => {
                 const questionId = question.id;
-                const questionText = question.fields['Pregunta'] || 'Pregunta sin texto';
-                const options = question.fields['Opciones'] || [];
+                const fields = question.fields;
+                const questionText = fields['Pregunta'] || 'Pregunta sin texto';
+                
+                // Obtener las opciones de los campos individuales
+                const optionA = fields['Opción A'] || fields['opción a'] || fields['Option A'] || fields['A'] || '';
+                const optionB = fields['Opción B'] || fields['opción b'] || fields['Option B'] || fields['B'] || '';
+                const optionC = fields['Opción C'] || fields['opción c'] || fields['Option C'] || fields['C'] || '';
+                const optionD = fields['Opción D'] || fields['opción d'] || fields['Option D'] || fields['D'] || '';
+                
+                // Crear array de opciones solo con las que tengan contenido
+                const options = [
+                    { letter: 'A', text: optionA },
+                    { letter: 'B', text: optionB },
+                    { letter: 'C', text: optionC },
+                    { letter: 'D', text: optionD }
+                ].filter(opt => opt.text.trim().length > 0);
                 
                 const questionEl = document.createElement('div');
                 questionEl.className = 'question-card';
                 
                 let optionsHTML = '';
-                const optionLetters = ['A', 'B', 'C', 'D'];
                 
-                options.forEach((option, idx) => {
+                options.forEach((option) => {
                     optionsHTML += `
                         <label class="option">
                             <input type="radio" 
                                    name="postest-q${questionId}" 
-                                   value="${optionLetters[idx]}"
+                                   value="${option.letter}"
                                    onchange="postestAnswers['${questionId}'] = this.value"
                             >
-                            <span class="option-letter">${optionLetters[idx]}</span>
-                            <span class="option-text">${option}</span>
+                            <span class="option-letter">${option.letter})</span>
+                            <span class="option-text">${option.text}</span>
                         </label>
                     `;
                 });
