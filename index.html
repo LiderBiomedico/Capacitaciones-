@@ -1345,6 +1345,30 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Área de posttest (oculta inicialmente) -->
+                <div id="posttestSection" style="display: none;">
+                    <div class="section-header">
+                        <h2>
+                            <i class="fas fa-star"></i>
+                            <span>Post-Test</span>
+                        </h2>
+                        <p>Evaluación después de la capacitación</p>
+                    </div>
+
+                    <div class="questions-section">
+                        <div id="posttestQuestionsContainer">
+                            <!-- Preguntas del posttest -->
+                        </div>
+
+                        <!-- Botón enviar -->
+                        <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e0e0e0;">
+                            <button class="btn btn-success" onclick="submitPosttest()" style="width: 100%;">
+                                <i class="fas fa-check"></i> Enviar Post-Test
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <section id="reports" class="tab-content">
@@ -1459,6 +1483,12 @@
         let currentTrainingRecord = null;
         let currentParticipantData = {};
         let pretestAnswers = {};
+        let posttestAnswers = {};
+        
+        // Variables para rastrear participación
+        let currentParticipationId = null;
+        let currentSessionId = null;
+        let postestCode = null;
 
         // ==================== FUNCIONES DE PARTICIPANTE ====================
         
@@ -2063,14 +2093,18 @@
                     confirmButtonColor: '#667eea'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        // Aquí podrías redirigir al contenido de la capacitación
+                        // GUARDAR participationId para uso posterior en posttest
+                        currentParticipationId = participationResult.id;
+                        currentSessionId = currentSession.id;
+                        
                         Swal.fire({
                             icon: 'info',
                             title: 'Contenido de Capacitación',
                             text: 'El coordinador compartirá el contenido de la capacitación. Una vez finalizado, podrás realizar el Post-Test.',
                             confirmButtonText: 'Entendido'
                         }).then(() => {
-                            cancelTraining();
+                            // Mostrar botón para acceder al posttest
+                            showPostestButton();
                         });
                     } else {
                         // Volver al inicio
@@ -2092,12 +2126,406 @@
             }
         }
         
+        // ==================== FUNCIONES DE POSTTEST ====================
+        
+        function showPostestButton() {
+            // Ocultar sección de pretest
+            document.getElementById('pretestSection').style.display = 'none';
+            document.getElementById('accessSection').style.display = 'none';
+            
+            // Mostrar mensaje de espera
+            Swal.fire({
+                icon: 'info',
+                title: 'Esperando acceso al Post-Test',
+                html: `
+                    <div style="text-align: center; padding: 1rem;">
+                        <p style="margin-bottom: 1rem;">¿Ya terminaste la capacitación?</p>
+                        <button class="btn btn-success" onclick="loadPosttest()" style="width: 100%; padding: 0.75rem; font-size: 1rem; margin-bottom: 0.5rem;">
+                            <i class="fas fa-arrow-right"></i> Continuar al Post-Test
+                        </button>
+                        <button class="btn btn-secondary" onclick="cancelTraining()" style="width: 100%; padding: 0.75rem; font-size: 0.9rem;">
+                            <i class="fas fa-times"></i> Salir
+                        </button>
+                    </div>
+                `,
+                allowOutsideClick: false,
+                showConfirmButton: false
+            });
+        }
+        
+        async function loadPosttest() {
+            try {
+                Swal.close();
+                Swal.fire({
+                    title: 'Cargando Post-Test...',
+                    text: 'Por favor espera',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                
+                // Obtener preguntas de posttest
+                const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Preguntas`
+                    })
+                });
+                
+                const questionsData = await questionsResponse.json();
+                
+                if (!questionsData.success || !questionsData.records) {
+                    throw new Error('No se pudieron obtener las preguntas del posttest');
+                }
+                
+                // Filtrar preguntas de posttest
+                const posttestQuestions = questionsData.records.filter(q => {
+                    const capacitacionLinks = q.fields['Capacitaciones'] || [];
+                    const tipoExamen = q.fields['Tipo Examen'] || '';
+                    
+                    const isCorrectTraining = capacitacionLinks.includes(currentTrainingRecord.id);
+                    const isPostest = tipoExamen.toLowerCase() === 'posttest' || 
+                                      tipoExamen.toLowerCase() === 'post-test' || 
+                                      tipoExamen.toLowerCase() === 'post test';
+                    
+                    return isCorrectTraining && isPostest;
+                });
+                
+                console.log(`✅ Preguntas de posttest encontradas: ${posttestQuestions.length}`);
+                
+                if (posttestQuestions.length === 0) {
+                    throw new Error('No hay preguntas de posttest configuradas');
+                }
+                
+                // Limpiar respuestas anteriores
+                posttestAnswers = {};
+                
+                // Mostrar interfaz de posttest
+                displayPosttestQuestions(posttestQuestions);
+                
+                // Ocultar modal y mostrar sección de posttest
+                Swal.close();
+                document.getElementById('posttestSection').style.display = 'block';
+                document.getElementById('accessSection').style.display = 'none';
+                document.getElementById('pretestSection').style.display = 'none';
+                
+            } catch (error) {
+                console.error('❌ Error cargando posttest:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo cargar el posttest: ' + error.message
+                }).then(() => {
+                    showPostestButton();
+                });
+            }
+        }
+        
+        function displayPosttestQuestions(questions) {
+            const container = document.getElementById('posttestQuestionsContainer');
+            container.innerHTML = '';
+            
+            if (questions.length === 0) {
+                container.innerHTML = `
+                    <div class="alert alert-warning">
+                        <strong>⚠️ No hay preguntas de posttest configuradas</strong>
+                    </div>
+                `;
+                return;
+            }
+            
+            questions.forEach((question, index) => {
+                const questionId = question.id;
+                const questionText = question.fields['Pregunta'] || 'Pregunta sin texto';
+                const options = question.fields['Opciones'] || [];
+                
+                const questionEl = document.createElement('div');
+                questionEl.className = 'question-card';
+                
+                let optionsHTML = '';
+                const optionLetters = ['A', 'B', 'C', 'D'];
+                
+                options.forEach((option, idx) => {
+                    optionsHTML += `
+                        <label class="option">
+                            <input type="radio" 
+                                   name="posttest-q${questionId}" 
+                                   value="${optionLetters[idx]}"
+                                   onchange="posttestAnswers['${questionId}'] = this.value"
+                            >
+                            <span class="option-letter">${optionLetters[idx]}</span>
+                            <span class="option-text">${option}</span>
+                        </label>
+                    `;
+                });
+                
+                questionEl.innerHTML = `
+                    <div class="question-header">
+                        <span class="question-number">Pregunta ${index + 1} / ${questions.length}</span>
+                    </div>
+                    <p class="question-text">${questionText}</p>
+                    <div class="options">
+                        ${optionsHTML}
+                    </div>
+                `;
+                
+                container.appendChild(questionEl);
+            });
+        }
+        
+        async function submitPosttest() {
+            const answers = Object.keys(posttestAnswers).length;
+            const questionCards = document.querySelectorAll('#posttestSection .question-card');
+            const totalQuestions = questionCards.length;
+            
+            // Validar que se hayan respondido todas las preguntas
+            if (answers === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Respuestas Incompletas',
+                    text: 'Por favor responde todas las preguntas antes de enviar'
+                });
+                return;
+            }
+            
+            if (answers < totalQuestions) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Respuestas Incompletas',
+                    text: `Has respondido ${answers} de ${totalQuestions} preguntas. Por favor completa todas antes de enviar`
+                });
+                return;
+            }
+            
+            try {
+                Swal.fire({
+                    title: 'Enviando Post-Test...',
+                    text: 'Por favor espera mientras guardamos tu evaluación',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                
+                console.log('📝 Iniciando proceso de guardado del posttest...');
+                console.log('👤 Participante:', currentParticipantData);
+                console.log('📋 Respuestas:', posttestAnswers);
+                
+                // ==========================================
+                // PASO 1: Obtener preguntas para calcular score
+                // ==========================================
+                
+                const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Preguntas`
+                    })
+                });
+                
+                const questionsData = await questionsResponse.json();
+                
+                if (!questionsData.success || !questionsData.records) {
+                    throw new Error('No se pudieron obtener las preguntas');
+                }
+                
+                // ==========================================
+                // PASO 2: Calcular el score del posttest
+                // ==========================================
+                
+                let correctAnswers = 0;
+                let totalAnswered = 0;
+                const answersToSave = [];
+                
+                for (const [questionId, userAnswer] of Object.entries(posttestAnswers)) {
+                    const question = questionsData.records.find(q => q.id === questionId);
+                    
+                    if (question) {
+                        totalAnswered++;
+                        
+                        const correctAnswer = question.fields['Respuesta Correcta'] || 
+                                             question.fields['Respuesta correcta'] || 
+                                             question.fields['RespuestaCorrecta'] ||
+                                             question.fields['Correct Answer'] ||
+                                             question.fields['correct_answer'] || '';
+                        
+                        const isCorrect = userAnswer.toUpperCase() === correctAnswer.toUpperCase();
+                        
+                        if (isCorrect) {
+                            correctAnswers++;
+                        }
+                        
+                        console.log(`Pregunta ${questionId}: Usuario=${userAnswer}, Correcta=${correctAnswer}, ✓=${isCorrect}`);
+                        
+                        answersToSave.push({
+                            questionId: questionId,
+                            userAnswer: userAnswer,
+                            isCorrect: isCorrect
+                        });
+                    }
+                }
+                
+                const posttestScore = totalAnswered > 0 
+                    ? Math.round((correctAnswers / totalAnswered) * 100) 
+                    : 0;
+                
+                console.log(`📊 Score calculado: ${correctAnswers}/${totalAnswered} = ${posttestScore}%`);
+                
+                // ==========================================
+                // PASO 3: Actualizar registro de participación
+                // ==========================================
+                
+                const now = new Date();
+                const year = now.getFullYear();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                const hours = String(now.getHours()).padStart(2, '0');
+                const minutes = String(now.getMinutes()).padStart(2, '0');
+                const seconds = String(now.getSeconds()).padStart(2, '0');
+                
+                const fechaFormato = `${year}-${month}-${day}`;
+                const horaFormato = `${hours}:${minutes}:${seconds}`;
+                const fechaHoraCompleta = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+                
+                const updateParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'PATCH',
+                        path: `/Participaciones/${currentParticipationId}`,
+                        body: {
+                            fields: {
+                                'Posttest Score': posttestScore,
+                                'Fecha Posttest': fechaFormato,
+                                'Hora Posttest': fechaHoraCompleta,
+                                'Completado Posttest': true,
+                                'Estado': 'Completado'
+                            }
+                        }
+                    })
+                });
+                
+                const updateParticipationData = await updateParticipationResponse.json();
+                
+                if (!updateParticipationData.success) {
+                    console.error('❌ Error actualizando participación:', updateParticipationData);
+                    throw new Error(updateParticipationData.error || 'No se pudo actualizar el registro');
+                }
+                
+                console.log('✅ Participación actualizada:', currentParticipationId);
+                
+                // ==========================================
+                // PASO 4: Guardar respuestas individuales
+                // ==========================================
+                
+                for (const answer of answersToSave) {
+                    try {
+                        const answerData = {
+                            fields: {
+                                'Participación': [currentParticipationId],
+                                'Pregunta': [answer.questionId],
+                                'Respuesta Usuario': answer.userAnswer,
+                                'Es Correcta': answer.isCorrect,
+                                'Tipo Examen': 'Posttest'
+                            }
+                        };
+                        
+                        await fetch('/.netlify/functions/airtable-proxy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                method: 'POST',
+                                path: `/Respuestas`,
+                                body: answerData
+                            })
+                        });
+                        
+                        console.log(`✅ Respuesta guardada para pregunta: ${answer.questionId}`);
+                        
+                    } catch (answerError) {
+                        console.warn(`⚠️ No se pudo guardar respuesta individual:`, answerError);
+                    }
+                }
+                
+                // ==========================================
+                // PASO 5: Mostrar resultado al usuario
+                // ==========================================
+                
+                Swal.close();
+                
+                let scoreMessage = '';
+                let scoreIcon = 'success';
+                let congratsMessage = '¡Felicidades!';
+                
+                if (posttestScore >= 80) {
+                    scoreMessage = '¡Excelente desempeño!';
+                    congratsMessage = '¡Demostraste un excelente dominio del tema!';
+                } else if (posttestScore >= 60) {
+                    scoreMessage = 'Buen desempeño';
+                    congratsMessage = '¡Aplicaste muy bien lo aprendido!';
+                } else if (posttestScore >= 40) {
+                    scoreMessage = 'Desempeño regular';
+                    congratsMessage = 'Continúa practicando para mejorar';
+                } else {
+                    scoreMessage = 'Es momento de reforzar el aprendizaje';
+                    scoreIcon = 'warning';
+                    congratsMessage = 'Te recomendamos revisar el contenido nuevamente';
+                }
+                
+                Swal.fire({
+                    icon: scoreIcon,
+                    title: congratsMessage,
+                    html: `
+                        <div style="text-align: center;">
+                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                                        color: white; 
+                                        padding: 1.5rem; 
+                                        border-radius: 12px; 
+                                        margin-bottom: 1rem;">
+                                <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Tu calificación en Post-Test</p>
+                                <p style="margin: 0.5rem 0; font-size: 2.5rem; font-weight: bold;">${posttestScore}%</p>
+                                <p style="margin: 0; font-size: 0.85rem;">${correctAnswers} de ${totalAnswered} correctas</p>
+                            </div>
+                            
+                            <p style="margin: 0.5rem 0;"><strong>${currentParticipantData.name}</strong></p>
+                            <p style="margin: 0; color: #666; font-size: 0.9rem;">${currentParticipantData.department}</p>
+                            <p style="margin: 1rem 0 0 0; color: #666; font-size: 0.9rem;">${scoreMessage}</p>
+                            <p style="margin: 0.5rem 0 0 0; color: #999; font-size: 0.8rem;">
+                                Tu evaluación ha sido completada y registrada
+                            </p>
+                        </div>
+                    `,
+                    confirmButtonText: 'Volver al Inicio',
+                    confirmButtonColor: '#667eea',
+                    allowOutsideClick: false
+                }).then(() => {
+                    cancelTraining();
+                });
+                
+                console.log('✅ Proceso de posttest completado exitosamente');
+                
+            } catch (error) {
+                console.error('❌ Error enviando posttest:', error);
+                Swal.close();
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo enviar el posttest: ' + error.message,
+                    footer: '<small>Revisa la consola (F12) para más detalles</small>'
+                });
+            }
+        }
+        
         function cancelTraining() {
             // Limpiar datos
             currentAccessCode = null;
             currentTrainingRecord = null;
             currentParticipantData = {};
             pretestAnswers = {};
+            posttestAnswers = {};
+            currentParticipationId = null;
+            currentSessionId = null;
+            postestCode = null;
             
             // Limpiar formulario
             document.getElementById('accessCode').value = '';
@@ -2107,7 +2535,9 @@
             // Mostrar/ocultar secciones
             document.getElementById('accessSection').style.display = 'block';
             document.getElementById('pretestSection').style.display = 'none';
+            document.getElementById('posttestSection').style.display = 'none';
         }
+
 
         // ==================== INICIALIZACIÓN ====================
         
