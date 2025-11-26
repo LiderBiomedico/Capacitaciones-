@@ -2194,13 +2194,14 @@
                 console.log('🎓 Total de preguntas en Airtable:', questionsData.records.length);
                 
                 // Log de TODOS los tipos disponibles
-                const todosLostipos = questionsData.records.map(q => q.fields['Tipo Examen']);
+                const todosLostipos = questionsData.records.map(q => q.fields['Tipo']);
                 console.log('Todos los tipos en Airtable:', todosLostipos);
                 
                 // BÚSQUEDA ULTRA FLEXIBLE: Solo buscar por "Pretest" o que NO sea "Pretest"
                 // Es decir: si no es Pretest, entonces es Postest/Postest
                 const allPostestQuestions = questionsData.records.filter(q => {
-                    const tipoExamen = (q.fields['Tipo Examen'] || '').trim().toLowerCase();
+                    // ⚠️ CAMPO CORRECTO EN AIRTABLE: 'Tipo' (no 'Tipo Examen')
+                    const tipoExamen = (q.fields['Tipo'] || '').trim().toLowerCase();
                     
                     console.log(`📝 Tipo: "${tipoExamen}"`);
                     
