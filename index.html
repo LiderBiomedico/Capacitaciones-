@@ -2254,64 +2254,69 @@
             const container = document.getElementById('postestQuestionsContainer');
             container.innerHTML = '';
             
-            if (questions.length === 0) {
+            if (!questions || questions.length === 0) {
                 container.innerHTML = `
-                    <div class="alert alert-warning">
-                        <strong>⚠️ No hay preguntas de postest configuradas</strong>
+                    <div style="text-align: center; padding: 2rem; background: #fff3cd; border-radius: 8px; border: 2px solid #ffc107;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #ff9800; margin-bottom: 1rem; display: block;"></i>
+                        <p style="color: #666; margin: 0; font-size: 1.1rem;">
+                            <strong>⚠️ No hay preguntas de postest configuradas</strong>
+                        </p>
+                        <p style="color: #999; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                            En Airtable, crea preguntas con Tipo = "Postest" enlazadas a esta capacitación
+                        </p>
                     </div>
                 `;
                 return;
             }
             
             questions.forEach((question, index) => {
-                const questionId = question.id;
                 const fields = question.fields;
-                const questionText = fields['Pregunta'] || 'Pregunta sin texto';
+                const questionNumber = index + 1;
+                const questionId = `postest-q${question.id}`;
                 
-                // Obtener las opciones de los campos individuales
-                const optionA = fields['Opción A'] || fields['opción a'] || fields['Option A'] || fields['A'] || '';
-                const optionB = fields['Opción B'] || fields['opción b'] || fields['Option B'] || fields['B'] || '';
-                const optionC = fields['Opción C'] || fields['opción c'] || fields['Option C'] || fields['C'] || '';
-                const optionD = fields['Opción D'] || fields['opción d'] || fields['Option D'] || fields['D'] || '';
+                // Buscar el nombre de la pregunta (intentar diferentes campos)
+                const questionText = fields['name'] || fields['Nombre'] || fields['Pregunta'] || fields['Título'] || 'Sin pregunta';
                 
-                // Crear array de opciones solo con las que tengan contenido
+                // Obtener opciones (intentar variaciones de nombres)
                 const options = [
-                    { letter: 'A', text: optionA },
-                    { letter: 'B', text: optionB },
-                    { letter: 'C', text: optionC },
-                    { letter: 'D', text: optionD }
-                ].filter(opt => opt.text.trim().length > 0);
+                    { letter: 'A', text: fields['Opción A'] || fields['opción a'] || fields['Option A'] || fields['A'] || '' },
+                    { letter: 'B', text: fields['Opción B'] || fields['opción b'] || fields['Option B'] || fields['B'] || '' },
+                    { letter: 'C', text: fields['Opción C'] || fields['opción c'] || fields['Option C'] || fields['C'] || '' },
+                    { letter: 'D', text: fields['Opción D'] || fields['opción d'] || fields['Option D'] || fields['D'] || '' }
+                ].filter(opt => opt.text && opt.text.trim());
                 
-                const questionEl = document.createElement('div');
-                questionEl.className = 'question-card';
+                // Si no hay opciones, intentar búsqueda más amplia
+                if (options.length === 0) {
+                    console.warn(`⚠️ Pregunta ${questionNumber} no tiene opciones configuradas:`, fields);
+                }
                 
-                let optionsHTML = '';
-                
-                options.forEach((option) => {
-                    optionsHTML += `
-                        <label class="option">
-                            <input type="radio" 
-                                   name="postest-q${questionId}" 
-                                   value="${option.letter}"
-                                   onchange="postestAnswers['${questionId}'] = this.value"
-                            >
-                            <span class="option-letter">${option.letter})</span>
-                            <span class="option-text">${option.text}</span>
-                        </label>
-                    `;
-                });
-                
-                questionEl.innerHTML = `
-                    <div class="question-header">
-                        <span class="question-number">Pregunta ${index + 1} / ${questions.length}</span>
-                    </div>
-                    <p class="question-text">${questionText}</p>
-                    <div class="options">
-                        ${optionsHTML}
+                const questionHTML = `
+                    <div class="question-card" style="margin-bottom: 1.5rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid var(--primary);">
+                        <h4 style="margin-top: 0; color: var(--primary); margin-bottom: 0.75rem;">
+                            <i class="fas fa-question-circle"></i> Pregunta ${questionNumber} / ${questions.length}
+                        </h4>
+                        <p style="margin: 0 0 1rem 0; font-weight: 500; color: #333; font-size: 1.05rem;">
+                            ${questionText}
+                        </p>
+                        
+                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                            ${options.length > 0 ? options.map(option => `
+                                <label style="display: flex; align-items: flex-start; padding: 0.75rem; background: white; border-radius: 6px; cursor: pointer; transition: all 0.3s; border: 2px solid #e0e0e0; hover: border-color: var(--primary);">
+                                    <input type="radio" 
+                                           name="${questionId}" 
+                                           value="${option.letter}" 
+                                           onchange="postestAnswers['${question.id}'] = this.value"
+                                           style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); margin-top: 2px; flex-shrink: 0;">
+                                    <span style="margin-left: 0.75rem; flex: 1;">
+                                        <strong style="color: var(--primary);">${option.letter})</strong> <span style="color: #333;">${option.text}</span>
+                                    </span>
+                                </label>
+                            `).join('') : '<p style="color: #f44336; font-weight: bold;">⚠️ Sin opciones de respuesta</p>'}
+                        </div>
                     </div>
                 `;
                 
-                container.appendChild(questionEl);
+                container.innerHTML += questionHTML;
             });
         }
         
