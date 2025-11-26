@@ -2193,32 +2193,39 @@
                 
                 console.log('🎓 Total de preguntas en Airtable:', questionsData.records.length);
                 
-                // Filtrar preguntas que contengan "post" en el tipo examen
-                // Aceptar: Postest, Posttest, Post-test, Post test, POST TEST, etc
+                // Filtrar preguntas de posttest con más flexibilidad
                 const allPosttestQuestions = questionsData.records.filter(q => {
-                    const tipoExamen = q.fields['Tipo Examen'] || '';
+                    const tipoExamen = (q.fields['Tipo Examen'] || '').trim().replace(/\s+/g, ' ');
                     const tipoLower = tipoExamen.toLowerCase().trim();
                     
-                    // Log para debug
-                    console.log(`📝 Tipo examen encontrado: "${tipoExamen}" | Comparando: "${tipoLower}"`);
+                    console.log(`📝 Campo completo: "${tipoExamen}" | Limpio: "${tipoLower}" | Largo: ${tipoLower.length} caracteres`);
+                    console.log(`   → Contiene 'pos': ${tipoLower.includes('pos')} | Contiene 'test': ${tipoLower.includes('test')}`);
                     
-                    // Buscar cualquier variación que contenga "pos" o "post"
-                    return tipoLower.includes('pos') && tipoLower.includes('test');
+                    // Búsqueda flexible
+                    const esPostest = tipoLower.includes('pos') && tipoLower.includes('test');
+                    
+                    if (esPostest) {
+                        console.log(`✅ MATCH ENCONTRADO: "${tipoExamen}"`);
+                    }
+                    
+                    return esPostest;
                 });
                 
-                console.log('🎓 Preguntas de tipo POSTTEST/POSTEST encontradas:', allPosttestQuestions.length);
+                console.log('🎓 Preguntas encontradas:', allPosttestQuestions.length);
                 
-                // Si no encuentra, mostrar qué encontró
+                // Si no encuentra, mostrar todos los tipos disponibles
                 if (allPosttestQuestions.length === 0) {
                     console.error('❌ NO HAY PREGUNTAS DE POSTTEST EN AIRTABLE');
-                    console.log('Tipos de examen disponibles:');
-                    const tipos = [...new Set(questionsData.records.map(q => q.fields['Tipo Examen']))];
-                    tipos.forEach(t => console.log(`  - "${t}"`));
+                    console.log('Tipos de examen disponibles en Airtable:');
+                    const tiposUnicos = [...new Set(questionsData.records.map(q => {
+                        const tipo = (q.fields['Tipo Examen'] || '').trim();
+                        return `"${tipo}" (${tipo.length} chars)`;
+                    }))];
+                    tiposUnicos.forEach(t => console.log(`  - ${t}`));
                     throw new Error('No hay preguntas de posttest configuradas');
                 }
                 
                 const posttestQuestions = allPosttestQuestions;
-                
                 console.log(`✅ Usando ${posttestQuestions.length} preguntas de posttest`);
                 
                 // Limpiar respuestas anteriores
