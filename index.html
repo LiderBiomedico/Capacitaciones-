@@ -2199,7 +2199,7 @@
                 
                 // BÚSQUEDA ULTRA FLEXIBLE: Solo buscar por "Pretest" o que NO sea "Pretest"
                 // Es decir: si no es Pretest, entonces es Postest/Postest
-                const allPosttestQuestions = questionsData.records.filter(q => {
+                const allPostestQuestions = questionsData.records.filter(q => {
                     const tipoExamen = (q.fields['Tipo Examen'] || '').trim().toLowerCase();
                     
                     console.log(`📝 Tipo: "${tipoExamen}"`);
