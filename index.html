@@ -2193,7 +2193,15 @@
                 
                 // Filtrar preguntas de posttest
                 const trainingIdForFilter = currentTrainingRecord.id;
-                console.log('🎓 Buscando preguntas posttest para capacitación ID:', trainingIdForFilter);
+                console.log('🎓 DEBUG - ID de capacitación a buscar:', trainingIdForFilter);
+                console.log('🎓 DEBUG - Total de preguntas en Airtable:', questionsData.records.length);
+                
+                // Log detallado de TODAS las preguntas
+                questionsData.records.forEach((q, idx) => {
+                    const capacitacionLinks = q.fields['Capacitaciones'] || [];
+                    const tipoExamen = q.fields['Tipo Examen'] || '';
+                    console.log(`📝 Pregunta ${idx+1}: Tipo="${tipoExamen}" | CapLinks=[${capacitacionLinks.join(',')}] | Pregunta="${q.fields['Pregunta'] || 'Sin nombre'}"`);
+                });
                 
                 const posttestQuestions = questionsData.records.filter(q => {
                     const capacitacionLinks = q.fields['Capacitaciones'] || [];
@@ -2204,14 +2212,14 @@
                                       tipoExamen.toLowerCase() === 'post-test' || 
                                       tipoExamen.toLowerCase() === 'post test';
                     
-                    if (!isCorrectTraining || !isPostest) {
-                        console.log(`✗ Pregunta NO match: "${q.fields['Pregunta'] || 'Sin nombre'}" | Tipo: "${tipoExamen}" | CapLinks: [${capacitacionLinks.join(',')}]`);
+                    if (isCorrectTraining && isPostest) {
+                        console.log(`✅ MATCH: "${q.fields['Pregunta']}" | Tipo=${tipoExamen} | CapLinks contiene ${trainingIdForFilter}`);
                     }
                     
                     return isCorrectTraining && isPostest;
                 });
                 
-                console.log(`✅ Preguntas de posttest encontradas: ${posttestQuestions.length}`);
+                console.log(`✅ TOTAL Preguntas de posttest encontradas: ${posttestQuestions.length}`);
                 
                 if (posttestQuestions.length === 0) {
                     throw new Error('No hay preguntas de posttest configuradas');
