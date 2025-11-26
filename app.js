@@ -24,13 +24,13 @@ let isConnected = false;
 // ==========================================
 
 /**
- * Generar link permanente de posttest después de completar pretest
+ * Generar link permanente de postest después de completar pretest
  */
 async function generatePostestLinkAfterPretest(sessionId, participationId, sessionCode, participantData) {
   try {
-    console.log('📝 Generando link de posttest...');
+    console.log('📝 Generando link de postest...');
     
-    const response = await fetch('/.netlify/functions/generate-posttest-link', {
+    const response = await fetch('/.netlify/functions/generate-postest-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -46,10 +46,10 @@ async function generatePostestLinkAfterPretest(sessionId, participationId, sessi
     const data = await response.json();
 
     if (!data.success) {
-      throw new Error(data.error || 'Error al generar link de posttest');
+      throw new Error(data.error || 'Error al generar link de postest');
     }
 
-    console.log('✅ Link de posttest generado:', data.postestUrl);
+    console.log('✅ Link de postest generado:', data.postestUrl);
 
     // Guardar datos globales para usar en el modal
     window.postestLinkData = {
@@ -62,20 +62,20 @@ async function generatePostestLinkAfterPretest(sessionId, participationId, sessi
     return data;
 
   } catch (error) {
-    console.error('❌ Error generando link de posttest:', error.message);
-    showAlert('Error al generar link de posttest: ' + error.message, 'error');
+    console.error('❌ Error generando link de postest:', error.message);
+    showAlert('Error al generar link de postest: ' + error.message, 'error');
     throw error;
   }
 }
 
 /**
- * Mostrar modal con el link y QR del posttest
+ * Mostrar modal con el link y QR del postest
  */
 function showPostestLinkModal(postestLinkData) {
   try {
-    console.log('📱 Mostrando modal de link de posttest');
+    console.log('📱 Mostrando modal de link de postest');
 
-    // Generar QR para el link de posttest
+    // Generar QR para el link de postest
     const qrContainer = document.getElementById('postestQrCode');
     if (qrContainer) {
       qrContainer.innerHTML = '';
@@ -107,7 +107,7 @@ function showPostestLinkModal(postestLinkData) {
     Swal.fire({
       icon: 'error',
       title: 'Error',
-      text: 'No se pudo mostrar el link de posttest'
+      text: 'No se pudo mostrar el link de postest'
     });
   }
 }
@@ -146,7 +146,7 @@ function copyPostestUrl() {
 }
 
 /**
- * Descargar QR del posttest
+ * Descargar QR del postest
  */
 function downloadPostestQR() {
   try {
@@ -183,7 +183,7 @@ function downloadPostestQR() {
 }
 
 /**
- * Cerrar modal de posttest
+ * Cerrar modal de postest
  */
 function closePostestLinkModal() {
   const modal = document.getElementById('postestLinkModal');
@@ -193,13 +193,13 @@ function closePostestLinkModal() {
 }
 
 /**
- * Detectar link de posttest en la URL y cargarlo automáticamente
+ * Detectar link de postest en la URL y cargarlo automáticamente
  */
 async function handlePostestCodeFromUrl(postestCode, participationId) {
   try {
-    console.log('🔍 Detectado link de posttest, buscando participación...');
+    console.log('🔍 Detectado link de postest, buscando participación...');
     
-    const response = await fetch('/.netlify/functions/get-participation-by-posttest-code', {
+    const response = await fetch('/.netlify/functions/get-participation-by-postest-code', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -210,7 +210,7 @@ async function handlePostestCodeFromUrl(postestCode, participationId) {
     const data = await response.json();
 
     if (!data.success) {
-      throw new Error(data.error || 'Código de posttest no válido');
+      throw new Error(data.error || 'Código de postest no válido');
     }
 
     if (!data.status.isValidForPosttest) {
@@ -223,7 +223,7 @@ async function handlePostestCodeFromUrl(postestCode, participationId) {
     currentParticipation = data.participation;
     currentSession = data.session;
     currentTraining = data.training;
-    currentExamType = 'posttest';
+    currentExamType = 'postest';
 
     // Mostrar información
     Swal.fire({
@@ -245,7 +245,7 @@ async function handlePostestCodeFromUrl(postestCode, participationId) {
     return data;
 
   } catch (error) {
-    console.error('❌ Error cargando posttest:', error.message);
+    console.error('❌ Error cargando postest:', error.message);
     Swal.fire({
       icon: 'error',
       title: 'Error',
@@ -256,7 +256,7 @@ async function handlePostestCodeFromUrl(postestCode, participationId) {
 }
 
 /**
- * Actualizar función checkUrlParams para detectar pretest y posttest
+ * Actualizar función checkUrlParams para detectar pretest y postest
  */
 function checkUrlParamsUpdated() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -265,8 +265,8 @@ function checkUrlParamsUpdated() {
   const participationId = urlParams.get('pid');
 
   if (code) {
-    // Detectar si es pretest o posttest
-    if (type === 'posttest' && code.startsWith('POSTTEST-')) {
+    // Detectar si es pretest o postest
+    if (type === 'postest' && code.startsWith('POSTTEST-')) {
       console.log('📋 URL detectada: POSTTEST');
       handlePostestCodeFromUrl(code, participationId);
     } else {
@@ -280,7 +280,7 @@ function checkUrlParamsUpdated() {
 }
 
 /**
- * Completar posttest - Guardar puntuación y mostrar resultados
+ * Completar postest - Guardar puntuación y mostrar resultados
  */
 async function completePosttest(postestScore) {
   try {
@@ -290,7 +290,7 @@ async function completePosttest(postestScore) {
 
     const participationId = currentParticipation.id;
 
-    // Actualizar puntuación del posttest
+    // Actualizar puntuación del postest
     const updateResponse = await fetch('/.netlify/functions/airtable-proxy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -310,7 +310,7 @@ async function completePosttest(postestScore) {
     const updateData = await updateResponse.json();
 
     if (!updateData.success) {
-      throw new Error('Error al guardar puntuación del posttest');
+      throw new Error('Error al guardar puntuación del postest');
     }
 
     console.log('✅ Posttest guardado exitosamente');
@@ -343,7 +343,7 @@ async function completePosttest(postestScore) {
     return updateData;
 
   } catch (error) {
-    console.error('❌ Error completando posttest:', error.message);
+    console.error('❌ Error completando postest:', error.message);
     Swal.fire({
       icon: 'error',
       title: 'Error',
@@ -371,7 +371,7 @@ function initializeApp() {
     updateDateTime();
     setInterval(updateDateTime, 60000);
     
-    // Verificar parámetros de URL (ACTUALIZADO para detectar posttest)
+    // Verificar parámetros de URL (ACTUALIZADO para detectar postest)
     checkUrlParamsUpdated();
     
     // Cargar tema guardado

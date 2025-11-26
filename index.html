@@ -2198,7 +2198,7 @@
                 console.log('Todos los tipos en Airtable:', todosLostipos);
                 
                 // BÚSQUEDA ULTRA FLEXIBLE: Solo buscar por "Pretest" o que NO sea "Pretest"
-                // Es decir: si no es Pretest, entonces es Postest/Posttest
+                // Es decir: si no es Pretest, entonces es Postest/Postest
                 const allPosttestQuestions = questionsData.records.filter(q => {
                     const tipoExamen = (q.fields['Tipo Examen'] || '').trim().toLowerCase();
                     
@@ -2209,20 +2209,20 @@
                     const esPosttest = !tipoExamen.includes('pre') && tipoExamen.length > 0;
                     
                     if (esPosttest) {
-                        console.log(`✅ ACEPTADO COMO POSTTEST: "${tipoExamen}"`);
+                        console.log(`✅ ACEPTADO COMO POSTEST: "${tipoExamen}"`);
                     }
                     
-                    return esPosttest;
+                    return esPostest;
                 });
                 
-                console.log('🎓 Preguntas de postest encontradas:', allPosttestQuestions.length);
+                console.log('🎓 Preguntas de postest encontradas:', allPostestQuestions.length);
                 
-                if (allPosttestQuestions.length === 0) {
-                    console.error('❌ NO HAY PREGUNTAS DE POSTTEST EN AIRTABLE');
+                if (allPostestQuestions.length === 0) {
+                    console.error('❌ NO HAY PREGUNTAS DE POSTEST EN AIRTABLE');
                     throw new Error('No hay preguntas de postest configuradas');
                 }
                 
-                const postestQuestions = allPosttestQuestions;
+                const postestQuestions = allPostestQuestions;
                 console.log(`✅ Usando ${postestQuestions.length} preguntas de postest`);
                 
                 // Limpiar respuestas anteriores

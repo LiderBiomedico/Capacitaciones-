@@ -1,7 +1,7 @@
-// netlify/functions/generate-posttest-link.js
+// netlify/functions/generate-postest-link.js
 // ═════════════════════════════════════════════════════════════════
-// Genera un vínculo permanente para posttest después de completar pretest
-// Guarda la participación con el código de posttest
+// Genera un vínculo permanente para postest después de completar pretest
+// Guarda la participación con el código de postest
 // ═════════════════════════════════════════════════════════════════
 
 export async function handler(event) {
@@ -40,7 +40,7 @@ export async function handler(event) {
     }
 
     // ═════════════════════════════════════════════════════════════
-    // PASO 1: Generar código único para posttest
+    // PASO 1: Generar código único para postest
     // ═════════════════════════════════════════════════════════════
     // Formato: POSTTEST-[SESSION_CODE]-[PARTICIPATION_ID]
     // Ejemplo: POSTTEST-ABC123-recXXXXXXXXX
@@ -49,16 +49,16 @@ export async function handler(event) {
     
     // Generar URL permanente
     const baseUrl = process.env.SITE_URL || 'https://capacitacioneshslv.netlify.app';
-    const postestUrl = `${baseUrl}?code=${postestCode}&type=posttest&pid=${participationId}`;
+    const postestUrl = `${baseUrl}?code=${postestCode}&type=postest&pid=${participationId}`;
 
-    console.log('📝 Generando vínculo de posttest');
+    console.log('📝 Generando vínculo de postest');
     console.log('   Código de pretest:', sessionCode);
-    console.log('   Código de posttest:', postestCode);
+    console.log('   Código de postest:', postestCode);
     console.log('   Participante:', userName);
     console.log('   URL generada:', postestUrl);
 
     // ═════════════════════════════════════════════════════════════
-    // PASO 2: Actualizar la participación con el código de posttest
+    // PASO 2: Actualizar la participación con el código de postest
     // ═════════════════════════════════════════════════════════════
 
     const updateParticipationUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Participaciones/${participationId}`;
@@ -87,13 +87,13 @@ export async function handler(event) {
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
         body: JSON.stringify({
           success: false,
-          error: 'Error al guardar código de posttest',
+          error: 'Error al guardar código de postest',
           details: updateParticipationData
         })
       };
     }
 
-    console.log('✅ Participación actualizada con código de posttest');
+    console.log('✅ Participación actualizada con código de postest');
 
     // ═════════════════════════════════════════════════════════════
     // PASO 3: Actualizar la sesión para vincular la participación
@@ -146,7 +146,7 @@ export async function handler(event) {
     };
 
   } catch (error) {
-    console.error('❌ Error en generate-posttest-link:', error);
+    console.error('❌ Error en generate-postest-link:', error);
     return {
       statusCode: 500,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
@@ -180,7 +180,7 @@ CÓMO USAR ESTA FUNCIÓN
    {
      success: true,
      postestCode: 'POSTTEST-ABC123-REC98765',
-     postestUrl: 'https://... ?code=POSTTEST-ABC123-REC98765&type=posttest&pid=rec987654',
+     postestUrl: 'https://... ?code=POSTTEST-ABC123-REC98765&type=postest&pid=rec987654',
      participationId: 'rec987654'
    }
 
