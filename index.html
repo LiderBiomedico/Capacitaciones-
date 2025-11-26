@@ -1602,9 +1602,13 @@
                 
                 // Guardar datos actuales
                 currentAccessCode = code;
-                currentTrainingRecord = trainingData;
+                currentTrainingRecord = {
+                    id: trainingId,
+                    fields: trainingData.fields
+                };
                 
-                console.log('✅ Listo para proceder al registro');
+                console.log('✅ Datos guardados - ID de capacitación:', trainingId);
+                console.log('✅ currentTrainingRecord:', currentTrainingRecord);
                 
                 Swal.close();
                 
@@ -1698,12 +1702,17 @@
                     throw new Error('No se pudieron cargar las preguntas');
                 }
                 
+                // IMPORTANTE: Obtener el trainingId correcto de la sesión
+                const trainingId = currentTrainingRecord.id;
+                console.log('🎓 Training ID de la sesión:', trainingId);
+                console.log('📋 Registro de capacitación actual:', currentTrainingRecord);
+                
                 // Filtrar preguntas en JavaScript - más robusto
                 const pretestQuestions = allQuestionsData.records.filter(q => {
                     const fields = q.fields;
                     
                     // Obtener el tipo de pregunta (intentar diferentes nombres)
-                    const tipo = fields['Tipo'] || fields['tipo'] || fields['Type'] || '';
+                    const tipo = fields['Tipo Examen'] || fields['Tipo'] || fields['tipo'] || fields['Type'] || '';
                     
                     // Verificar si es pretest (case-insensitive)
                     const isPretest = tipo.toLowerCase() === 'pretest' || tipo.toLowerCase() === 'pre-test' || tipo.toLowerCase() === 'pre test';
@@ -1721,9 +1730,13 @@
                         capacitacionId = fields['capacitaciones'][0];
                     }
                     
-                    console.log(`✓ Pregunta: ${fields['name'] || 'Sin nombre'} | Tipo: ${tipo} | CapID: ${capacitacionId} | Match: ${isPretest && capacitacionId === trainingId}`);
+                    const isMatch = isPretest && capacitacionId === trainingId;
                     
-                    return isPretest && capacitacionId === trainingId;
+                    if (!isMatch) {
+                        console.log(`✗ Pregunta NO match: "${fields['Pregunta'] || 'Sin nombre'}" | Tipo: "${tipo}" | CapID: "${capacitacionId}" vs "${trainingId}"`);
+                    }
+                    
+                    return isMatch;
                 });
                 
                 console.log(`✅ Preguntas de pretest encontradas: ${pretestQuestions.length}`);
@@ -2180,14 +2193,21 @@
                 }
                 
                 // Filtrar preguntas de posttest
+                const trainingIdForFilter = currentTrainingRecord.id;
+                console.log('🎓 Buscando preguntas posttest para capacitación ID:', trainingIdForFilter);
+                
                 const posttestQuestions = questionsData.records.filter(q => {
                     const capacitacionLinks = q.fields['Capacitaciones'] || [];
                     const tipoExamen = q.fields['Tipo Examen'] || '';
                     
-                    const isCorrectTraining = capacitacionLinks.includes(currentTrainingRecord.id);
+                    const isCorrectTraining = capacitacionLinks.includes(trainingIdForFilter);
                     const isPostest = tipoExamen.toLowerCase() === 'posttest' || 
                                       tipoExamen.toLowerCase() === 'post-test' || 
                                       tipoExamen.toLowerCase() === 'post test';
+                    
+                    if (!isCorrectTraining || !isPostest) {
+                        console.log(`✗ Pregunta NO match: "${q.fields['Pregunta'] || 'Sin nombre'}" | Tipo: "${tipoExamen}" | CapLinks: [${capacitacionLinks.join(',')}]`);
+                    }
                     
                     return isCorrectTraining && isPostest;
                 });
