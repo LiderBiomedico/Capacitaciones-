@@ -1201,8 +1201,8 @@
 
                 <div class="card">
                     <h3>✅ Post-test (Evaluación Final)</h3>
-                    <div id="posttestQuestions" class="questions-container"></div>
-                    <button class="btn btn-secondary" onclick="addQuestion('posttest')">
+                    <div id="PostestQuestions" class="questions-container"></div>
+                    <button class="btn btn-secondary" onclick="addQuestion('postest')">
                         <i class="fas fa-plus"></i> Agregar Pregunta
                     </button>
                 </div>
@@ -1346,8 +1346,8 @@
                     </div>
                 </div>
 
-                <!-- Área de posttest (oculta inicialmente) -->
-                <div id="posttestSection" style="display: none;">
+                <!-- Área de Postest (oculta inicialmente) -->
+                <div id="postestSection" style="display: none;">
                     <div class="section-header">
                         <h2>
                             <i class="fas fa-star"></i>
@@ -1357,8 +1357,8 @@
                     </div>
 
                     <div class="questions-section">
-                        <div id="posttestQuestionsContainer">
-                            <!-- Preguntas del posttest -->
+                        <div id="postestQuestionsContainer">
+                            <!-- Preguntas del postest -->
                         </div>
 
                         <!-- Botón enviar -->
@@ -1475,7 +1475,7 @@
     <script>
         // ==================== VARIABLES GLOBALES ====================
         let pretestQuestionCount = 0;
-        let posttestQuestionCount = 0;
+        let postestQuestionCount = 0;
         const MAX_QUESTIONS = 10;
         
         // Variables para el flujo de pretest
@@ -1483,7 +1483,7 @@
         let currentTrainingRecord = null;
         let currentParticipantData = {};
         let pretestAnswers = {};
-        let posttestAnswers = {};
+        let postestAnswers = {};
         
         // Variables para rastrear participación
         let currentParticipationId = null;
@@ -2105,7 +2105,7 @@
                     confirmButtonColor: '#667eea'
                 }).then((result) => {
                     if (result.isConfirmed) {
-                        // GUARDAR participationId para uso posterior en posttest
+                        // GUARDAR participationId para uso posterior en postest
                         currentParticipationId = participationResult.id;
                         currentSessionId = currentSession.id;
                         
@@ -2115,7 +2115,7 @@
                             text: 'El coordinador compartirá el contenido de la capacitación. Una vez finalizado, podrás realizar el Post-Test.',
                             confirmButtonText: 'Entendido'
                         }).then(() => {
-                            // Mostrar botón para acceder al posttest
+                            // Mostrar botón para acceder al postest
                             showPostestButton();
                         });
                     } else {
@@ -2175,7 +2175,7 @@
                     didOpen: () => Swal.showLoading()
                 });
                 
-                // Obtener preguntas de posttest
+                // Obtener preguntas de postest
                 const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -2188,7 +2188,7 @@
                 const questionsData = await questionsResponse.json();
                 
                 if (!questionsData.success || !questionsData.records) {
-                    throw new Error('No se pudieron obtener las preguntas del posttest');
+                    throw new Error('No se pudieron obtener las preguntas del postest');
                 }
                 
                 console.log('🎓 Total de preguntas en Airtable:', questionsData.records.length);
@@ -2205,7 +2205,7 @@
                     console.log(`📝 Tipo: "${tipoExamen}"`);
                     
                     // Si contiene "pre" = es pretest, lo descartamos
-                    // Si NO contiene "pre" = es posttest
+                    // Si NO contiene "pre" = es postest
                     const esPosttest = !tipoExamen.includes('pre') && tipoExamen.length > 0;
                     
                     if (esPosttest) {
@@ -2215,34 +2215,34 @@
                     return esPosttest;
                 });
                 
-                console.log('🎓 Preguntas de posttest encontradas:', allPosttestQuestions.length);
+                console.log('🎓 Preguntas de postest encontradas:', allPosttestQuestions.length);
                 
                 if (allPosttestQuestions.length === 0) {
                     console.error('❌ NO HAY PREGUNTAS DE POSTTEST EN AIRTABLE');
-                    throw new Error('No hay preguntas de posttest configuradas');
+                    throw new Error('No hay preguntas de postest configuradas');
                 }
                 
-                const posttestQuestions = allPosttestQuestions;
-                console.log(`✅ Usando ${posttestQuestions.length} preguntas de posttest`);
+                const postestQuestions = allPosttestQuestions;
+                console.log(`✅ Usando ${postestQuestions.length} preguntas de postest`);
                 
                 // Limpiar respuestas anteriores
-                posttestAnswers = {};
+                postestAnswers = {};
                 
-                // Mostrar interfaz de posttest
-                displayPosttestQuestions(posttestQuestions);
+                // Mostrar interfaz de postest
+                displayPosttestQuestions(postestQuestions);
                 
-                // Ocultar modal y mostrar sección de posttest
+                // Ocultar modal y mostrar sección de postest
                 Swal.close();
-                document.getElementById('posttestSection').style.display = 'block';
+                document.getElementById('postestSection').style.display = 'block';
                 document.getElementById('accessSection').style.display = 'none';
                 document.getElementById('pretestSection').style.display = 'none';
                 
             } catch (error) {
-                console.error('❌ Error cargando posttest:', error);
+                console.error('❌ Error cargando postest:', error);
                 Swal.fire({
                     icon: 'error',
                     title: 'Error',
-                    text: 'No se pudo cargar el posttest: ' + error.message
+                    text: 'No se pudo cargar el postest: ' + error.message
                 }).then(() => {
                     showPostestButton();
                 });
@@ -2250,13 +2250,13 @@
         }
         
         function displayPosttestQuestions(questions) {
-            const container = document.getElementById('posttestQuestionsContainer');
+            const container = document.getElementById('postestQuestionsContainer');
             container.innerHTML = '';
             
             if (questions.length === 0) {
                 container.innerHTML = `
                     <div class="alert alert-warning">
-                        <strong>⚠️ No hay preguntas de posttest configuradas</strong>
+                        <strong>⚠️ No hay preguntas de postest configuradas</strong>
                     </div>
                 `;
                 return;
@@ -2277,9 +2277,9 @@
                     optionsHTML += `
                         <label class="option">
                             <input type="radio" 
-                                   name="posttest-q${questionId}" 
+                                   name="postest-q${questionId}" 
                                    value="${optionLetters[idx]}"
-                                   onchange="posttestAnswers['${questionId}'] = this.value"
+                                   onchange="postestAnswers['${questionId}'] = this.value"
                             >
                             <span class="option-letter">${optionLetters[idx]}</span>
                             <span class="option-text">${option}</span>
@@ -2302,8 +2302,8 @@
         }
         
         async function submitPosttest() {
-            const answers = Object.keys(posttestAnswers).length;
-            const questionCards = document.querySelectorAll('#posttestSection .question-card');
+            const answers = Object.keys(postestAnswers).length;
+            const questionCards = document.querySelectorAll('#postestSection .question-card');
             const totalQuestions = questionCards.length;
             
             // Validar que se hayan respondido todas las preguntas
@@ -2333,9 +2333,9 @@
                     didOpen: () => Swal.showLoading()
                 });
                 
-                console.log('📝 Iniciando proceso de guardado del posttest...');
+                console.log('📝 Iniciando proceso de guardado del postest...');
                 console.log('👤 Participante:', currentParticipantData);
-                console.log('📋 Respuestas:', posttestAnswers);
+                console.log('📋 Respuestas:', postestAnswers);
                 
                 // ==========================================
                 // PASO 1: Obtener preguntas para calcular score
@@ -2357,14 +2357,14 @@
                 }
                 
                 // ==========================================
-                // PASO 2: Calcular el score del posttest
+                // PASO 2: Calcular el score del postest
                 // ==========================================
                 
                 let correctAnswers = 0;
                 let totalAnswered = 0;
                 const answersToSave = [];
                 
-                for (const [questionId, userAnswer] of Object.entries(posttestAnswers)) {
+                for (const [questionId, userAnswer] of Object.entries(postestAnswers)) {
                     const question = questionsData.records.find(q => q.id === questionId);
                     
                     if (question) {
@@ -2392,11 +2392,11 @@
                     }
                 }
                 
-                const posttestScore = totalAnswered > 0 
+                const postestScore = totalAnswered > 0 
                     ? Math.round((correctAnswers / totalAnswered) * 100) 
                     : 0;
                 
-                console.log(`📊 Score calculado: ${correctAnswers}/${totalAnswered} = ${posttestScore}%`);
+                console.log(`📊 Score calculado: ${correctAnswers}/${totalAnswered} = ${postestScore}%`);
                 
                 // ==========================================
                 // PASO 3: Actualizar registro de participación
@@ -2422,7 +2422,7 @@
                         path: `/Participaciones/${currentParticipationId}`,
                         body: {
                             fields: {
-                                'Posttest Score': posttestScore,
+                                'Posttest Score': postestScore,
                                 'Fecha Posttest': fechaFormato,
                                 'Hora Posttest': fechaHoraCompleta,
                                 'Completado Posttest': true,
@@ -2484,13 +2484,13 @@
                 let scoreIcon = 'success';
                 let congratsMessage = '¡Felicidades!';
                 
-                if (posttestScore >= 80) {
+                if (postestScore >= 80) {
                     scoreMessage = '¡Excelente desempeño!';
                     congratsMessage = '¡Demostraste un excelente dominio del tema!';
-                } else if (posttestScore >= 60) {
+                } else if (postestScore >= 60) {
                     scoreMessage = 'Buen desempeño';
                     congratsMessage = '¡Aplicaste muy bien lo aprendido!';
-                } else if (posttestScore >= 40) {
+                } else if (postestScore >= 40) {
                     scoreMessage = 'Desempeño regular';
                     congratsMessage = 'Continúa practicando para mejorar';
                 } else {
@@ -2510,7 +2510,7 @@
                                         border-radius: 12px; 
                                         margin-bottom: 1rem;">
                                 <p style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Tu calificación en Post-Test</p>
-                                <p style="margin: 0.5rem 0; font-size: 2.5rem; font-weight: bold;">${posttestScore}%</p>
+                                <p style="margin: 0.5rem 0; font-size: 2.5rem; font-weight: bold;">${postestScore}%</p>
                                 <p style="margin: 0; font-size: 0.85rem;">${correctAnswers} de ${totalAnswered} correctas</p>
                             </div>
                             
@@ -2529,15 +2529,15 @@
                     cancelTraining();
                 });
                 
-                console.log('✅ Proceso de posttest completado exitosamente');
+                console.log('✅ Proceso de postest completado exitosamente');
                 
             } catch (error) {
-                console.error('❌ Error enviando posttest:', error);
+                console.error('❌ Error enviando postest:', error);
                 Swal.close();
                 Swal.fire({
                     icon: 'error',
                     title: 'Error',
-                    text: 'No se pudo enviar el posttest: ' + error.message,
+                    text: 'No se pudo enviar el postest: ' + error.message,
                     footer: '<small>Revisa la consola (F12) para más detalles</small>'
                 });
             }
@@ -2549,7 +2549,7 @@
             currentTrainingRecord = null;
             currentParticipantData = {};
             pretestAnswers = {};
-            posttestAnswers = {};
+            postestAnswers = {};
             currentParticipationId = null;
             currentSessionId = null;
             postestCode = null;
@@ -2562,7 +2562,7 @@
             // Mostrar/ocultar secciones
             document.getElementById('accessSection').style.display = 'block';
             document.getElementById('pretestSection').style.display = 'none';
-            document.getElementById('posttestSection').style.display = 'none';
+            document.getElementById('postestSection').style.display = 'none';
         }
 
 
@@ -2741,7 +2741,7 @@
         
         function addQuestion(type) {
             const container = document.getElementById(`${type}Questions`);
-            const currentCount = type === 'pretest' ? pretestQuestionCount : posttestQuestionCount;
+            const currentCount = type === 'pretest' ? pretestQuestionCount : postestQuestionCount;
             
             if (currentCount >= MAX_QUESTIONS) {
                 Swal.fire({
@@ -2756,7 +2756,7 @@
             if (type === 'pretest') {
                 pretestQuestionCount++;
             } else {
-                posttestQuestionCount++;
+                postestQuestionCount++;
             }
             
             const questionNumber = currentCount + 1;
@@ -2844,7 +2844,7 @@
                             if (type === 'pretest') {
                                 pretestQuestionCount--;
                             } else {
-                                posttestQuestionCount--;
+                                postestQuestionCount--;
                             }
                             
                             renumberQuestions(type);
@@ -2871,7 +2871,7 @@
 
         function updateQuestionCounter(type) {
             const container = document.getElementById(`${type}Questions`);
-            const count = type === 'pretest' ? pretestQuestionCount : posttestQuestionCount;
+            const count = type === 'pretest' ? pretestQuestionCount : postestQuestionCount;
             
             let counter = container.parentElement.querySelector('.question-counter');
             if (!counter) {
@@ -2979,7 +2979,7 @@ function getSelectedStaff() {
 
     // NUEVO: Recopilar preguntas del pretest y postest
     const pretestQuestions = collectQuestions('pretest');
-    const posttestQuestions = collectQuestions('posttest');
+    const postestQuestions = collectQuestions('postest');
     
     // Validar que hay al menos algunas preguntas
     if (!pretestQuestions || pretestQuestions.length === 0) {
@@ -2993,14 +2993,14 @@ function getSelectedStaff() {
         return;
     }
 
-    if (!posttestQuestions || posttestQuestions.length === 0) {
+    if (!postestQuestions || postestQuestions.length === 0) {
         Swal.fire({
             icon: 'warning',
             title: 'Sin Preguntas de Postest',
             text: 'Debes agregar al menos una pregunta al post-test',
             confirmButtonText: 'Entendido'
         });
-        document.getElementById('posttestQuestions').scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('postestQuestions').scrollIntoView({ behavior: 'smooth' });
         return;
     }
 
@@ -3018,7 +3018,7 @@ function getSelectedStaff() {
         status: 'active',
         createdAtISO,
         pretestQuestions: pretestQuestions,
-        posttestQuestions: posttestQuestions
+        postestQuestions: postestQuestions
     };
 
     // Mostrar indicador de carga
@@ -3053,10 +3053,10 @@ function getSelectedStaff() {
     );
 
     // PASO 3: Guardar preguntas del postest
-    const posttestSaved = await saveQuestionsToAirtable(
-        posttestQuestions, 
+    const postestSaved = await saveQuestionsToAirtable(
+        postestQuestions, 
         trainingResult.id, 
-        'posttest'
+        'postest'
     );
 
     // Respaldo local
@@ -3075,9 +3075,9 @@ function getSelectedStaff() {
     
     // Limpiar preguntas
     document.getElementById('pretestQuestions').innerHTML = '';
-    document.getElementById('posttestQuestions').innerHTML = '';
+    document.getElementById('postestQuestions').innerHTML = '';
     pretestQuestionCount = 0;
-    posttestQuestionCount = 0;
+    postestQuestionCount = 0;
     document.querySelectorAll('.question-counter').forEach(c => c.remove());
 
     // Mensaje final
@@ -3093,7 +3093,7 @@ function getSelectedStaff() {
                 <p style="font-size: 0.85em;">
                     ✅ Capacitación guardada en Airtable<br>
                     ${pretestSaved ? '✅' : '⚠️'} ${pretestQuestions.length} preguntas de pretest ${pretestSaved ? 'guardadas' : 'con error'}<br>
-                    ${posttestSaved ? '✅' : '⚠️'} ${posttestQuestions.length} preguntas de postest ${posttestSaved ? 'guardadas' : 'con error'}
+                    ${postestSaved ? '✅' : '⚠️'} ${postestQuestions.length} preguntas de postest ${postestSaved ? 'guardadas' : 'con error'}
                 </p>
             </div>
         `,
@@ -3312,7 +3312,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         }
 
         function resetForm() {
-            if (pretestQuestionCount > 0 || posttestQuestionCount > 0) {
+            if (pretestQuestionCount > 0 || postestQuestionCount > 0) {
                 Swal.fire({
                     title: '¿Limpiar Formulario?',
                     text: 'Se perderán todas las preguntas',
@@ -3333,9 +3333,9 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         function performReset() {
             document.getElementById('trainingForm').reset();
             document.getElementById('pretestQuestions').innerHTML = '';
-            document.getElementById('posttestQuestions').innerHTML = '';
+            document.getElementById('postestQuestions').innerHTML = '';
             pretestQuestionCount = 0;
-            posttestQuestionCount = 0;
+            postestQuestionCount = 0;
             document.querySelectorAll('.question-counter').forEach(c => c.remove());
             
             Swal.fire({
@@ -3984,14 +3984,14 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
 <!-- ═════════════════════════════════════════════════════════════════
      MODAL DE LINK POSTTEST - PRETEST → POSTTEST
-     Modal que muestra QR y link permanente para posttest
+     Modal que muestra QR y link permanente para postest
      ═════════════════════════════════════════════════════════════════ -->
 
 <div id="postestLinkModal" class="modal-overlay" style="display: none;">
-  <div class="modal-content posttest-modal" style="max-width: 600px;">
+  <div class="modal-content postest-modal" style="max-width: 600px;">
     <button class="close-btn" onclick="closePostestLinkModal()">✕</button>
     
-    <div class="posttest-modal-header">
+    <div class="postest-modal-header">
       <i class="fas fa-check-circle" style="font-size: 3rem; color: #28a745; margin-bottom: 1rem;"></i>
       <h2>¡Pretest Completado!</h2>
       <p style="color: #666; margin-top: 0.5rem;">
@@ -3999,9 +3999,9 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
       </p>
     </div>
 
-    <div class="posttest-modal-body">
+    <div class="postest-modal-body">
       <!-- Sección del QR -->
-      <div class="posttest-qr-section">
+      <div class="postest-qr-section">
         <h3 style="color: #667eea; margin-bottom: 1rem; text-align: center;">
           <i class="fas fa-qrcode"></i> Código para Posttest
         </h3>
@@ -4034,7 +4034,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
       </div>
 
       <!-- Sección del Link -->
-      <div class="posttest-link-section">
+      <div class="postest-link-section">
         <h3 style="color: #667eea; margin-bottom: 1rem;">
           <i class="fas fa-link"></i> Link Permanente
         </h3>
@@ -4097,8 +4097,8 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         <ul style="color: #558b2f; font-size: 0.9rem; margin: 0.5rem 0 0 1.5rem; padding: 0;">
           <li>Este link es único para ti y permanecerá válido durante toda la capacitación</li>
           <li>Guarda el link o escanea el QR para usarlo después de la capacitación</li>
-          <li>Podrás responder el posttest desde cualquier dispositivo usando este código</li>
-          <li>Solo necesitarás este código para acceder al posttest</li>
+          <li>Podrás responder el postest desde cualquier dispositivo usando este código</li>
+          <li>Solo necesitarás este código para acceder al postest</li>
         </ul>
       </div>
 
@@ -4125,7 +4125,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
       </div>
     </div>
 
-    <div class="posttest-modal-footer" style="
+    <div class="postest-modal-footer" style="
       display: flex;
       gap: 1rem;
       margin-top: 2rem;
@@ -4163,7 +4163,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
 <!-- CSS para el Modal Posttest -->
 <style>
-  .posttest-modal {
+  .postest-modal {
     background: white;
     border-radius: 16px;
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
@@ -4173,27 +4173,27 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
     position: relative;
   }
 
-  .posttest-modal-header {
+  .postest-modal-header {
     text-align: center;
     margin-bottom: 2rem;
   }
 
-  .posttest-modal-header h2 {
+  .postest-modal-header h2 {
     color: #333;
     font-size: 1.8rem;
     margin: 1rem 0 0.5rem 0;
   }
 
-  .posttest-qr-section {
+  .postest-qr-section {
     text-align: center;
     margin-bottom: 2rem;
   }
 
-  .posttest-link-section {
+  .postest-link-section {
     margin: 2rem 0;
   }
 
-  .posttest-link-section h3 {
+  .postest-link-section h3 {
     margin-bottom: 1rem;
   }
 
@@ -4233,12 +4233,12 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
   /* Responsive */
   @media (max-width: 600px) {
-    .posttest-modal {
+    .postest-modal {
       padding: 1.5rem;
       margin: 0 1rem;
     }
 
-    .posttest-modal-header h2 {
+    .postest-modal-header h2 {
       font-size: 1.5rem;
     }
 
@@ -4248,11 +4248,11 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
       margin: 0 auto 1rem !important;
     }
 
-    .posttest-modal-footer {
+    .postest-modal-footer {
       flex-direction: column;
     }
 
-    .posttest-modal-footer button {
+    .postest-modal-footer button {
       width: 100% !important;
     }
   }
