@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico - Sistema de Capacitaciones</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .results {
+            margin-top: 30px;
+        }
+        
+        .section {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #667eea;
+        }
+        
+        .section h2 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+        
+        .item {
+            background: white;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+        }
+        
+        .item-header {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .item-details {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-right: 8px;
+            margin-bottom: 5px;
+        }
+        
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .badge-info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+        }
+        
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .code {
+            background: #f1f3f5;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+        
+        pre {
+            background: #f1f3f5;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 12px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Diagnóstico del Sistema</h1>
+        <p class="subtitle">Herramienta para verificar la configuración de Airtable</p>
+        
+        <div>
+            <button onclick="runFullDiagnostic()">🚀 Ejecutar Diagnóstico Completo</button>
+            <button onclick="checkSpecificCodes()">🎯 Verificar Códigos D34SXS y 89YG0W</button>
+            <button onclick="clearResults()">🗑️ Limpiar Resultados</button>
+        </div>
+        
+        <div id="results" class="results"></div>
+    </div>
+
+    <script>
+        let diagnosticData = {
+            sesiones: [],
+            capacitaciones: [],
+            preguntas: []
+        };
+
+        async function airtableRequest(method, endpoint, data = null) {
+            try {
+                const response = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        method: method,
+                        path: endpoint,
+                        body: data
+                    })
+                });
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `Error ${response.status}`);
+                }
+                
+                return await response.json();
+            } catch (error) {
+                console.error('Error en petición Airtable:', error);
+                throw error;
+            }
+        }
+
+        async function runFullDiagnostic() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">⏳ Cargando datos de Airtable...</div>';
+            
+            try {
+                // 1. Cargar sesiones
+                resultsDiv.innerHTML += '<div class="loading">📋 Cargando sesiones...</div>';
+                const sessionResponse = await airtableRequest('GET', '/Sesiones');
+                diagnosticData.sesiones = sessionResponse.records || [];
+                
+                // 2. Cargar capacitaciones
+                resultsDiv.innerHTML += '<div class="loading">🎓 Cargando capacitaciones...</div>';
+                const trainingResponse = await airtableRequest('GET', '/Capacitaciones');
+                diagnosticData.capacitaciones = trainingResponse.records || [];
+                
+                // 3. Cargar preguntas
+                resultsDiv.innerHTML += '<div class="loading">❓ Cargando preguntas...</div>';
+                const questionResponse = await airtableRequest('GET', '/Preguntas');
+                diagnosticData.preguntas = questionResponse.records || [];
+                
+                // Mostrar resultados
+                displayDiagnosticResults();
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="error">
+                        <strong>❌ Error:</strong> ${error.message}
+                        <br><br>
+                        Verifica que las variables de entorno estén configuradas en Netlify:
+                        <br>• AIRTABLE_API_KEY
+                        <br>• AIRTABLE_BASE_ID
+                    </div>
+                `;
+            }
+        }
+
+        function displayDiagnosticResults() {
+            const resultsDiv = document.getElementById('results');
+            let html = '';
+            
+            // Resumen general
+            html += `
+                <div class="section">
+                    <h2>📊 Resumen General</h2>
+                    <div class="item">
+                        <span class="badge badge-info">${diagnosticData.sesiones.length} Sesiones</span>
+                        <span class="badge badge-info">${diagnosticData.capacitaciones.length} Capacitaciones</span>
+                        <span class="badge badge-info">${diagnosticData.preguntas.length} Preguntas</span>
+                    </div>
+                </div>
+            `;
+            
+            // Análisis de sesiones
+            html += '<div class="section"><h2>📋 Análisis de Sesiones</h2>';
+            
+            diagnosticData.sesiones.forEach(session => {
+                const fields = session.fields;
+                const codigo = fields['Código Acceso'] || 'Sin código';
+                const activa = fields['Activa'] !== false;
+                const capacitacionIds = fields['Capacitaciones'] || fields['Capacitación'] || [];
+                
+                // Buscar capacitación vinculada
+                let capacitacionNombre = 'No vinculada';
+                let capacitacionId = null;
+                
+                if (capacitacionIds.length > 0) {
+                    capacitacionId = capacitacionIds[0];
+                    const capacitacion = diagnosticData.capacitaciones.find(c => c.id === capacitacionId);
+                    if (capacitacion) {
+                        capacitacionNombre = capacitacion.fields['Título'] || capacitacion.fields['name'] || 'Sin título';
+                    }
+                }
+                
+                // Contar preguntas para esta capacitación
+                const preguntasPretest = diagnosticData.preguntas.filter(p => {
+                    const pFields = p.fields;
+                    const tipo = (pFields['Tipo Examen'] || pFields['Tipo'] || '').toLowerCase();
+                    const capIds = pFields['Capacitación'] || pFields['Capacitaciones'] || [];
+                    return tipo.includes('pretest') && capIds.includes(capacitacionId);
+                }).length;
+                
+                const preguntasPosttest = diagnosticData.preguntas.filter(p => {
+                    const pFields = p.fields;
+                    const tipo = (pFields['Tipo Examen'] || pFields['Tipo'] || '').toLowerCase();
+                    const capIds = pFields['Capacitación'] || pFields['Capacitaciones'] || [];
+                    return tipo.includes('posttest') && capIds.includes(capacitacionId);
+                }).length;
+                
+                const hasIssues = !capacitacionId || preguntasPretest === 0;
+                
+                html += `
+                    <div class="item">
+                        <div class="item-header">
+                            ${activa ? '✅' : '❌'} Código: <span class="code">${codigo}</span>
+                            ${hasIssues ? '<span class="badge badge-danger">⚠️ Problemas detectados</span>' : '<span class="badge badge-success">✓ OK</span>'}
+                        </div>
+                        <div class="item-details">
+                            <strong>Capacitación:</strong> ${capacitacionNombre}<br>
+                            <strong>ID Capacitación:</strong> <span class="code">${capacitacionId || 'N/A'}</span><br>
+                            <strong>Preguntas Pretest:</strong> ${preguntasPretest} ${preguntasPretest === 0 ? '⚠️' : '✅'}<br>
+                            <strong>Preguntas Posttest:</strong> ${preguntasPosttest} ${preguntasPosttest === 0 ? '⚠️' : '✅'}<br>
+                            <strong>Estado:</strong> ${activa ? 'Activa ✅' : 'Inactiva ❌'}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            // Análisis de capacitaciones
+            html += '<div class="section"><h2>🎓 Análisis de Capacitaciones</h2>';
+            
+            diagnosticData.capacitaciones.forEach(cap => {
+                const fields = cap.fields;
+                const titulo = fields['Título'] || fields['name'] || 'Sin título';
+                
+                // Contar preguntas
+                const preguntasPretest = diagnosticData.preguntas.filter(p => {
+                    const pFields = p.fields;
+                    const tipo = (pFields['Tipo Examen'] || pFields['Tipo'] || '').toLowerCase();
+                    const capIds = pFields['Capacitación'] || pFields['Capacitaciones'] || [];
+                    return tipo.includes('pretest') && capIds.includes(cap.id);
+                }).length;
+                
+                const preguntasPosttest = diagnosticData.preguntas.filter(p => {
+                    const pFields = p.fields;
+                    const tipo = (pFields['Tipo Examen'] || pFields['Tipo'] || '').toLowerCase();
+                    const capIds = pFields['Capacitación'] || pFields['Capacitaciones'] || [];
+                    return tipo.includes('posttest') && capIds.includes(cap.id);
+                }).length;
+                
+                html += `
+                    <div class="item">
+                        <div class="item-header">${titulo}</div>
+                        <div class="item-details">
+                            <strong>ID:</strong> <span class="code">${cap.id}</span><br>
+                            <strong>Preguntas Pretest:</strong> ${preguntasPretest}<br>
+                            <strong>Preguntas Posttest:</strong> ${preguntasPosttest}<br>
+                            ${(preguntasPretest === 0 || preguntasPosttest === 0) ? '<span class="badge badge-warning">⚠️ Faltan preguntas</span>' : '<span class="badge badge-success">✓ Completo</span>'}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            // Análisis de preguntas
+            html += '<div class="section"><h2>❓ Análisis de Preguntas</h2>';
+            html += `<p style="color: #666; margin-bottom: 15px;">Total de preguntas: ${diagnosticData.preguntas.length}</p>`;
+            
+            // Agrupar por capacitación
+            const preguntasPorCap = {};
+            
+            diagnosticData.preguntas.forEach(p => {
+                const fields = p.fields;
+                const capIds = fields['Capacitación'] || fields['Capacitaciones'] || [];
+                const tipo = fields['Tipo Examen'] || fields['Tipo'] || 'Sin tipo';
+                const pregunta = fields['Pregunta'] || fields['pregunta'] || 'Sin texto';
+                
+                capIds.forEach(capId => {
+                    if (!preguntasPorCap[capId]) {
+                        preguntasPorCap[capId] = {
+                            pretest: [],
+                            posttest: [],
+                            otros: []
+                        };
+                    }
+                    
+                    const tipoLower = tipo.toLowerCase();
+                    if (tipoLower.includes('pretest')) {
+                        preguntasPorCap[capId].pretest.push(pregunta.substring(0, 80) + '...');
+                    } else if (tipoLower.includes('posttest') || tipoLower.includes('post-test')) {
+                        preguntasPorCap[capId].posttest.push(pregunta.substring(0, 80) + '...');
+                    } else {
+                        preguntasPorCap[capId].otros.push(`[${tipo}] ${pregunta.substring(0, 60)}...`);
+                    }
+                });
+            });
+            
+            Object.keys(preguntasPorCap).forEach(capId => {
+                const cap = diagnosticData.capacitaciones.find(c => c.id === capId);
+                const capNombre = cap ? (cap.fields['Título'] || cap.fields['name'] || 'Sin título') : 'Capacitación no encontrada';
+                const data = preguntasPorCap[capId];
+                
+                html += `
+                    <div class="item">
+                        <div class="item-header">
+                            ${capNombre}
+                            <span class="badge badge-info">${data.pretest.length} Pretest</span>
+                            <span class="badge badge-info">${data.posttest.length} Posttest</span>
+                            ${data.otros.length > 0 ? `<span class="badge badge-warning">${data.otros.length} Sin clasificar</span>` : ''}
+                        </div>
+                        <div class="item-details">
+                            <strong>ID Capacitación:</strong> <span class="code">${capId}</span><br><br>
+                            
+                            ${data.pretest.length > 0 ? `
+                                <strong>Pretest (${data.pretest.length}):</strong><br>
+                                ${data.pretest.map((p, i) => `${i + 1}. ${p}`).join('<br>')}
+                                <br><br>
+                            ` : ''}
+                            
+                            ${data.posttest.length > 0 ? `
+                                <strong>Posttest (${data.posttest.length}):</strong><br>
+                                ${data.posttest.map((p, i) => `${i + 1}. ${p}`).join('<br>')}
+                                <br><br>
+                            ` : ''}
+                            
+                            ${data.otros.length > 0 ? `
+                                <strong>⚠️ Sin clasificar correctamente (${data.otros.length}):</strong><br>
+                                ${data.otros.map((p, i) => `${i + 1}. ${p}`).join('<br>')}
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        async function checkSpecificCodes() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="loading">🔍 Verificando códigos D34SXS y 89YG0W...</div>';
+            
+            try {
+                if (diagnosticData.sesiones.length === 0) {
+                    await runFullDiagnostic();
+                }
+                
+                const code1 = 'D34SXS';
+                const code2 = '89YG0W';
+                
+                const session1 = diagnosticData.sesiones.find(s => (s.fields['Código Acceso'] || '').toUpperCase() === code1);
+                const session2 = diagnosticData.sesiones.find(s => (s.fields['Código Acceso'] || '').toUpperCase() === code2);
+                
+                let html = '<div class="section"><h2>🎯 Verificación Específica de Códigos</h2>';
+                
+                // Analizar D34SXS
+                if (session1) {
+                    const capIds1 = session1.fields['Capacitaciones'] || session1.fields['Capacitación'] || [];
+                    const cap1 = diagnosticData.capacitaciones.find(c => c.id === capIds1[0]);
+                    const preguntas1 = diagnosticData.preguntas.filter(p => {
+                        const capIds = p.fields['Capacitación'] || p.fields['Capacitaciones'] || [];
+                        const tipo = (p.fields['Tipo Examen'] || p.fields['Tipo'] || '').toLowerCase();
+                        return tipo.includes('pretest') && capIds.includes(capIds1[0]);
+                    });
+                    
+                    html += `
+                        <div class="item">
+                            <div class="item-header">
+                                <span class="code">D34SXS</span> - ${cap1 ? (cap1.fields['Título'] || cap1.fields['name']) : 'No encontrada'}
+                                ${preguntas1.length > 0 ? '<span class="badge badge-success">✓</span>' : '<span class="badge badge-danger">✗</span>'}
+                            </div>
+                            <div class="item-details">
+                                <strong>ID Capacitación:</strong> <span class="code">${capIds1[0] || 'N/A'}</span><br>
+                                <strong>Preguntas Pretest:</strong> ${preguntas1.length}<br><br>
+                                ${preguntas1.length > 0 ? `
+                                    <strong>Lista de preguntas:</strong><br>
+                                    ${preguntas1.map((p, i) => `${i + 1}. ${p.fields['Pregunta'] || 'Sin texto'}`).join('<br>')}
+                                ` : '<span class="badge badge-danger">⚠️ NO HAY PREGUNTAS VINCULADAS</span>'}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += `<div class="error">❌ No se encontró sesión con código D34SXS</div>`;
+                }
+                
+                // Analizar 89YG0W
+                if (session2) {
+                    const capIds2 = session2.fields['Capacitaciones'] || session2.fields['Capacitación'] || [];
+                    const cap2 = diagnosticData.capacitaciones.find(c => c.id === capIds2[0]);
+                    const preguntas2 = diagnosticData.preguntas.filter(p => {
+                        const capIds = p.fields['Capacitación'] || p.fields['Capacitaciones'] || [];
+                        const tipo = (p.fields['Tipo Examen'] || p.fields['Tipo'] || '').toLowerCase();
+                        return tipo.includes('pretest') && capIds.includes(capIds2[0]);
+                    });
+                    
+                    html += `
+                        <div class="item">
+                            <div class="item-header">
+                                <span class="code">89YG0W</span> - ${cap2 ? (cap2.fields['Título'] || cap2.fields['name']) : 'No encontrada'}
+                                ${preguntas2.length > 0 ? '<span class="badge badge-success">✓</span>' : '<span class="badge badge-danger">✗</span>'}
+                            </div>
+                            <div class="item-details">
+                                <strong>ID Capacitación:</strong> <span class="code">${capIds2[0] || 'N/A'}</span><br>
+                                <strong>Preguntas Pretest:</strong> ${preguntas2.length}<br><br>
+                                ${preguntas2.length > 0 ? `
+                                    <strong>Lista de preguntas:</strong><br>
+                                    ${preguntas2.map((p, i) => `${i + 1}. ${p.fields['Pregunta'] || 'Sin texto'}`).join('<br>')}
+                                ` : '<span class="badge badge-danger">⚠️ NO HAY PREGUNTAS VINCULADAS</span>'}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    html += `<div class="error">❌ No se encontró sesión con código 89YG0W</div>`;
+                }
+                
+                html += '</div>';
+                
+                // Diagnóstico del problema
+                html += `
+                    <div class="section">
+                        <h2>🔧 Diagnóstico del Problema</h2>
+                        <div class="item">
+                            <div class="item-details">
+                                <p><strong>Problema detectado:</strong></p>
+                                <p>Si el código <span class="code">89YG0W</span> muestra las preguntas de <span class="code">D34SXS</span>, significa que:</p>
+                                <ul style="margin-left: 20px; margin-top: 10px; line-height: 1.8;">
+                                    <li>✅ Las preguntas en Airtable están vinculadas a la capacitación incorrecta</li>
+                                    <li>✅ Necesitas ir a la tabla <strong>Preguntas</strong> en Airtable</li>
+                                    <li>✅ Verificar que cada pregunta esté vinculada a su capacitación correcta</li>
+                                    <li>✅ El campo de vinculación se llama <strong>"Capacitación"</strong> o <strong>"Capacitaciones"</strong></li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                resultsDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultsDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            diagnosticData = {
+                sesiones: [],
+                capacitaciones: [],
+                preguntas: []
+            };
+        }
+    </script>
+</body>
+</html>
