@@ -2175,7 +2175,16 @@
                     didOpen: () => Swal.showLoading()
                 });
                 
-                // Obtener preguntas de postest
+                // ⚠️ IMPORTANTE: Verificar que tengamos el ID de capacitación guardado
+                if (!currentTrainingRecord || !currentTrainingRecord.id) {
+                    throw new Error('No se encontró la capacitación actual. Por favor vuelve a ingresar el código de acceso.');
+                }
+                
+                const trainingId = currentTrainingRecord.id;
+                console.log('🎓 ID de Capacitación para Postest:', trainingId);
+                console.log('📋 Registro de capacitación:', currentTrainingRecord);
+                
+                // Obtener TODAS las preguntas
                 const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -2191,39 +2200,65 @@
                     throw new Error('No se pudieron obtener las preguntas del postest');
                 }
                 
-                console.log('🎓 Total de preguntas en Airtable:', questionsData.records.length);
+                console.log('📚 Total de preguntas en Airtable:', questionsData.records.length);
                 
-                // Log de TODOS los tipos disponibles
-                const todosLostipos = questionsData.records.map(q => q.fields['Tipo']);
-                console.log('Todos los tipos en Airtable:', todosLostipos);
+                // ═══════════════════════════════════════════════════════════
+                // FILTRO CORRECTO: Por tipo Y por capacitación
+                // ═══════════════════════════════════════════════════════════
                 
-                // BÚSQUEDA ULTRA FLEXIBLE: Solo buscar por "Pretest" o que NO sea "Pretest"
-                // Es decir: si no es Pretest, entonces es Postest/Postest
-                const allPostestQuestions = questionsData.records.filter(q => {
-                    // ⚠️ CAMPO CORRECTO EN AIRTABLE: 'Tipo' (no 'Tipo Examen')
-                    const tipoExamen = (q.fields['Tipo'] || '').trim().toLowerCase();
+                const postestQuestions = questionsData.records.filter(q => {
+                    const fields = q.fields;
                     
-                    console.log(`📝 Tipo: "${tipoExamen}"`);
+                    // 1. Obtener el tipo de examen
+                    const tipoExamen = (fields['Tipo Examen'] || fields['Tipo'] || '').toLowerCase().trim();
                     
-                    // Si contiene "pre" = es pretest, lo descartamos
-                    // Si NO contiene "pre" = es postest
-                    const esPosttest = !tipoExamen.includes('pre') && tipoExamen.length > 0;
+                    // 2. Verificar que sea postest
+                    const esPosttest = tipoExamen === 'postest' || 
+                                      tipoExamen === 'posttest' || 
+                                      tipoExamen === 'post-test';
                     
-                    if (esPosttest) {
-                        console.log(`✅ ACEPTADO COMO POSTEST: "${tipoExamen}"`);
+                    // 3. Obtener el ID de capacitación vinculado
+                    let capacitacionId = null;
+                    
+                    if (fields['Capacitación'] && Array.isArray(fields['Capacitación'])) {
+                        capacitacionId = fields['Capacitación'][0];
+                    } else if (fields['Capacitaciones'] && Array.isArray(fields['Capacitaciones'])) {
+                        capacitacionId = fields['Capacitaciones'][0];
                     }
                     
-                    return esPosttest;
+                    // 4. Verificar que coincida con la capacitación actual
+                    const perteneceACapacitacion = capacitacionId === trainingId;
+                    
+                    // Log de debug
+                    if (esPosttest) {
+                        console.log(`📝 Pregunta Postest encontrada:`);
+                        console.log(`   Texto: "${fields['Pregunta']?.substring(0, 50)}..."`);
+                        console.log(`   Tipo: "${tipoExamen}"`);
+                        console.log(`   Cap ID: "${capacitacionId}"`);
+                        console.log(`   Match: ${perteneceACapacitacion ? '✅' : '❌'} (buscando: ${trainingId})`);
+                    }
+                    
+                    // RETORNAR TRUE solo si cumple AMBAS condiciones
+                    return esPosttest && perteneceACapacitacion;
                 });
                 
-                console.log('🎓 Preguntas de postest encontradas:', allPostestQuestions.length);
+                console.log('✅ Preguntas de postest filtradas:', postestQuestions.length);
+                console.log('📋 IDs de preguntas:', postestQuestions.map(p => p.id));
                 
-                if (allPostestQuestions.length === 0) {
-                    console.error('❌ NO HAY PREGUNTAS DE POSTEST EN AIRTABLE');
-                    throw new Error('No hay preguntas de postest configuradas');
+                // Verificar que haya preguntas
+                if (postestQuestions.length === 0) {
+                    console.error('❌ NO HAY PREGUNTAS DE POSTEST PARA ESTA CAPACITACIÓN');
+                    console.error('   Capacitación ID:', trainingId);
+                    console.error('   Capacitación Nombre:', currentTrainingRecord.fields['Título'] || currentTrainingRecord.fields['name']);
+                    
+                    throw new Error(
+                        `No hay preguntas de postest configuradas para "${currentTrainingRecord.fields['Título'] || 'esta capacitación'}".\n\n` +
+                        `Verifica en Airtable que:\n` +
+                        `1. Existan preguntas con Tipo = "Postest"\n` +
+                        `2. Estén vinculadas a la capacitación correcta (ID: ${trainingId})`
+                    );
                 }
                 
-                const postestQuestions = allPostestQuestions;
                 console.log(`✅ Usando ${postestQuestions.length} preguntas de postest`);
                 
                 // Limpiar respuestas anteriores
