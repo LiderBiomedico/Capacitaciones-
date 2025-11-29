@@ -1990,10 +1990,8 @@
                         'Departamento': currentParticipantData.department,
                         'Sesión': [currentSession.id],
                         'Pretest Score': pretestScore,
-                        'Fecha Registro': fechaFormato,  // Solo fecha: 2025-11-20
-                        'Hora Registro': fechaHoraCompleta,  // ✅ CORREGIDO: Fecha y hora completa
-                        'Completado Pretest': true,
-                        'Completado Postest': false
+                        'Fecha de Inicio': fechaFormato,
+                        'Completado Pretest': true
                     }
                 };
                 
@@ -2477,9 +2475,8 @@
                         body: {
                             fields: {
                                 'Post-test Score': postestScore,
-                                'Fecha Postest': fechaFormato,
-                                'Hora Postest': fechaHoraCompleta,
-                                'Completado Postest': true,
+                                'Fecha Fin': fechaFormato,
+                                'Estado': 'Completado'
                                 'Estado': 'Completado'
                             }
                         }
