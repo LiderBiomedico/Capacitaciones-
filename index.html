@@ -3086,26 +3086,32 @@
         }
 
         function switchTab(tabName, event = null) {
-            document.querySelectorAll('.tab-content').forEach(tab => {
-                tab.classList.remove('active');
-            });
-            
-            document.querySelectorAll('.nav-tab').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            
-            const selectedTab = document.getElementById(tabName);
-            if (selectedTab) selectedTab.classList.add('active');
-            
-            // Si hay un evento, marcar el botón clickeado como activo
-            if (event && event.target) {
-                const navTab = event.target.closest('.nav-tab');
-                if (navTab) navTab.classList.add('active');
-            } else {
-                // Si no hay evento, buscar el botón correspondiente por data-tab
-                const navTab = document.querySelector(`[data-tab="${tabName}"]`);
-                if (navTab) navTab.classList.add('active');
-            }
+    // Mostrar/ocultar tabs
+    document.querySelectorAll('.tab-content').forEach(tab => {
+        tab.classList.remove('active');
+    });
+
+    document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.classList.remove('active');
+    });
+
+    const selectedTab = document.getElementById(tabName);
+    if (selectedTab) selectedTab.classList.add('active');
+
+    // Resolver evento (en handlers inline, a veces no se pasa como parámetro)
+    const resolvedEvent = event || (typeof window !== 'undefined' ? window.event : null);
+
+    // Marcar el botón activo
+    if (resolvedEvent && resolvedEvent.target) {
+        const navTab = resolvedEvent.target.closest('.nav-tab');
+        if (navTab) navTab.classList.add('active');
+    } else {
+        // Fallback: buscar botón por su onclick (no depende de data-tab)
+        const navTab = Array.from(document.querySelectorAll('.nav-tab'))
+            .find(btn => (btn.getAttribute('onclick') || '').includes(`switchTab('${tabName}'`));
+        if (navTab) navTab.classList.add('active');
+    }
+}
         }
 
         // ==================== FUNCIONES DE PREGUNTAS ====================
@@ -4135,14 +4141,19 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             document.getElementById('totalTrainings').textContent = allTrainings.length;
         }
         
-        // Cargar capacitaciones cuando se cambia a la pestaña "Gestionar"
-        const originalSwitchTab = switchTab;
-        window.switchTab = function(tabName) {
-            originalSwitchTab(tabName);
-            if (tabName === 'manage') {
-                loadTrainings();
-            }
-        };
+        // Cargar capacitaciones y reportes cuando se cambia de pestaña
+const originalSwitchTab = switchTab;
+window.switchTab = function(tabName, event = null) {
+    originalSwitchTab(tabName, event);
+
+    if (tabName === 'manage') {
+        loadTrainings();
+    }
+
+    if (tabName === 'reports') {
+        loadReportOptions();
+    }
+};
 
         // ==================== CHARTS ====================
         
