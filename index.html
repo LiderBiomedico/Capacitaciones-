@@ -959,6 +959,161 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* ═══════════════════════════════════════════════════════════════
+           ESTILOS PARA LA SECCIÓN DE REPORTES DE PARTICIPANTES
+           ═══════════════════════════════════════════════════════════════ */
+
+        /* Estilos para la tabla de participantes */
+        #participantsTable tbody tr {
+            border-bottom: 1px solid #e0e0e0;
+            transition: all 0.3s;
+        }
+
+        #participantsTable tbody tr:hover {
+            background: #f8f9ff;
+        }
+
+        #participantsTable tbody tr:nth-child(even) {
+            background: #f8f9fa;
+        }
+
+        #participantsTable tbody tr:nth-child(even):hover {
+            background: #f0f4ff;
+        }
+
+        .score-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .score-badge.excellent {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .score-badge.good {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .score-badge.average {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .score-badge.low {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .score-badge.pending {
+            background: #f5f5f5;
+            color: #9e9e9e;
+        }
+
+        .improvement-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.85rem;
+        }
+
+        .improvement-badge.positive {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .improvement-badge.negative {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .improvement-badge.neutral {
+            background: #f5f5f5;
+            color: #9e9e9e;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-badge.completed {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .status-badge.pretest-done {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .status-badge.pending {
+            background: #f5f5f5;
+            color: #9e9e9e;
+        }
+
+        /* Estilos para impresión */
+        @media print {
+            .header, .navigation, .footer, .btn, .form-group, #trainingActionsContainer {
+                display: none !important;
+            }
+            
+            .card {
+                box-shadow: none !important;
+                border: 1px solid #ddd !important;
+                page-break-inside: avoid;
+            }
+            
+            #reportContainer {
+                display: block !important;
+            }
+            
+            .stats-grid {
+                display: flex !important;
+                flex-wrap: wrap !important;
+            }
+            
+            .stat-card {
+                background: white !important;
+                color: #333 !important;
+                border: 1px solid #ddd !important;
+            }
+            
+            .stat-card h3, .stat-card p {
+                color: #333 !important;
+            }
+        }
+
+        /* Animación de carga para reportes */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        #reportContainer .card {
+            animation: fadeInUp 0.5s ease-out;
+        }
+
+        #reportContainer .card:nth-child(2) { animation-delay: 0.1s; }
+        #reportContainer .card:nth-child(3) { animation-delay: 0.2s; }
+        #reportContainer .card:nth-child(4) { animation-delay: 0.3s; }
     </style>
 </head>
 <body>
@@ -1372,11 +1527,178 @@
             </section>
 
             <section id="reports" class="tab-content">
-                <h2 class="section-title"><i class="fas fa-chart-bar"></i> Reportes</h2>
+                <h2 class="section-title"><i class="fas fa-chart-bar"></i> Reportes de Participantes</h2>
+                
+                <!-- Selector de Capacitación -->
                 <div class="card">
-                    <p style="text-align: center; padding: 2rem; color: #666;">
-                        Estadísticas y reportes de capacitaciones
-                    </p>
+                    <h3><i class="fas fa-graduation-cap"></i> Seleccionar Capacitación</h3>
+                    <p style="color: #666; margin-bottom: 1rem;">Selecciona una capacitación para ver el listado de participantes y sus calificaciones</p>
+                    
+                    <div class="form-group">
+                        <label><i class="fas fa-list"></i> Capacitación</label>
+                        <select id="reportTrainingSelect" onchange="loadTrainingReport()">
+                            <option value="">-- Selecciona una capacitación --</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Área del Reporte (oculta inicialmente) -->
+                <div id="reportContainer" style="display: none;">
+                    
+                    <!-- Información de la Capacitación -->
+                    <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
+                            <div>
+                                <h3 style="color: white; margin: 0;"><i class="fas fa-book"></i> <span id="reportTrainingTitle">-</span></h3>
+                                <p style="margin: 0.5rem 0 0 0; opacity: 0.9;"><span id="reportTrainingDescription">-</span></p>
+                                <p style="margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                                    <i class="fas fa-building"></i> <span id="reportTrainingDepartment">-</span> | 
+                                    <i class="fas fa-calendar"></i> <span id="reportTrainingDate">-</span>
+                                </p>
+                            </div>
+                            <div style="text-align: right;">
+                                <span id="reportTrainingStatus" class="training-status active" style="background: rgba(255,255,255,0.2); color: white;">Activa</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Estadísticas Generales -->
+                    <div class="stats-grid" style="margin-bottom: 1.5rem;">
+                        <div class="stat-card" style="background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);">
+                            <div class="stat-icon"><i class="fas fa-users"></i></div>
+                            <div class="stat-info">
+                                <h3 id="reportTotalParticipants">0</h3>
+                                <p>Participantes Totales</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card" style="background: linear-gradient(135deg, #28a745 0%, #1e7e34 100%);">
+                            <div class="stat-icon"><i class="fas fa-check-double"></i></div>
+                            <div class="stat-info">
+                                <h3 id="reportCompletedPostest">0</h3>
+                                <p>Completados</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card" style="background: linear-gradient(135deg, #ffc107 0%, #d39e00 100%);">
+                            <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                            <div class="stat-info">
+                                <h3 id="reportAvgImprovement">0%</h3>
+                                <p>Mejora Promedio</p>
+                            </div>
+                        </div>
+                        
+                        <div class="stat-card" style="background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);">
+                            <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+                            <div class="stat-info">
+                                <h3 id="reportAdherenceRate">0%</h3>
+                                <p>Tasa de Adherencia</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Promedios de Calificaciones -->
+                    <div class="card" style="margin-bottom: 1.5rem;">
+                        <h3><i class="fas fa-star"></i> Promedios de Calificaciones</h3>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 1rem;">
+                            <div style="text-align: center; padding: 1rem; background: #e3f2fd; border-radius: 8px;">
+                                <p style="margin: 0; color: #1976d2; font-size: 0.9rem;">Promedio Pretest</p>
+                                <p style="margin: 0.5rem 0 0 0; font-size: 2rem; font-weight: bold; color: #1565c0;" id="reportAvgPretest">0%</p>
+                            </div>
+                            <div style="text-align: center; padding: 1rem; background: #e8f5e9; border-radius: 8px;">
+                                <p style="margin: 0; color: #388e3c; font-size: 0.9rem;">Promedio Posttest</p>
+                                <p style="margin: 0.5rem 0 0 0; font-size: 2rem; font-weight: bold; color: #2e7d32;" id="reportAvgPostest">0%</p>
+                            </div>
+                            <div style="text-align: center; padding: 1rem; background: #fff3e0; border-radius: 8px;">
+                                <p style="margin: 0; color: #f57c00; font-size: 0.9rem;">Mejora Promedio</p>
+                                <p style="margin: 0.5rem 0 0 0; font-size: 2rem; font-weight: bold; color: #e65100;" id="reportAvgImprovementBig">+0%</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tabla de Participantes -->
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+                            <h3 style="margin: 0;"><i class="fas fa-list-alt"></i> Listado de Participantes</h3>
+                            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+                                <button class="btn btn-info" onclick="exportReportCSV()" style="margin: 0;">
+                                    <i class="fas fa-file-csv"></i> Exportar CSV
+                                </button>
+                                <button class="btn btn-success" onclick="exportReportExcel()" style="margin: 0;">
+                                    <i class="fas fa-file-excel"></i> Exportar Excel
+                                </button>
+                                <button class="btn btn-secondary" onclick="printReport()" style="margin: 0;">
+                                    <i class="fas fa-print"></i> Imprimir
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Filtros de la tabla -->
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                            <div class="form-group" style="margin: 0; flex: 1; min-width: 200px;">
+                                <input type="text" id="participantSearchInput" placeholder="🔍 Buscar por nombre..." onkeyup="filterParticipantsTable()">
+                            </div>
+                            <div class="form-group" style="margin: 0; min-width: 150px;">
+                                <select id="participantStatusFilter" onchange="filterParticipantsTable()">
+                                    <option value="">Todos los estados</option>
+                                    <option value="Completado">Completados</option>
+                                    <option value="Pretest Completado">Pretest Completado</option>
+                                    <option value="Pendiente">Pendientes</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Tabla -->
+                        <div style="overflow-x: auto;">
+                            <table id="participantsTable" style="width: 100%; border-collapse: collapse; min-width: 800px;">
+                                <thead>
+                                    <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                        <th style="padding: 0.75rem; text-align: left; border-radius: 8px 0 0 0;">#</th>
+                                        <th style="padding: 0.75rem; text-align: left;">Participante</th>
+                                        <th style="padding: 0.75rem; text-align: left;">Departamento</th>
+                                        <th style="padding: 0.75rem; text-align: center;">Pretest</th>
+                                        <th style="padding: 0.75rem; text-align: center;">Posttest</th>
+                                        <th style="padding: 0.75rem; text-align: center;">Mejora</th>
+                                        <th style="padding: 0.75rem; text-align: center; border-radius: 0 8px 0 0;">Estado</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="participantsTableBody">
+                                    <!-- Se llena dinámicamente -->
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <!-- Mensaje cuando no hay participantes -->
+                        <div id="noParticipantsMessage" style="display: none; text-align: center; padding: 2rem; color: #666;">
+                            <i class="fas fa-users" style="font-size: 3rem; opacity: 0.3; margin-bottom: 1rem;"></i>
+                            <p>No hay participantes registrados en esta capacitación</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Acciones de la Capacitación -->
+                    <div class="card" style="background: #f8f9fa; border: 2px dashed #dee2e6;">
+                        <h3><i class="fas fa-cog"></i> Acciones de la Capacitación</h3>
+                        <p style="color: #666; margin-bottom: 1.5rem;">
+                            Cuando una capacitación ha finalizado, puedes marcarla como completada para poder reutilizarla en el futuro.
+                        </p>
+                        
+                        <div id="trainingActionsContainer">
+                            <!-- Se llena dinámicamente según el estado de la capacitación -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Estado de carga -->
+                <div id="reportLoading" style="display: none; text-align: center; padding: 3rem;">
+                    <i class="fas fa-spinner fa-spin" style="font-size: 3rem; color: var(--primary);"></i>
+                    <p style="color: #666; margin-top: 1rem;">Cargando reporte...</p>
+                </div>
+                
+                <!-- Mensaje inicial -->
+                <div id="reportInitialMessage" class="card" style="text-align: center; padding: 3rem;">
+                    <i class="fas fa-chart-pie" style="font-size: 4rem; color: #dee2e6; margin-bottom: 1rem;"></i>
+                    <h3 style="color: #666;">Selecciona una Capacitación</h3>
+                    <p style="color: #999;">Elige una capacitación del listado para ver el reporte de participantes</p>
                 </div>
             </section>
         </main>
@@ -4029,6 +4351,650 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 window.open(window.currentQRData.url, '_blank');
             }
         }
+
+        // ═════════════════════════════════════════════════════════════════
+        // FUNCIONES DE REPORTES DE PARTICIPANTES
+        // ═════════════════════════════════════════════════════════════════
+
+        // Variables globales para reportes
+        let currentReportData = null;
+        let allParticipantsData = [];
+
+        // ═════════════════════════════════════════════════════════════════
+        // CARGAR OPCIONES DE CAPACITACIONES EN EL SELECT
+        // ═════════════════════════════════════════════════════════════════
+
+        async function loadReportOptions() {
+            try {
+                console.log('📊 Cargando opciones de reportes...');
+                
+                const select = document.getElementById('reportTrainingSelect');
+                if (!select) return;
+                
+                // Mostrar loading en el select
+                select.innerHTML = '<option value="">Cargando capacitaciones...</option>';
+                select.disabled = true;
+                
+                // Obtener todas las capacitaciones
+                const response = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: '/Capacitaciones'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success || !data.records) {
+                    throw new Error('No se pudieron obtener las capacitaciones');
+                }
+                
+                // Limpiar y llenar el select
+                select.innerHTML = '<option value="">-- Selecciona una capacitación --</option>';
+                
+                // Ordenar por fecha (más reciente primero)
+                const sortedTrainings = data.records.sort((a, b) => {
+                    const dateA = new Date(a.fields['Fecha Creación'] || 0);
+                    const dateB = new Date(b.fields['Fecha Creación'] || 0);
+                    return dateB - dateA;
+                });
+                
+                sortedTrainings.forEach(training => {
+                    const option = document.createElement('option');
+                    option.value = training.id;
+                    
+                    const titulo = training.fields['Título'] || 'Sin título';
+                    const departamento = training.fields['Departamento'] || '';
+                    const activa = training.fields['Activa'] !== false;
+                    const finalizada = training.fields['Finalizada'] === true;
+                    
+                    let status = '';
+                    if (finalizada) {
+                        status = ' [FINALIZADA]';
+                    } else if (!activa) {
+                        status = ' [INACTIVA]';
+                    }
+                    
+                    option.textContent = `${titulo}${departamento ? ' - ' + departamento : ''}${status}`;
+                    select.appendChild(option);
+                });
+                
+                select.disabled = false;
+                console.log(`✅ ${sortedTrainings.length} capacitaciones cargadas`);
+                
+            } catch (error) {
+                console.error('❌ Error cargando opciones de reportes:', error);
+                const select = document.getElementById('reportTrainingSelect');
+                if (select) {
+                    select.innerHTML = '<option value="">Error al cargar capacitaciones</option>';
+                    select.disabled = false;
+                }
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // CARGAR REPORTE DE UNA CAPACITACIÓN
+        // ═════════════════════════════════════════════════════════════════
+
+        async function loadTrainingReport() {
+            const trainingId = document.getElementById('reportTrainingSelect').value;
+            
+            // Elementos del DOM
+            const reportContainer = document.getElementById('reportContainer');
+            const reportLoading = document.getElementById('reportLoading');
+            const reportInitialMessage = document.getElementById('reportInitialMessage');
+            
+            if (!trainingId) {
+                // Mostrar mensaje inicial
+                reportContainer.style.display = 'none';
+                reportLoading.style.display = 'none';
+                reportInitialMessage.style.display = 'block';
+                currentReportData = null;
+                return;
+            }
+            
+            try {
+                // Mostrar loading
+                reportContainer.style.display = 'none';
+                reportInitialMessage.style.display = 'none';
+                reportLoading.style.display = 'block';
+                
+                console.log('📊 Cargando reporte para capacitación:', trainingId);
+                
+                // Llamar a la función serverless
+                const response = await fetch('/.netlify/functions/get-training-participants', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ trainingId })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Error al obtener el reporte');
+                }
+                
+                console.log('✅ Datos del reporte recibidos:', data);
+                
+                // Guardar datos globalmente
+                currentReportData = data;
+                allParticipantsData = data.participants || [];
+                
+                // Llenar información de la capacitación
+                document.getElementById('reportTrainingTitle').textContent = data.training.titulo;
+                document.getElementById('reportTrainingDescription').textContent = data.training.descripcion || 'Sin descripción';
+                document.getElementById('reportTrainingDepartment').textContent = data.training.departamento || 'General';
+                document.getElementById('reportTrainingDate').textContent = formatDateForReport(data.training.fechaCreacion);
+                
+                // Estado de la capacitación
+                const statusBadge = document.getElementById('reportTrainingStatus');
+                if (data.training.finalizada) {
+                    statusBadge.textContent = 'Finalizada';
+                    statusBadge.style.background = 'rgba(255,255,255,0.2)';
+                } else if (data.training.activa) {
+                    statusBadge.textContent = 'Activa';
+                    statusBadge.style.background = 'rgba(40,167,69,0.3)';
+                } else {
+                    statusBadge.textContent = 'Inactiva';
+                    statusBadge.style.background = 'rgba(220,53,69,0.3)';
+                }
+                
+                // Estadísticas
+                const stats = data.statistics;
+                document.getElementById('reportTotalParticipants').textContent = stats.totalParticipants;
+                document.getElementById('reportCompletedPostest').textContent = stats.completedPostest;
+                document.getElementById('reportAvgImprovement').textContent = `+${stats.avgImprovement}%`;
+                document.getElementById('reportAdherenceRate').textContent = `${stats.adherenceRate}%`;
+                
+                // Promedios de calificaciones
+                document.getElementById('reportAvgPretest').textContent = `${stats.avgPretestScore}%`;
+                document.getElementById('reportAvgPostest').textContent = `${stats.avgPostestScore}%`;
+                document.getElementById('reportAvgImprovementBig').textContent = `+${stats.avgImprovement}%`;
+                
+                // Llenar tabla de participantes
+                fillParticipantsTable(allParticipantsData);
+                
+                // Actualizar acciones de la capacitación
+                updateTrainingActions(data.training);
+                
+                // Mostrar contenedor
+                reportLoading.style.display = 'none';
+                reportContainer.style.display = 'block';
+                
+            } catch (error) {
+                console.error('❌ Error cargando reporte:', error);
+                reportLoading.style.display = 'none';
+                
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo cargar el reporte: ' + error.message
+                });
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // LLENAR TABLA DE PARTICIPANTES
+        // ═════════════════════════════════════════════════════════════════
+
+        function fillParticipantsTable(participants) {
+            const tbody = document.getElementById('participantsTableBody');
+            const noParticipantsMessage = document.getElementById('noParticipantsMessage');
+            const table = document.getElementById('participantsTable');
+            
+            if (!tbody) return;
+            
+            tbody.innerHTML = '';
+            
+            if (!participants || participants.length === 0) {
+                table.style.display = 'none';
+                noParticipantsMessage.style.display = 'block';
+                return;
+            }
+            
+            table.style.display = 'table';
+            noParticipantsMessage.style.display = 'none';
+            
+            participants.forEach((participant, index) => {
+                const row = document.createElement('tr');
+                row.dataset.status = participant.status;
+                row.dataset.name = participant.nombre.toLowerCase();
+                
+                // Determinar clases para las calificaciones
+                const pretestClass = getScoreClass(participant.pretestScore);
+                const postestClass = getScoreClass(participant.postestScore);
+                const improvementClass = participant.improvement > 0 ? 'positive' : 
+                                        participant.improvement < 0 ? 'negative' : 'neutral';
+                
+                // Determinar clase para el estado
+                let statusClass = 'pending';
+                if (participant.status === 'Completado') statusClass = 'completed';
+                else if (participant.status === 'Pretest Completado') statusClass = 'pretest-done';
+                
+                row.innerHTML = `
+                    <td style="padding: 0.75rem; font-weight: bold; color: var(--primary);">${index + 1}</td>
+                    <td style="padding: 0.75rem;">
+                        <div style="font-weight: 500;">${participant.nombre}</div>
+                        ${participant.email ? `<div style="font-size: 0.8rem; color: #666;">${participant.email}</div>` : ''}
+                    </td>
+                    <td style="padding: 0.75rem; color: #666;">${participant.departamento || '-'}</td>
+                    <td style="padding: 0.75rem; text-align: center;">
+                        <span class="score-badge ${pretestClass}">${participant.pretestScore > 0 ? participant.pretestScore + '%' : '-'}</span>
+                    </td>
+                    <td style="padding: 0.75rem; text-align: center;">
+                        <span class="score-badge ${postestClass}">${participant.postestScore > 0 ? participant.postestScore + '%' : '-'}</span>
+                    </td>
+                    <td style="padding: 0.75rem; text-align: center;">
+                        <span class="improvement-badge ${improvementClass}">
+                            ${participant.postestScore > 0 ? (participant.improvement >= 0 ? '+' : '') + participant.improvement + '%' : '-'}
+                        </span>
+                    </td>
+                    <td style="padding: 0.75rem; text-align: center;">
+                        <span class="status-badge ${statusClass}">${participant.status}</span>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // FILTRAR TABLA DE PARTICIPANTES
+        // ═════════════════════════════════════════════════════════════════
+
+        function filterParticipantsTable() {
+            const searchValue = document.getElementById('participantSearchInput').value.toLowerCase();
+            const statusFilter = document.getElementById('participantStatusFilter').value;
+            
+            // Filtrar datos
+            const filteredParticipants = allParticipantsData.filter(p => {
+                const matchesSearch = p.nombre.toLowerCase().includes(searchValue) ||
+                                     (p.email && p.email.toLowerCase().includes(searchValue)) ||
+                                     (p.departamento && p.departamento.toLowerCase().includes(searchValue));
+                
+                const matchesStatus = !statusFilter || p.status === statusFilter;
+                
+                return matchesSearch && matchesStatus;
+            });
+            
+            // Actualizar tabla
+            fillParticipantsTable(filteredParticipants);
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // ACTUALIZAR ACCIONES DE LA CAPACITACIÓN
+        // ═════════════════════════════════════════════════════════════════
+
+        function updateTrainingActions(training) {
+            const container = document.getElementById('trainingActionsContainer');
+            if (!container) return;
+            
+            if (training.finalizada) {
+                container.innerHTML = `
+                    <div style="background: #e8f5e9; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #4caf50;">
+                        <p style="margin: 0; color: #2e7d32;">
+                            <i class="fas fa-check-circle"></i> <strong>Esta capacitación está FINALIZADA</strong>
+                        </p>
+                        <p style="margin: 0.5rem 0 0 0; color: #388e3c; font-size: 0.9rem;">
+                            Puede reutilizar esta capacitación creando una nueva sesión desde la pestaña "Gestionar".
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <button class="btn btn-info" onclick="reactivateTraining('${training.id}')" style="margin: 0;">
+                            <i class="fas fa-redo"></i> Reactivar Capacitación
+                        </button>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div style="background: #fff3e0; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #ff9800;">
+                        <p style="margin: 0; color: #e65100;">
+                            <i class="fas fa-exclamation-triangle"></i> <strong>¿Ha finalizado la capacitación?</strong>
+                        </p>
+                        <p style="margin: 0.5rem 0 0 0; color: #f57c00; font-size: 0.9rem;">
+                            Al finalizar una capacitación, las sesiones activas se desactivarán y podrá crear nuevas sesiones en el futuro.
+                        </p>
+                    </div>
+                    <div style="display: flex; gap: 1rem; flex-wrap: wrap;">
+                        <button class="btn btn-success" onclick="confirmFinalizeTraining('${training.id}')" style="margin: 0;">
+                            <i class="fas fa-flag-checkered"></i> Finalizar Capacitación
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // FINALIZAR CAPACITACIÓN
+        // ═════════════════════════════════════════════════════════════════
+
+        function confirmFinalizeTraining(trainingId) {
+            Swal.fire({
+                icon: 'question',
+                title: '¿Finalizar Capacitación?',
+                html: `
+                    <p>Al finalizar la capacitación:</p>
+                    <ul style="text-align: left; margin: 1rem 0;">
+                        <li>Las sesiones activas se desactivarán</li>
+                        <li>Los participantes no podrán acceder con los códigos actuales</li>
+                        <li>Podrás crear nuevas sesiones para reutilizar la capacitación</li>
+                        <li>El historial de participantes se mantendrá</li>
+                    </ul>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Sí, Finalizar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#28a745'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    finalizeTraining(trainingId);
+                }
+            });
+        }
+
+        async function finalizeTraining(trainingId) {
+            try {
+                Swal.fire({
+                    title: 'Finalizando capacitación...',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                
+                const response = await fetch('/.netlify/functions/toggle-training-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        trainingId: trainingId,
+                        action: 'finalize'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Error al finalizar');
+                }
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Capacitación Finalizada!',
+                    text: `Se desactivaron ${data.sessionsUpdated} sesiones.`,
+                    confirmButtonText: 'Continuar'
+                }).then(() => {
+                    // Recargar el reporte
+                    loadTrainingReport();
+                    // Recargar opciones del select
+                    loadReportOptions();
+                });
+                
+            } catch (error) {
+                console.error('❌ Error finalizando capacitación:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo finalizar la capacitación: ' + error.message
+                });
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // REACTIVAR CAPACITACIÓN
+        // ═════════════════════════════════════════════════════════════════
+
+        async function reactivateTraining(trainingId) {
+            try {
+                const result = await Swal.fire({
+                    icon: 'question',
+                    title: '¿Reactivar Capacitación?',
+                    text: 'Las sesiones se reactivarán y los participantes podrán acceder nuevamente.',
+                    showCancelButton: true,
+                    confirmButtonText: 'Sí, Reactivar',
+                    cancelButtonText: 'Cancelar',
+                    confirmButtonColor: '#17a2b8'
+                });
+                
+                if (!result.isConfirmed) return;
+                
+                Swal.fire({
+                    title: 'Reactivando capacitación...',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                
+                const response = await fetch('/.netlify/functions/toggle-training-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        trainingId: trainingId,
+                        action: 'reactivate'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (!data.success) {
+                    throw new Error(data.error || 'Error al reactivar');
+                }
+                
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡Capacitación Reactivada!',
+                    text: `Se reactivaron ${data.sessionsUpdated} sesiones.`,
+                    confirmButtonText: 'Continuar'
+                }).then(() => {
+                    loadTrainingReport();
+                    loadReportOptions();
+                });
+                
+            } catch (error) {
+                console.error('❌ Error reactivando capacitación:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo reactivar la capacitación: ' + error.message
+                });
+            }
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // EXPORTAR REPORTE A CSV
+        // ═════════════════════════════════════════════════════════════════
+
+        function exportReportCSV() {
+            if (!currentReportData || !currentReportData.participants || currentReportData.participants.length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Sin datos',
+                    text: 'No hay participantes para exportar'
+                });
+                return;
+            }
+            
+            const training = currentReportData.training;
+            const participants = currentReportData.participants;
+            
+            // Crear contenido CSV
+            let csv = '\uFEFF'; // BOM para UTF-8
+            csv += 'REPORTE DE CAPACITACIÓN\n';
+            csv += `"Título","${training.titulo}"\n`;
+            csv += `"Departamento","${training.departamento || 'General'}"\n`;
+            csv += `"Fecha","${training.fechaCreacion || ''}"\n`;
+            csv += `"Total Participantes","${currentReportData.statistics.totalParticipants}"\n`;
+            csv += `"Completados","${currentReportData.statistics.completedPostest}"\n`;
+            csv += `"Tasa de Adherencia","${currentReportData.statistics.adherenceRate}%"\n`;
+            csv += '\n';
+            csv += 'LISTADO DE PARTICIPANTES\n';
+            csv += '"#","Nombre","Email","Departamento","Pretest (%)","Posttest (%)","Mejora (%)","Estado"\n';
+            
+            participants.forEach((p, i) => {
+                csv += `"${i + 1}","${p.nombre}","${p.email || ''}","${p.departamento || ''}","${p.pretestScore || 0}","${p.postestScore || 0}","${p.improvement || 0}","${p.status}"\n`;
+            });
+            
+            // Descargar archivo
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `Reporte_${training.titulo.replace(/[^a-zA-Z0-9]/g, '_')}_${formatDateForFile(new Date())}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            Swal.fire({
+                icon: 'success',
+                title: '¡Exportado!',
+                text: 'El reporte CSV ha sido descargado',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // EXPORTAR REPORTE A EXCEL (HTML TABLE)
+        // ═════════════════════════════════════════════════════════════════
+
+        function exportReportExcel() {
+            if (!currentReportData || !currentReportData.participants || currentReportData.participants.length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Sin datos',
+                    text: 'No hay participantes para exportar'
+                });
+                return;
+            }
+            
+            const training = currentReportData.training;
+            const participants = currentReportData.participants;
+            const stats = currentReportData.statistics;
+            
+            // Crear tabla HTML para Excel
+            let html = `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+                <head>
+                    <meta charset="utf-8">
+                    <style>
+                        table { border-collapse: collapse; }
+                        th, td { border: 1px solid #000; padding: 8px; }
+                        th { background-color: #667eea; color: white; }
+                        .header { font-size: 18px; font-weight: bold; }
+                        .stat { background-color: #f0f0f0; }
+                    </style>
+                </head>
+                <body>
+                    <h2>${training.titulo}</h2>
+                    <table>
+                        <tr><td class="stat"><strong>Departamento:</strong></td><td>${training.departamento || 'General'}</td></tr>
+                        <tr><td class="stat"><strong>Total Participantes:</strong></td><td>${stats.totalParticipants}</td></tr>
+                        <tr><td class="stat"><strong>Completados:</strong></td><td>${stats.completedPostest}</td></tr>
+                        <tr><td class="stat"><strong>Promedio Pretest:</strong></td><td>${stats.avgPretestScore}%</td></tr>
+                        <tr><td class="stat"><strong>Promedio Posttest:</strong></td><td>${stats.avgPostestScore}%</td></tr>
+                        <tr><td class="stat"><strong>Mejora Promedio:</strong></td><td>${stats.avgImprovement}%</td></tr>
+                        <tr><td class="stat"><strong>Tasa de Adherencia:</strong></td><td>${stats.adherenceRate}%</td></tr>
+                    </table>
+                    <br><br>
+                    <h3>Listado de Participantes</h3>
+                    <table>
+                        <tr>
+                            <th>#</th>
+                            <th>Nombre</th>
+                            <th>Email</th>
+                            <th>Departamento</th>
+                            <th>Pretest (%)</th>
+                            <th>Posttest (%)</th>
+                            <th>Mejora (%)</th>
+                            <th>Estado</th>
+                        </tr>
+            `;
+            
+            participants.forEach((p, i) => {
+                html += `
+                    <tr>
+                        <td>${i + 1}</td>
+                        <td>${p.nombre}</td>
+                        <td>${p.email || ''}</td>
+                        <td>${p.departamento || ''}</td>
+                        <td>${p.pretestScore || 0}</td>
+                        <td>${p.postestScore || 0}</td>
+                        <td>${p.improvement || 0}</td>
+                        <td>${p.status}</td>
+                    </tr>
+                `;
+            });
+            
+            html += '</table></body></html>';
+            
+            // Descargar archivo
+            const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `Reporte_${training.titulo.replace(/[^a-zA-Z0-9]/g, '_')}_${formatDateForFile(new Date())}.xls`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            Swal.fire({
+                icon: 'success',
+                title: '¡Exportado!',
+                text: 'El reporte Excel ha sido descargado',
+                timer: 2000,
+                showConfirmButton: false
+            });
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // IMPRIMIR REPORTE
+        // ═════════════════════════════════════════════════════════════════
+
+        function printReport() {
+            if (!currentReportData) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Sin datos',
+                    text: 'No hay reporte para imprimir'
+                });
+                return;
+            }
+            
+            window.print();
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // FUNCIONES AUXILIARES PARA REPORTES
+        // ═════════════════════════════════════════════════════════════════
+
+        function getScoreClass(score) {
+            if (!score || score === 0) return 'pending';
+            if (score >= 80) return 'excellent';
+            if (score >= 60) return 'good';
+            if (score >= 40) return 'average';
+            return 'low';
+        }
+
+        function formatDateForReport(dateString) {
+            if (!dateString) return '-';
+            try {
+                const date = new Date(dateString);
+                return date.toLocaleDateString('es-CO', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                });
+            } catch (e) {
+                return dateString;
+            }
+        }
+
+        function formatDateForFile(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        console.log('📊 Módulo de Reportes cargado correctamente');
     </script>
 
 <!-- ═════════════════════════════════════════════════════════════════
