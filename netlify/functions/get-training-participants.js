@@ -1,11 +1,11 @@
 // netlify/functions/get-training-participants.js
 // ═════════════════════════════════════════════════════════════════
-// Obtiene todos los participantes de una capacitación con sus notas
-// de pretest y posttest para generar reportes
+// Obtiene todos los participantes de una capacitación específica
+// Flujo: Capacitación → Sesiones → Participaciones
 // ═════════════════════════════════════════════════════════════════
 
 export async function handler(event) {
-  // Configurar CORS
+  // Headers CORS
   const headers = {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
@@ -13,7 +13,7 @@ export async function handler(event) {
     'Access-Control-Allow-Methods': 'POST, OPTIONS'
   };
 
-  // Manejar preflight
+  // Manejar preflight OPTIONS
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
@@ -22,21 +22,39 @@ export async function handler(event) {
     return {
       statusCode: 405,
       headers,
-      body: JSON.stringify({ success: false, error: 'Solo POST' })
+      body: JSON.stringify({ success: false, error: 'Solo POST permitido' })
     };
   }
 
   try {
-    let payload = JSON.parse(event.body || '{}');
+    // ═════════════════════════════════════════════════════════════
+    // PASO 1: Parsear request y validar
+    // ═════════════════════════════════════════════════════════════
+    
+    let payload;
+    try {
+      payload = JSON.parse(event.body || '{}');
+    } catch (e) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ success: false, error: 'JSON inválido' })
+      };
+    }
+
     const { trainingId } = payload;
 
     if (!trainingId) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ success: false, error: 'Falta parámetro: trainingId' })
+        body: JSON.stringify({ success: false, error: 'Falta trainingId' })
       };
     }
+
+    // ═════════════════════════════════════════════════════════════
+    // PASO 2: Obtener credenciales
+    // ═════════════════════════════════════════════════════════════
 
     const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
     const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
@@ -45,24 +63,28 @@ export async function handler(event) {
       return {
         statusCode: 500,
         headers,
-        body: JSON.stringify({ success: false, error: 'Variables de entorno no configuradas' })
+        body: JSON.stringify({ 
+          success: false, 
+          error: 'Variables de entorno no configuradas (AIRTABLE_API_KEY, AIRTABLE_BASE_ID)' 
+        })
       };
     }
+
+    const baseUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}`;
+    const authHeaders = {
+      'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+      'Content-Type': 'application/json'
+    };
 
     console.log('📊 Obteniendo participantes para capacitación:', trainingId);
 
     // ═════════════════════════════════════════════════════════════
-    // PASO 1: Obtener información de la capacitación
+    // PASO 3: Obtener datos de la capacitación
     // ═════════════════════════════════════════════════════════════
 
-    const trainingUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Capacitaciones/${trainingId}`;
-    
-    const trainingResponse = await fetch(trainingUrl, {
+    const trainingResponse = await fetch(`${baseUrl}/Capacitaciones/${trainingId}`, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
+      headers: authHeaders
     });
 
     if (!trainingResponse.ok) {
@@ -71,10 +93,10 @@ export async function handler(event) {
       return {
         statusCode: trainingResponse.status,
         headers,
-        body: JSON.stringify({
-          success: false,
-          error: 'No se pudo obtener la capacitación',
-          details: errorData
+        body: JSON.stringify({ 
+          success: false, 
+          error: 'Capacitación no encontrada',
+          details: errorData 
         })
       };
     }
@@ -83,167 +105,215 @@ export async function handler(event) {
     console.log('✅ Capacitación encontrada:', trainingData.fields['Título']);
 
     // ═════════════════════════════════════════════════════════════
-    // PASO 2: Obtener todas las sesiones de esta capacitación
+    // PASO 4: Obtener TODAS las sesiones de esta capacitación
     // ═════════════════════════════════════════════════════════════
 
-    const sessionsUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sesiones?filterByFormula=FIND('${trainingId}',ARRAYJOIN({Capacitaciones}))`;
+    // Usamos filterByFormula para buscar sesiones que tengan esta capacitación
+    const sessionsFormula = encodeURIComponent(`FIND("${trainingId}", ARRAYJOIN({Capacitaciones})) > 0`);
+    const sessionsUrl = `${baseUrl}/Sesiones?filterByFormula=${sessionsFormula}`;
+    
+    console.log('🔍 Buscando sesiones...');
     
     const sessionsResponse = await fetch(sessionsUrl, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
+      headers: authHeaders
     });
 
     let sessions = [];
     if (sessionsResponse.ok) {
       const sessionsData = await sessionsResponse.json();
       sessions = sessionsData.records || [];
-      console.log(`📋 Sesiones encontradas: ${sessions.length}`);
+      console.log(`✅ Encontradas ${sessions.length} sesiones`);
+    } else {
+      console.warn('⚠️ No se pudieron obtener sesiones, intentando método alternativo...');
+      
+      // Método alternativo: obtener todas las sesiones y filtrar manualmente
+      const allSessionsResponse = await fetch(`${baseUrl}/Sesiones?maxRecords=100`, {
+        method: 'GET',
+        headers: authHeaders
+      });
+      
+      if (allSessionsResponse.ok) {
+        const allSessionsData = await allSessionsResponse.json();
+        sessions = (allSessionsData.records || []).filter(session => {
+          const caps = session.fields['Capacitaciones'] || [];
+          return caps.includes(trainingId);
+        });
+        console.log(`✅ (Método alternativo) Encontradas ${sessions.length} sesiones`);
+      }
     }
 
     // ═════════════════════════════════════════════════════════════
-    // PASO 3: Obtener todas las participaciones
+    // PASO 5: Obtener TODAS las participaciones de estas sesiones
     // ═════════════════════════════════════════════════════════════
 
     let allParticipants = [];
     
-    // Obtener IDs de sesiones
-    const sessionIds = sessions.map(s => s.id);
-    
-    if (sessionIds.length > 0) {
-      // Construir filtro para buscar participaciones de estas sesiones
-      const filterParts = sessionIds.map(id => `FIND('${id}',ARRAYJOIN({Sesión}))`);
-      const filter = `OR(${filterParts.join(',')})`;
+    if (sessions.length > 0) {
+      const sessionIds = sessions.map(s => s.id);
+      console.log('🔍 Buscando participaciones para sesiones:', sessionIds);
       
-      const participationsUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Participaciones?filterByFormula=${encodeURIComponent(filter)}`;
+      // Construir fórmula para buscar participaciones de cualquiera de estas sesiones
+      // OR(FIND("rec1", ARRAYJOIN({Sesión}))>0, FIND("rec2", ARRAYJOIN({Sesión}))>0, ...)
+      const orConditions = sessionIds.map(id => `FIND("${id}", ARRAYJOIN({Sesión})) > 0`);
+      const participationsFormula = encodeURIComponent(`OR(${orConditions.join(', ')})`);
+      
+      const participationsUrl = `${baseUrl}/Participaciones?filterByFormula=${participationsFormula}`;
       
       const participationsResponse = await fetch(participationsUrl, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
+        headers: authHeaders
       });
 
       if (participationsResponse.ok) {
         const participationsData = await participationsResponse.json();
         allParticipants = participationsData.records || [];
-        console.log(`👥 Participantes encontrados: ${allParticipants.length}`);
+        console.log(`✅ Encontradas ${allParticipants.length} participaciones`);
+      } else {
+        console.warn('⚠️ Error en filtro, intentando método alternativo...');
+        
+        // Método alternativo: obtener todas las participaciones y filtrar
+        const allParticipationsResponse = await fetch(`${baseUrl}/Participaciones?maxRecords=500`, {
+          method: 'GET',
+          headers: authHeaders
+        });
+        
+        if (allParticipationsResponse.ok) {
+          const allParticipationsData = await allParticipationsResponse.json();
+          allParticipants = (allParticipationsData.records || []).filter(p => {
+            const sessionLinks = p.fields['Sesión'] || [];
+            return sessionLinks.some(sid => sessionIds.includes(sid));
+          });
+          console.log(`✅ (Método alternativo) Encontradas ${allParticipants.length} participaciones`);
+        }
       }
     }
 
     // ═════════════════════════════════════════════════════════════
-    // PASO 4: Formatear datos de participantes
+    // PASO 6: Formatear datos de participantes
     // ═════════════════════════════════════════════════════════════
 
     const formattedParticipants = allParticipants.map(p => {
       const fields = p.fields;
       
+      // Obtener scores (pueden estar en diferentes campos)
+      const pretestScore = fields['Puntuación Pretest'] || fields['Pretest Score'] || fields['PretestScore'] || 0;
+      const postestScore = fields['Puntuación Posttest'] || fields['Post-test Score'] || fields['PosttestScore'] || fields['Puntuación Postest'] || 0;
+      
       // Calcular mejora
-      const pretestScore = parseFloat(fields['Puntuación Pretest']) || 0;
-      const postestScore = parseFloat(fields['Puntuación Posttest']) || 0;
-      const improvement = postestScore - pretestScore;
+      const improvement = pretestScore > 0 && postestScore > 0 
+        ? Math.round(((postestScore - pretestScore) / pretestScore) * 100) 
+        : 0;
       
       // Determinar estado
       let status = 'Pendiente';
-      if (fields['Puntuación Posttest'] !== undefined && fields['Puntuación Posttest'] !== null) {
+      if (postestScore > 0) {
         status = 'Completado';
-      } else if (fields['Puntuación Pretest'] !== undefined && fields['Puntuación Pretest'] !== null) {
+      } else if (pretestScore > 0) {
         status = 'Pretest Completado';
+      } else if (fields['Estado']) {
+        status = fields['Estado'];
       }
 
       return {
         id: p.id,
         nombre: fields['Nombre Completo'] || fields['Nombre'] || 'Sin nombre',
-        email: fields['Email'] || '',
-        departamento: fields['Departamento'] || fields['Servicio'] || '',
+        email: fields['Email'] || fields['Correo'] || '',
+        departamento: fields['Departamento'] || fields['Cargo'] || '',
         cargo: fields['Cargo'] || '',
-        pretestScore: pretestScore,
-        postestScore: postestScore,
+        pretestScore: Math.round(pretestScore),
+        postestScore: Math.round(postestScore),
         improvement: improvement,
-        improvementPercent: pretestScore > 0 ? ((improvement / pretestScore) * 100).toFixed(1) : 0,
         status: status,
-        fechaPretest: fields['Fecha Pretest'] || '',
-        fechaPostest: fields['Fecha Posttest'] || '',
-        codigoPostest: fields['Código Posttest'] || ''
+        fechaRegistro: fields['Fecha Registro'] || fields['Fecha Inicio'] || fields['Created'] || ''
       };
     });
 
+    // Ordenar por nombre
+    formattedParticipants.sort((a, b) => a.nombre.localeCompare(b.nombre));
+
     // ═════════════════════════════════════════════════════════════
-    // PASO 5: Calcular estadísticas generales
+    // PASO 7: Calcular estadísticas
     // ═════════════════════════════════════════════════════════════
 
     const totalParticipants = formattedParticipants.length;
     const completedPretest = formattedParticipants.filter(p => p.pretestScore > 0).length;
     const completedPostest = formattedParticipants.filter(p => p.postestScore > 0).length;
     
-    const avgPretestScore = completedPretest > 0 
-      ? (formattedParticipants.reduce((sum, p) => sum + p.pretestScore, 0) / completedPretest).toFixed(1)
+    // Promedios
+    const pretestScores = formattedParticipants.filter(p => p.pretestScore > 0).map(p => p.pretestScore);
+    const postestScores = formattedParticipants.filter(p => p.postestScore > 0).map(p => p.postestScore);
+    
+    const avgPretestScore = pretestScores.length > 0 
+      ? Math.round(pretestScores.reduce((a, b) => a + b, 0) / pretestScores.length) 
       : 0;
     
-    const avgPostestScore = completedPostest > 0
-      ? (formattedParticipants.filter(p => p.postestScore > 0).reduce((sum, p) => sum + p.postestScore, 0) / completedPostest).toFixed(1)
+    const avgPostestScore = postestScores.length > 0 
+      ? Math.round(postestScores.reduce((a, b) => a + b, 0) / postestScores.length) 
       : 0;
     
-    const avgImprovement = completedPostest > 0
-      ? (formattedParticipants.filter(p => p.postestScore > 0).reduce((sum, p) => sum + p.improvement, 0) / completedPostest).toFixed(1)
+    const avgImprovement = avgPretestScore > 0 && avgPostestScore > 0
+      ? Math.round(((avgPostestScore - avgPretestScore) / avgPretestScore) * 100)
       : 0;
-
+    
     const adherenceRate = totalParticipants > 0 
-      ? ((completedPostest / totalParticipants) * 100).toFixed(1)
+      ? Math.round((completedPostest / totalParticipants) * 100) 
       : 0;
 
     // ═════════════════════════════════════════════════════════════
-    // RESPUESTA EXITOSA
+    // PASO 8: Respuesta exitosa
     // ═════════════════════════════════════════════════════════════
+
+    const response = {
+      success: true,
+      training: {
+        id: trainingId,
+        titulo: trainingData.fields['Título'] || 'Sin título',
+        descripcion: trainingData.fields['Descripción'] || '',
+        departamento: trainingData.fields['Departamento'] || 'General',
+        activa: trainingData.fields['Activa'] !== false,
+        finalizada: trainingData.fields['Finalizada'] === true,
+        fechaCreacion: trainingData.fields['Fecha Creación'] || ''
+      },
+      sessions: sessions.map(s => ({
+        id: s.id,
+        codigo: s.fields['Código Acceso'] || '',
+        activa: s.fields['Activa'] !== false,
+        fechaInicio: s.fields['Fecha Inicio'] || ''
+      })),
+      participants: formattedParticipants,
+      statistics: {
+        totalParticipants,
+        completedPretest,
+        completedPostest,
+        avgPretestScore,
+        avgPostestScore,
+        avgImprovement,
+        adherenceRate
+      }
+    };
+
+    console.log('✅ Reporte generado exitosamente');
+    console.log(`   - Total participantes: ${totalParticipants}`);
+    console.log(`   - Completaron pretest: ${completedPretest}`);
+    console.log(`   - Completaron postest: ${completedPostest}`);
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({
-        success: true,
-        training: {
-          id: trainingId,
-          titulo: trainingData.fields['Título'] || 'Sin título',
-          descripcion: trainingData.fields['Descripción'] || '',
-          departamento: trainingData.fields['Departamento'] || '',
-          fechaCreacion: trainingData.fields['Fecha Creación'] || '',
-          activa: trainingData.fields['Activa'] !== false,
-          finalizada: trainingData.fields['Finalizada'] === true
-        },
-        sessions: sessions.map(s => ({
-          id: s.id,
-          codigo: s.fields['Código Acceso'] || '',
-          activa: s.fields['Activa'] !== false,
-          fechaInicio: s.fields['Fecha Inicio'] || ''
-        })),
-        participants: formattedParticipants,
-        statistics: {
-          totalParticipants,
-          completedPretest,
-          completedPostest,
-          avgPretestScore: parseFloat(avgPretestScore),
-          avgPostestScore: parseFloat(avgPostestScore),
-          avgImprovement: parseFloat(avgImprovement),
-          adherenceRate: parseFloat(adherenceRate)
-        }
-      })
+      body: JSON.stringify(response)
     };
 
   } catch (error) {
     console.error('❌ Error en get-training-participants:', error);
     return {
       statusCode: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify({ 
-        success: false, 
-        error: error.message,
-        type: error.name
+      headers,
+      body: JSON.stringify({
+        success: false,
+        error: 'Error interno del servidor',
+        message: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
       })
     };
   }
@@ -251,46 +321,60 @@ export async function handler(event) {
 
 /*
 ═════════════════════════════════════════════════════════════════
-CÓMO USAR ESTA FUNCIÓN
+INSTALACIÓN
 ═════════════════════════════════════════════════════════════════
 
-1. Llamar desde el frontend:
+1. Crear el archivo en:
+   netlify/functions/get-training-participants.js
 
-   const result = await fetch('/.netlify/functions/get-training-participants', {
-     method: 'POST',
-     headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({
-       trainingId: 'recXXXXXXXXXXXXXX'
-     })
-   }).then(r => r.json());
+2. Asegúrate de tener las variables de entorno en Netlify:
+   - AIRTABLE_API_KEY
+   - AIRTABLE_BASE_ID
 
-2. La función devolverá:
+3. Deploy:
+   netlify deploy --prod
 
-   {
-     success: true,
-     training: { id, titulo, descripcion, ... },
-     sessions: [...],
-     participants: [
-       {
-         id: 'rec123',
-         nombre: 'Juan Pérez',
-         pretestScore: 60,
-         postestScore: 85,
-         improvement: 25,
-         status: 'Completado'
-       },
-       ...
-     ],
-     statistics: {
-       totalParticipants: 10,
-       completedPretest: 10,
-       completedPostest: 8,
-       avgPretestScore: 65.5,
-       avgPostestScore: 82.3,
-       avgImprovement: 16.8,
-       adherenceRate: 80
-     }
-   }
+═════════════════════════════════════════════════════════════════
+ESTRUCTURA DE AIRTABLE ESPERADA
+═════════════════════════════════════════════════════════════════
+
+Tabla: Capacitaciones
+- Título (Single line text)
+- Descripción (Long text)
+- Departamento (Single select)
+- Activa (Checkbox)
+- Finalizada (Checkbox)
+- Fecha Creación (Date)
+
+Tabla: Sesiones
+- Capacitaciones (Link to Capacitaciones) ← IMPORTANTE
+- Código Acceso (Single line text)
+- Activa (Checkbox)
+- Fecha Inicio (Date)
+
+Tabla: Participaciones
+- Sesión (Link to Sesiones) ← IMPORTANTE
+- Nombre Completo (Single line text)
+- Email (Email)
+- Departamento (Single line text)
+- Cargo (Single select)
+- Puntuación Pretest (Number) o Pretest Score
+- Puntuación Posttest (Number) o Post-test Score
+- Estado (Single select)
+
+═════════════════════════════════════════════════════════════════
+TESTING
+═════════════════════════════════════════════════════════════════
+
+En consola del navegador:
+
+fetch('/.netlify/functions/get-training-participants', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ trainingId: 'recXXXXXXXXXXXX' })
+})
+.then(r => r.json())
+.then(d => console.log(d));
 
 ═════════════════════════════════════════════════════════════════
 */

@@ -89,7 +89,7 @@ export async function handler(event) {
     const participationFields = participation.fields;
 
     console.log('✅ Participación encontrada');
-    console.log('   Participante:', participationFields['Nombre Completo']);
+    console.log('   Participante:', participationFields['Nombre Completo'] || participationFields['Nombre']);
     console.log('   Email:', participationFields['Email']);
     console.log('   Estado:', participationFields['Estado']);
 
@@ -162,8 +162,8 @@ export async function handler(event) {
         training: trainingData,
         status: {
           isValidForPosttest: participationFields['Estado'] === 'Pretest Completado' || participationFields['Estado'] === 'Esperando Posttest',
-          pretestScore: participationFields['Puntuación Pretest'] || 0,
-          hasCompletedPretest: !!participationFields['Puntuación Pretest']
+          pretestScore: participationFields['Puntuación Pretest'] || participationFields['Pretest Score'] || 0,
+          hasCompletedPretest: !!(participationFields['Puntuación Pretest'] || participationFields['Pretest Score'])
         }
       })
     };
@@ -181,37 +181,3 @@ export async function handler(event) {
     };
   }
 }
-
-/*
-═════════════════════════════════════════════════════════════════
-CÓMO USAR ESTA FUNCIÓN
-═════════════════════════════════════════════════════════════════
-
-1. Cuando el usuario abre el link con ?code=POSTTEST-ABC123&type=posttest
-
-   const result = await fetch('/.netlify/functions/get-participation-by-posttest-code', {
-     method: 'POST',
-     headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({
-       postestCode: 'POSTTEST-ABC123-REC98765'
-     })
-   }).then(r => r.json());
-
-2. La función devolverá:
-
-   {
-     success: true,
-     participation: { id: 'rec987654', fields: {...} },
-     session: { id: 'rec123456', fields: {...} },
-     training: { id: 'recABCDEF', fields: {...} },
-     status: {
-       isValidForPosttest: true,
-       pretestScore: 85,
-       hasCompletedPretest: true
-     }
-   }
-
-3. Si es válido, cargar el posttest automáticamente
-
-═════════════════════════════════════════════════════════════════
-*/

@@ -1,4 +1,4 @@
-// netlify/functions/generate-postest-link.js
+// netlify/functions/generate-posttest-link.js
 // ═════════════════════════════════════════════════════════════════
 // Genera un vínculo permanente para postest después de completar pretest
 // Guarda la participación con el código de postest
@@ -42,8 +42,6 @@ export async function handler(event) {
     // ═════════════════════════════════════════════════════════════
     // PASO 1: Generar código único para postest
     // ═════════════════════════════════════════════════════════════
-    // Formato: POSTTEST-[SESSION_CODE]-[PARTICIPATION_ID]
-    // Ejemplo: POSTTEST-ABC123-recXXXXXXXXX
     
     const postestCode = `POSTTEST-${sessionCode}-${participationId.substring(0, 8).toUpperCase()}`;
     
@@ -119,7 +117,6 @@ export async function handler(event) {
 
     if (!updateSessionResponse.ok) {
       console.warn('⚠️ Advertencia actualizando sesión:', updateSessionData);
-      // No es crítico si falla, continuamos
     } else {
       console.log('✅ Sesión actualizada');
     }
@@ -158,42 +155,3 @@ export async function handler(event) {
     };
   }
 }
-
-/*
-═════════════════════════════════════════════════════════════════
-CÓMO USAR ESTA FUNCIÓN
-═════════════════════════════════════════════════════════════════
-
-1. Desde app.js después de completar el pretest:
-
-   const postestLinkData = await generatePostestLink({
-     sessionId: 'rec123456',
-     participationId: 'rec987654',
-     sessionCode: 'ABC123',
-     userName: 'Juan Pérez',
-     userEmail: 'juan@hospital.com',
-     department: 'Enfermería'
-   });
-
-2. La función devolverá:
-
-   {
-     success: true,
-     postestCode: 'POSTTEST-ABC123-REC98765',
-     postestUrl: 'https://... ?code=POSTTEST-ABC123-REC98765&type=postest&pid=rec987654',
-     participationId: 'rec987654'
-   }
-
-3. Mostrar esta URL al usuario en un modal con QR
-
-
-═════════════════════════════════════════════════════════════════
-VARIABLES DE ENTORNO EN NETLIFY
-═════════════════════════════════════════════════════════════════
-
-AIRTABLE_API_KEY = patXXXXXXXXXXXXXXXXXXXXXX
-AIRTABLE_BASE_ID = appXXXXXXXXXXXXXX
-SITE_URL = https://capacitacioneshslv.netlify.app (opcional, por defecto es este)
-
-═════════════════════════════════════════════════════════════════
-*/
