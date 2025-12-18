@@ -2956,6 +2956,9 @@
 
             setTimeout(() => initializeCharts(), 2000);
             
+            // Cargar estadísticas del dashboard después de que los gráficos estén listos
+            setTimeout(() => loadDashboardStats(), 2500);
+            
             // Cargar capacitaciones al inicio (sin mostrar, solo en background)
             setTimeout(() => loadTrainings(), 2500);
             
@@ -4139,6 +4142,55 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         // Actualizar estadísticas del dashboard
         function updateDashboardStats() {
             document.getElementById('totalTrainings').textContent = allTrainings.length;
+            
+            // Cargar estadísticas completas desde el servidor
+            loadDashboardStats();
+        }
+        
+        // Cargar estadísticas del dashboard desde Airtable
+        async function loadDashboardStats() {
+            try {
+                console.log('📊 Cargando estadísticas del dashboard...');
+                
+                const response = await fetch('/.netlify/functions/get-dashboard-stats', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    console.log('✅ Estadísticas recibidas:', data.statistics);
+                    
+                    // Actualizar cards del dashboard
+                    document.getElementById('totalTrainings').textContent = data.statistics.totalTrainings;
+                    document.getElementById('totalParticipants').textContent = data.statistics.totalParticipants;
+                    document.getElementById('adherenceRate').textContent = data.statistics.adherenceRate + '%';
+                    document.getElementById('avgImprovement').textContent = '+' + data.statistics.avgImprovement + '%';
+                    
+                    // Actualizar gráfico de participaciones por día
+                    if (participationsChart && data.charts && data.charts.participationsByDay) {
+                        participationsChart.data.labels = data.charts.participationsByDay.labels;
+                        participationsChart.data.datasets[0].data = data.charts.participationsByDay.data;
+                        participationsChart.update();
+                    }
+                    
+                    // Actualizar gráfico de departamentos
+                    if (departmentChart && data.charts && data.charts.departmentPerformance) {
+                        departmentChart.data.labels = data.charts.departmentPerformance.labels;
+                        departmentChart.data.datasets[0].data = data.charts.departmentPerformance.data;
+                        departmentChart.update();
+                    }
+                    
+                    console.log('✅ Dashboard actualizado correctamente');
+                } else {
+                    console.error('❌ Error en respuesta:', data.error);
+                }
+                
+            } catch (error) {
+                console.error('❌ Error cargando estadísticas del dashboard:', error);
+            }
         }
         
         // Cargar capacitaciones cuando se cambia a la pestaña "Gestionar"
