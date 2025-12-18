@@ -4417,6 +4417,24 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         // Variables globales para reportes
         let currentReportData = null;
         let allParticipantsData = [];
+        
+        // Logos para el reporte oficial SLV-SR-03-F05
+        const LOGO_COLOMBIA_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="60" height="60">
+            <circle cx="50" cy="50" r="48" fill="#003087" stroke="#003087" stroke-width="2"/>
+            <text x="50" y="25" text-anchor="middle" fill="white" font-size="8" font-weight="bold">REPÚBLICA</text>
+            <text x="50" y="65" text-anchor="middle" fill="white" font-size="8" font-weight="bold">DE</text>
+            <text x="50" y="80" text-anchor="middle" fill="white" font-size="8" font-weight="bold">COLOMBIA</text>
+            <text x="50" y="45" text-anchor="middle" fill="#FFD700" font-size="20">🇨🇴</text>
+        </svg>`;
+        
+        const LOGO_HOSPITAL_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 150 80" width="120" height="65">
+            <rect x="0" y="0" width="150" height="80" fill="white"/>
+            <text x="10" y="15" fill="#666" font-size="6">HOSPITAL</text>
+            <text x="10" y="40" fill="#4CAF50" font-size="18" font-weight="bold">Susana</text>
+            <text x="10" y="55" fill="#666" font-size="8">López de Valencia E.S.E.</text>
+            <circle cx="130" cy="40" r="20" fill="none" stroke="#4CAF50" stroke-width="2"/>
+            <text x="130" y="45" text-anchor="middle" fill="#4CAF50" font-size="12">🏥</text>
+        </svg>`;
 
         // ═════════════════════════════════════════════════════════════════
         // CARGAR OPCIONES DE CAPACITACIONES EN EL SELECT
@@ -4975,18 +4993,36 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         <!-- ENCABEZADO -->
                         <!-- ═══════════════════════════════════════════════════════════ -->
                         <tr>
-                            <td rowspan="2" class="logo-cell" style="width: 15%;">
-                                <strong>REPÚBLICA DE COLOMBIA</strong><br>
-                                <small>Departamento del Cauca</small>
+                            <td rowspan="2" class="logo-cell" style="width: 15%; padding: 10px;">
+                                <div style="text-align: center;">
+                                    <div style="width: 60px; height: 60px; margin: 0 auto; border: 2px solid #003087; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #003087 0%, #001a4d 100%);">
+                                        <span style="color: #FFD700; font-size: 24px;">⭐</span>
+                                    </div>
+                                    <div style="margin-top: 5px;">
+                                        <strong style="font-size: 9pt; color: #003087;">REPÚBLICA DE COLOMBIA</strong><br>
+                                        <small style="font-size: 8pt; color: #666;">Departamento del Cauca</small>
+                                    </div>
+                                </div>
                             </td>
                             <td colspan="4" rowspan="2" class="header-title">
                                 INFORME DE PLANEACIÓN, EJECUCIÓN Y EVALUACIÓN DE<br>
                                 CAPACITACIONES INTERNAS
                             </td>
-                            <td colspan="2" class="logo-cell" style="width: 20%;">
-                                <strong>HOSPITAL</strong><br>
-                                <strong>Susana</strong><br>
-                                <small>López de Valencia E.S.E.</small>
+                            <td colspan="2" class="logo-cell" style="width: 20%; padding: 10px;">
+                                <div style="text-align: center;">
+                                    <div style="display: inline-block; padding: 5px;">
+                                        <div style="color: #4CAF50; font-size: 28px; margin-bottom: 3px;">🏥</div>
+                                        <div style="font-size: 7pt; color: #888;">HOSPITAL</div>
+                                        <div style="font-size: 14pt; color: #4CAF50; font-weight: bold;">Susana</div>
+                                        <div style="font-size: 7pt; color: #666;">López de Valencia E.S.E.</div>
+                                    </div>
+                                    <div style="display: inline-block; margin-left: 10px; vertical-align: top;">
+                                        <div style="border: 2px solid #003087; padding: 3px; font-size: 6pt; text-align: center;">
+                                            <div style="color: #d32f2f; font-weight: bold;">ACREDITACIÓN</div>
+                                            <div style="color: #003087;">EN SALUD</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                         <tr>
@@ -5057,7 +5093,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         </tr>
                         <tr>
                             <td class="field-label">Número de preguntas:</td>
-                            <td colspan="6" class="field-value">5</td>
+                            <td colspan="6" class="field-value">10</td>
                         </tr>
                         <tr>
                             <td class="field-label">Máxima calificación:</td>
