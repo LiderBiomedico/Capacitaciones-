@@ -4926,78 +4926,296 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const training = currentReportData.training;
             const participants = currentReportData.participants;
             const stats = currentReportData.statistics;
+            const fechaActual = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' }).toUpperCase();
             
-            // Crear tabla HTML para Excel
+            // ═══════════════════════════════════════════════════════════
+            // FORMATO OFICIAL SLV-SR-03-F05
+            // Hospital Susana López de Valencia E.S.E.
+            // ═══════════════════════════════════════════════════════════
+            
             let html = `
                 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
                 <head>
                     <meta charset="utf-8">
+                    <!--[if gte mso 9]>
+                    <xml>
+                        <x:ExcelWorkbook>
+                            <x:ExcelWorksheets>
+                                <x:ExcelWorksheet>
+                                    <x:Name>Informe</x:Name>
+                                    <x:WorksheetOptions>
+                                        <x:DisplayGridlines/>
+                                    </x:WorksheetOptions>
+                                </x:ExcelWorksheet>
+                            </x:ExcelWorksheets>
+                        </x:ExcelWorkbook>
+                    </xml>
+                    <![endif]-->
                     <style>
-                        table { border-collapse: collapse; }
-                        th, td { border: 1px solid #000; padding: 8px; }
-                        th { background-color: #667eea; color: white; }
-                        .header { font-size: 18px; font-weight: bold; }
-                        .stat { background-color: #f0f0f0; }
+                        table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 10pt; }
+                        th, td { border: 1px solid #000; padding: 6px 8px; vertical-align: top; }
+                        .header-title { font-size: 12pt; font-weight: bold; text-align: center; background-color: #f0f0f0; }
+                        .header-code { text-align: right; font-weight: bold; }
+                        .section-title { background-color: #d9e2f3; font-weight: bold; text-align: center; }
+                        .field-label { background-color: #f2f2f2; font-weight: bold; width: 25%; }
+                        .field-value { width: 75%; }
+                        .participants-header { background-color: #4472c4; color: white; font-weight: bold; text-align: center; }
+                        .participants-row td { text-align: center; }
+                        .participants-row td:nth-child(2) { text-align: left; }
+                        .participants-row td:nth-child(3) { text-align: left; }
+                        .results-header { background-color: #70ad47; color: white; font-weight: bold; }
+                        .results-value { text-align: center; font-weight: bold; }
+                        .signature-cell { height: 60px; vertical-align: bottom; text-align: center; }
+                        .logo-cell { text-align: center; vertical-align: middle; }
                     </style>
                 </head>
                 <body>
-                    <h2>${training.titulo}</h2>
                     <table>
-                        <tr><td class="stat"><strong>Departamento:</strong></td><td>${training.departamento || 'General'}</td></tr>
-                        <tr><td class="stat"><strong>Total Participantes:</strong></td><td>${stats.totalParticipants}</td></tr>
-                        <tr><td class="stat"><strong>Completados:</strong></td><td>${stats.completedPostest}</td></tr>
-                        <tr><td class="stat"><strong>Promedio Pretest:</strong></td><td>${stats.avgPretestScore}%</td></tr>
-                        <tr><td class="stat"><strong>Promedio Posttest:</strong></td><td>${stats.avgPostestScore}%</td></tr>
-                        <tr><td class="stat"><strong>Mejora Promedio:</strong></td><td>${stats.avgImprovement}%</td></tr>
-                        <tr><td class="stat"><strong>Tasa de Adherencia:</strong></td><td>${stats.adherenceRate}%</td></tr>
-                    </table>
-                    <br><br>
-                    <h3>Listado de Participantes</h3>
-                    <table>
+                        <!-- ═══════════════════════════════════════════════════════════ -->
+                        <!-- ENCABEZADO -->
+                        <!-- ═══════════════════════════════════════════════════════════ -->
                         <tr>
-                            <th>#</th>
-                            <th>Nombre</th>
-                            <th>Email</th>
-                            <th>Departamento</th>
-                            <th>Pretest (%)</th>
-                            <th>Posttest (%)</th>
-                            <th>Mejora (%)</th>
-                            <th>Estado</th>
+                            <td rowspan="2" class="logo-cell" style="width: 15%;">
+                                <strong>REPÚBLICA DE COLOMBIA</strong><br>
+                                <small>Departamento del Cauca</small>
+                            </td>
+                            <td colspan="4" rowspan="2" class="header-title">
+                                INFORME DE PLANEACIÓN, EJECUCIÓN Y EVALUACIÓN DE<br>
+                                CAPACITACIONES INTERNAS
+                            </td>
+                            <td colspan="2" class="logo-cell" style="width: 20%;">
+                                <strong>HOSPITAL</strong><br>
+                                <strong>Susana</strong><br>
+                                <small>López de Valencia E.S.E.</small>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="header-code">SLV-SR-03-F05</td>
+                        </tr>
+                        
+                        <!-- ═══════════════════════════════════════════════════════════ -->
+                        <!-- SECCIÓN I. INFORMACIÓN GENERAL -->
+                        <!-- ═══════════════════════════════════════════════════════════ -->
+                        <tr>
+                            <td colspan="7" class="section-title">I. INFORMACIÓN GENERAL</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">CAPACITACIÓN:</td>
+                            <td colspan="6" class="field-value"><strong>${training.titulo || ''}</strong></td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">OBJETIVO DE LA CAPACITACIÓN:</td>
+                            <td colspan="6" class="field-value">${training.descripcion || 'Explicar al personal el uso adecuado del equipo/tema'}</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">TEMAS A TRATAR:</td>
+                            <td colspan="6" class="field-value">Funcionamiento adecuado - ${training.titulo || ''}</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">METODOLOGÍA:</td>
+                            <td colspan="6" class="field-value">Presencial</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">PLANEACIÓN:</td>
+                            <td colspan="6" class="field-value">
+                                1. Se prepara el tema de la capacitación y el material educativo para la capacitación<br>
+                                2. Explicar al personal el correcto uso del tema/equipo<br>
+                                3. Creación del pre test y post test para aplicar al personal participante y determinar el grado de conocimiento del personal en el correcto uso
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">HACER:</td>
+                            <td colspan="6" class="field-value">Realizar capacitación en el buen uso de ${training.titulo || 'el tema'}</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">VERIFICACIÓN:</td>
+                            <td colspan="6" class="field-value">Se realizó un pre test y un post test para las personas que participaron en la capacitación para evaluar el grado de conocimiento en el tema.</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">ACTUAR:</td>
+                            <td colspan="6" class="field-value">(Aplica si en el pos test el resultado es <= al 100%, no aplica plan de acción si en el pos test el resultado es el 100% de adherencia)</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">Lugar de Capacitación y fecha:</td>
+                            <td colspan="6" class="field-value">Hospital Susana López de Valencia - ${fechaActual}</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">Duración de la capacitación:</td>
+                            <td colspan="6" class="field-value">30 min por proceso asistencial</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">Expositor Responsable:</td>
+                            <td colspan="6" class="field-value">ING. BIOMÉDICO</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">Coordinador de capacitación:</td>
+                            <td colspan="6" class="field-value">ING. BIOMÉDICO</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">Instrumento de Evaluación:</td>
+                            <td colspan="6" class="field-value">Pre y Post-Test</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">Número de preguntas:</td>
+                            <td colspan="6" class="field-value">5</td>
+                        </tr>
+                        <tr>
+                            <td class="field-label">Máxima calificación:</td>
+                            <td colspan="6" class="field-value">5 (nota: aprueban el examen los participantes que obtienen como resultado nota mayor e igual 3 puntos)</td>
+                        </tr>
+                        
+                        <!-- ═══════════════════════════════════════════════════════════ -->
+                        <!-- SECCIÓN II. LISTADO DE PARTICIPANTES -->
+                        <!-- ═══════════════════════════════════════════════════════════ -->
+                        <tr><td colspan="7" style="border: none; height: 10px;"></td></tr>
+                        <tr>
+                            <td colspan="7" class="section-title">II. LISTADO DE ASISTENTES Y CALIFICACIONES</td>
+                        </tr>
+                        <tr class="participants-header">
+                            <td style="width: 5%;">No.</td>
+                            <td style="width: 30%;">NOMBRE COMPLETO</td>
+                            <td style="width: 20%;">CARGO</td>
+                            <td style="width: 15%;">SERVICIO</td>
+                            <td style="width: 10%;">PRE-TEST</td>
+                            <td style="width: 10%;">POST-TEST</td>
+                            <td style="width: 10%;">FIRMA</td>
                         </tr>
             `;
             
+            // Agregar participantes
             participants.forEach((p, i) => {
                 html += `
-                    <tr>
+                    <tr class="participants-row">
                         <td>${i + 1}</td>
-                        <td>${p.nombre}</td>
-                        <td>${p.email || ''}</td>
+                        <td>${p.nombre || ''}</td>
                         <td>${p.departamento || ''}</td>
-                        <td>${p.pretestScore || 0}</td>
-                        <td>${p.postestScore || 0}</td>
-                        <td>${p.improvement || 0}</td>
-                        <td>${p.status}</td>
+                        <td>${p.departamento || ''}</td>
+                        <td>${p.pretestScore > 0 ? (p.pretestScore / 20).toFixed(1) : '-'}</td>
+                        <td>${p.postestScore > 0 ? (p.postestScore / 20).toFixed(1) : '-'}</td>
+                        <td></td>
                     </tr>
                 `;
             });
             
-            html += '</table></body></html>';
+            // Agregar filas vacías si hay menos de 10 participantes
+            const filasVacias = Math.max(0, 10 - participants.length);
+            for (let i = 0; i < filasVacias; i++) {
+                html += `
+                    <tr class="participants-row">
+                        <td>${participants.length + i + 1}</td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                        <td></td>
+                    </tr>
+                `;
+            }
+            
+            // ═══════════════════════════════════════════════════════════
+            // SECCIÓN III. RESULTADOS
+            // ═══════════════════════════════════════════════════════════
+            
+            html += `
+                        <tr><td colspan="7" style="border: none; height: 10px;"></td></tr>
+                        <tr>
+                            <td colspan="7" class="section-title">III. RESULTADOS DE LA EVALUACIÓN</td>
+                        </tr>
+                        <tr class="results-header">
+                            <td colspan="2">INDICADOR</td>
+                            <td colspan="2">VALOR</td>
+                            <td colspan="3">OBSERVACIONES</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="field-label">Total de participantes:</td>
+                            <td colspan="2" class="results-value">${stats.totalParticipants}</td>
+                            <td colspan="3"></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="field-label">Participantes que completaron Pre-Test:</td>
+                            <td colspan="2" class="results-value">${stats.completedPretest}</td>
+                            <td colspan="3"></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="field-label">Participantes que completaron Post-Test:</td>
+                            <td colspan="2" class="results-value">${stats.completedPostest}</td>
+                            <td colspan="3"></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="field-label">Promedio Pre-Test:</td>
+                            <td colspan="2" class="results-value">${(stats.avgPretestScore / 20).toFixed(1)} / 5.0</td>
+                            <td colspan="3">${stats.avgPretestScore}%</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="field-label">Promedio Post-Test:</td>
+                            <td colspan="2" class="results-value">${(stats.avgPostestScore / 20).toFixed(1)} / 5.0</td>
+                            <td colspan="3">${stats.avgPostestScore}%</td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="field-label">Mejora Promedio:</td>
+                            <td colspan="2" class="results-value">+${stats.avgImprovement}%</td>
+                            <td colspan="3"></td>
+                        </tr>
+                        <tr>
+                            <td colspan="2" class="field-label">Tasa de Adherencia:</td>
+                            <td colspan="2" class="results-value" style="background-color: ${stats.adherenceRate >= 80 ? '#c6efce' : stats.adherenceRate >= 60 ? '#ffeb9c' : '#ffc7ce'};">${stats.adherenceRate}%</td>
+                            <td colspan="3">${stats.adherenceRate >= 80 ? 'Meta cumplida' : 'Requiere plan de mejora'}</td>
+                        </tr>
+                        
+                        <!-- ═══════════════════════════════════════════════════════════ -->
+                        <!-- SECCIÓN IV. FIRMAS -->
+                        <!-- ═══════════════════════════════════════════════════════════ -->
+                        <tr><td colspan="7" style="border: none; height: 20px;"></td></tr>
+                        <tr>
+                            <td colspan="7" class="section-title">IV. FIRMAS DE RESPONSABLES</td>
+                        </tr>
+                        <tr>
+                            <td colspan="3" class="signature-cell">
+                                <br><br><br>
+                                _________________________________<br>
+                                <strong>EXPOSITOR RESPONSABLE</strong><br>
+                                Ing. Biomédico
+                            </td>
+                            <td colspan="4" class="signature-cell">
+                                <br><br><br>
+                                _________________________________<br>
+                                <strong>COORDINADOR DE CAPACITACIÓN</strong><br>
+                                Ing. Biomédico
+                            </td>
+                        </tr>
+                        
+                        <!-- ═══════════════════════════════════════════════════════════ -->
+                        <!-- PIE DE PÁGINA -->
+                        <!-- ═══════════════════════════════════════════════════════════ -->
+                        <tr><td colspan="7" style="border: none; height: 10px;"></td></tr>
+                        <tr>
+                            <td colspan="7" style="text-align: center; font-size: 8pt; color: #666; border: none;">
+                                Documento generado automáticamente por el Sistema de Capacitaciones - Hospital Susana López de Valencia E.S.E.<br>
+                                Fecha de generación: ${new Date().toLocaleString('es-CO')}
+                            </td>
+                        </tr>
+                    </table>
+                </body>
+                </html>
+            `;
             
             // Descargar archivo
             const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
             const link = document.createElement('a');
             const url = URL.createObjectURL(blob);
             link.setAttribute('href', url);
-            link.setAttribute('download', `Reporte_${training.titulo.replace(/[^a-zA-Z0-9]/g, '_')}_${formatDateForFile(new Date())}.xls`);
+            link.setAttribute('download', `SLV-SR-03-F05_${training.titulo.replace(/[^a-zA-Z0-9]/g, '_')}_${formatDateForFile(new Date())}.xls`);
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
             
             Swal.fire({
                 icon: 'success',
-                title: '¡Exportado!',
-                text: 'El reporte Excel ha sido descargado',
-                timer: 2000,
+                title: '¡Reporte Generado!',
+                html: `<p>Se ha descargado el informe oficial <strong>SLV-SR-03-F05</strong></p>
+                       <p><small>Formato: Informe de Planeación, Ejecución y Evaluación de Capacitaciones Internas</small></p>`,
+                timer: 3000,
                 showConfirmButton: false
             });
         }
