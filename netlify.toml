@@ -2,10 +2,13 @@
   functions = "netlify/functions"
   publish = "."
 
-# Esto habilita CORS básico para dev rápido;
-# en producción puedes restringirlo a tu dominio
+[build.environment]
+  NODE_VERSION = "18"
+
+# Esto habilita CORS básico
 [[headers]]
   for = "/*"
   [headers.values]
     Access-Control-Allow-Origin = "*"
-
+    Access-Control-Allow-Headers = "Content-Type"
+    Access-Control-Allow-Methods = "GET, POST, OPTIONS"
