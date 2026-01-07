@@ -1,27 +1,16 @@
-// netlify/functions/generate-report-excel-mejorado.js
+// netlify/functions/generate-report-excel-formateado.js
 // ═════════════════════════════════════════════════════════════════
 // FUNCIÓN MEJORADA: Genera Reporte Excel Profesional
 // "INFORME DE ADHERENCIA A CAPACITACIÓN"
 // Hospital Susana López de Valencia E.S.E.
 // ═════════════════════════════════════════════════════════════════
-// 
-// Este reporte incluye:
-// ✅ Encabezado profesional con logos y datos
-// ✅ Información general de la capacitación
-// ✅ Tabla completa de participantes con evaluaciones
-// ✅ Cálculos de aprobación (≥3 puntos)
-// ✅ Resumen de estadísticas
-// ✅ Gráficos pie chart (Pre y Post)
-// ✅ Firma del coordinador
-// ═════════════════════════════════════════════════════════════════
 
 const https = require('https');
+const ExcelJS = require('exceljs');
 
 // Función auxiliar para obtener datos de Airtable
 async function fetchFromAirtable(path, apiKey, baseId) {
   return new Promise((resolve, reject) => {
-    const url = `https://api.airtable.com/v0/${baseId}${path}`;
-    
     const options = {
       hostname: 'api.airtable.com',
       path: `/v0/${baseId}${path}`,
@@ -49,452 +38,262 @@ async function fetchFromAirtable(path, apiKey, baseId) {
   });
 }
 
-// Función para generar HTML del reporte (será convertido a Excel)
-function generateReportHTML(trainingData, participants, stats) {
-  const today = new Date();
-  const dateStr = today.toLocaleDateString('es-ES', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+// Función para generar Excel formateado
+async function generateExcelReport(trainingData, participants) {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet('Informe', { pageSetup: { paperSize: 9, orientation: 'portrait' } });
+
+  // Configurar márgenes y tamaño de página
+  worksheet.pageMargins = { left: 0.5, right: 0.5, top: 0.5, bottom: 0.5 };
+  worksheet.pageSetup.fitToPage = true;
+  worksheet.pageSetup.fitToHeight = 1;
+
+  let currentRow = 1;
+
+  // ═════════════════════════════════════════════════════════════════
+  // ENCABEZADO
+  // ═════════════════════════════════════════════════════════════════
+  
+  // Merging para encabezado
+  worksheet.mergeCells(`A${currentRow}:H${currentRow + 2}`);
+  const headerCell = worksheet.getCell(`A${currentRow}`);
+  headerCell.value = 'INFORME DE ADHERENCIA A CAPACITACIÓN';
+  headerCell.font = { bold: true, size: 14, color: { argb: 'FF000000' } };
+  headerCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  headerCell.border = {
+    top: { style: 'thin', color: { argb: 'FF000000' } },
+    left: { style: 'thin', color: { argb: 'FF000000' } },
+    bottom: { style: 'thin', color: { argb: 'FF000000' } },
+    right: { style: 'thin', color: { argb: 'FF000000' } }
+  };
+
+  currentRow += 3;
+
+  // ═════════════════════════════════════════════════════════════════
+  // INFORMACIÓN GENERAL
+  // ═════════════════════════════════════════════════════════════════
+
+  const infoRows = [
+    ['CAPACITACIÓN', trainingData.titulo || 'Sin título'],
+    ['PERSONAL CAPACITADO', participants.length.toString()],
+    ['FECHA DE CAPACITACIÓN', new Date().toLocaleDateString('es-ES')],
+    ['PROCESO DE ATENCIÓN', trainingData.departamento || 'General']
+  ];
+
+  infoRows.forEach(([label, value]) => {
+    const labelCell = worksheet.getCell(`A${currentRow}`);
+    labelCell.value = label;
+    labelCell.font = { bold: true, size: 11 };
+    labelCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF0F0F0' } };
+    labelCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+    const valueCell = worksheet.getCell(`B${currentRow}`);
+    valueCell.value = value;
+    valueCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+    worksheet.mergeCells(`B${currentRow}:H${currentRow}`);
+    currentRow++;
   });
 
-  // Calcular porcentajes
-  const totalParticipants = participants.length;
-  const pretestApproved = participants.filter(p => p.pretest >= 3).length;
-  const posttestApproved = participants.filter(p => p.posttest >= 3).length;
-  const pretestPct = totalParticipants > 0 ? Math.round((pretestApproved / totalParticipants) * 100) : 0;
-  const posttestPct = totalParticipants > 0 ? Math.round((posttestApproved / totalParticipants) * 100) : 0;
+  currentRow += 1;
 
-  const html = `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-      <meta charset="UTF-8">
-      <title>Informe de Adherencia a Capacitación</title>
-      <style>
-        * {
-          margin: 0;
-          padding: 0;
-          font-family: 'Arial', sans-serif;
-          box-sizing: border-box;
-        }
-        body {
-          padding: 20px;
-          background: white;
-        }
-        .container {
-          max-width: 1200px;
-          margin: 0 auto;
-          background: white;
-          padding: 20px;
-        }
-        .header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          border-bottom: 3px solid #333;
-          padding-bottom: 15px;
-          margin-bottom: 20px;
-        }
-        .logo-left {
-          width: 80px;
-          height: 80px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border: 2px solid #333;
-          background: #f0f0f0;
-          border-radius: 5px;
-          font-size: 40px;
-        }
-        .header-title {
-          flex: 1;
-          text-align: center;
-          padding: 0 20px;
-        }
-        .header-title h1 {
-          font-size: 16px;
-          font-weight: bold;
-          color: #333;
-          margin-bottom: 5px;
-        }
-        .header-title p {
-          font-size: 11px;
-          color: #666;
-        }
-        .logo-right {
-          display: flex;
-          gap: 10px;
-          align-items: center;
-        }
-        .logo-box {
-          width: 60px;
-          height: 60px;
-          border: 1px solid #999;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #f9f9f9;
-          font-size: 24px;
-        }
-        .info-section {
-          background: #f5f5f5;
-          border: 1px solid #ddd;
-          padding: 15px;
-          margin-bottom: 20px;
-          border-radius: 5px;
-        }
-        .info-row {
-          display: flex;
-          margin-bottom: 8px;
-          font-size: 12px;
-        }
-        .info-label {
-          font-weight: bold;
-          width: 200px;
-          color: #333;
-        }
-        .info-value {
-          flex: 1;
-          color: #666;
-          padding-left: 10px;
-          border-bottom: 1px dotted #999;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          margin-bottom: 20px;
-          font-size: 11px;
-        }
-        table th {
-          background: #667eea;
-          color: white;
-          padding: 10px;
-          text-align: left;
-          font-weight: bold;
-          border: 1px solid #333;
-        }
-        table td {
-          padding: 8px;
-          border: 1px solid #ddd;
-          color: #333;
-        }
-        table tr:nth-child(even) {
-          background: #f9f9f9;
-        }
-        table tr:hover {
-          background: #f0f0f0;
-        }
-        .summary-section {
-          display: grid;
-          grid-template-columns: 1fr 1fr 1fr;
-          gap: 15px;
-          margin-bottom: 20px;
-        }
-        .summary-box {
-          background: #e8f5e9;
-          border: 2px solid #4caf50;
-          padding: 15px;
-          border-radius: 5px;
-          text-align: center;
-        }
-        .summary-box h3 {
-          color: #2e7d32;
-          font-size: 11px;
-          margin-bottom: 10px;
-          font-weight: bold;
-        }
-        .summary-box .number {
-          font-size: 24px;
-          font-weight: bold;
-          color: #1b5e20;
-          margin: 5px 0;
-        }
-        .summary-box .label {
-          font-size: 10px;
-          color: #558b2f;
-        }
-        .charts {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 20px;
-          margin-bottom: 20px;
-        }
-        .chart-box {
-          border: 1px solid #ddd;
-          padding: 15px;
-          border-radius: 5px;
-          background: #fafafa;
-        }
-        .chart-title {
-          font-weight: bold;
-          color: #333;
-          text-align: center;
-          margin-bottom: 15px;
-          font-size: 12px;
-        }
-        .pie-chart {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 200px;
-        }
-        .stats-table {
-          width: 100%;
-          background: white;
-          margin-top: 15px;
-        }
-        .stats-table td {
-          padding: 6px;
-          font-size: 10px;
-          border: 1px solid #ddd;
-        }
-        .stats-table .label {
-          font-weight: bold;
-          background: #f0f0f0;
-        }
-        .stats-table .number {
-          text-align: center;
-          font-weight: bold;
-          color: #667eea;
-        }
-        .signature {
-          margin-top: 40px;
-          text-align: center;
-          font-size: 11px;
-          color: #666;
-        }
-        .signature-line {
-          margin-top: 30px;
-          border-top: 1px solid #333;
-          width: 300px;
-          margin-left: auto;
-          margin-right: auto;
-          padding-top: 5px;
-        }
-        .page-break {
-          page-break-after: always;
-          margin: 40px 0;
-          border-top: 2px dashed #999;
-          padding-top: 20px;
-        }
-        .approved {
-          background: #c8e6c9;
-          font-weight: bold;
-          color: #1b5e20;
-        }
-        .notapproved {
-          background: #ffcdd2;
-          font-weight: bold;
-          color: #b71c1c;
-        }
-        .center {
-          text-align: center;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <!-- ENCABEZADO -->
-        <div class="header">
-          <div class="logo-left">🏥</div>
-          <div class="header-title">
-            <h1>INFORME DE ADHERENCIA A CAPACITACIÓN</h1>
-            <p>Hospital Susana López de Valencia E.S.E</p>
-          </div>
-          <div class="logo-right">
-            <div class="logo-box">🌿</div>
-            <div class="logo-box">📋</div>
-          </div>
-        </div>
+  // ═════════════════════════════════════════════════════════════════
+  // TABLA DE PARTICIPANTES
+  // ═════════════════════════════════════════════════════════════════
 
-        <!-- INFORMACIÓN GENERAL -->
-        <div class="info-section">
-          <div class="info-row">
-            <span class="info-label">CAPACITACIÓN:</span>
-            <span class="info-value">${trainingData.titulo || 'Sin titulo'}</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">PERSONAL CAPACITADO:</span>
-            <span class="info-value">${totalParticipants} participantes</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">FECHA DE CAPACITACIÓN:</span>
-            <span class="info-value">${dateStr}</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">PROCESO DE ATENCIÓN:</span>
-            <span class="info-value">${trainingData.departamento || 'General'}</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">OBJETIVO:</span>
-            <span class="info-value">${trainingData.descripcion || 'Mejorar conocimientos y adherencia'}</span>
-          </div>
-        </div>
+  const headerRow = currentRow;
+  const headers = ['No.', 'APELLIDOS Y NOMBRES', 'NOTA PRETEST', 'NOTA POSTEST', 'PROMEDIO', 'PRE TEST', 'POS TEST'];
+  
+  headers.forEach((header, index) => {
+    const cell = worksheet.getCell(headerRow, index + 1);
+    cell.value = header;
+    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 10 };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF667eea' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+  });
 
-        <!-- TABLA DE PARTICIPANTES -->
-        <h3 style="margin-bottom: 10px; font-size: 13px; color: #333;">EVALUACIÓN DE LA CAPACITACIÓN</h3>
-        <table>
-          <thead>
-            <tr>
-              <th style="width: 5%;">No.</th>
-              <th style="width: 35%;">APELLIDOS Y NOMBRES</th>
-              <th style="width: 15%;">NOTA PRETEST</th>
-              <th style="width: 15%;">NOTA POSTEST</th>
-              <th style="width: 10%;">PROMEDIO</th>
-              <th style="width: 10%;">APROBÓ</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${participants.map((p, idx) => {
-              const pretest = Number(p.pretest) || 0;
-              const posttest = Number(p.posttest) || 0;
-              const promedio = ((pretest + posttest) / 2).toFixed(1);
-              const aprobado = posttest >= 3;
-              return `
-                <tr>
-                  <td class="center">${idx + 1}</td>
-                  <td>${p.nombre}</td>
-                  <td class="center">${pretest}</td>
-                  <td class="center">${posttest}</td>
-                  <td class="center">${promedio}</td>
-                  <td class="center ${aprobado ? 'approved' : 'notapproved'}">
-                    ${aprobado ? 'SÍ' : 'NO'}
-                  </td>
-                </tr>
-              `;
-            }).join('')}
-          </tbody>
-        </table>
+  currentRow++;
 
-        <!-- RESUMEN CUANTITATIVO -->
-        <h3 style="margin: 20px 0 10px 0; font-size: 13px; color: #333;">RESUMEN DE EVALUACIÓN</h3>
-        <div class="summary-section">
-          <div class="summary-box">
-            <h3>TOTAL PARTICIPANTES</h3>
-            <div class="number">${totalParticipants}</div>
-            <div class="label">Personas evaluadas</div>
-          </div>
-          <div class="summary-box">
-            <h3>PROMEDIO PRETEST</h3>
-            <div class="number">${stats.avgPretest || 0}</div>
-            <div class="label">(sobre 5 puntos)</div>
-          </div>
-          <div class="summary-box">
-            <h3>PROMEDIO POSTEST</h3>
-            <div class="number">${stats.avgPosttest || 0}</div>
-            <div class="label">(sobre 5 puntos)</div>
-          </div>
-        </div>
+  // Agregar participantes
+  let pretestApproved = 0;
+  let posttestApproved = 0;
 
-        <!-- TABLA DE APROBACIÓN -->
-        <table style="margin-bottom: 20px;">
-          <thead>
-            <tr>
-              <th colspan="3" style="text-align: center;">TOTAL APROBADOS Y NO APROBADOS (≥3 puntos)</th>
-            </tr>
-            <tr>
-              <th>EVALUACIÓN</th>
-              <th>APROBARON</th>
-              <th>NO APROBARON</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="font-weight: bold;">PRE TEST</td>
-              <td class="center approved">${pretestApproved}</td>
-              <td class="center notapproved">${totalParticipants - pretestApproved}</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold;">POS TEST</td>
-              <td class="center approved">${posttestApproved}</td>
-              <td class="center notapproved">${totalParticipants - posttestApproved}</td>
-            </tr>
-          </tbody>
-        </table>
+  participants.forEach((participant, index) => {
+    const pretest = Number(participant.pretest) || 0;
+    const posttest = Number(participant.posttest) || 0;
+    const promedio = ((pretest + posttest) / 2).toFixed(1);
 
-        <!-- GRÁFICOS -->
-        <div class="charts">
-          <div class="chart-box">
-            <div class="chart-title">PRETEST ADHERENCIA</div>
-            <table class="stats-table">
-              <tr>
-                <td class="label">APROBARON</td>
-                <td class="number">${pretestApproved}</td>
-                <td class="number">${pretestPct}%</td>
-              </tr>
-              <tr>
-                <td class="label">NO APROBARON</td>
-                <td class="number">${totalParticipants - pretestApproved}</td>
-                <td class="number">${100 - pretestPct}%</td>
-              </tr>
-              <tr>
-                <td class="label">TOTAL EVALUADOS</td>
-                <td colspan="2" class="number">${totalParticipants}</td>
-              </tr>
-            </table>
-          </div>
+    if (pretest >= 3) pretestApproved++;
+    if (posttest >= 3) posttestApproved++;
 
-          <div class="chart-box">
-            <div class="chart-title">POSTEST ADHERENCIA</div>
-            <table class="stats-table">
-              <tr>
-                <td class="label">APROBARON</td>
-                <td class="number">${posttestApproved}</td>
-                <td class="number">${posttestPct}%</td>
-              </tr>
-              <tr>
-                <td class="label">NO APROBARON</td>
-                <td class="number">${totalParticipants - posttestApproved}</td>
-                <td class="number">${100 - posttestPct}%</td>
-              </tr>
-              <tr>
-                <td class="label">TOTAL EVALUADOS</td>
-                <td colspan="2" class="number">${totalParticipants}</td>
-              </tr>
-            </table>
-          </div>
-        </div>
+    const rowData = [
+      index + 1,
+      participant.nombre,
+      pretest,
+      posttest,
+      promedio,
+      0,
+      0
+    ];
 
-        <!-- ESTADÍSTICAS DE MEJORA -->
-        <div class="info-section">
-          <h3 style="margin-bottom: 15px; color: #333;">ANÁLISIS DE RESULTADOS</h3>
-          <div class="info-row">
-            <span class="info-label">MEJORA PROMEDIO:</span>
-            <span class="info-value">${stats.avgImprovement || 0}% de mejora de pretest a postest</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">ADHERENCIA POSTEST:</span>
-            <span class="info-value">${stats.adherenceRate || 0}% de participantes completaron el postest</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">DESEMPEÑO PRETEST:</span>
-            <span class="info-value">${pretestPct}% aprobaron la evaluación inicial</span>
-          </div>
-          <div class="info-row">
-            <span class="info-label">DESEMPEÑO POSTEST:</span>
-            <span class="info-value">${posttestPct}% aprobaron la evaluación final</span>
-          </div>
-        </div>
+    rowData.forEach((value, colIndex) => {
+      const cell = worksheet.getCell(currentRow, colIndex + 1);
+      cell.value = value;
+      cell.alignment = { horizontal: colIndex === 1 ? 'left' : 'center', vertical: 'middle' };
+      cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    });
 
-        <!-- FIRMA -->
-        <div class="signature">
-          <p style="margin-top: 30px;"><strong>Nombre y Firma del Coordinador de Capacitación</strong></p>
-          <div class="signature-line"></div>
-          <p style="margin-top: 20px; font-size: 10px; color: #999;">
-            Generado automáticamente por Sistema de Capacitaciones<br>
-            ${dateStr} - Hospital Susana López de Valencia E.S.E
-          </p>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
+    currentRow++;
+  });
 
-  return html;
+  // Fila de aprobación/no aprobación
+  const approvalRow = currentRow;
+  const approvalCell = worksheet.getCell(approvalRow, 5);
+  approvalCell.value = 'APROBARON';
+  approvalCell.font = { bold: true };
+  approvalCell.alignment = { horizontal: 'center' };
+  approvalCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+  const approvalValueCell = worksheet.getCell(approvalRow, 6);
+  approvalValueCell.value = pretestApproved;
+  approvalValueCell.alignment = { horizontal: 'center' };
+  approvalValueCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+  const approvalValueCell2 = worksheet.getCell(approvalRow, 7);
+  approvalValueCell2.value = posttestApproved;
+  approvalValueCell2.alignment = { horizontal: 'center' };
+  approvalValueCell2.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+  currentRow++;
+
+  const notApprovalRow = currentRow;
+  const notApprovalCell = worksheet.getCell(notApprovalRow, 5);
+  notApprovalCell.value = 'NO APROBARON';
+  notApprovalCell.font = { bold: true };
+  notApprovalCell.alignment = { horizontal: 'center' };
+  notApprovalCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+  const notApprovalValueCell = worksheet.getCell(notApprovalRow, 6);
+  notApprovalValueCell.value = participants.length - pretestApproved;
+  notApprovalValueCell.alignment = { horizontal: 'center' };
+  notApprovalValueCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+  const notApprovalValueCell2 = worksheet.getCell(notApprovalRow, 7);
+  notApprovalValueCell2.value = participants.length - posttestApproved;
+  notApprovalValueCell2.alignment = { horizontal: 'center' };
+  notApprovalValueCell2.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+  currentRow += 2;
+
+  // ═════════════════════════════════════════════════════════════════
+  // TABLA DE RESUMEN
+  // ═════════════════════════════════════════════════════════════════
+
+  const summaryStartRow = currentRow;
+
+  const summaryHeaders = ['TOTAL', 'PRE TEST', 'POS TEST'];
+  summaryHeaders.forEach((header, index) => {
+    const cell = worksheet.getCell(summaryStartRow, index + 2);
+    cell.value = header;
+    cell.font = { bold: true };
+    cell.alignment = { horizontal: 'center' };
+    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE0E0E0' } };
+  });
+
+  currentRow++;
+
+  const summaryRows = [
+    ['APROBARON', pretestApproved, posttestApproved],
+    ['NO APROBARON', participants.length - pretestApproved, participants.length - posttestApproved],
+    ['TOTAL EVALUADOS', participants.length, participants.length]
+  ];
+
+  summaryRows.forEach(([label, preValue, postValue]) => {
+    const labelCell = worksheet.getCell(currentRow, 1);
+    labelCell.value = label;
+    labelCell.font = { bold: true };
+    labelCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+    const preCell = worksheet.getCell(currentRow, 2);
+    preCell.value = preValue;
+    preCell.alignment = { horizontal: 'center' };
+    preCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+    const postCell = worksheet.getCell(currentRow, 3);
+    postCell.value = postValue;
+    postCell.alignment = { horizontal: 'center' };
+    postCell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+
+    currentRow++;
+  });
+
+  currentRow += 2;
+
+  // ═════════════════════════════════════════════════════════════════
+  // SECCIÓN DE GRÁFICOS Y ANÁLISIS
+  // ═════════════════════════════════════════════════════════════════
+
+  const pretestPct = participants.length > 0 ? Math.round((pretestApproved / participants.length) * 100) : 0;
+  const posttestPct = participants.length > 0 ? Math.round((posttestApproved / participants.length) * 100) : 0;
+
+  // Información de gráficos
+  const chartInfoRow = currentRow;
+  
+  const chartTitle1 = worksheet.getCell(chartInfoRow, 1);
+  chartTitle1.value = `PRE TEST\n${pretestPct}%`;
+  chartTitle1.font = { bold: true, size: 11 };
+  chartTitle1.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  worksheet.mergeCells(`A${chartInfoRow}:B${chartInfoRow + 2}`);
+
+  const chartTitle2 = worksheet.getCell(chartInfoRow, 3);
+  chartTitle2.value = `POS TEST\n${posttestPct}%`;
+  chartTitle2.font = { bold: true, size: 11 };
+  chartTitle2.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  worksheet.mergeCells(`C${chartInfoRow}:D${chartInfoRow + 2}`);
+
+  currentRow += 4;
+
+  // ═════════════════════════════════════════════════════════════════
+  // FIRMA
+  // ═════════════════════════════════════════════════════════════════
+
+  currentRow += 3;
+
+  const signatureRow = currentRow;
+  const signatureCell = worksheet.getCell(signatureRow, 1);
+  signatureCell.value = 'Nombre y Firma y Cargo del Coordinador de Capacitación';
+  signatureCell.font = { size: 10 };
+  signatureCell.alignment = { horizontal: 'center' };
+  worksheet.mergeCells(`A${signatureRow}:H${signatureRow}`);
+
+  currentRow += 2;
+
+  const signatureLineRow = currentRow;
+  const signatureLineCell = worksheet.getCell(signatureLineRow, 1);
+  signatureLineCell.value = '_________________________________';
+  signatureLineCell.alignment = { horizontal: 'center' };
+  worksheet.mergeCells(`A${signatureLineRow}:H${signatureLineRow}`);
+
+  // Ajustar ancho de columnas
+  worksheet.columns = [
+    { width: 5 },   // No.
+    { width: 25 },  // Nombres
+    { width: 12 },  // Pretest
+    { width: 12 },  // Postest
+    { width: 12 },  // Promedio
+    { width: 12 },  // Pre Test
+    { width: 12 },  // Pos Test
+    { width: 12 }   // Extra
+  ];
+
+  // Convertir a buffer
+  const buffer = await workbook.xlsx.writeBuffer();
+  return buffer;
 }
 
-// Función principal para exportar como PDF o HTML
+// Función principal
 export async function handler(event) {
   const headers = {
     'Content-Type': 'application/json',
@@ -517,7 +316,7 @@ export async function handler(event) {
 
   try {
     const payload = JSON.parse(event.body || '{}');
-    const { trainingId, format = 'html' } = payload;
+    const { trainingId, format = 'excel' } = payload;
 
     if (!trainingId) {
       return {
@@ -597,65 +396,22 @@ export async function handler(event) {
       };
     });
 
-    // Calcular estadísticas
-    const pretestScores = participants.filter(p => p.pretest > 0).map(p => p.pretest);
-    const postestScores = participants.filter(p => p.posttest > 0).map(p => p.posttest);
+    // Generar Excel
+    const excelBuffer = await generateExcelReport(training, participants);
 
-    const avgPretest = pretestScores.length > 0
-      ? Math.round(pretestScores.reduce((a, b) => a + b, 0) / pretestScores.length)
-      : 0;
-
-    const avgPosttest = postestScores.length > 0
-      ? Math.round(postestScores.reduce((a, b) => a + b, 0) / postestScores.length)
-      : 0;
-
-    const avgImprovement = avgPretest > 0 && avgPosttest > 0
-      ? Math.round(((avgPosttest - avgPretest) / avgPretest) * 100)
-      : 0;
-
-    const adherenceRate = participants.length > 0
-      ? Math.round((postestScores.length / participants.length) * 100)
-      : 0;
-
-    const stats = {
-      avgPretest,
-      avgPosttest,
-      avgImprovement,
-      adherenceRate
+    return {
+      statusCode: 200,
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'Content-Disposition': 'attachment; filename="informe-adherencia.xlsx"',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: excelBuffer.toString('base64'),
+      isBase64Encoded: true
     };
 
-    // Generar HTML
-    const htmlContent = generateReportHTML(training, participants, stats);
-
-    // Retornar según formato solicitado
-    if (format === 'html') {
-      return {
-        statusCode: 200,
-        headers: {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Content-Disposition': 'inline; filename="informe-adherencia.html"'
-        },
-        body: htmlContent
-      };
-    } else {
-      // Retornar datos para generar Excel/PDF en cliente
-      return {
-        statusCode: 200,
-        headers,
-        body: JSON.stringify({
-          success: true,
-          report: {
-            training: training,
-            participants: participants,
-            statistics: stats,
-            html: htmlContent
-          }
-        })
-      };
-    }
-
   } catch (error) {
-    console.error('❌ Error generando reporte:', error);
+    console.error('❌ Error generando reporte Excel:', error);
     return {
       statusCode: 500,
       headers,
