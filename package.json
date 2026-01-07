@@ -1,0 +1,23 @@
+{
+  "name": "sistema-capacitaciones-hospital",
+  "version": "1.0.0",
+  "description": "Sistema de gestión de capacitaciones - Hospital Susana López de Valencia",
+  "main": "capacitaciones.html",
+  "scripts": {
+    "dev": "netlify dev",
+    "deploy": "netlify deploy --prod"
+  },
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  },
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  },
+  "keywords": [
+    "capacitaciones",
+    "hospital",
+    "airtable"
+  ],
+  "author": "Hospital Susana López de Valencia",
+  "license": "ISC"
+}
