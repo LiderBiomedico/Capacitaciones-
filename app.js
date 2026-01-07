@@ -616,6 +616,149 @@ async function accessTraining() {
 
 document.addEventListener('DOMContentLoaded', initializeApp);
 
+// ═════════════════════════════════════════════════════════════════
+// FUNCIONES DE REPORTE PROFESIONAL - INFORME DE ADHERENCIA
+// ═════════════════════════════════════════════════════════════════
+// Versión 2.0.0 - Sistema de reportes formateados
+// Hospital Susana López de Valencia E.S.E.
+
+/**
+ * Función para generar y descargar Informe de Adherencia profesional
+ * @param {string} trainingId - ID de la capacitación
+ * @param {string} format - Formato de salida ('html' o 'json')
+ */
+async function generateAdherenceReport(trainingId, format = 'html') {
+  try {
+    showAlert('Generando informe de adherencia...', 'info');
+    
+    console.log('📊 Generando Informe de Adherencia');
+    console.log('   Capacitación:', trainingId);
+    console.log('   Formato:', format);
+
+    const response = await fetch('/.netlify/functions/generate-report-excel-mejorado', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        trainingId: trainingId,
+        format: format
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Error ${response.status}`);
+    }
+
+    if (format === 'html') {
+      // Descargar como HTML
+      const blob = await response.blob();
+      downloadFile(blob, 'informe-adherencia.html', 'text/html');
+      showAlert('✅ Informe HTML descargado exitosamente', 'success');
+    } else if (format === 'json') {
+      // Obtener datos JSON para procesar en cliente
+      const data = await response.json();
+      
+      if (data.success && data.report) {
+        // Opción 1: Descargar HTML desde los datos
+        downloadFile(
+          new Blob([data.report.html], { type: 'text/html' }),
+          'informe-adherencia.html',
+          'text/html'
+        );
+        
+        // Opción 2: Abrir en nueva ventana
+        const newWindow = window.open();
+        newWindow.document.write(data.report.html);
+        newWindow.document.close();
+        
+        showAlert('✅ Informe generado exitosamente', 'success');
+      } else {
+        throw new Error(data.error || 'Error al generar reporte');
+      }
+    }
+
+  } catch (error) {
+    console.error('❌ Error generando informe:', error);
+    showAlert('Error al generar informe: ' + error.message, 'error');
+  }
+}
+
+/**
+ * Función auxiliar para descargar archivos
+ * @param {Blob} blob - Contenido del archivo
+ * @param {string} filename - Nombre del archivo
+ * @param {string} mimeType - Tipo MIME del archivo
+ */
+function downloadFile(blob, filename, mimeType) {
+  const url = window.URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.type = mimeType;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.URL.revokeObjectURL(url);
+}
+
+/**
+ * Función para abrir el informe en nueva ventana (para imprimir)
+ * @param {string} trainingId - ID de la capacitación
+ */
+function viewAdherenceReportInWindow(trainingId) {
+  try {
+    if (!trainingId) {
+      showAlert('Por favor selecciona una capacitación', 'error');
+      return;
+    }
+
+    showAlert('Abriendo informe...', 'info');
+
+    fetch('/.netlify/functions/generate-report-excel-mejorado', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        trainingId: trainingId,
+        format: 'json'
+      })
+    })
+    .then(res => {
+      if (!res.ok) throw new Error(`Error ${res.status}`);
+      return res.json();
+    })
+    .then(data => {
+      if (data.success && data.report && data.report.html) {
+        const newWindow = window.open();
+        newWindow.document.write(data.report.html);
+        newWindow.document.close();
+        
+        // Esperar a que cargue y luego mostrar el diálogo de impresión
+        setTimeout(() => {
+          newWindow.print();
+        }, 500);
+
+        showAlert('✅ Informe abierto', 'success');
+      } else {
+        throw new Error(data.error || 'Error al generar reporte');
+      }
+    })
+    .catch(error => {
+      console.error('Error:', error);
+      showAlert('Error al abrir informe: ' + error.message, 'error');
+    });
+
+  } catch (error) {
+    console.error('❌ Error abriendo informe:', error);
+    showAlert('Error: ' + error.message, 'error');
+  }
+}
+
+// ═════════════════════════════════════════════════════════════════
+// FIN DE FUNCIONES DE REPORTE
+// ═════════════════════════════════════════════════════════════════
+
+console.log('✅ Funciones de Informe de Adherencia cargadas correctamente');
+
 // ==========================================
 // NOTAS DE SEGURIDAD
 // ==========================================
@@ -639,4 +782,12 @@ AIRTABLE_API_KEY=patXXXXXXXXXXXXXXXXXXXXXX
 AIRTABLE_BASE_ID=appXXXXXXXXXXXXXX
 
 Estas variables NUNCA estÃ¡n en el cÃ³digo, solo en el servidor.
+
+ðŸ"Š REPORTES:
+
+Las funciones de reporte mejorado están disponibles:
+- generateAdherenceReport(trainingId, format) - Generar y descargar
+- viewAdherenceReportInWindow(trainingId) - Ver e imprimir
+- downloadFile(blob, filename, mimeType) - Descargar archivos
+
 */
