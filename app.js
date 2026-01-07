@@ -754,7 +754,7 @@ function viewAdherenceReportInWindow(trainingId) {
 }
 
 /**
- * Función para descargar informe en Excel formateado
+ * Función para descargar informe en Excel con DATOS REALES
  * @param {string} trainingId - ID de la capacitación
  */
 async function downloadAdherenceReportExcel(trainingId) {
@@ -764,41 +764,55 @@ async function downloadAdherenceReportExcel(trainingId) {
       return;
     }
 
-    showAlert('Generando archivo Excel...', 'info');
+    showAlert('⏳ Generando archivo... por favor espera', 'info');
     
-    console.log('📊 Generando Informe Excel');
+    console.log('📊 Generando Informe Excel con datos reales');
     console.log('   Capacitación:', trainingId);
 
-    const response = await fetch('/.netlify/functions/generate-report-excel-formateado', {
+    // Usar la nueva función que realmente obtiene datos
+    const response = await fetch('/.netlify/functions/generate-report-excel-data', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        trainingId: trainingId,
-        format: 'excel'
+        trainingId: trainingId
       })
     });
 
+    console.log('📬 Respuesta del servidor:', response.status);
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || `Error ${response.status}`);
+      const errorText = await response.text();
+      console.error('Error response:', errorText);
+      
+      let errorMsg = `Error ${response.status}`;
+      try {
+        const errorData = JSON.parse(errorText);
+        errorMsg = errorData.error || errorMsg;
+      } catch (e) {
+        // errorText no es JSON
+      }
+      
+      throw new Error(errorMsg);
     }
 
-    // Descargar como blob
+    // Descargar el archivo
     const blob = await response.blob();
     
     // Crear nombre del archivo con fecha
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
-    const filename = `Informe-Adherencia-${dateStr}.xlsx`;
+    const filename = `Informe-Adherencia-${dateStr}.csv`;
+    
+    console.log('💾 Descargando archivo:', filename);
     
     // Descargar
-    downloadFile(blob, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    downloadFile(blob, filename, 'text/csv');
     
-    showAlert('✅ Informe Excel descargado exitosamente', 'success');
+    showAlert('✅ Informe descargado exitosamente. Abre el archivo CSV en Excel.', 'success');
 
   } catch (error) {
     console.error('❌ Error generando Excel:', error);
-    showAlert('Error al generar Excel: ' + error.message, 'error');
+    showAlert('Error: ' + error.message, 'error');
   }
 }
 
