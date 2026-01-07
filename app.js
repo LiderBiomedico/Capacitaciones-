@@ -753,6 +753,55 @@ function viewAdherenceReportInWindow(trainingId) {
   }
 }
 
+/**
+ * Función para descargar informe en Excel formateado
+ * @param {string} trainingId - ID de la capacitación
+ */
+async function downloadAdherenceReportExcel(trainingId) {
+  try {
+    if (!trainingId) {
+      showAlert('Por favor selecciona una capacitación', 'error');
+      return;
+    }
+
+    showAlert('Generando archivo Excel...', 'info');
+    
+    console.log('📊 Generando Informe Excel');
+    console.log('   Capacitación:', trainingId);
+
+    const response = await fetch('/.netlify/functions/generate-report-excel-formateado', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        trainingId: trainingId,
+        format: 'excel'
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || `Error ${response.status}`);
+    }
+
+    // Descargar como blob
+    const blob = await response.blob();
+    
+    // Crear nombre del archivo con fecha
+    const today = new Date();
+    const dateStr = today.toISOString().split('T')[0];
+    const filename = `Informe-Adherencia-${dateStr}.xlsx`;
+    
+    // Descargar
+    downloadFile(blob, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    
+    showAlert('✅ Informe Excel descargado exitosamente', 'success');
+
+  } catch (error) {
+    console.error('❌ Error generando Excel:', error);
+    showAlert('Error al generar Excel: ' + error.message, 'error');
+  }
+}
+
 // ═════════════════════════════════════════════════════════════════
 // FIN DE FUNCIONES DE REPORTE
 // ═════════════════════════════════════════════════════════════════
