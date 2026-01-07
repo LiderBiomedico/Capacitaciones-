@@ -754,7 +754,7 @@ function viewAdherenceReportInWindow(trainingId) {
 }
 
 /**
- * Función para descargar informe en Excel con DATOS REALES
+ * Función para descargar informe en Excel PROFESIONAL con formato ADERENCIA
  * @param {string} trainingId - ID de la capacitación
  */
 async function downloadAdherenceReportExcel(trainingId) {
@@ -764,13 +764,13 @@ async function downloadAdherenceReportExcel(trainingId) {
       return;
     }
 
-    showAlert('⏳ Generando archivo... por favor espera', 'info');
+    showAlert('⏳ Generando archivo Excel profesional... por favor espera', 'info');
     
-    console.log('📊 Generando Informe Excel con datos reales');
+    console.log('📊 Generando Informe Excel Profesional');
     console.log('   Capacitación:', trainingId);
 
-    // Usar la nueva función que realmente obtiene datos
-    const response = await fetch('/.netlify/functions/generate-report-excel-data', {
+    // Usar la nueva función profesional que genera Excel formateado
+    const response = await fetch('/.netlify/functions/generate-report-excel-profesional', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -789,26 +789,26 @@ async function downloadAdherenceReportExcel(trainingId) {
         const errorData = JSON.parse(errorText);
         errorMsg = errorData.error || errorMsg;
       } catch (e) {
-        // errorText no es JSON
+        // No es JSON
       }
       
       throw new Error(errorMsg);
     }
 
-    // Descargar el archivo
+    // Descargar el archivo XLSX
     const blob = await response.blob();
     
     // Crear nombre del archivo con fecha
     const today = new Date();
     const dateStr = today.toISOString().split('T')[0];
-    const filename = `Informe-Adherencia-${dateStr}.csv`;
+    const filename = `Informe-Adherencia-${dateStr}.xlsx`;
     
     console.log('💾 Descargando archivo:', filename);
     
     // Descargar
-    downloadFile(blob, filename, 'text/csv');
+    downloadFile(blob, filename, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     
-    showAlert('✅ Informe descargado exitosamente. Abre el archivo CSV en Excel.', 'success');
+    showAlert('✅ Informe Excel descargado exitosamente', 'success');
 
   } catch (error) {
     console.error('❌ Error generando Excel:', error);
