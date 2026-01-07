@@ -8,6 +8,7 @@
     "deploy": "netlify deploy --prod"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "node-fetch": "^2.6.7"
   },
   "devDependencies": {
