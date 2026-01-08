@@ -23,9 +23,7 @@
     
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    
-    <!-- SheetJS (Excel .xlsx) -->
-    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     
     <style>
         * {
@@ -1790,17 +1788,17 @@
                     </div>
                 </div>
 
-                <div class="card" style="margin-top: 1.25rem;">
+                                <div class="card" style="margin-top: 1.25rem;">
                     <h3><i class="fas fa-calendar-plus"></i> Capacitaciones individuales (fecha específica)</h3>
                     <p style="color:#666; margin-bottom: 1rem;">
-                        Agrega eventos puntuales con <strong>fecha</strong> y <strong>hora exactas</strong>. Se incluyen en <strong>Excel</strong>, <strong>.ICS</strong> e <strong>Impresión</strong>.
+                        Agrega eventos puntuales con fecha y hora exactas. Se incluyen en <strong>Excel</strong>, <strong>.ICS</strong> e <strong>Impresión</strong>.
                     </p>
 
                     <div class="form-row" style="display:flex; flex-wrap:wrap; gap: 1rem; align-items:end;">
                         <div class="form-group" style="margin:0; min-width: 260px; flex:1;">
                             <label><i class="fas fa-chalkboard-teacher"></i> Capacitación</label>
                             <select id="manualTrainingSelect"></select>
-                            <small style="color:#888;">Si no aparece, selecciona “Otra...” y escribe el nombre.</small>
+                            <small style="color:#888;">Si no aparece, selecciona “Otra…” y escribe el nombre.</small>
                         </div>
 
                         <div class="form-group" style="margin:0; min-width: 240px; flex:1; display:none;" id="manualTrainingOtherWrap">
@@ -1867,8 +1865,7 @@
                     </div>
                 </div>
 
-
-                <div id="scheduleEmpty" class="card" style="text-align:center; padding: 2.5rem; display:none;">
+<div id="scheduleEmpty" class="card" style="text-align:center; padding: 2.5rem; display:none;">
                     <i class="fas fa-info-circle" style="font-size: 3rem; color: #dee2e6; margin-bottom: 1rem;"></i>
                     <h3 style="color:#666;">Sin capacitaciones activas</h3>
                     <p style="color:#999;">Crea o activa capacitaciones para poder generar el cronograma anual.</p>
@@ -4717,6 +4714,8 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
         // Datos del cronograma generado (para exportar / imprimir)
         let annualScheduleData = [];
+        let manualScheduleData = [];
+        const MANUAL_SCHEDULE_STORAGE_KEY = 'manualScheduleData_v1';
 
         function initScheduleTab() {
             // Año por defecto
@@ -4725,17 +4724,20 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 yearInput.value = String(new Date().getFullYear());
             }
 
-            // Limpiar vista
+            // Limpiar vista del cronograma generado
             const container = document.getElementById('scheduleContainer');
             const empty = document.getElementById('scheduleEmpty');
             if (container) container.style.display = 'none';
             if (empty) empty.style.display = 'none';
 
+            // Reset generado (manual se conserva)
             annualScheduleData = [];
-            // Inicializar módulo manual
+
+            // Inicializar UI manual + cargar guardados
             initManualScheduleUI();
             loadManualScheduleData();
-            updateScheduleButtons();
+
+            updateScheduleActionButtons();
         }
 
         function setScheduleActionButtonsEnabled(enabled) {
@@ -4746,6 +4748,366 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             if (btnIcs) btnIcs.disabled = !enabled;
             if (btnPrint) btnPrint.disabled = !enabled;
         }
+
+        function updateScheduleActionButtons() {
+            const combined = getCombinedScheduleData();
+            setScheduleActionButtonsEnabled(combined.length > 0);
+        }
+
+        // ======================
+        // CRONOGRAMA: Capacitaciones individuales (manual)
+        // ======================
+        function loadManualScheduleData() {
+            try {
+                const raw = localStorage.getItem(MANUAL_SCHEDULE_STORAGE_KEY);
+                manualScheduleData = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(manualScheduleData)) manualScheduleData = [];
+            } catch (e) {
+                manualScheduleData = [];
+            }
+            renderManualScheduleTable();
+        }
+
+        function saveManualScheduleData() {
+            localStorage.setItem(MANUAL_SCHEDULE_STORAGE_KEY, JSON.stringify(manualScheduleData));
+            renderManualScheduleTable();
+            updateScheduleActionButtons();
+        }
+
+        async function initManualScheduleUI() {
+            const select = document.getElementById('manualTrainingSelect');
+            if (!select) return;
+
+            let trainings = [];
+            try {
+                trainings = await fetchTrainingsForSchedule();
+            } catch (e) {
+                trainings = [];
+            }
+
+            select.innerHTML = '';
+            const opt0 = document.createElement('option');
+            opt0.value = '';
+            opt0.textContent = 'Seleccione...';
+            select.appendChild(opt0);
+
+            trainings.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id || t.title || t.titulo || '';
+                opt.dataset.title = t.title || t.titulo || 'Capacitación';
+                opt.dataset.department = t.department || t.departamento || '';
+                opt.dataset.duration = t.duration || t.duracion || '';
+                opt.textContent = `${opt.dataset.title}${opt.dataset.department ? ' — ' + opt.dataset.department : ''}`;
+                select.appendChild(opt);
+            });
+
+            const optOther = document.createElement('option');
+            optOther.value = '__other__';
+            optOther.textContent = 'Otra... (escribir nombre)';
+            select.appendChild(optOther);
+
+            select.onchange = () => {
+                const wrap = document.getElementById('manualTrainingOtherWrap');
+                if (!wrap) return;
+                wrap.style.display = (select.value === '__other__') ? 'block' : 'none';
+            };
+
+            const d = document.getElementById('manualDate');
+            if (d && !d.value) {
+                const now = new Date();
+                const yyyy = now.getFullYear();
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                const dd = String(now.getDate()).padStart(2, '0');
+                d.value = `${yyyy}-${mm}-${dd}`;
+            }
+        }
+
+        function addManualScheduleEvent() {
+            const sel = document.getElementById('manualTrainingSelect');
+            const other = document.getElementById('manualTrainingOther');
+            const date = document.getElementById('manualDate');
+            const time = document.getElementById('manualTime');
+            const duration = document.getElementById('manualDuration');
+            const location = document.getElementById('manualLocation');
+            const notes = document.getElementById('manualNotes');
+
+            if (!sel || !date || !time) return;
+
+            const dateISO = (date.value || '').trim();
+            const hhmm = (time.value || '').trim();
+            if (!dateISO || !hhmm) {
+                Swal.fire({ icon:'warning', title:'Faltan datos', text:'Selecciona fecha y hora.' });
+                return;
+            }
+
+            let title = '';
+            let department = '';
+            let dur = (duration?.value || '').trim();
+
+            if (sel.value === '__other__') {
+                title = (other?.value || '').trim();
+                if (!title) {
+                    Swal.fire({ icon:'warning', title:'Falta el nombre', text:'Escribe el nombre de la capacitación.' });
+                    return;
+                }
+            } else {
+                const opt = sel.options[sel.selectedIndex];
+                title = opt?.dataset?.title || opt?.textContent || 'Capacitación';
+                department = opt?.dataset?.department || '';
+                if (!dur) dur = opt?.dataset?.duration || '';
+            }
+
+            const item = {
+                id: (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random()),
+                dateISO,
+                time: hhmm,
+                title,
+                department,
+                duration: dur,
+                location: (location?.value || '').trim(),
+                notes: (notes?.value || '').trim()
+            };
+
+            manualScheduleData.push(item);
+            saveManualScheduleData();
+            Swal.fire({ icon:'success', title:'Agregado', timer: 900, showConfirmButton:false });
+        }
+
+        function clearManualScheduleForm() {
+            const other = document.getElementById('manualTrainingOther');
+            const duration = document.getElementById('manualDuration');
+            const location = document.getElementById('manualLocation');
+            const notes = document.getElementById('manualNotes');
+            if (other) other.value = '';
+            if (duration) duration.value = '';
+            if (location) location.value = '';
+            if (notes) notes.value = '';
+        }
+
+        function deleteManualScheduleEvent(id) {
+            manualScheduleData = manualScheduleData.filter(x => x.id !== id);
+            saveManualScheduleData();
+        }
+
+        function renderManualScheduleTable() {
+            const empty = document.getElementById('manualScheduleEmpty');
+            const container = document.getElementById('manualScheduleContainer');
+            const tbody = document.getElementById('manualScheduleTbody');
+            if (!tbody) return;
+
+            if (!manualScheduleData || manualScheduleData.length === 0) {
+                if (empty) empty.style.display = 'block';
+                if (container) container.style.display = 'none';
+                tbody.innerHTML = '';
+                return;
+            }
+
+            if (empty) empty.style.display = 'none';
+            if (container) container.style.display = 'block';
+
+            const sorted = [...manualScheduleData].sort((a,b) => new Date(`${a.dateISO}T${a.time}:00`) - new Date(`${b.dateISO}T${b.time}:00`));
+
+            tbody.innerHTML = '';
+            sorted.forEach((r, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding:8px; border:1px solid #e5e7eb;">${i+1}</td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;">${r.dateISO}</td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;">${r.time}</td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;"><strong>${escapeHtml(r.title)}</strong></td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;">${escapeHtml(r.location || '')}</td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;">${escapeHtml(r.duration || '')}</td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;">
+                        <button class="btn btn-danger" style="padding:6px 10px;" onclick="deleteManualScheduleEvent('${r.id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function getCombinedScheduleData() {
+            const gen = (annualScheduleData || []).map(x => ({ ...x, source: 'Generado' }));
+            const man = (manualScheduleData || []).map(x => ({
+                dateISO: x.dateISO,
+                time: x.time,
+                title: x.title,
+                department: x.department || '',
+                duration: x.duration || '',
+                location: x.location || '',
+                notes: x.notes || '',
+                source: 'Manual'
+            }));
+
+            const all = [...gen, ...man].sort((a,b) => new Date(`${a.dateISO}T${a.time}:00`) - new Date(`${b.dateISO}T${b.time}:00`));
+            all.forEach((r, idx) => r._exportIndex = idx + 1);
+            return all;
+        }
+
+        // ======================
+        // Exportar Excel (.xlsx) - formato profesional
+        // ======================
+        function downloadScheduleExcel() {
+            const data = getCombinedScheduleData();
+            if (!data || data.length === 0) return;
+
+            if (typeof XLSX === 'undefined') {
+                Swal.fire({ icon:'error', title:'Excel no disponible', text:'No se cargó la librería para Excel. Verifica que xlsx-js-style esté incluido.' });
+                return;
+            }
+
+            const year = document.getElementById('scheduleYear')?.value || String(new Date().getFullYear());
+            const generatedAt = new Date().toLocaleString('es-CO');
+
+            const header = ['#','Fecha','Hora','Capacitación','Departamento','Duración','Lugar','Observación','Tipo'];
+            const aoa = [];
+            aoa.push([`Cronograma Anual de Capacitaciones - ${year}`]);
+            aoa.push([`Hospital Susana López de Valencia | Generado: ${generatedAt}`]);
+            aoa.push([]);
+            aoa.push(header);
+
+            data.forEach(r => {
+                const d = new Date(`${r.dateISO}T00:00:00`);
+                const t = (r.time && r.time.includes(':')) ? r.time : '00:00';
+                const [hh, mm] = t.split(':').map(x => parseInt(x, 10) || 0);
+                const timeFraction = (hh * 60 + mm) / (24 * 60);
+
+                aoa.push([
+                    r._exportIndex,
+                    d,
+                    timeFraction,
+                    r.title || '',
+                    r.department || '',
+                    r.duration || '',
+                    r.location || '',
+                    r.notes || '',
+                    r.source || ''
+                ]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(aoa, { cellDates: true });
+
+            ws['!cols'] = [
+                { wch: 4 }, { wch: 12 }, { wch: 7 }, { wch: 48 }, { wch: 18 },
+                { wch: 12 }, { wch: 22 }, { wch: 30 }, { wch: 10 }
+            ];
+
+            ws['!merges'] = [
+                { s: { r:0, c:0 }, e: { r:0, c:8 } },
+                { s: { r:1, c:0 }, e: { r:1, c:8 } }
+            ];
+
+            ws['!freeze'] = { xSplit: 0, ySplit: 4, topLeftCell: 'A5', activePane: 'bottomLeft', state: 'frozen' };
+            ws['!autofilter'] = { ref: 'A4:I4' };
+
+            const border = {
+                top: { style: 'thin', color: { rgb: 'D1D5DB' } },
+                bottom: { style: 'thin', color: { rgb: 'D1D5DB' } },
+                left: { style: 'thin', color: { rgb: 'D1D5DB' } },
+                right: { style: 'thin', color: { rgb: 'D1D5DB' } },
+            };
+
+            const titleStyle = {
+                font: { bold: true, sz: 16, color: { rgb: 'FFFFFF' } },
+                fill: { patternType: 'solid', fgColor: { rgb: '4F46E5' } },
+                alignment: { horizontal: 'center', vertical: 'center' }
+            };
+
+            const subTitleStyle = {
+                font: { italic: true, sz: 11, color: { rgb: '374151' } },
+                alignment: { horizontal: 'center', vertical: 'center' }
+            };
+
+            const headerStyle = {
+                font: { bold: true, color: { rgb: 'FFFFFF' } },
+                fill: { patternType: 'solid', fgColor: { rgb: '111827' } },
+                alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+                border
+            };
+
+            function styleCell(addr, s, z) {
+                if (!ws[addr]) return;
+                ws[addr].s = s;
+                if (z) ws[addr].z = z;
+            }
+
+            styleCell('A1', titleStyle);
+            styleCell('A2', subTitleStyle);
+
+            ws['!rows'] = [
+                { hpt: 28 },
+                { hpt: 18 },
+                { hpt: 8 },
+                { hpt: 20 }
+            ];
+
+            const cols = ['A','B','C','D','E','F','G','H','I'];
+            cols.forEach(col => styleCell(`${col}4`, headerStyle));
+
+            const firstDataRow = 5;
+            const lastRow = 4 + data.length;
+            for (let r = firstDataRow; r <= lastRow; r++) {
+                const isAlt = ((r - firstDataRow) % 2) === 1;
+                const fill = isAlt ? { patternType:'solid', fgColor:{ rgb:'F9FAFB' } } : undefined;
+
+                cols.forEach((col, cidx) => {
+                    const addr = `${col}${r}`;
+                    if (!ws[addr]) return;
+
+                    const baseStyle = {
+                        alignment: { horizontal: (cidx<=2 ? 'center' : 'left'), vertical:'top', wrapText: (col==='D' || col==='H') },
+                        border
+                    };
+                    if (fill) baseStyle.fill = fill;
+
+                    if (col === 'B') ws[addr].z = 'dd/mm/yyyy';
+                    if (col === 'C') ws[addr].z = 'hh:mm';
+
+                    ws[addr].s = baseStyle;
+                });
+            }
+
+            // Resumen
+            const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+            const monthCount = Array(12).fill(0);
+            const typeCount = {};
+            data.forEach(r => {
+                const m = parseInt(r.dateISO.split('-')[1], 10) - 1;
+                if (m >= 0 && m < 12) monthCount[m] += 1;
+                typeCount[r.source || ''] = (typeCount[r.source || ''] || 0) + 1;
+            });
+
+            const summaryAoa = [];
+            summaryAoa.push([`Resumen - Cronograma ${year}`]);
+            summaryAoa.push([`Total de eventos`, data.length]);
+            summaryAoa.push([]);
+            summaryAoa.push(['Eventos por mes', 'Cantidad']);
+            monthNames.forEach((name, idx) => summaryAoa.push([name, monthCount[idx]]));
+            summaryAoa.push([]);
+            summaryAoa.push(['Eventos por tipo', 'Cantidad']);
+            Object.keys(typeCount).forEach(k => summaryAoa.push([k, typeCount[k]]));
+
+            const ws2 = XLSX.utils.aoa_to_sheet(summaryAoa);
+            ws2['!cols'] = [{ wch: 22 }, { wch: 12 }];
+            ws2['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:1} }];
+            ws2['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft', state: 'frozen' };
+
+            const sumTitle = {
+                font: { bold: true, sz: 14, color: { rgb: 'FFFFFF' } },
+                fill: { patternType: 'solid', fgColor: { rgb: '0F766E' } },
+                alignment: { horizontal: 'center', vertical: 'center' }
+            };
+            if (ws2['A1']) ws2['A1'].s = sumTitle;
+            ws2['!rows'] = [{ hpt: 22 }];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Cronograma');
+            XLSX.utils.book_append_sheet(wb, ws2, 'Resumen');
+
+            XLSX.writeFile(wb, `cronograma_capacitaciones_${year}.xlsx`);
+        }
+
 
         async function fetchTrainingsForSchedule() {
             const response = await fetch('/.netlify/functions/airtable-proxy', {
@@ -4911,7 +5273,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 if (!trainings || trainings.length === 0) {
                     if (empty) empty.style.display = 'block';
                     annualScheduleData = [];
-                    updateScheduleButtons();
+                    setScheduleActionButtonsEnabled(false);
                     Swal.close();
                     return;
                 }
@@ -4940,13 +5302,13 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 renderScheduleTable();
                 if (container) container.style.display = 'block';
-                updateScheduleButtons();
+                setScheduleActionButtonsEnabled(true);
 
                 Swal.close();
 
             } catch (error) {
                 console.error('❌ Error generando cronograma:', error);
-                updateScheduleButtons();
+                setScheduleActionButtonsEnabled(false);
                 Swal.fire({
                     icon: 'error',
                     title: 'No se pudo generar el cronograma',
@@ -4961,7 +5323,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
             tbody.innerHTML = '';
 
-            combined.forEach(item => {
+            annualScheduleData.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.style.borderBottom = '1px solid #eee';
                 tr.innerHTML = `
@@ -5015,291 +5377,38 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             URL.revokeObjectURL(url);
         }
 
-        
-
-        // ======================
-        // CRONOGRAMA: Capacitaciones individuales + Excel (.xlsx)
-        // ======================
-        let manualScheduleData = [];
-        const MANUAL_SCHEDULE_STORAGE_KEY = 'manualScheduleData_v1';
-
-        function loadManualScheduleData() {
-            try {
-                const raw = localStorage.getItem(MANUAL_SCHEDULE_STORAGE_KEY);
-                manualScheduleData = raw ? JSON.parse(raw) : [];
-                if (!Array.isArray(manualScheduleData)) manualScheduleData = [];
-            } catch {
-                manualScheduleData = [];
-            }
-            renderManualScheduleTable();
-            updateScheduleButtons();
-        }
-
-        function saveManualScheduleData() {
-            localStorage.setItem(MANUAL_SCHEDULE_STORAGE_KEY, JSON.stringify(manualScheduleData));
-            updateScheduleButtons();
-        }
-
-        function updateScheduleButtons() {
-            const hasAny = (Array.isArray(annualScheduleData) && annualScheduleData.length > 0) ||
-                           (Array.isArray(manualScheduleData) && manualScheduleData.length > 0);
-            setScheduleActionButtonsEnabled(hasAny);
-        }
-
-        async function initManualScheduleUI() {
-            const select = document.getElementById('manualTrainingSelect');
-            if (!select) return;
-
-            let trainings = [];
-            try {
-                trainings = await fetchTrainingsForSchedule();
-            } catch {
-                trainings = [];
-            }
-
-            select.innerHTML = '';
-            const opt0 = document.createElement('option');
-            opt0.value = '';
-            opt0.textContent = 'Seleccione...';
-            select.appendChild(opt0);
-
-            trainings.forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = t.id || t.title || '';
-                opt.dataset.title = t.title || 'Capacitación';
-                opt.dataset.department = t.department || '';
-                opt.dataset.duration = t.duration || '';
-                opt.textContent = `${opt.dataset.title}${opt.dataset.department ? ' — ' + opt.dataset.department : ''}`;
-                select.appendChild(opt);
-            });
-
-            const optOther = document.createElement('option');
-            optOther.value = '__other__';
-            optOther.textContent = 'Otra... (escribir nombre)';
-            select.appendChild(optOther);
-
-            select.addEventListener('change', () => {
-                const wrap = document.getElementById('manualTrainingOtherWrap');
-                if (!wrap) return;
-                wrap.style.display = (select.value === '__other__') ? 'block' : 'none';
-            });
-
-            // Fecha por defecto: hoy
-            const d = document.getElementById('manualDate');
-            if (d && !d.value) {
-                const now = new Date();
-                const yyyy = now.getFullYear();
-                const mm = String(now.getMonth() + 1).padStart(2, '0');
-                const dd = String(now.getDate()).padStart(2, '0');
-                d.value = `${yyyy}-${mm}-${dd}`;
-            }
-        }
-
-        function addManualScheduleEvent() {
-            const sel = document.getElementById('manualTrainingSelect');
-            const other = document.getElementById('manualTrainingOther');
-            const date = document.getElementById('manualDate');
-            const time = document.getElementById('manualTime');
-            const duration = document.getElementById('manualDuration');
-            const location = document.getElementById('manualLocation');
-            const notes = document.getElementById('manualNotes');
-
-            if (!sel || !date || !time) return;
-
-            const dateISO = (date.value || '').trim();
-            const hhmm = (time.value || '').trim();
-
-            if (!dateISO || !hhmm) {
-                Swal.fire({ icon:'warning', title:'Faltan datos', text:'Selecciona fecha y hora.' });
-                return;
-            }
-
-            let title = '';
-            let department = '';
-            let dur = (duration?.value || '').trim();
-
-            if (sel.value === '__other__') {
-                title = (other?.value || '').trim();
-                if (!title) {
-                    Swal.fire({ icon:'warning', title:'Falta el nombre', text:'Escribe el nombre de la capacitación.' });
-                    return;
-                }
-            } else {
-                const opt = sel.options[sel.selectedIndex];
-                title = opt?.dataset?.title || opt?.textContent || 'Capacitación';
-                department = opt?.dataset?.department || '';
-                if (!dur) dur = opt?.dataset?.duration || '';
-            }
-
-            const dateObj = new Date(`${dateISO}T00:00:00`);
-            const dateES = (typeof formatDateES === 'function') ? formatDateES(dateObj) : dateISO;
-
-            const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
-
-            manualScheduleData.push({
-                id,
-                source: 'Manual',
-                title,
-                department,
-                dateISO,
-                dateObj,
-                dateES,
-                time: hhmm,
-                duration: dur,
-                location: (location?.value || '').trim(),
-                notes: (notes?.value || '').trim()
-            });
-
-            saveManualScheduleData();
-            renderManualScheduleTable();
-            Swal.fire({ icon:'success', title:'Agregado', timer: 900, showConfirmButton:false });
-        }
-
-        function clearManualScheduleForm() {
-            const other = document.getElementById('manualTrainingOther');
-            const duration = document.getElementById('manualDuration');
-            const location = document.getElementById('manualLocation');
-            const notes = document.getElementById('manualNotes');
-            if (other) other.value = '';
-            if (duration) duration.value = '';
-            if (location) location.value = '';
-            if (notes) notes.value = '';
-        }
-
-        function deleteManualScheduleEvent(id) {
-            manualScheduleData = manualScheduleData.filter(x => x.id !== id);
-            saveManualScheduleData();
-            renderManualScheduleTable();
-        }
-
-        function renderManualScheduleTable() {
-            const empty = document.getElementById('manualScheduleEmpty');
-            const container = document.getElementById('manualScheduleContainer');
-            const tbody = document.getElementById('manualScheduleTbody');
-            if (!tbody) return;
-
-            if (!manualScheduleData || manualScheduleData.length === 0) {
-                if (empty) empty.style.display = 'block';
-                if (container) container.style.display = 'none';
-                tbody.innerHTML = '';
-                return;
-            }
-
-            if (empty) empty.style.display = 'none';
-            if (container) container.style.display = 'block';
-
-            const sorted = [...manualScheduleData].sort((a,b) => new Date(`${a.dateISO}T${a.time}:00`) - new Date(`${b.dateISO}T${b.time}:00`));
-
-            tbody.innerHTML = '';
-            sorted.forEach((r, i) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td style="padding:8px; border:1px solid #e5e7eb;">${i + 1}</td>
-                    <td style="padding:8px; border:1px solid #e5e7eb;">${r.dateES || r.dateISO}</td>
-                    <td style="padding:8px; border:1px solid #e5e7eb;">${r.time}</td>
-                    <td style="padding:8px; border:1px solid #e5e7eb;"><strong>${escapeHtml(r.title || '')}</strong></td>
-                    <td style="padding:8px; border:1px solid #e5e7eb;">${escapeHtml(r.location || '')}</td>
-                    <td style="padding:8px; border:1px solid #e5e7eb;">${escapeHtml(r.duration || '')}</td>
-                    <td style="padding:8px; border:1px solid #e5e7eb;">
-                        <button class="btn btn-danger" style="padding:6px 10px;" onclick="deleteManualScheduleEvent('${r.id}')">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        function getCombinedScheduleData() {
-            const gen = (annualScheduleData || []).map(x => ({ ...x, source: 'Generado' }));
-            const man = (manualScheduleData || []).map(x => ({
-                index: null,
-                dateObj: x.dateObj || new Date(`${x.dateISO}T00:00:00`),
-                dateES: x.dateES || x.dateISO,
-                dateISO: x.dateISO,
-                time: x.time,
-                title: x.title,
-                department: x.department || '',
-                duration: x.duration || '',
-                location: x.location || '',
-                notes: x.notes || '',
-                source: 'Manual'
-            }));
-
-            const all = [...gen, ...man].sort((a,b) => new Date(`${a.dateISO}T${a.time}:00`) - new Date(`${b.dateISO}T${b.time}:00`));
-            all.forEach((r, idx) => r._exportIndex = idx + 1);
-            return all;
-        }
-
-        function downloadScheduleExcel() {
-            const data = getCombinedScheduleData();
-            if (!data || data.length === 0) return;
-
-            if (typeof XLSX === 'undefined') {
-                Swal.fire({ icon:'error', title:'Excel no disponible', text:'No se cargó la librería XLSX (SheetJS). Revisa el script en el <head>.' });
-                return;
-            }
-
-            const year = document.getElementById('scheduleYear')?.value || String(new Date().getFullYear());
-            const header = ['#','Fecha','Hora','Capacitación','Departamento','Duración','Lugar','Observación','Tipo'];
-            const rows = data.map(r => ([
-                r._exportIndex,
-                r.dateISO,
-                r.time,
-                r.title || '',
-                r.department || '',
-                r.duration || '',
-                r.location || '',
-                r.notes || '',
-                r.source || ''
-            ]));
-
-            const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
-            ws['!cols'] = [
-                { wch: 4 }, { wch: 12 }, { wch: 6 }, { wch: 45 }, { wch: 18 },
-                { wch: 12 }, { wch: 22 }, { wch: 28 }, { wch: 10 }
-            ];
-
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Cronograma');
-            XLSX.writeFile(wb, `cronograma_capacitaciones_${year}.xlsx`);
-        }
-
-function downloadScheduleICS() {
+        function downloadScheduleICS() {
             const combined = getCombinedScheduleData();
             if (!combined || combined.length === 0) return;
 
             const year = document.getElementById('scheduleYear')?.value || String(new Date().getFullYear());
             const nowStamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
 
-            // iCalendar (floating time) - fácil de importar a Google Calendar
-            let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Hospital SLV//Capacitaciones//ES\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
+            let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Hospital Susana López de Valencia//Capacitaciones//ES\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
+
+            const esc = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
 
             combined.forEach(item => {
-                const dt = `${item.dateISO.replace(/-/g, '')}T${item.time.replace(':', '')}00`;
-                // DTEND: +60min
-                const tParts = item.time.split(':');
-                const endT = addMinutesToTime(parseInt(tParts[0], 10), parseInt(tParts[1], 10), 60);
-                const dtEnd = `${item.dateISO.replace(/-/g, '')}T${endT.hh}${endT.mm}00`;
+                const dtStart = item.dateISO.replace(/-/g, '') + 'T' + item.time.replace(':', '') + '00';
+                const uid = `cap-${year}-${item._exportIndex}@hslv`;
 
-                const uid = `${item.dateISO}-${item._exportIndex}-capacitaciones@slv`;
-                const summary = sanitizeICS(item.title);
-                const desc = sanitizeICS(`Departamento: ${item.department || ''}${item.duration ? ' | Duración: ' + item.duration : ''}${item.notes ? ' | Nota: ' + item.notes : ''}${item.source ? ' | Tipo: ' + item.source : ''}`);
+                const summary = esc(item.title || 'Capacitación');
+                const location = esc(item.location || '');
+                const description = esc(`Departamento: ${item.department || ''}\nDuración: ${item.duration || ''}\nObservación: ${item.notes || ''}\nTipo: ${item.source || ''}`);
 
                 ics += 'BEGIN:VEVENT\n';
                 ics += `UID:${uid}\n`;
                 ics += `DTSTAMP:${nowStamp}\n`;
-                ics += `DTSTART:${dt}\n`;
-                ics += `DTEND:${dtEnd}\n`;
+                ics += `DTSTART:${dtStart}\n`;
                 ics += `SUMMARY:${summary}\n`;
-                ics += `DESCRIPTION:${desc}\n`;
-                ics += `LOCATION:${sanitizeICS(item.location || 'Hospital Susana López de Valencia E.S.E.')}\n`;
+                if (location) ics += `LOCATION:${location}\n`;
+                if (description) ics += `DESCRIPTION:${description}\n`;
                 ics += 'END:VEVENT\n';
             });
 
             ics += 'END:VCALENDAR\n';
 
-            const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8;' });
+            const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
@@ -5324,70 +5433,71 @@ function downloadScheduleICS() {
             if (!combined || combined.length === 0) return;
 
             const year = document.getElementById('scheduleYear')?.value || String(new Date().getFullYear());
-            const w = window.open('', '_blank');
-            if (!w) return;
+            const generatedAt = new Date().toLocaleString('es-CO');
 
-            const rows = combined.map(r => `
+            const w = window.open('', '_blank');
+            if (!w) {
+                Swal.fire({ icon:'warning', title:'Ventana bloqueada', text:'Permite ventanas emergentes para imprimir.' });
+                return;
+            }
+
+            const rowsHtml = combined.map(r => `
                 <tr>
-                    <td style="padding:8px; border:1px solid #ddd;">${r._exportIndex}</td>
-                    <td style="padding:8px; border:1px solid #ddd;">${r.dateES}</td>
-                    <td style="padding:8px; border:1px solid #ddd;">${r.time}</td>
-                    <td style="padding:8px; border:1px solid #ddd;"><strong>${escapeHtml(r.title)}</strong></td>
-                    <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(r.department || '')}</td>
-                    <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(r.location || '')}</td>
-                    <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(r.duration || '')}</td>
-                    <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(r.source || '')}</td>
+                    <td>${r._exportIndex}</td>
+                    <td>${r.dateISO}</td>
+                    <td>${r.time}</td>
+                    <td><strong>${escapeHtml(r.title || '')}</strong></td>
+                    <td>${escapeHtml(r.department || '')}</td>
+                    <td>${escapeHtml(r.duration || '')}</td>
+                    <td>${escapeHtml(r.location || '')}</td>
+                    <td>${escapeHtml(r.notes || '')}</td>
+                    <td>${escapeHtml(r.source || '')}</td>
                 </tr>
             `).join('');
 
             w.document.write(`
-                <!doctype html>
-                <html lang="es">
+                <html>
                 <head>
                     <meta charset="utf-8" />
                     <title>Cronograma Capacitaciones ${year}</title>
                     <style>
-                        body{font-family: Arial, sans-serif; padding: 24px; color:#222;}
-                        h1{margin:0 0 8px 0; font-size:20px;}
-                        h2{margin:0 0 18px 0; font-size:14px; color:#555; font-weight: normal;}
-                        table{width:100%; border-collapse: collapse; font-size:12px;}
-                        thead th{background:#f3f4f6;}
-                        th, td{border:1px solid #ddd;}
+                        body { font-family: Arial, sans-serif; margin: 24px; color:#111827; }
+                        .title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+                        .subtitle { font-size: 12px; color:#4b5563; margin-bottom: 16px; }
+                        table { width: 100%; border-collapse: collapse; font-size: 12px; }
+                        th, td { border: 1px solid #e5e7eb; padding: 8px; vertical-align: top; }
+                        th { background: #111827; color: #fff; text-align: center; }
+                        tr:nth-child(even) td { background: #f9fafb; }
                     </style>
                 </head>
                 <body>
-                    <h1>Hospital Susana López de Valencia E.S.E.</h1>
-                    <h2>Cronograma Anual de Capacitaciones - ${year}</h2>
+                    <div class="title">Cronograma Anual de Capacitaciones - ${year}</div>
+                    <div class="subtitle">Hospital Susana López de Valencia | Generado: ${generatedAt}</div>
+
                     <table>
                         <thead>
                             <tr>
-                                <th style="padding:8px; text-align:left;">#</th>
-                                <th style="padding:8px; text-align:left;">Fecha</th>
-                                <th style="padding:8px; text-align:left;">Hora</th>
-                                <th style="padding:8px; text-align:left;">Capacitación</th>
-                                <th style="padding:8px; text-align:left;">Departamento</th>
-                                <th style="padding:8px; text-align:left;">Lugar</th>
-                                <th style="padding:8px; text-align:left;">Duración</th>
-                                <th style="padding:8px; text-align:left;">Tipo</th>
+                                <th>#</th>
+                                <th>Fecha</th>
+                                <th>Hora</th>
+                                <th>Capacitación</th>
+                                <th>Departamento</th>
+                                <th>Duración</th>
+                                <th>Lugar</th>
+                                <th>Observación</th>
+                                <th>Tipo</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            ${rows}
-                        </tbody>
+                        <tbody>${rowsHtml}</tbody>
                     </table>
+
+                    <script>
+                        setTimeout(() => window.print(), 250);
+                    </script>
                 </body>
                 </html>
             `);
-	            w.document.close();
-	            // Imprimir desde aquí (evita incrustar etiquetas de cierre dentro del HTML generado)
-	            setTimeout(() => {
-	                try {
-	                    w.focus();
-	                    w.print();
-	                } catch (e) {
-	                    console.warn('No se pudo imprimir automáticamente:', e);
-	                }
-	            }, 250);
+            w.document.close();
         }
 
         // ═════════════════════════════════════════════════════════════════
