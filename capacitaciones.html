@@ -4766,25 +4766,71 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         // ======================
         // CRONOGRAMA: Capacitaciones individuales (manual)
         // ======================
-        async function airtableProxyRequest(payload) {
-            const res = await fetch('/.netlify/functions/airtable-proxy', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+        
+async function airtableProxyRequest(payload) {
+    // Request helper with automatic fallback when Airtable rejects an "Unknown field name"
+    // (commonly due to accents/tilde differences like Observación vs Observacion).
+    const stripDiacritics = (s) => (s || '')
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
 
-            const text = await res.text();
-            let data = null;
-            try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+    // Deep-clone payload to avoid mutating caller objects
+    let current = JSON.parse(JSON.stringify(payload || {}));
 
-            if (!res.ok) {
-                const msg = (data && (data.error || data.message)) ? (data.error || data.message) : text;
-                throw new Error(msg || `Error HTTP ${res.status}`);
-            }
-            return data;
+    const tryFixUnknownField = (msg) => {
+        if (!msg) return false;
+
+        // Common Airtable message: Unknown field name: "Observación"
+        const m = String(msg).match(/Unknown field name\s*:?\s*"?([^"\n]+)"?/i);
+        const unknown = m && m[1] ? m[1].trim() : null;
+        if (!unknown) return false;
+
+        const fields = current?.body?.fields;
+        if (!fields || typeof fields !== 'object') return false;
+        if (!(unknown in fields)) return false;
+
+        const alt = stripDiacritics(unknown);
+
+        // 1) Prefer switching to the de-accented name (Observacion)
+        if (alt && alt !== unknown && !(alt in fields)) {
+            fields[alt] = fields[unknown];
+            delete fields[unknown];
+            return true;
         }
 
-        function makeCronogramaFilterFormula(year, tipo) {
+        // 2) If de-accented already exists or no change, drop the unknown field to allow saving
+        delete fields[unknown];
+        return true;
+    };
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const res = await fetch('/.netlify/functions/airtable-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(current)
+        });
+
+        const rawText = await res.text();
+        let data = null;
+        try { data = rawText ? JSON.parse(rawText) : {}; } catch { data = { raw: rawText }; }
+
+        if (res.ok) return data;
+
+        const msg = (data && (data.error || data.message)) ? (data.error || data.message) : rawText;
+
+        // Auto-fix: retry if Airtable complains about an unknown field name
+        if (res.status === 422 && attempt < 2 && tryFixUnknownField(msg)) {
+            continue;
+        }
+
+        throw new Error(msg || `Error HTTP ${res.status}`);
+    }
+
+    throw new Error('Error desconocido comunicándose con Airtable.');
+}
+
+function makeCronogramaFilterFormula(year, tipo) {
             const y = Number(year);
             if (!tipo) return `{Año}=${y}`;
             // Tipo es Single select / texto: Manual o Generado
