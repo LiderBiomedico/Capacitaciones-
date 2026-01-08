@@ -24,6 +24,9 @@
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
+    <!-- SheetJS (Excel .xlsx) -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -1771,8 +1774,8 @@
                         <button class="btn btn-primary" onclick="generateAnnualSchedule()">
                             <i class="fas fa-magic"></i> Generar Cronograma
                         </button>
-                        <button id="btnDownloadScheduleCSV" class="btn btn-success" onclick="downloadScheduleCSV()" disabled>
-                            <i class="fas fa-file-csv"></i> Descargar CSV
+                        <button id="btnDownloadScheduleExcel" class="btn btn-success" onclick="downloadScheduleExcel()" disabled>
+                            <i class="fas fa-file-excel"></i> Descargar Excel
                         </button>
                         <button id="btnDownloadScheduleICS" class="btn btn-info" onclick="downloadScheduleICS()" disabled>
                             <i class="fas fa-calendar-plus"></i> Descargar .ICS
@@ -1786,6 +1789,84 @@
                         Consejo: si tienes más de 12 capacitaciones activas, se distribuirán en el año con múltiples eventos por mes.
                     </div>
                 </div>
+
+                <div class="card" style="margin-top: 1.25rem;">
+                    <h3><i class="fas fa-calendar-plus"></i> Capacitaciones individuales (fecha específica)</h3>
+                    <p style="color:#666; margin-bottom: 1rem;">
+                        Agrega eventos puntuales con <strong>fecha</strong> y <strong>hora exactas</strong>. Se incluyen en <strong>Excel</strong>, <strong>.ICS</strong> e <strong>Impresión</strong>.
+                    </p>
+
+                    <div class="form-row" style="display:flex; flex-wrap:wrap; gap: 1rem; align-items:end;">
+                        <div class="form-group" style="margin:0; min-width: 260px; flex:1;">
+                            <label><i class="fas fa-chalkboard-teacher"></i> Capacitación</label>
+                            <select id="manualTrainingSelect"></select>
+                            <small style="color:#888;">Si no aparece, selecciona “Otra...” y escribe el nombre.</small>
+                        </div>
+
+                        <div class="form-group" style="margin:0; min-width: 240px; flex:1; display:none;" id="manualTrainingOtherWrap">
+                            <label><i class="fas fa-pen"></i> Nombre (otra)</label>
+                            <input id="manualTrainingOther" type="text" placeholder="Ej: Seguridad del Paciente" />
+                        </div>
+
+                        <div class="form-group" style="margin:0; min-width: 160px;">
+                            <label><i class="fas fa-calendar-day"></i> Fecha</label>
+                            <input id="manualDate" type="date" />
+                        </div>
+
+                        <div class="form-group" style="margin:0; min-width: 140px;">
+                            <label><i class="fas fa-clock"></i> Hora</label>
+                            <input id="manualTime" type="time" value="08:00" />
+                        </div>
+
+                        <div class="form-group" style="margin:0; min-width: 160px;">
+                            <label><i class="fas fa-stopwatch"></i> Duración</label>
+                            <input id="manualDuration" type="text" placeholder="Ej: 2 horas" />
+                        </div>
+
+                        <div class="form-group" style="margin:0; min-width: 220px; flex:1;">
+                            <label><i class="fas fa-location-dot"></i> Lugar</label>
+                            <input id="manualLocation" type="text" placeholder="Ej: Auditorio / UCI" />
+                        </div>
+
+                        <div class="form-group" style="margin:0; min-width: 220px; flex:1;">
+                            <label><i class="fas fa-note-sticky"></i> Observación</label>
+                            <input id="manualNotes" type="text" placeholder="Ej: Turno mañana / grupo A" />
+                        </div>
+                    </div>
+
+                    <div class="form-actions" style="display:flex; flex-wrap:wrap; gap: 0.75rem; margin-top: 1rem;">
+                        <button class="btn btn-primary" onclick="addManualScheduleEvent()">
+                            <i class="fas fa-plus"></i> Agregar
+                        </button>
+                        <button class="btn btn-secondary" onclick="clearManualScheduleForm()">
+                            <i class="fas fa-eraser"></i> Limpiar
+                        </button>
+                    </div>
+
+                    <div id="manualScheduleEmpty" style="margin-top: 1rem; color:#999;">
+                        Aún no has agregado eventos individuales.
+                    </div>
+
+                    <div id="manualScheduleContainer" style="display:none; margin-top: 1rem;">
+                        <div style="overflow-x:auto;">
+                            <table id="manualScheduleTable" style="width:100%; border-collapse: collapse; min-width: 900px;">
+                                <thead>
+                                    <tr style="background: #f3f4f6;">
+                                        <th style="padding:10px; border:1px solid #e5e7eb;">#</th>
+                                        <th style="padding:10px; border:1px solid #e5e7eb;">Fecha</th>
+                                        <th style="padding:10px; border:1px solid #e5e7eb;">Hora</th>
+                                        <th style="padding:10px; border:1px solid #e5e7eb;">Capacitación</th>
+                                        <th style="padding:10px; border:1px solid #e5e7eb;">Lugar</th>
+                                        <th style="padding:10px; border:1px solid #e5e7eb;">Duración</th>
+                                        <th style="padding:10px; border:1px solid #e5e7eb;">Acción</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="manualScheduleTbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
 
                 <div id="scheduleEmpty" class="card" style="text-align:center; padding: 2.5rem; display:none;">
                     <i class="fas fa-info-circle" style="font-size: 3rem; color: #dee2e6; margin-bottom: 1rem;"></i>
@@ -4651,14 +4732,17 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             if (empty) empty.style.display = 'none';
 
             annualScheduleData = [];
-            setScheduleActionButtonsEnabled(false);
+            // Inicializar módulo manual
+            initManualScheduleUI();
+            loadManualScheduleData();
+            updateScheduleButtons();
         }
 
         function setScheduleActionButtonsEnabled(enabled) {
-            const btnCsv = document.getElementById('btnDownloadScheduleCSV');
+            const btnExcel = document.getElementById('btnDownloadScheduleExcel');
             const btnIcs = document.getElementById('btnDownloadScheduleICS');
             const btnPrint = document.getElementById('btnPrintSchedule');
-            if (btnCsv) btnCsv.disabled = !enabled;
+            if (btnExcel) btnExcel.disabled = !enabled;
             if (btnIcs) btnIcs.disabled = !enabled;
             if (btnPrint) btnPrint.disabled = !enabled;
         }
@@ -4827,7 +4911,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 if (!trainings || trainings.length === 0) {
                     if (empty) empty.style.display = 'block';
                     annualScheduleData = [];
-                    setScheduleActionButtonsEnabled(false);
+                    updateScheduleButtons();
                     Swal.close();
                     return;
                 }
@@ -4856,13 +4940,13 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 renderScheduleTable();
                 if (container) container.style.display = 'block';
-                setScheduleActionButtonsEnabled(true);
+                updateScheduleButtons();
 
                 Swal.close();
 
             } catch (error) {
                 console.error('❌ Error generando cronograma:', error);
-                setScheduleActionButtonsEnabled(false);
+                updateScheduleButtons();
                 Swal.fire({
                     icon: 'error',
                     title: 'No se pudo generar el cronograma',
@@ -4877,7 +4961,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
             tbody.innerHTML = '';
 
-            annualScheduleData.forEach(item => {
+            combined.forEach(item => {
                 const tr = document.createElement('tr');
                 tr.style.borderBottom = '1px solid #eee';
                 tr.innerHTML = `
@@ -4931,8 +5015,259 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             URL.revokeObjectURL(url);
         }
 
-        function downloadScheduleICS() {
-            if (!annualScheduleData || annualScheduleData.length === 0) return;
+        
+
+        // ======================
+        // CRONOGRAMA: Capacitaciones individuales + Excel (.xlsx)
+        // ======================
+        let manualScheduleData = [];
+        const MANUAL_SCHEDULE_STORAGE_KEY = 'manualScheduleData_v1';
+
+        function loadManualScheduleData() {
+            try {
+                const raw = localStorage.getItem(MANUAL_SCHEDULE_STORAGE_KEY);
+                manualScheduleData = raw ? JSON.parse(raw) : [];
+                if (!Array.isArray(manualScheduleData)) manualScheduleData = [];
+            } catch {
+                manualScheduleData = [];
+            }
+            renderManualScheduleTable();
+            updateScheduleButtons();
+        }
+
+        function saveManualScheduleData() {
+            localStorage.setItem(MANUAL_SCHEDULE_STORAGE_KEY, JSON.stringify(manualScheduleData));
+            updateScheduleButtons();
+        }
+
+        function updateScheduleButtons() {
+            const hasAny = (Array.isArray(annualScheduleData) && annualScheduleData.length > 0) ||
+                           (Array.isArray(manualScheduleData) && manualScheduleData.length > 0);
+            setScheduleActionButtonsEnabled(hasAny);
+        }
+
+        async function initManualScheduleUI() {
+            const select = document.getElementById('manualTrainingSelect');
+            if (!select) return;
+
+            let trainings = [];
+            try {
+                trainings = await fetchTrainingsForSchedule();
+            } catch {
+                trainings = [];
+            }
+
+            select.innerHTML = '';
+            const opt0 = document.createElement('option');
+            opt0.value = '';
+            opt0.textContent = 'Seleccione...';
+            select.appendChild(opt0);
+
+            trainings.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id || t.title || '';
+                opt.dataset.title = t.title || 'Capacitación';
+                opt.dataset.department = t.department || '';
+                opt.dataset.duration = t.duration || '';
+                opt.textContent = `${opt.dataset.title}${opt.dataset.department ? ' — ' + opt.dataset.department : ''}`;
+                select.appendChild(opt);
+            });
+
+            const optOther = document.createElement('option');
+            optOther.value = '__other__';
+            optOther.textContent = 'Otra... (escribir nombre)';
+            select.appendChild(optOther);
+
+            select.addEventListener('change', () => {
+                const wrap = document.getElementById('manualTrainingOtherWrap');
+                if (!wrap) return;
+                wrap.style.display = (select.value === '__other__') ? 'block' : 'none';
+            });
+
+            // Fecha por defecto: hoy
+            const d = document.getElementById('manualDate');
+            if (d && !d.value) {
+                const now = new Date();
+                const yyyy = now.getFullYear();
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                const dd = String(now.getDate()).padStart(2, '0');
+                d.value = `${yyyy}-${mm}-${dd}`;
+            }
+        }
+
+        function addManualScheduleEvent() {
+            const sel = document.getElementById('manualTrainingSelect');
+            const other = document.getElementById('manualTrainingOther');
+            const date = document.getElementById('manualDate');
+            const time = document.getElementById('manualTime');
+            const duration = document.getElementById('manualDuration');
+            const location = document.getElementById('manualLocation');
+            const notes = document.getElementById('manualNotes');
+
+            if (!sel || !date || !time) return;
+
+            const dateISO = (date.value || '').trim();
+            const hhmm = (time.value || '').trim();
+
+            if (!dateISO || !hhmm) {
+                Swal.fire({ icon:'warning', title:'Faltan datos', text:'Selecciona fecha y hora.' });
+                return;
+            }
+
+            let title = '';
+            let department = '';
+            let dur = (duration?.value || '').trim();
+
+            if (sel.value === '__other__') {
+                title = (other?.value || '').trim();
+                if (!title) {
+                    Swal.fire({ icon:'warning', title:'Falta el nombre', text:'Escribe el nombre de la capacitación.' });
+                    return;
+                }
+            } else {
+                const opt = sel.options[sel.selectedIndex];
+                title = opt?.dataset?.title || opt?.textContent || 'Capacitación';
+                department = opt?.dataset?.department || '';
+                if (!dur) dur = opt?.dataset?.duration || '';
+            }
+
+            const dateObj = new Date(`${dateISO}T00:00:00`);
+            const dateES = (typeof formatDateES === 'function') ? formatDateES(dateObj) : dateISO;
+
+            const id = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random());
+
+            manualScheduleData.push({
+                id,
+                source: 'Manual',
+                title,
+                department,
+                dateISO,
+                dateObj,
+                dateES,
+                time: hhmm,
+                duration: dur,
+                location: (location?.value || '').trim(),
+                notes: (notes?.value || '').trim()
+            });
+
+            saveManualScheduleData();
+            renderManualScheduleTable();
+            Swal.fire({ icon:'success', title:'Agregado', timer: 900, showConfirmButton:false });
+        }
+
+        function clearManualScheduleForm() {
+            const other = document.getElementById('manualTrainingOther');
+            const duration = document.getElementById('manualDuration');
+            const location = document.getElementById('manualLocation');
+            const notes = document.getElementById('manualNotes');
+            if (other) other.value = '';
+            if (duration) duration.value = '';
+            if (location) location.value = '';
+            if (notes) notes.value = '';
+        }
+
+        function deleteManualScheduleEvent(id) {
+            manualScheduleData = manualScheduleData.filter(x => x.id !== id);
+            saveManualScheduleData();
+            renderManualScheduleTable();
+        }
+
+        function renderManualScheduleTable() {
+            const empty = document.getElementById('manualScheduleEmpty');
+            const container = document.getElementById('manualScheduleContainer');
+            const tbody = document.getElementById('manualScheduleTbody');
+            if (!tbody) return;
+
+            if (!manualScheduleData || manualScheduleData.length === 0) {
+                if (empty) empty.style.display = 'block';
+                if (container) container.style.display = 'none';
+                tbody.innerHTML = '';
+                return;
+            }
+
+            if (empty) empty.style.display = 'none';
+            if (container) container.style.display = 'block';
+
+            const sorted = [...manualScheduleData].sort((a,b) => new Date(`${a.dateISO}T${a.time}:00`) - new Date(`${b.dateISO}T${b.time}:00`));
+
+            tbody.innerHTML = '';
+            sorted.forEach((r, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding:8px; border:1px solid #e5e7eb;">${i + 1}</td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;">${r.dateES || r.dateISO}</td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;">${r.time}</td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;"><strong>${escapeHtml(r.title || '')}</strong></td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;">${escapeHtml(r.location || '')}</td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;">${escapeHtml(r.duration || '')}</td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;">
+                        <button class="btn btn-danger" style="padding:6px 10px;" onclick="deleteManualScheduleEvent('${r.id}')">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function getCombinedScheduleData() {
+            const gen = (annualScheduleData || []).map(x => ({ ...x, source: 'Generado' }));
+            const man = (manualScheduleData || []).map(x => ({
+                index: null,
+                dateObj: x.dateObj || new Date(`${x.dateISO}T00:00:00`),
+                dateES: x.dateES || x.dateISO,
+                dateISO: x.dateISO,
+                time: x.time,
+                title: x.title,
+                department: x.department || '',
+                duration: x.duration || '',
+                location: x.location || '',
+                notes: x.notes || '',
+                source: 'Manual'
+            }));
+
+            const all = [...gen, ...man].sort((a,b) => new Date(`${a.dateISO}T${a.time}:00`) - new Date(`${b.dateISO}T${b.time}:00`));
+            all.forEach((r, idx) => r._exportIndex = idx + 1);
+            return all;
+        }
+
+        function downloadScheduleExcel() {
+            const data = getCombinedScheduleData();
+            if (!data || data.length === 0) return;
+
+            if (typeof XLSX === 'undefined') {
+                Swal.fire({ icon:'error', title:'Excel no disponible', text:'No se cargó la librería XLSX (SheetJS). Revisa el script en el <head>.' });
+                return;
+            }
+
+            const year = document.getElementById('scheduleYear')?.value || String(new Date().getFullYear());
+            const header = ['#','Fecha','Hora','Capacitación','Departamento','Duración','Lugar','Observación','Tipo'];
+            const rows = data.map(r => ([
+                r._exportIndex,
+                r.dateISO,
+                r.time,
+                r.title || '',
+                r.department || '',
+                r.duration || '',
+                r.location || '',
+                r.notes || '',
+                r.source || ''
+            ]));
+
+            const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+            ws['!cols'] = [
+                { wch: 4 }, { wch: 12 }, { wch: 6 }, { wch: 45 }, { wch: 18 },
+                { wch: 12 }, { wch: 22 }, { wch: 28 }, { wch: 10 }
+            ];
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Cronograma');
+            XLSX.writeFile(wb, `cronograma_capacitaciones_${year}.xlsx`);
+        }
+
+function downloadScheduleICS() {
+            const combined = getCombinedScheduleData();
+            if (!combined || combined.length === 0) return;
 
             const year = document.getElementById('scheduleYear')?.value || String(new Date().getFullYear());
             const nowStamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
@@ -4940,16 +5275,16 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             // iCalendar (floating time) - fácil de importar a Google Calendar
             let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Hospital SLV//Capacitaciones//ES\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
 
-            annualScheduleData.forEach(item => {
+            combined.forEach(item => {
                 const dt = `${item.dateISO.replace(/-/g, '')}T${item.time.replace(':', '')}00`;
                 // DTEND: +60min
                 const tParts = item.time.split(':');
                 const endT = addMinutesToTime(parseInt(tParts[0], 10), parseInt(tParts[1], 10), 60);
                 const dtEnd = `${item.dateISO.replace(/-/g, '')}T${endT.hh}${endT.mm}00`;
 
-                const uid = `${item.dateISO}-${item.index}-capacitaciones@slv`;
+                const uid = `${item.dateISO}-${item._exportIndex}-capacitaciones@slv`;
                 const summary = sanitizeICS(item.title);
-                const desc = sanitizeICS(`Departamento: ${item.department}${item.duration ? ' | Duración: ' + item.duration : ''}`);
+                const desc = sanitizeICS(`Departamento: ${item.department || ''}${item.duration ? ' | Duración: ' + item.duration : ''}${item.notes ? ' | Nota: ' + item.notes : ''}${item.source ? ' | Tipo: ' + item.source : ''}`);
 
                 ics += 'BEGIN:VEVENT\n';
                 ics += `UID:${uid}\n`;
@@ -4958,7 +5293,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 ics += `DTEND:${dtEnd}\n`;
                 ics += `SUMMARY:${summary}\n`;
                 ics += `DESCRIPTION:${desc}\n`;
-                ics += 'LOCATION:Hospital Susana López de Valencia E.S.E.\n';
+                ics += `LOCATION:${sanitizeICS(item.location || 'Hospital Susana López de Valencia E.S.E.')}\n`;
                 ics += 'END:VEVENT\n';
             });
 
@@ -4985,20 +5320,23 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         }
 
         function printSchedule() {
-            if (!annualScheduleData || annualScheduleData.length === 0) return;
+            const combined = getCombinedScheduleData();
+            if (!combined || combined.length === 0) return;
 
             const year = document.getElementById('scheduleYear')?.value || String(new Date().getFullYear());
             const w = window.open('', '_blank');
             if (!w) return;
 
-            const rows = annualScheduleData.map(r => `
+            const rows = combined.map(r => `
                 <tr>
-                    <td style="padding:8px; border:1px solid #ddd;">${r.index}</td>
+                    <td style="padding:8px; border:1px solid #ddd;">${r._exportIndex}</td>
                     <td style="padding:8px; border:1px solid #ddd;">${r.dateES}</td>
                     <td style="padding:8px; border:1px solid #ddd;">${r.time}</td>
                     <td style="padding:8px; border:1px solid #ddd;"><strong>${escapeHtml(r.title)}</strong></td>
-                    <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(r.department)}</td>
+                    <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(r.department || '')}</td>
+                    <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(r.location || '')}</td>
                     <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(r.duration || '')}</td>
+                    <td style="padding:8px; border:1px solid #ddd;">${escapeHtml(r.source || '')}</td>
                 </tr>
             `).join('');
 
@@ -5028,7 +5366,9 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                                 <th style="padding:8px; text-align:left;">Hora</th>
                                 <th style="padding:8px; text-align:left;">Capacitación</th>
                                 <th style="padding:8px; text-align:left;">Departamento</th>
+                                <th style="padding:8px; text-align:left;">Lugar</th>
                                 <th style="padding:8px; text-align:left;">Duración</th>
+                                <th style="padding:8px; text-align:left;">Tipo</th>
                             </tr>
                         </thead>
                         <tbody>
