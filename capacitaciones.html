@@ -5491,13 +5491,11 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         <tbody>${rowsHtml}</tbody>
                     </table>
 
-                    <script>
-                        setTimeout(() => window.print(), 250);
-                    </script>
                 </body>
                 </html>
             `);
             w.document.close();
+            setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 300);
         }
 
         // ═════════════════════════════════════════════════════════════════
