@@ -1781,7 +1781,14 @@
                         <button id="btnPrintSchedule" class="btn btn-secondary" onclick="printSchedule()" disabled>
                             <i class="fas fa-print"></i> Imprimir
                         </button>
-                    </div>
+                    <button id="btnLoadScheduleAirtable" class="btn btn-secondary" onclick="loadScheduleFromAirtable()">
+                            <i class="fas fa-cloud-arrow-down"></i> Cargar de Airtable
+                        </button>
+                        <button id="btnSaveGeneratedAirtable" class="btn btn-primary" onclick="saveGeneratedScheduleToAirtable()" disabled>
+                            <i class="fas fa-cloud-arrow-up"></i> Guardar generados en Airtable
+                        </button>
+                        <span id="scheduleSyncStatus" style="align-self:center; margin-left:auto; color:#6b7280; font-size:0.9em;"></span>
+</div>
 
                     <div style="margin-top: 0.75rem; color: #888; font-size: 0.9em;">
                         Consejo: si tienes más de 12 capacitaciones activas, se distribuirán en el año con múltiples eventos por mes.
@@ -4709,36 +4716,30 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         }
 
         // ═════════════════════════════════════════════════════════════════
-        // CRONOGRAMA ANUAL DE CAPACITACIONES (NUEVO)
+        // CRONOGRAMA ANUAL DE CAPACITACIONES (NUEVO) - CON AIRTABLE
         // ═════════════════════════════════════════════════════════════════
 
-        // Datos del cronograma generado (para exportar / imprimir)
+        // Datos del cronograma (para exportar / imprimir)
+        // - annualScheduleData: eventos generados (pueden guardarse en Airtable)
+        // - manualScheduleData: eventos con fecha específica (se guardan en Airtable)
         let annualScheduleData = [];
         let manualScheduleData = [];
-        const MANUAL_SCHEDULE_STORAGE_KEY = 'manualScheduleData_v1';
 
-        function initScheduleTab() {
-            // Año por defecto
-            const yearInput = document.getElementById('scheduleYear');
-            if (yearInput && !yearInput.value) {
-                yearInput.value = String(new Date().getFullYear());
-            }
-
-            // Limpiar vista del cronograma generado
-            const container = document.getElementById('scheduleContainer');
-            const empty = document.getElementById('scheduleEmpty');
-            if (container) container.style.display = 'none';
-            if (empty) empty.style.display = 'none';
-
-            // Reset generado (manual se conserva)
-            annualScheduleData = [];
-
-            // Inicializar UI manual + cargar guardados
-            initManualScheduleUI();
-            loadManualScheduleData();
-
-            updateScheduleActionButtons();
-        }
+        // Airtable: Tabla para cronogramas
+        const SCHEDULE_TABLE_NAME = 'Cronograma';
+        const SCHEDULE_FIELDS = {
+            year: 'Año',
+            date: 'Fecha',
+            time: 'Hora',
+            title: 'Capacitación',
+            department: 'Departamento',
+            duration: 'Duración',
+            location: 'Lugar',
+            notes: 'Observación',
+            type: 'Tipo',
+            trainingId: 'Capacitación ID',
+            uid: 'UID'
+        };
 
         function setScheduleActionButtonsEnabled(enabled) {
             const btnExcel = document.getElementById('btnDownloadScheduleExcel');
@@ -4749,144 +4750,479 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             if (btnPrint) btnPrint.disabled = !enabled;
         }
 
+        function setScheduleSyncButtons() {
+            const btnSaveGen = document.getElementById('btnSaveGeneratedAirtable');
+            if (btnSaveGen) btnSaveGen.disabled = !(annualScheduleData && annualScheduleData.length > 0);
+        }
+
+        function updateScheduleSyncStatus(message = '', kind = 'info') {
+            const el = document.getElementById('scheduleSyncStatus');
+            if (!el) return;
+
+            const colors = {
+                info: '#6b7280',
+                success: '#059669',
+                warning: '#d97706',
+                error: '#dc2626'
+            };
+            el.style.color = colors[kind] || colors.info;
+            el.textContent = message || '';
+        }
+
         function updateScheduleActionButtons() {
             const combined = getCombinedScheduleData();
             setScheduleActionButtonsEnabled(combined.length > 0);
+            setScheduleSyncButtons();
         }
 
-        // ======================
-        // CRONOGRAMA: Capacitaciones individuales (manual)
-        // ======================
-        function loadManualScheduleData() {
-            try {
-                const raw = localStorage.getItem(MANUAL_SCHEDULE_STORAGE_KEY);
-                manualScheduleData = raw ? JSON.parse(raw) : [];
-                if (!Array.isArray(manualScheduleData)) manualScheduleData = [];
-            } catch (e) {
-                manualScheduleData = [];
+        function initScheduleTab() {
+            // Año por defecto
+            const yearInput = document.getElementById('scheduleYear');
+            if (yearInput && !yearInput.value) {
+                yearInput.value = String(new Date().getFullYear());
             }
-            renderManualScheduleTable();
-        }
 
-        function saveManualScheduleData() {
-            localStorage.setItem(MANUAL_SCHEDULE_STORAGE_KEY, JSON.stringify(manualScheduleData));
-            renderManualScheduleTable();
+            // Ocultar vistas
+            const container = document.getElementById('scheduleContainer');
+            const empty = document.getElementById('scheduleEmpty');
+            if (container) container.style.display = 'none';
+            if (empty) empty.style.display = 'none';
+
+            annualScheduleData = [];
+            manualScheduleData = [];
+
+            updateScheduleSyncStatus('Sincronizando con Airtable…', 'info');
             updateScheduleActionButtons();
+
+            // Inicializar UI (combo de capacitaciones) y cargar desde Airtable
+            Promise.resolve()
+                .then(() => initManualScheduleUI())
+                .then(() => loadScheduleFromAirtable(false))
+                .catch((e) => {
+                    console.warn('⚠️ No se pudo inicializar cronograma:', e);
+                    updateScheduleSyncStatus('No se pudo cargar desde Airtable (revisa conexión/tabla).', 'warning');
+                });
         }
 
-        async function initManualScheduleUI() {
-            const select = document.getElementById('manualTrainingSelect');
-            if (!select) return;
-
-            let trainings = [];
-            try {
-                trainings = await fetchTrainingsForSchedule();
-            } catch (e) {
-                trainings = [];
-            }
-
-            select.innerHTML = '';
-            const opt0 = document.createElement('option');
-            opt0.value = '';
-            opt0.textContent = 'Seleccione...';
-            select.appendChild(opt0);
-
-            trainings.forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = t.id || t.title || t.titulo || '';
-                opt.dataset.title = t.title || t.titulo || 'Capacitación';
-                opt.dataset.department = t.department || t.departamento || '';
-                opt.dataset.duration = t.duration || t.duracion || '';
-                opt.textContent = `${opt.dataset.title}${opt.dataset.department ? ' — ' + opt.dataset.department : ''}`;
-                select.appendChild(opt);
+        // ======================
+        // Airtable helper (vía Netlify Function airtable-proxy)
+        // ======================
+        async function airtableProxy(method, path, body = null) {
+            const response = await fetch('/.netlify/functions/airtable-proxy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    method,
+                    path,
+                    body
+                })
             });
 
-            const optOther = document.createElement('option');
-            optOther.value = '__other__';
-            optOther.textContent = 'Otra... (escribir nombre)';
-            select.appendChild(optOther);
+            const data = await response.json().catch(() => ({}));
+            if (!data || data.success === false) {
+                throw new Error(data?.error || 'Error consultando Airtable');
+            }
+            return data;
+        }
 
-            select.onchange = () => {
-                const wrap = document.getElementById('manualTrainingOtherWrap');
-                if (!wrap) return;
-                wrap.style.display = (select.value === '__other__') ? 'block' : 'none';
+        function scheduleTablePath() {
+            return `/${encodeURIComponent(SCHEDULE_TABLE_NAME)}`;
+        }
+
+        function filterFormulaByYear(year) {
+            // Recomendado: campo "Año" tipo Number en Airtable
+            return `{${SCHEDULE_FIELDS.year}}=${year}`;
+        }
+
+        async function fetchAllScheduleRecords(year) {
+            const records = [];
+            let offset = null;
+
+            const sortQuery = `&sort%5B0%5D%5Bfield%5D=${encodeURIComponent(SCHEDULE_FIELDS.date)}&sort%5B0%5D%5Bdirection%5D=asc` +
+                              `&sort%5B1%5D%5Bfield%5D=${encodeURIComponent(SCHEDULE_FIELDS.time)}&sort%5B1%5D%5Bdirection%5D=asc`;
+
+            while (true) {
+                const formula = encodeURIComponent(filterFormulaByYear(year));
+                const off = offset ? `&offset=${encodeURIComponent(offset)}` : '';
+                const path = `${scheduleTablePath()}?pageSize=100&filterByFormula=${formula}${sortQuery}${off}`;
+                const data = await airtableProxy('GET', path);
+
+                if (Array.isArray(data.records)) records.push(...data.records);
+                if (data.offset) offset = data.offset;
+                else break;
+            }
+
+            return records;
+        }
+
+        function recordToScheduleRow(rec) {
+            const f = rec.fields || {};
+            const dateISO = (f[SCHEDULE_FIELDS.date] || '').slice(0, 10); // Airtable date -> "YYYY-MM-DD"
+            return {
+                recordId: rec.id,
+                id: rec.id, // para compatibilidad
+                year: f[SCHEDULE_FIELDS.year],
+                dateISO: dateISO || '',
+                time: String(f[SCHEDULE_FIELDS.time] || '').slice(0, 5),
+                title: f[SCHEDULE_FIELDS.title] || '',
+                department: f[SCHEDULE_FIELDS.department] || '',
+                duration: f[SCHEDULE_FIELDS.duration] || '',
+                location: f[SCHEDULE_FIELDS.location] || '',
+                notes: f[SCHEDULE_FIELDS.notes] || '',
+                type: f[SCHEDULE_FIELDS.type] || ''
             };
+        }
 
-            const d = document.getElementById('manualDate');
-            if (d && !d.value) {
-                const now = new Date();
-                const yyyy = now.getFullYear();
-                const mm = String(now.getMonth() + 1).padStart(2, '0');
-                const dd = String(now.getDate()).padStart(2, '0');
-                d.value = `${yyyy}-${mm}-${dd}`;
+        // ======================
+        // Cargar cronograma desde Airtable (visible en cualquier PC)
+        // ======================
+        async function loadScheduleFromAirtable(showToast = true) {
+            const year = parseInt(document.getElementById('scheduleYear')?.value || String(new Date().getFullYear()), 10);
+
+            try {
+                if (showToast) {
+                    Swal.fire({
+                        title: 'Cargando cronograma...',
+                        text: 'Leyendo datos desde Airtable',
+                        allowOutsideClick: false,
+                        didOpen: () => Swal.showLoading()
+                    });
+                }
+
+                const records = await fetchAllScheduleRecords(year);
+                const rows = records.map(recordToScheduleRow);
+
+                // Separar por tipo
+                const genRows = rows.filter(r => String(r.type || '').toLowerCase() === 'generado');
+                const manRows = rows.filter(r => String(r.type || '').toLowerCase() !== 'generado');
+
+                // Mapear al formato usado por la tabla generada
+                annualScheduleData = genRows
+                    .sort((a,b) => new Date(`${a.dateISO}T${a.time || '00:00'}:00`) - new Date(`${b.dateISO}T${b.time || '00:00'}:00`))
+                    .map((r, idx) => ({
+                        recordId: r.recordId,
+                        index: idx + 1,
+                        dateObj: r.dateISO ? new Date(`${r.dateISO}T00:00:00`) : null,
+                        dateES: r.dateISO ? formatDateES(new Date(`${r.dateISO}T00:00:00`)) : '',
+                        dateISO: r.dateISO,
+                        time: r.time || '',
+                        title: r.title || '',
+                        department: r.department || '',
+                        duration: r.duration || ''
+                    }));
+
+                manualScheduleData = manRows
+                    .sort((a,b) => new Date(`${a.dateISO}T${a.time || '00:00'}:00`) - new Date(`${b.dateISO}T${b.time || '00:00'}:00`))
+                    .map(r => ({
+                        id: r.recordId,
+                        recordId: r.recordId,
+                        dateISO: r.dateISO,
+                        time: r.time || '',
+                        title: r.title || '',
+                        department: r.department || '',
+                        duration: r.duration || '',
+                        location: r.location || '',
+                        notes: r.notes || ''
+                    }));
+
+                // Renderizar
+                const container = document.getElementById('scheduleContainer');
+                if (container) container.style.display = (annualScheduleData.length > 0) ? 'block' : 'none';
+                renderScheduleTable();
+                renderManualScheduleTable();
+
+                updateScheduleActionButtons();
+                updateScheduleSyncStatus(`Airtable: ${rows.length} evento(s) cargado(s) para ${year}.`, 'success');
+
+                if (showToast) Swal.close();
+
+            } catch (error) {
+                console.error('❌ Error cargando cronograma desde Airtable:', error);
+                if (showToast) Swal.close();
+
+                updateScheduleSyncStatus('Error cargando desde Airtable. Verifica que exista la tabla "Cronograma".', 'error');
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'No se pudo cargar el cronograma',
+                    html: `
+                        <div style="text-align:left; font-size: 0.95em;">
+                            <p>${escapeHtml(error.message || 'Error desconocido')}</p>
+                            <p style="margin-top: 10px;"><strong>Revisa en Airtable:</strong></p>
+                            <ul style="margin-left: 18px;">
+                                <li>Tabla llamada <strong>Cronograma</strong></li>
+                                <li>Campos: <strong>Año</strong> (Number), <strong>Fecha</strong> (Date), <strong>Hora</strong> (Text), <strong>Capacitación</strong>, <strong>Tipo</strong> (Manual/Generado)</li>
+                            </ul>
+                        </div>
+                    `
+                });
             }
         }
 
-        function addManualScheduleEvent() {
-            const sel = document.getElementById('manualTrainingSelect');
-            const other = document.getElementById('manualTrainingOther');
-            const date = document.getElementById('manualDate');
-            const time = document.getElementById('manualTime');
-            const duration = document.getElementById('manualDuration');
-            const location = document.getElementById('manualLocation');
-            const notes = document.getElementById('manualNotes');
+        // ======================
+        // Guardar cronograma generado en Airtable (para compartir)
+        // ======================
+        async function saveGeneratedScheduleToAirtable() {
+            const year = parseInt(document.getElementById('scheduleYear')?.value || String(new Date().getFullYear()), 10);
 
-            if (!sel || !date || !time) return;
-
-            const dateISO = (date.value || '').trim();
-            const hhmm = (time.value || '').trim();
-            if (!dateISO || !hhmm) {
-                Swal.fire({ icon:'warning', title:'Faltan datos', text:'Selecciona fecha y hora.' });
+            if (!annualScheduleData || annualScheduleData.length === 0) {
+                Swal.fire({ icon:'info', title:'Sin datos', text:'Primero genera un cronograma para poder guardarlo.' });
                 return;
             }
 
-            let title = '';
-            let department = '';
-            let dur = (duration?.value || '').trim();
+            const confirm = await Swal.fire({
+                icon: 'warning',
+                title: 'Guardar en Airtable',
+                html: `
+                    <p>Esto <strong>reemplazará</strong> los eventos <strong>Generado</strong> del año <strong>${year}</strong> en Airtable.</p>
+                    <p style="color:#6b7280; font-size:0.9em;">Los eventos Manuales no se eliminan.</p>
+                `,
+                showCancelButton: true,
+                confirmButtonText: 'Sí, guardar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#667eea'
+            });
 
-            if (sel.value === '__other__') {
-                title = (other?.value || '').trim();
-                if (!title) {
-                    Swal.fire({ icon:'warning', title:'Falta el nombre', text:'Escribe el nombre de la capacitación.' });
-                    return;
+            if (!confirm.isConfirmed) return;
+
+            try {
+                Swal.fire({
+                    title: 'Guardando…',
+                    text: 'Actualizando eventos generados en Airtable',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+
+                // 1) Encontrar generados existentes del año
+                const formula = encodeURIComponent(`AND(${filterFormulaByYear(year)}, {${SCHEDULE_FIELDS.type}}="Generado")`);
+                let offset = null;
+                const toDelete = [];
+
+                while (true) {
+                    const off = offset ? `&offset=${encodeURIComponent(offset)}` : '';
+                    const path = `${scheduleTablePath()}?pageSize=100&filterByFormula=${formula}${off}`;
+                    const data = await airtableProxy('GET', path);
+                    if (Array.isArray(data.records)) {
+                        data.records.forEach(r => toDelete.push(r.id));
+                    }
+                    if (data.offset) offset = data.offset;
+                    else break;
                 }
-            } else {
-                const opt = sel.options[sel.selectedIndex];
-                title = opt?.dataset?.title || opt?.textContent || 'Capacitación';
-                department = opt?.dataset?.department || '';
-                if (!dur) dur = opt?.dataset?.duration || '';
+
+                // 2) Borrar en lotes de 10
+                for (let i = 0; i < toDelete.length; i += 10) {
+                    const chunk = toDelete.slice(i, i + 10);
+                    const qs = chunk.map(id => `records[]=${encodeURIComponent(id)}`).join('&');
+                    await airtableProxy('DELETE', `${scheduleTablePath()}?${qs}`);
+                }
+
+                // 3) Crear nuevos generados en lotes de 10
+                const buildFields = (item) => {
+                    const uid = `${year}|Generado|${item.dateISO}|${item.time}|${item.title}`;
+                    return {
+                        [SCHEDULE_FIELDS.year]: year,
+                        [SCHEDULE_FIELDS.date]: item.dateISO,
+                        [SCHEDULE_FIELDS.time]: item.time,
+                        [SCHEDULE_FIELDS.title]: item.title,
+                        [SCHEDULE_FIELDS.department]: item.department || 'General',
+                        [SCHEDULE_FIELDS.duration]: item.duration || '',
+                        [SCHEDULE_FIELDS.location]: '',
+                        [SCHEDULE_FIELDS.notes]: '',
+                        [SCHEDULE_FIELDS.type]: 'Generado',
+                        [SCHEDULE_FIELDS.uid]: uid
+                    };
+                };
+
+                const recordsToCreate = annualScheduleData.map(ev => ({ fields: buildFields(ev) }));
+
+                for (let i = 0; i < recordsToCreate.length; i += 10) {
+                    const chunk = recordsToCreate.slice(i, i + 10);
+                    await airtableProxy('POST', scheduleTablePath(), { records: chunk });
+                }
+
+                Swal.close();
+                updateScheduleSyncStatus('Cronograma generado guardado en Airtable.', 'success');
+
+                // Recargar para asegurar consistencia
+                await loadScheduleFromAirtable(false);
+
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Guardado',
+                    text: `Se guardó el cronograma generado del año ${year} en Airtable.`
+                });
+
+            } catch (error) {
+                console.error('❌ Error guardando cronograma generado:', error);
+                Swal.close();
+                updateScheduleSyncStatus('Error guardando en Airtable.', 'error');
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'No se pudo guardar',
+                    text: error.message || 'Error desconocido'
+                });
+            }
+        }
+
+        // ======================
+        // Capacitaciones individuales (Manual) -> Airtable
+        // ======================
+        async function addManualScheduleEvent() {
+            const year = parseInt(document.getElementById('scheduleYear')?.value || String(new Date().getFullYear()), 10);
+
+            const select = document.getElementById('manualTrainingSelect');
+            const otherWrap = document.getElementById('manualTrainingOtherWrap');
+            const other = document.getElementById('manualTrainingOther');
+            const dateEl = document.getElementById('manualDate');
+            const timeEl = document.getElementById('manualTime');
+            const durationEl = document.getElementById('manualDuration');
+            const locationEl = document.getElementById('manualLocation');
+            const notesEl = document.getElementById('manualNotes');
+
+            const selected = select ? select.value : '';
+            const isOther = selected === '__other__';
+            const title = isOther ? (other?.value || '').trim() : (select?.selectedOptions?.[0]?.textContent || '').trim();
+
+            const dateISO = (dateEl?.value || '').trim();
+            const time = (timeEl?.value || '08:00').trim();
+            const duration = (durationEl?.value || '').trim();
+            const location = (locationEl?.value || '').trim();
+            const notes = (notesEl?.value || '').trim();
+
+            if (!title) {
+                Swal.fire({ icon:'warning', title:'Falta el nombre', text:'Selecciona o escribe el nombre de la capacitación.' });
+                return;
+            }
+            if (!dateISO) {
+                Swal.fire({ icon:'warning', title:'Falta la fecha', text:'Selecciona una fecha específica.' });
+                return;
             }
 
-            const item = {
-                id: (crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now() + Math.random()),
-                dateISO,
-                time: hhmm,
-                title,
-                department,
-                duration: dur,
-                location: (location?.value || '').trim(),
-                notes: (notes?.value || '').trim()
-            };
+            // departamento si viene del select
+            let department = 'General';
+            let trainingId = '';
+            if (!isOther && select?.selectedOptions?.[0]) {
+                trainingId = selected;
+                const dep = select.selectedOptions[0].getAttribute('data-department');
+                if (dep) department = dep;
+            }
 
-            manualScheduleData.push(item);
-            saveManualScheduleData();
-            Swal.fire({ icon:'success', title:'Agregado', timer: 900, showConfirmButton:false });
+            try {
+                Swal.fire({
+                    title: 'Guardando…',
+                    text: 'Creando evento en Airtable',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+
+                const uid = `${year}|Manual|${dateISO}|${time}|${trainingId || title}`;
+
+                const fields = {
+                    [SCHEDULE_FIELDS.year]: year,
+                    [SCHEDULE_FIELDS.date]: dateISO,
+                    [SCHEDULE_FIELDS.time]: time,
+                    [SCHEDULE_FIELDS.title]: title,
+                    [SCHEDULE_FIELDS.department]: department,
+                    [SCHEDULE_FIELDS.duration]: duration,
+                    [SCHEDULE_FIELDS.location]: location,
+                    [SCHEDULE_FIELDS.notes]: notes,
+                    [SCHEDULE_FIELDS.type]: 'Manual',
+                    [SCHEDULE_FIELDS.uid]: uid
+                };
+                if (trainingId) fields[SCHEDULE_FIELDS.trainingId] = trainingId;
+
+                const created = await airtableProxy('POST', scheduleTablePath(), { records: [{ fields }] });
+
+                const rec = created?.records?.[0];
+                if (!rec?.id) throw new Error('No se recibió el ID del registro creado');
+
+                manualScheduleData.push({
+                    id: rec.id,
+                    recordId: rec.id,
+                    dateISO,
+                    time,
+                    title,
+                    department,
+                    duration,
+                    location,
+                    notes
+                });
+
+                clearManualScheduleForm();
+                renderManualScheduleTable();
+                updateScheduleActionButtons();
+                updateScheduleSyncStatus('Evento manual guardado en Airtable.', 'success');
+
+                Swal.close();
+
+            } catch (error) {
+                console.error('❌ Error guardando evento manual:', error);
+                Swal.close();
+                updateScheduleSyncStatus('Error guardando evento manual en Airtable.', 'error');
+                Swal.fire({ icon:'error', title:'No se pudo guardar', text: error.message || 'Error desconocido' });
+            }
         }
 
         function clearManualScheduleForm() {
+            const select = document.getElementById('manualTrainingSelect');
+            const otherWrap = document.getElementById('manualTrainingOtherWrap');
             const other = document.getElementById('manualTrainingOther');
-            const duration = document.getElementById('manualDuration');
-            const location = document.getElementById('manualLocation');
-            const notes = document.getElementById('manualNotes');
+            const dateEl = document.getElementById('manualDate');
+            const timeEl = document.getElementById('manualTime');
+            const durationEl = document.getElementById('manualDuration');
+            const locationEl = document.getElementById('manualLocation');
+            const notesEl = document.getElementById('manualNotes');
+
+            if (select) select.value = '';
+            if (otherWrap) otherWrap.style.display = 'none';
             if (other) other.value = '';
-            if (duration) duration.value = '';
-            if (location) location.value = '';
-            if (notes) notes.value = '';
+            if (dateEl) dateEl.value = '';
+            if (timeEl) timeEl.value = '08:00';
+            if (durationEl) durationEl.value = '';
+            if (locationEl) locationEl.value = '';
+            if (notesEl) notesEl.value = '';
         }
 
-        function deleteManualScheduleEvent(id) {
-            manualScheduleData = manualScheduleData.filter(x => x.id !== id);
-            saveManualScheduleData();
+        async function deleteManualScheduleEvent(id) {
+            const row = manualScheduleData.find(x => x.id === id || x.recordId === id);
+            if (!row) return;
+
+            const confirm = await Swal.fire({
+                icon: 'warning',
+                title: 'Eliminar evento',
+                text: '¿Deseas eliminar este evento del cronograma? Se eliminará también en Airtable.',
+                showCancelButton: true,
+                confirmButtonText: 'Eliminar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#dc2626'
+            });
+
+            if (!confirm.isConfirmed) return;
+
+            try {
+                Swal.fire({
+                    title: 'Eliminando…',
+                    text: 'Actualizando Airtable',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+
+                await airtableProxy('DELETE', `${scheduleTablePath()}/${encodeURIComponent(row.recordId)}`);
+
+                manualScheduleData = manualScheduleData.filter(x => x.recordId !== row.recordId);
+                renderManualScheduleTable();
+                updateScheduleActionButtons();
+
+                Swal.close();
+                updateScheduleSyncStatus('Evento eliminado en Airtable.', 'success');
+
+            } catch (error) {
+                console.error('❌ Error eliminando evento manual:', error);
+                Swal.close();
+                updateScheduleSyncStatus('Error eliminando en Airtable.', 'error');
+                Swal.fire({ icon:'error', title:'No se pudo eliminar', text: error.message || 'Error desconocido' });
+            }
         }
 
         function renderManualScheduleTable() {
@@ -4905,20 +5241,22 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             if (empty) empty.style.display = 'none';
             if (container) container.style.display = 'block';
 
-            const sorted = [...manualScheduleData].sort((a,b) => new Date(`${a.dateISO}T${a.time}:00`) - new Date(`${b.dateISO}T${b.time}:00`));
+            const sorted = [...manualScheduleData].sort((a,b) =>
+                new Date(`${a.dateISO}T${a.time || '00:00'}:00`) - new Date(`${b.dateISO}T${b.time || '00:00'}:00`)
+            );
 
             tbody.innerHTML = '';
             sorted.forEach((r, i) => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td style="padding:8px; border:1px solid #e5e7eb;">${i+1}</td>
-                    <td style="padding:8px; border:1px solid #e5e7eb;">${r.dateISO}</td>
-                    <td style="padding:8px; border:1px solid #e5e7eb;">${r.time}</td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;">${escapeHtml(r.dateISO)}</td>
+                    <td style="padding:8px; border:1px solid #e5e7eb;">${escapeHtml(r.time)}</td>
                     <td style="padding:8px; border:1px solid #e5e7eb;"><strong>${escapeHtml(r.title)}</strong></td>
                     <td style="padding:8px; border:1px solid #e5e7eb;">${escapeHtml(r.location || '')}</td>
                     <td style="padding:8px; border:1px solid #e5e7eb;">${escapeHtml(r.duration || '')}</td>
-                    <td style="padding:8px; border:1px solid #e5e7eb;">
-                        <button class="btn btn-danger" style="padding:6px 10px;" onclick="deleteManualScheduleEvent('${r.id}')">
+                    <td style="padding:8px; border:1px solid #e5e7eb; text-align:center;">
+                        <button class="btn btn-danger" style="padding:6px 10px;" onclick="deleteManualScheduleEvent('${r.recordId}')">
                             <i class="fas fa-trash"></i>
                         </button>
                     </td>
@@ -4927,8 +5265,56 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             });
         }
 
+        async function initManualScheduleUI() {
+            const select = document.getElementById('manualTrainingSelect');
+            if (!select) return;
+
+            let trainings = [];
+            try {
+                trainings = await fetchTrainingsForSchedule();
+            } catch (e) {
+                trainings = [];
+            }
+
+            select.innerHTML = '';
+
+            const optEmpty = document.createElement('option');
+            optEmpty.value = '';
+            optEmpty.textContent = '-- Selecciona una capacitación --';
+            select.appendChild(optEmpty);
+
+            trainings.forEach(t => {
+                const opt = document.createElement('option');
+                opt.value = t.id;
+                opt.textContent = `${t.title}${t.department ? ' - ' + t.department : ''}`;
+                opt.setAttribute('data-department', t.department || 'General');
+                select.appendChild(opt);
+            });
+
+            const optOther = document.createElement('option');
+            optOther.value = '__other__';
+            optOther.textContent = 'Otra… (escribir manualmente)';
+            select.appendChild(optOther);
+
+            select.addEventListener('change', () => {
+                const wrap = document.getElementById('manualTrainingOtherWrap');
+                if (!wrap) return;
+                wrap.style.display = (select.value === '__other__') ? 'block' : 'none';
+            });
+        }
+
         function getCombinedScheduleData() {
-            const gen = (annualScheduleData || []).map(x => ({ ...x, source: 'Generado' }));
+            const gen = (annualScheduleData || []).map(x => ({
+                dateISO: x.dateISO,
+                time: x.time,
+                title: x.title,
+                department: x.department || '',
+                duration: x.duration || '',
+                location: '',
+                notes: '',
+                source: 'Generado'
+            }));
+
             const man = (manualScheduleData || []).map(x => ({
                 dateISO: x.dateISO,
                 time: x.time,
@@ -4940,7 +5326,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 source: 'Manual'
             }));
 
-            const all = [...gen, ...man].sort((a,b) => new Date(`${a.dateISO}T${a.time}:00`) - new Date(`${b.dateISO}T${b.time}:00`));
+            const all = [...gen, ...man].sort((a,b) => new Date(`${a.dateISO}T${a.time || '00:00'}:00`) - new Date(`${b.dateISO}T${b.time || '00:00'}:00`));
             all.forEach((r, idx) => r._exportIndex = idx + 1);
             return all;
         }
@@ -5108,44 +5494,69 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             XLSX.writeFile(wb, `cronograma_capacitaciones_${year}.xlsx`);
         }
 
+        function downloadScheduleICS() {
+            const combined = getCombinedScheduleData();
+            if (!combined || combined.length === 0) return;
 
-        async function fetchTrainingsForSchedule() {
-            const response = await fetch('/.netlify/functions/airtable-proxy', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    method: 'GET',
-                    path: '/Capacitaciones'
-                })
+            const year = document.getElementById('scheduleYear')?.value || String(new Date().getFullYear());
+            const nowStamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+            let ics = 'BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Hospital Susana López de Valencia//Capacitaciones//ES
+CALSCALE:GREGORIAN
+METHOD:PUBLISH
+';
+
+            const esc = (s) => String(s || '').replace(/\/g, '\\').replace(/
+/g, '\n').replace(/,/g, '\,').replace(/;/g, '\;');
+
+            combined.forEach(item => {
+                const dtStart = item.dateISO.replace(/-/g, '') + 'T' + String(item.time || '00:00').replace(':', '') + '00';
+                const uid = `cap-${year}-${item._exportIndex}@hslv`;
+
+                const summary = esc(item.title || 'Capacitación');
+                const location = esc(item.location || '');
+                const description = esc(`Departamento: ${item.department || ''}
+Duración: ${item.duration || ''}
+Observación: ${item.notes || ''}
+Tipo: ${item.source || ''}`);
+
+                ics += 'BEGIN:VEVENT
+';
+                ics += `UID:${uid}
+`;
+                ics += `DTSTAMP:${nowStamp}
+`;
+                ics += `DTSTART:${dtStart}
+`;
+                ics += `SUMMARY:${summary}
+`;
+                if (location) ics += `LOCATION:${location}
+`;
+                if (description) ics += `DESCRIPTION:${description}
+`;
+                ics += 'END:VEVENT
+';
             });
 
-            const data = await response.json();
-            if (!response.ok || !data || data.success !== true || !Array.isArray(data.records)) {
-                const msg = (data && (data.error || data.message)) ? (data.error || data.message) : `HTTP ${response.status}`;
-                throw new Error(msg);
-            }
+            ics += 'END:VCALENDAR
+';
 
-            // Filtrar activas y no finalizadas (si existen los campos)
-            const trainings = data.records
-                .filter(r => {
-                    const f = r.fields || {};
-                    const activa = f['Activa'] !== false; // por defecto true
-                    const finalizada = f['Finalizada'] === true; // por defecto false
-                    const estado = String(f['Estado'] || '').toLowerCase();
-                    const estadoFinal = estado.includes('final') || estado.includes('complet');
-                    return activa && !finalizada && !estadoFinal;
-                })
-                .map(r => ({
-                    id: r.id,
-                    title: (r.fields && (r.fields['Título'] || r.fields['Titulo'])) || 'Sin título',
-                    department: (r.fields && r.fields['Departamento']) || 'General',
-                    duration: (r.fields && r.fields['Duración']) || (r.fields && r.fields['Duracion']) || ''
-                }));
-
-            // Ordenar por título para un resultado estable
-            trainings.sort((a, b) => a.title.localeCompare(b.title, 'es'));
-            return trainings;
+            const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `cronograma_capacitaciones_${year}.ics`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
         }
+
+        // ======================
+        // Funciones base del generador anual
+        // ======================
 
         function parseTimeHHMM(value) {
             const safe = String(value || '08:00');
@@ -5162,12 +5573,10 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         function getNthWeekdayOfMonth(year, monthIndex, weekday, nth) {
             const first = new Date(year, monthIndex, 1);
             const firstDow = first.getDay();
-            // offset hasta el primer weekday
             let offset = (weekday - firstDow + 7) % 7;
             let day = 1 + offset;
 
             if (nth === 'last') {
-                // Buscar desde el final
                 const last = new Date(year, monthIndex + 1, 0);
                 const lastDow = last.getDay();
                 const back = (lastDow - weekday + 7) % 7;
@@ -5177,7 +5586,6 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const n = Math.max(1, Math.min(4, parseInt(nth, 10) || 1));
             day += (n - 1) * 7;
 
-            // Si se pasa del mes, caer en la última ocurrencia
             const candidate = new Date(year, monthIndex, day);
             if (candidate.getMonth() !== monthIndex) {
                 const last = new Date(year, monthIndex + 1, 0);
@@ -5192,13 +5600,11 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const dow = parseInt(dayOfWeek, 10);
 
             if (frequency === 'weekly') {
-                // Primer día del año alineado al dow
                 const first = new Date(year, 0, 1);
                 const offset = (dow - first.getDay() + 7) % 7;
                 const start = new Date(year, 0, 1 + offset);
 
                 const dates = [];
-                // Generar hasta final de año
                 let d = new Date(start);
                 while (d.getFullYear() === year) {
                     dates.push(new Date(d));
@@ -5207,12 +5613,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 return dates;
             }
 
-            const monthSteps = {
-                monthly: 1,
-                bimonthly: 2,
-                quarterly: 3
-            };
-
+            const monthSteps = { monthly: 1, bimonthly: 2, quarterly: 3 };
             const step = monthSteps[frequency] || 1;
             const dates = [];
             for (let m = 0; m < 12; m += step) {
@@ -5239,12 +5640,48 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
         function addMinutesToTime(hh, mm, addMinutes) {
             const total = (hh * 60) + mm + addMinutes;
-            const newHH = Math.floor(((total % 1440) + 1440) % 1440 / 60);
-            const newMM = ((total % 60) + 60) % 60;
+            const newHH = Math.floor((((total % 1440) + 1440) % 1440) / 60);
+            const newMM = (((total % 60) + 60) % 60);
             return {
                 hh: String(newHH).padStart(2, '0'),
                 mm: String(newMM).padStart(2, '0')
             };
+        }
+
+        async function fetchTrainingsForSchedule() {
+            const response = await fetch('/.netlify/functions/airtable-proxy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    method: 'GET',
+                    path: `/Capacitaciones`
+                })
+            });
+
+            const data = await response.json();
+            if (!data.success || !data.records) {
+                const msg = data?.error || `Error ${response.status}`;
+                throw new Error(msg);
+            }
+
+            const trainings = data.records
+                .filter(r => {
+                    const f = r.fields || {};
+                    const activa = f['Activa'] !== false;
+                    const finalizada = f['Finalizada'] === true;
+                    const estado = String(f['Estado'] || '').toLowerCase();
+                    const estadoFinal = estado.includes('final') || estado.includes('complet');
+                    return activa && !finalizada && !estadoFinal;
+                })
+                .map(r => ({
+                    id: r.id,
+                    title: (r.fields && (r.fields['Título'] || r.fields['Titulo'])) || 'Sin título',
+                    department: (r.fields && r.fields['Departamento']) || 'General',
+                    duration: (r.fields && r.fields['Duración']) || (r.fields && r.fields['Duracion']) || ''
+                }));
+
+            trainings.sort((a, b) => a.title.localeCompare(b.title, 'es'));
+            return trainings;
         }
 
         async function generateAnnualSchedule() {
@@ -5273,7 +5710,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 if (!trainings || trainings.length === 0) {
                     if (empty) empty.style.display = 'block';
                     annualScheduleData = [];
-                    setScheduleActionButtonsEnabled(false);
+                    updateScheduleActionButtons();
                     Swal.close();
                     return;
                 }
@@ -5286,7 +5723,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     const training = trainings[i % trainings.length];
                     const dateBase = baseDates[i % baseDates.length];
                     const round = Math.floor(i / baseDates.length);
-                    const t = addMinutesToTime(hh, mm, round * 60); // si se repite fecha, escalonar 1h
+                    const t = addMinutesToTime(hh, mm, round * 60);
 
                     annualScheduleData.push({
                         index: i + 1,
@@ -5302,13 +5739,14 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 renderScheduleTable();
                 if (container) container.style.display = 'block';
-                setScheduleActionButtonsEnabled(true);
 
                 Swal.close();
+                updateScheduleSyncStatus('Cronograma generado. Puedes guardarlo en Airtable.', 'info');
+                updateScheduleActionButtons();
 
             } catch (error) {
                 console.error('❌ Error generando cronograma:', error);
-                setScheduleActionButtonsEnabled(false);
+                updateScheduleActionButtons();
                 Swal.fire({
                     icon: 'error',
                     title: 'No se pudo generar el cronograma',
@@ -5323,13 +5761,13 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
             tbody.innerHTML = '';
 
-            annualScheduleData.forEach(item => {
+            (annualScheduleData || []).forEach(item => {
                 const tr = document.createElement('tr');
                 tr.style.borderBottom = '1px solid #eee';
                 tr.innerHTML = `
                     <td style="padding: 0.75rem;">${item.index}</td>
                     <td style="padding: 0.75rem;">${item.dateES}</td>
-                    <td style="padding: 0.75rem;">${item.time}</td>
+                    <td style="padding: 0.75rem;">${escapeHtml(item.time)}</td>
                     <td style="padding: 0.75rem;"><strong>${escapeHtml(item.title)}</strong></td>
                     <td style="padding: 0.75rem;">${escapeHtml(item.department)}</td>
                     <td style="padding: 0.75rem;">${escapeHtml(item.duration || '')}</td>
@@ -5347,88 +5785,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 .replace(/'/g, '&#039;');
         }
 
-        function downloadScheduleCSV() {
-            if (!annualScheduleData || annualScheduleData.length === 0) return;
-
-            const year = document.getElementById('scheduleYear')?.value || String(new Date().getFullYear());
-
-            const header = ['#', 'Fecha', 'Hora', 'Capacitación', 'Departamento', 'Duración'];
-            const rows = annualScheduleData.map(r => ([
-                r.index,
-                r.dateISO,
-                r.time,
-                r.title,
-                r.department,
-                r.duration || ''
-            ]));
-
-            const csv = [header, ...rows]
-                .map(cols => cols.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
-                .join('\n');
-
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `cronograma_capacitaciones_${year}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function downloadScheduleICS() {
-            const combined = getCombinedScheduleData();
-            if (!combined || combined.length === 0) return;
-
-            const year = document.getElementById('scheduleYear')?.value || String(new Date().getFullYear());
-            const nowStamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-
-            let ics = 'BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Hospital Susana López de Valencia//Capacitaciones//ES\nCALSCALE:GREGORIAN\nMETHOD:PUBLISH\n';
-
-            const esc = (s) => String(s || '').replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/,/g, '\\,').replace(/;/g, '\\;');
-
-            combined.forEach(item => {
-                const dtStart = item.dateISO.replace(/-/g, '') + 'T' + item.time.replace(':', '') + '00';
-                const uid = `cap-${year}-${item._exportIndex}@hslv`;
-
-                const summary = esc(item.title || 'Capacitación');
-                const location = esc(item.location || '');
-                const description = esc(`Departamento: ${item.department || ''}\nDuración: ${item.duration || ''}\nObservación: ${item.notes || ''}\nTipo: ${item.source || ''}`);
-
-                ics += 'BEGIN:VEVENT\n';
-                ics += `UID:${uid}\n`;
-                ics += `DTSTAMP:${nowStamp}\n`;
-                ics += `DTSTART:${dtStart}\n`;
-                ics += `SUMMARY:${summary}\n`;
-                if (location) ics += `LOCATION:${location}\n`;
-                if (description) ics += `DESCRIPTION:${description}\n`;
-                ics += 'END:VEVENT\n';
-            });
-
-            ics += 'END:VCALENDAR\n';
-
-            const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `cronograma_capacitaciones_${year}.ics`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function sanitizeICS(text) {
-            return String(text || '')
-                .replace(/\\/g, '\\\\')
-                .replace(/\n/g, '\\n')
-                .replace(/\r/g, '')
-                .replace(/,/g, '\\,')
-                .replace(/;/g, '\\;');
-        }
-
-        function printSchedule() {
+function printSchedule() {
             const combined = getCombinedScheduleData();
             if (!combined || combined.length === 0) return;
 
