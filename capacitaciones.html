@@ -5035,11 +5035,19 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                             ${rows}
                         </tbody>
                     </table>
-                    <script>window.onload = () => window.print();</script>
                 </body>
                 </html>
             `);
-            w.document.close();
+	            w.document.close();
+	            // Imprimir desde aquí (evita incrustar etiquetas de cierre dentro del HTML generado)
+	            setTimeout(() => {
+	                try {
+	                    w.focus();
+	                    w.print();
+	                } catch (e) {
+	                    console.warn('No se pudo imprimir automáticamente:', e);
+	                }
+	            }, 250);
         }
 
         // ═════════════════════════════════════════════════════════════════
