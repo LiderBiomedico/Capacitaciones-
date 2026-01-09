@@ -6,7 +6,7 @@
     <title>Sistema de Capacitaciones - Hospital Susana López de Valencia</title>
     
     <meta name="description" content="Sistema integral de gestión de capacitaciones hospitalarias">
-    <meta name="theme-color" content="#16A34A">
+    <meta name="theme-color" content="#2E7D32">
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E🏥%3C/text%3E%3C/svg%3E">
@@ -33,8 +33,8 @@
         }
 
         :root {
-            --primary: #667eea;
-            --secondary: #764ba2;
+            --primary: #2E7D32;
+            --secondary: #66BB6A;
             --success: #28a745;
             --danger: #dc3545;
             --warning: #ffc107;
@@ -43,7 +43,7 @@
 
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #ffffff 0%, #fafafa 100%);
+            background: #ffffff;
             min-height: 100vh;
         }
 
@@ -221,7 +221,7 @@
         /* Navigation */
         .navigation {
             display: flex;
-            background: white;
+            background: #ffffff;
             border-bottom: 2px solid #e0e0e0;
             overflow-x: auto;
             position: sticky;
@@ -242,22 +242,24 @@
             flex-direction: column;
             align-items: center;
             gap: 0.5rem;
-            color: #F2FFFA;
+            color: #334155;
         }
 
         .nav-tab i {
             font-size: 1.3rem;
+        
+            color: currentColor;
         }
 
         .nav-tab:hover {
-            background: #f8f9fa;
+            background: #f8fafc;
             color: var(--primary);
         }
 
         .nav-tab.active {
             color: var(--primary);
             border-bottom-color: var(--primary);
-            background: #f8f9ff;
+            background: #F1FAF5;
         }
 
         /* Main Content */
@@ -475,7 +477,7 @@
 
         .option-item:hover {
             border-color: var(--primary);
-            background: #f8f9ff;
+            background: #F1FAF5;
         }
 
         .option-item input[type="radio"] {
@@ -1161,7 +1163,7 @@ overflow: hidden;
         }
 
         #participantsTable tbody tr:hover {
-            background: #f8f9ff;
+            background: #F1FAF5;
         }
 
         #participantsTable tbody tr:nth-child(even) {
@@ -1811,7 +1813,7 @@ overflow: hidden;
                 <div id="reportContainer" style="display: none;">
                     
                     <!-- Información de la Capacitación -->
-                    <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #F2FFFA;">
+                    <div class="card" style="background: linear-gradient(135deg, #2E7D32 0%, #66BB6A 100%); color: #F2FFFA;">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
                             <div>
                                 <h3 style="color: #F2FFFA; margin: 0;"><i class="fas fa-book"></i> <span id="reportTrainingTitle">-</span></h3>
@@ -1917,7 +1919,7 @@ overflow: hidden;
                         <div style="overflow-x: auto;">
                             <table id="participantsTable" style="width: 100%; border-collapse: collapse; min-width: 800px;">
                                 <thead>
-                                    <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #F2FFFA;">
+                                    <tr style="background: linear-gradient(135deg, #2E7D32 0%, #66BB6A 100%); color: #F2FFFA;">
                                         <th style="padding: 0.75rem; text-align: left; border-radius: 8px 0 0 0;">#</th>
                                         <th style="padding: 0.75rem; text-align: left;">Participante</th>
                                         <th style="padding: 0.75rem; text-align: left;">Departamento</th>
@@ -2141,7 +2143,7 @@ overflow: hidden;
                         <div style="overflow-x:auto;">
                             <table id="scheduleTable" style="width: 100%; border-collapse: collapse; min-width: 950px;">
                                 <thead>
-                                    <tr style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #F2FFFA;">
+                                    <tr style="background: linear-gradient(135deg, #2E7D32 0%, #66BB6A 100%); color: #F2FFFA;">
                                         <th style="padding: 0.75rem; text-align:left; border-radius: 8px 0 0 0;">#</th>
                                         <th style="padding: 0.75rem; text-align:left;">Fecha</th>
                                         <th style="padding: 0.75rem; text-align:left;">Hora</th>
@@ -2858,7 +2860,7 @@ overflow: hidden;
                     title: '¡Pre-Test Enviado!',
                     html: `
                         <div style="text-align: center;">
-                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                            <div style="background: linear-gradient(135deg, #2E7D32 0%, #66BB6A 100%); 
                                         color: #F2FFFA; 
                                         padding: 1.5rem; 
                                         border-radius: 12px; 
@@ -2879,7 +2881,7 @@ overflow: hidden;
                     confirmButtonText: 'Continuar a la Capacitación',
                     showCancelButton: true,
                     cancelButtonText: 'Volver al Inicio',
-                    confirmButtonColor: '#667eea'
+                    confirmButtonColor: '#2E7D32'
                 }).then((result) => {
                     if (result.isConfirmed) {
                         // GUARDAR participationId para uso posterior en postest
@@ -3332,7 +3334,7 @@ overflow: hidden;
                     title: congratsMessage,
                     html: `
                         <div style="text-align: center;">
-                            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                            <div style="background: linear-gradient(135deg, #2E7D32 0%, #66BB6A 100%); 
                                         color: #F2FFFA; 
                                         padding: 1.5rem; 
                                         border-radius: 12px; 
@@ -3351,7 +3353,7 @@ overflow: hidden;
                         </div>
                     `,
                     confirmButtonText: 'Volver al Inicio',
-                    confirmButtonColor: '#667eea',
+                    confirmButtonColor: '#2E7D32',
                     allowOutsideClick: false
                 }).then(() => {
                     cancelTraining();
@@ -4090,7 +4092,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 text: accessUrl,
                 width: 256,
                 height: 256,
-                colorDark: '#667eea',
+                colorDark: '#2E7D32',
                 colorLight: '#ffffff',
                 correctLevel: QRCode.CorrectLevel.H
             });
@@ -4682,7 +4684,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         datasets: [{
                             label: 'Participaciones',
                             data: [0, 0, 0, 0, 0, 0, 0],
-                            borderColor: '#667eea',
+                            borderColor: '#2E7D32',
                             backgroundColor: 'rgba(102, 126, 234, 0.1)',
                             tension: 0.4
                         }]
@@ -6872,7 +6874,7 @@ function makeCronogramaFilterFormula(year, tipo) {
           display: flex;
           justify-content: center;
           padding: 1.5rem;
-          background: #f8f9ff;
+          background: #F1FAF5;
           border-radius: 12px;
           margin-bottom: 1.5rem;
         "></div>
@@ -6928,7 +6930,7 @@ function makeCronogramaFilterFormula(year, tipo) {
         <button onclick="copyPostestUrl()" class="btn btn-primary" style="
           width: 100%;
           padding: 0.75rem 1.5rem;
-          background: #667eea;
+          background: #2E7D32;
           color: #F2FFFA;
           border: none;
           border-radius: 8px;
@@ -6940,7 +6942,7 @@ function makeCronogramaFilterFormula(year, tipo) {
           justify-content: center;
           gap: 0.5rem;
           margin-bottom: 1rem;
-        " onmouseover="this.style.background='#5568d3'" onmouseout="this.style.background='#667eea'">
+        " onmouseover="this.style.background='#5568d3'" onmouseout="this.style.background='#2E7D32'">
           <i class="fas fa-copy"></i> Copiar Link
         </button>
       </div>
@@ -7009,14 +7011,14 @@ function makeCronogramaFilterFormula(year, tipo) {
       <button onclick="copyPostestUrl()" class="btn-primary" style="
         flex: 1;
         padding: 0.75rem 1.5rem;
-        background: #667eea;
+        background: #2E7D32;
         color: #F2FFFA;
         border: none;
         border-radius: 8px;
         cursor: pointer;
         font-weight: 600;
         transition: all 0.3s;
-      " onmouseover="this.style.background='#5568d3'" onmouseout="this.style.background='#667eea'">
+      " onmouseover="this.style.background='#5568d3'" onmouseout="this.style.background='#2E7D32'">
         Copiar Link
       </button>
     </div>
