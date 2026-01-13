@@ -357,29 +357,124 @@ async function completePosttest(postestScore) {
 // INICIALIZACIÓN
 // ==========================================
 
-function initializeApp() {
-    console.log('ðŸš€ Iniciando Sistema de Capacitaciones (VersiÃ³n Segura)...');
-    console.log('ðŸ"' Modo: Netlify Functions - Credenciales en servidor');
-    
+
+// ==========================================
+// BLOQUEO POR CONTRASEÑA (ADMIN) - Airtable
+// - Se omite cuando el usuario entra por QR (?code=...)
+// - Valida contra Netlify Function: /.netlify/functions/validate-app-password
+// ==========================================
+const ADMIN_AUTH_STORAGE_KEY = 'HSLV_ADMIN_AUTH_V1';
+const ADMIN_AUTH_TTL_HOURS = 8;
+
+function isParticipantFlow() {
+  const urlParams = new URLSearchParams(window.location.search);
+  return !!urlParams.get('code');
+}
+
+function getStoredAdminAuth() {
+  try {
+    const raw = localStorage.getItem(ADMIN_AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    if (!data?.expiresAt) return null;
+    if (Date.now() > data.expiresAt) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+function setStoredAdminAuth() {
+  const ttlMs = ADMIN_AUTH_TTL_HOURS * 60 * 60 * 1000;
+  localStorage.setItem(ADMIN_AUTH_STORAGE_KEY, JSON.stringify({ ok: true, expiresAt: Date.now() + ttlMs }));
+}
+
+async function validateAdminPassword(password) {
+  const res = await fetch('/.netlify/functions/validate-app-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password })
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success) {
+    throw new Error(data?.error || 'Contraseña incorrecta');
+  }
+  return true;
+}
+
+async function enforceAdminPassword() {
+  if (getStoredAdminAuth()) return true;
+
+  while (true) {
+    const result = await Swal.fire({
+      title: 'Acceso Administrativo',
+      text: 'Ingresa la contraseña para administrar el sistema',
+      input: 'password',
+      inputPlaceholder: 'Contraseña',
+      inputAttributes: { autocapitalize: 'off', autocomplete: 'current-password' },
+      confirmButtonText: 'Ingresar',
+      showCancelButton: false,
+      allowOutsideClick: false,
+      allowEscapeKey: false,
+      showLoaderOnConfirm: true,
+      preConfirm: async (pwd) => {
+        if (!pwd || String(pwd).trim().length < 6) {
+          Swal.showValidationMessage('Ingresa una contraseña válida');
+          return false;
+        }
+        try {
+          await validateAdminPassword(String(pwd));
+          return true;
+        } catch (e) {
+          Swal.showValidationMessage(e.message || 'Contraseña incorrecta');
+          return false;
+        }
+      }
+    });
+
+    if (result.isConfirmed) {
+      setStoredAdminAuth();
+      return true;
+    }
+  }
+}
+
+async function initializeApp() {
+    console.log('🚀 Iniciando Sistema de Capacitaciones (Versión Segura)...');
+    console.log('🔐 Modo: Netlify Functions - Credenciales en servidor');
+
     // Ocultar pantalla de carga
     setTimeout(() => {
         const loadingScreen = document.getElementById('loadingScreen');
         if (loadingScreen) loadingScreen.classList.add('hidden');
     }, 1500);
-    
+
+    // Flujo participante: NO pedir contraseña
+    if (isParticipantFlow()) {
+        // Verificar parámetros de URL (ACTUALIZADO para detectar postest)
+        checkUrlParamsUpdated();
+        return;
+    }
+
+    // Esperar a que se oculte el loading antes de pedir contraseña
+    await new Promise(resolve => setTimeout(resolve, 1600));
+
+    // Pedir contraseña (guardada en Airtable)
+    await enforceAdminPassword();
+
     // Actualizar fecha y hora
     updateDateTime();
     setInterval(updateDateTime, 60000);
-    
+
     // Verificar parámetros de URL (ACTUALIZADO para detectar postest)
     checkUrlParamsUpdated();
-    
+
     // Cargar tema guardado
     loadTheme();
-    
+
     // Cargar configuración (sin credenciales)
     loadConfiguration();
-    
+
     // Inicializar dashboard
     if (isConnected) {
         initializeDashboard();

@@ -3405,7 +3405,103 @@ overflow: hidden;
             setInterval(updateDateTime, 1000);
         });
 
-        function initializeApp() {
+        // ==================== BLOQUEO POR CONTRASEÑA (ADMIN) ====================
+        // 🔒 La contraseña se lee desde Airtable (tabla AppConfig) mediante una Netlify Function.
+        // ✅ Se omite el bloqueo cuando el usuario entra por QR con ?code=... (flujo participante).
+
+        const ADMIN_AUTH_STORAGE_KEY = 'HSLV_ADMIN_AUTH_V1';
+        const ADMIN_AUTH_TTL_HOURS = 8; // cambia si quieres (ej. 24)
+
+        function isParticipantFlow() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return !!urlParams.get('code'); // QR / postest siempre trae "code"
+        }
+
+        function getStoredAdminAuth() {
+            try {
+                const raw = localStorage.getItem(ADMIN_AUTH_STORAGE_KEY);
+                if (!raw) return null;
+                const data = JSON.parse(raw);
+                if (!data || !data.expiresAt) return null;
+                if (Date.now() > data.expiresAt) return null;
+                return data;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function setStoredAdminAuth() {
+            const ttlMs = ADMIN_AUTH_TTL_HOURS * 60 * 60 * 1000;
+            const payload = { ok: true, expiresAt: Date.now() + ttlMs };
+            localStorage.setItem(ADMIN_AUTH_STORAGE_KEY, JSON.stringify(payload));
+        }
+
+        async function validateAdminPassword(password) {
+            const res = await fetch('/.netlify/functions/validate-app-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                const msg = data?.error || 'Contraseña incorrecta';
+                throw new Error(msg);
+            }
+            return true;
+        }
+
+        async function enforceAdminPassword() {
+            // Si ya hay sesión válida, no pedir de nuevo
+            if (getStoredAdminAuth()) return true;
+
+            // Pedir contraseña hasta que sea correcta
+            while (true) {
+                const result = await Swal.fire({
+                    title: 'Acceso Administrativo',
+                    text: 'Ingresa la contraseña para administrar el sistema',
+                    input: 'password',
+                    inputPlaceholder: 'Contraseña',
+                    inputAttributes: {
+                        autocapitalize: 'off',
+                        autocomplete: 'current-password'
+                    },
+                    confirmButtonText: 'Ingresar',
+                    showCancelButton: false,
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    showLoaderOnConfirm: true,
+                    preConfirm: async (pwd) => {
+                        if (!pwd || String(pwd).trim().length < 6) {
+                            Swal.showValidationMessage('Ingresa una contraseña válida');
+                            return false;
+                        }
+                        try {
+                            await validateAdminPassword(String(pwd));
+                            return true;
+                        } catch (e) {
+                            Swal.showValidationMessage(e.message || 'Contraseña incorrecta');
+                            return false;
+                        }
+                    }
+                });
+
+                if (result.isConfirmed) {
+                    setStoredAdminAuth();
+                    return true;
+                }
+            }
+        }
+
+        function startAdminApp() {
+            // Inicializar gráficos y dashboard (ahora SOLO después de autenticar)
+            setTimeout(() => initializeCharts(), 200);
+            setTimeout(() => loadDashboardStats(), 600);
+            setTimeout(() => loadTrainings(), 600);
+        }
+        
+
+        async function initializeApp() {
+            // Mantener splash / pantalla de inicio
             setTimeout(() => {
                 document.getElementById('loadingScreen').style.opacity = '0';
                 setTimeout(() => {
@@ -3413,15 +3509,22 @@ overflow: hidden;
                 }, 250);
             }, 5000);
 
-            setTimeout(() => initializeCharts(), 2000);
-            
-            // Cargar estadísticas del dashboard después de que los gráficos estén listos
-            setTimeout(() => loadDashboardStats(), 2500);
-            
-            // Cargar capacitaciones al inicio (sin mostrar, solo en background)
-            setTimeout(() => loadTrainings(), 2500);
-            
-            // Verificar si viene con código QR en la URL
+            // Si viene por QR (participante), NO pedir contraseña
+            if (isParticipantFlow()) {
+                checkForAccessCode();
+                return;
+            }
+
+            // Esperar a que se oculte la pantalla de inicio antes de pedir contraseña
+            await new Promise(resolve => setTimeout(resolve, 5200));
+
+            // Pedir contraseña (guardada en Airtable)
+            await enforceAdminPassword();
+
+            // Cargar el modo administrador
+            startAdminApp();
+
+            // (Por si en el futuro agregas otros parámetros)
             checkForAccessCode();
         }
         
