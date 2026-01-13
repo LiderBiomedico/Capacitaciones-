@@ -6134,9 +6134,9 @@ function makeCronogramaFilterFormula(year, tipo) {
 
             const rowsHtml = combined.map(r => `
                 <tr>
-                    <td>${r._exportIndex}</td>
-                    <td>${r.dateISO}</td>
-                    <td>${r.time}</td>
+                    <td style="text-align:center;">${r._exportIndex}</td>
+                    <td>${escapeHtml(r.date || '')}</td>
+                    <td>${escapeHtml(r.time || '')}</td>
                     <td><strong>${escapeHtml(r.title || '')}</strong></td>
                     <td>${escapeHtml(r.department || '')}</td>
                     <td>${escapeHtml(r.duration || '')}</td>
@@ -6152,19 +6152,19 @@ function makeCronogramaFilterFormula(year, tipo) {
                     <meta charset="utf-8" />
                     <title>Cronograma Capacitaciones ${year}</title>
                     <style>
-                        body { font-family: Arial, sans-serif; margin: 24px; color: #F2FFFA; }
+                        body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
                         .title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-                        .subtitle { font-size: 12px; color: #F2FFFA; margin-bottom: 16px; }
+                        .subtitle { font-size: 12px; color: #4b5563; margin-bottom: 16px; }
                         table { width: 100%; border-collapse: collapse; font-size: 12px; }
                         th, td { border: 1px solid #e5e7eb; padding: 8px; vertical-align: top; }
-                        th { background: #111827; color: #F2FFFA; text-align: center; }
+                        th { background: #2e7d32; color: #ffffff; text-align: center; }
                         tr:nth-child(even) td { background: #f9fafb; }
+                        @media print { body { margin: 0; } }
                     </style>
                 </head>
                 <body>
-                    <div class="title">Cronograma Anual de Capacitaciones - ${year}</div>
-                    <div class="subtitle">Hospital Susana López de Valencia | Generado: ${generatedAt}</div>
-
+                    <div class="title">Cronograma de Capacitaciones - ${year}</div>
+                    <div class="subtitle">Generado: ${generatedAt}</div>
                     <table>
                         <thead>
                             <tr>
@@ -6181,236 +6181,14 @@ function makeCronogramaFilterFormula(year, tipo) {
                         </thead>
                         <tbody>${rowsHtml}</tbody>
                     </table>
-
-                
-    <!-- ═══════════════════════════════════════════════════════════════
-         OVERLAY DE CONTRASEÑA (ADMIN)
-         ═══════════════════════════════════════════════════════════════ -->
-    <div id="authOverlay" aria-hidden="true">
-        <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
-            <div class="auth-head">
-                <div class="auth-badge"><i class="fas fa-lock"></i></div>
-                <div>
-                    <h2 class="auth-title" id="authTitle">Acceso restringido</h2>
-                    <p class="auth-sub">Ingresa la contraseña para continuar.</p>
-                </div>
-            </div>
-            <div class="auth-body">
-                <div class="auth-row">
-                    <label style="font-weight:700; color:#111827;">Contraseña</label>
-                    <input id="authPassword" type="password" autocomplete="current-password" placeholder="••••••••••••••••" />
-                    <div class="auth-actions">
-                        <button class="auth-btn primary" id="authLoginBtn"><i class="fas fa-unlock"></i> Entrar</button>
-                        <button class="auth-btn secondary" id="authReloadBtn"><i class="fas fa-rotate"></i> Recargar</button>
-                    </div>
-                    <div class="auth-msg" id="authMsg"></div>
-                </div>
-            </div>
-            <div class="auth-foot">
-                <span>✔ Cambiable desde <b>Airtable</b> (AppConfig → APP_PASSWORD)</span>
-                <span id="authLockInfo"></span>
-            </div>
-        </div>
-    </div>
-    
-
-    <script>
-    // ═════════════════════════════════════════════════════════════════
-    // BLOQUEO POR CONTRASEÑA (ADMIN) - valida contra Netlify Function
-    // Function: /.netlify/functions/validate-app-password
-    // Airtable: AppConfig(Key='APP_PASSWORD', Value='...')
-    // ═════════════════════════════════════════════════════════════════
-    (function () {
-      const AUTH = {
-        sessionKey: 'hslv_auth_ok_until',
-        attemptsKey: 'hslv_auth_attempts',
-        lockKey: 'hslv_auth_lock_until',
-        maxAttempts: 5,
-        lockMinutes: 10,
-        sessionHours: 4,
-        bypassParam: 'code' // si viene ?code=XXXX (QR), NO pedimos contraseña
-      };
-
-      function qs(name) {
-        return new URLSearchParams(window.location.search).get(name);
-      }
-
-      function now() { return Date.now(); }
-
-      function getNum(key, def = 0) {
-        const v = Number(localStorage.getItem(key));
-        return Number.isFinite(v) ? v : def;
-      }
-
-      function setNum(key, val) {
-        localStorage.setItem(key, String(val));
-      }
-
-      function showOverlay() {
-        const ov = document.getElementById('authOverlay');
-        if (!ov) return;
-        ov.style.display = 'flex';
-        ov.setAttribute('aria-hidden', 'false');
-        document.body.style.overflow = 'hidden';
-      }
-
-      function hideOverlay() {
-        const ov = document.getElementById('authOverlay');
-        if (!ov) return;
-        ov.style.display = 'none';
-        ov.setAttribute('aria-hidden', 'true');
-        document.body.style.overflow = '';
-      }
-
-      function fmtMs(ms) {
-        const s = Math.max(0, Math.floor(ms / 1000));
-        const m = Math.floor(s / 60);
-        const r = s % 60;
-        if (m <= 0) return `${r}s`;
-        return `${m}m ${r}s`;
-      }
-
-      function updateLockInfo() {
-        const lockUntil = getNum(AUTH.lockKey, 0);
-        const el = document.getElementById('authLockInfo');
-        if (!el) return;
-        if (lockUntil > now()) {
-          el.textContent = `Bloqueado: ${fmtMs(lockUntil - now())}`;
-        } else {
-          el.textContent = '';
-        }
-      }
-
-      async function validatePassword(pw) {
-        const res = await fetch('/.netlify/functions/validate-app-password', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ password: pw })
-        });
-
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data && data.success) return true;
-
-        const msg = data && data.error ? data.error : 'Contraseña incorrecta';
-        throw new Error(msg);
-      }
-
-      async function tryLogin() {
-        const msgEl = document.getElementById('authMsg');
-        const pwEl = document.getElementById('authPassword');
-        const btnEl = document.getElementById('authLoginBtn');
-
-        const lockUntil = getNum(AUTH.lockKey, 0);
-        if (lockUntil > now()) {
-          if (msgEl) msgEl.textContent = `Demasiados intentos. Intenta en ${fmtMs(lockUntil - now())}.`;
-          updateLockInfo();
-          return;
-        }
-
-        const pw = (pwEl && pwEl.value ? pwEl.value : '').trim();
-        if (!pw) {
-          if (msgEl) msgEl.textContent = 'Escribe la contraseña.';
-          return;
-        }
-
-        if (msgEl) msgEl.textContent = '';
-        if (btnEl) {
-          btnEl.disabled = true;
-          btnEl.style.opacity = '0.85';
-          btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
-        }
-
-        try {
-          const ok = await validatePassword(pw);
-          if (ok) {
-            // sesión por 4 horas
-            const until = now() + AUTH.sessionHours * 60 * 60 * 1000;
-            setNum(AUTH.sessionKey, until);
-            setNum(AUTH.attemptsKey, 0);
-            setNum(AUTH.lockKey, 0);
-            hideOverlay();
-            return;
-          }
-        } catch (e) {
-          const attempts = getNum(AUTH.attemptsKey, 0) + 1;
-          setNum(AUTH.attemptsKey, attempts);
-
-          if (attempts >= AUTH.maxAttempts) {
-            const lockUntil2 = now() + AUTH.lockMinutes * 60 * 1000;
-            setNum(AUTH.lockKey, lockUntil2);
-            if (msgEl) msgEl.textContent = `Bloqueado por ${AUTH.lockMinutes} min (muchos intentos).`;
-          } else {
-            if (msgEl) msgEl.textContent = `${e.message} (Intento ${attempts}/${AUTH.maxAttempts})`;
-          }
-          updateLockInfo();
-        } finally {
-          if (btnEl) {
-            btnEl.disabled = false;
-            btnEl.style.opacity = '';
-            btnEl.innerHTML = '<i class="fas fa-unlock"></i> Entrar';
-          }
-        }
-      }
-
-      function bindAuthUI() {
-        const btn = document.getElementById('authLoginBtn');
-        const reload = document.getElementById('authReloadBtn');
-        const pw = document.getElementById('authPassword');
-
-        if (btn) btn.addEventListener('click', tryLogin);
-        if (reload) reload.addEventListener('click', () => window.location.reload());
-        if (pw) pw.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') tryLogin();
-        });
-        updateLockInfo();
-      }
-
-      function shouldBypass() {
-        // si viene un code (QR), NO pedimos contraseña
-        const c = qs(AUTH.bypassParam);
-        return !!(c && String(c).trim().length > 0);
-      }
-
-      function initAuthGate() {
-        try {
-          if (shouldBypass()) return; // participantes
-          const okUntil = getNum(AUTH.sessionKey, 0);
-          const lockUntil = getNum(AUTH.lockKey, 0);
-
-          if (lockUntil > now()) {
-            showOverlay();
-          } else if (okUntil > now()) {
-            hideOverlay();
-          } else {
-            showOverlay();
-          }
-
-          bindAuthUI();
-          // foco
-          setTimeout(() => document.getElementById('authPassword')?.focus(), 300);
-        } catch (e) {
-          // si falla algo, igual bloqueamos
-          showOverlay();
-          bindAuthUI();
-        }
-      }
-
-      // Ejecutar cuando el DOM esté listo
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initAuthGate);
-      } else {
-        initAuthGate();
-      }
-    })();
-    </script>
-    
-</body>
+                </body>
                 </html>
             `);
+
             w.document.close();
+            // dar un pequeño tiempo a que renderice
             setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 300);
         }
-
         // ═════════════════════════════════════════════════════════════════
         // CARGAR REPORTE DE UNA CAPACITACIÓN
         // ═════════════════════════════════════════════════════════════════
@@ -7208,8 +6986,229 @@ function makeCronogramaFilterFormula(year, tipo) {
             return `${year}-${month}-${day}`;
         }
 
+
+        // ═════════════════════════════════════════════════════════════════
+        // BLOQUEO POR CONTRASEÑA (ADMIN) - valida contra Netlify Function
+        // Function: /.netlify/functions/validate-app-password
+        // Airtable: AppConfig(Key='APP_PASSWORD', Value='...')
+        // ═════════════════════════════════════════════════════════════════
+        (function () {
+          const AUTH = {
+            sessionKey: 'hslv_auth_ok_until',
+            attemptsKey: 'hslv_auth_attempts',
+            lockKey: 'hslv_auth_lock_until',
+            maxAttempts: 5,
+            lockMinutes: 10,
+            sessionHours: 4,
+            bypassParam: 'code' // si viene ?code=XXXX (QR), NO pedimos contraseña
+          };
+
+          function qs(name) {
+            return new URLSearchParams(window.location.search).get(name);
+          }
+
+          function now() { return Date.now(); }
+
+          function getNum(key, def = 0) {
+            const v = Number(localStorage.getItem(key));
+            return Number.isFinite(v) ? v : def;
+          }
+
+          function setNum(key, val) {
+            localStorage.setItem(key, String(val));
+          }
+
+          function showOverlay() {
+            const ov = document.getElementById('authOverlay');
+            if (!ov) return;
+            ov.style.display = 'flex';
+            ov.setAttribute('aria-hidden', 'false');
+            document.body.style.overflow = 'hidden';
+          }
+
+          function hideOverlay() {
+            const ov = document.getElementById('authOverlay');
+            if (!ov) return;
+            ov.style.display = 'none';
+            ov.setAttribute('aria-hidden', 'true');
+            document.body.style.overflow = '';
+          }
+
+          function fmtMs(ms) {
+            const s = Math.max(0, Math.floor(ms / 1000));
+            const m = Math.floor(s / 60);
+            const r = s % 60;
+            if (m <= 0) return `${r}s`;
+            return `${m}m ${r}s`;
+          }
+
+          function updateLockInfo() {
+            const lockUntil = getNum(AUTH.lockKey, 0);
+            const el = document.getElementById('authLockInfo');
+            if (!el) return;
+            if (lockUntil > now()) {
+              el.textContent = `Bloqueado: ${fmtMs(lockUntil - now())}`;
+            } else {
+              el.textContent = '';
+            }
+          }
+
+          async function validatePassword(pw) {
+            const res = await fetch('/.netlify/functions/validate-app-password', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ password: pw })
+            });
+
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data && data.success) return true;
+
+            const msg = data && data.error ? data.error : 'Contraseña incorrecta';
+            throw new Error(msg);
+          }
+
+          async function tryLogin() {
+            const msgEl = document.getElementById('authMsg');
+            const pwEl = document.getElementById('authPassword');
+            const btnEl = document.getElementById('authLoginBtn');
+
+            const lockUntil = getNum(AUTH.lockKey, 0);
+            if (lockUntil > now()) {
+              if (msgEl) msgEl.textContent = `Demasiados intentos. Intenta en ${fmtMs(lockUntil - now())}.`;
+              updateLockInfo();
+              return;
+            }
+
+            const pw = (pwEl && pwEl.value ? pwEl.value : '').trim();
+            if (!pw) {
+              if (msgEl) msgEl.textContent = 'Escribe la contraseña.';
+              return;
+            }
+
+            if (msgEl) msgEl.textContent = '';
+            if (btnEl) {
+              btnEl.disabled = true;
+              btnEl.style.opacity = '0.85';
+              btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
+            }
+
+            try {
+              const ok = await validatePassword(pw);
+              if (ok) {
+                // sesión por 4 horas
+                const until = now() + AUTH.sessionHours * 60 * 60 * 1000;
+                setNum(AUTH.sessionKey, until);
+                setNum(AUTH.attemptsKey, 0);
+                setNum(AUTH.lockKey, 0);
+                hideOverlay();
+                return;
+              }
+            } catch (e) {
+              const attempts = getNum(AUTH.attemptsKey, 0) + 1;
+              setNum(AUTH.attemptsKey, attempts);
+
+              if (attempts >= AUTH.maxAttempts) {
+                const lockUntil2 = now() + AUTH.lockMinutes * 60 * 1000;
+                setNum(AUTH.lockKey, lockUntil2);
+                if (msgEl) msgEl.textContent = `Bloqueado por ${AUTH.lockMinutes} min (muchos intentos).`;
+              } else {
+                if (msgEl) msgEl.textContent = `${e.message} (Intento ${attempts}/${AUTH.maxAttempts})`;
+              }
+              updateLockInfo();
+            } finally {
+              if (btnEl) {
+                btnEl.disabled = false;
+                btnEl.style.opacity = '';
+                btnEl.innerHTML = '<i class="fas fa-unlock"></i> Entrar';
+              }
+            }
+          }
+
+          function bindAuthUI() {
+            const btn = document.getElementById('authLoginBtn');
+            const reload = document.getElementById('authReloadBtn');
+            const pw = document.getElementById('authPassword');
+
+            if (btn) btn.addEventListener('click', tryLogin);
+            if (reload) reload.addEventListener('click', () => window.location.reload());
+            if (pw) pw.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter') tryLogin();
+            });
+            updateLockInfo();
+          }
+
+          function shouldBypass() {
+            // si viene un code (QR), NO pedimos contraseña
+            const c = qs(AUTH.bypassParam);
+            return !!(c && String(c).trim().length > 0);
+          }
+
+          function initAuthGate() {
+            try {
+              if (shouldBypass()) return; // participantes
+              const okUntil = getNum(AUTH.sessionKey, 0);
+              const lockUntil = getNum(AUTH.lockKey, 0);
+
+              if (lockUntil > now()) {
+                showOverlay();
+              } else if (okUntil > now()) {
+                hideOverlay();
+              } else {
+                showOverlay();
+              }
+
+              bindAuthUI();
+              // foco
+              setTimeout(() => document.getElementById('authPassword')?.focus(), 300);
+            } catch (e) {
+              // si falla algo, igual bloqueamos
+              showOverlay();
+              bindAuthUI();
+            }
+          }
+
+          // Ejecutar cuando el DOM esté listo
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initAuthGate);
+          } else {
+            initAuthGate();
+          }
+        })();
+
         console.log('📊 Módulo de Reportes cargado correctamente');
     </script>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         OVERLAY DE CONTRASEÑA (ADMIN)
+         ═══════════════════════════════════════════════════════════════ -->
+    <div id="authOverlay" aria-hidden="true">
+        <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+            <div class="auth-head">
+                <div class="auth-badge"><i class="fas fa-lock"></i></div>
+                <div>
+                    <h2 class="auth-title" id="authTitle">Acceso restringido</h2>
+                    <p class="auth-sub">Ingresa la contraseña para continuar.</p>
+                </div>
+            </div>
+            <div class="auth-body">
+                <div class="auth-row">
+                    <label style="font-weight:700; color:#111827;">Contraseña</label>
+                    <input id="authPassword" type="password" autocomplete="current-password" placeholder="••••••••••••••••" />
+                    <div class="auth-actions">
+                        <button class="auth-btn primary" id="authLoginBtn"><i class="fas fa-unlock"></i> Entrar</button>
+                        <button class="auth-btn secondary" id="authReloadBtn"><i class="fas fa-rotate"></i> Recargar</button>
+                    </div>
+                    <div class="auth-msg" id="authMsg"></div>
+                </div>
+            </div>
+            <div class="auth-foot">
+                <span>✔ Cambiable desde <b>Airtable</b> (AppConfig → APP_PASSWORD)</span>
+                <span id="authLockInfo"></span>
+            </div>
+        </div>
+    </div>
+    
+
 
 <!-- ═════════════════════════════════════════════════════════════════
      MODAL DE LINK POSTTEST - PRETEST → POSTTEST
