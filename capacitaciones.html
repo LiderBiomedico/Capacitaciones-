@@ -3424,7 +3424,7 @@ overflow: hidden;
         // ✅ Se omite el bloqueo cuando el usuario entra por QR con ?code=... (flujo participante).
 
         const ADMIN_AUTH_STORAGE_KEY = 'HSLV_ADMIN_AUTH_V1';
-        const ADMIN_AUTH_TTL_HOURS = 8; // cambia si quieres (ej. 24)
+        const ADMIN_AUTH_TTL_HOURS = 0; // NO USAR - La contraseña NUNCA se guarda
 
         function isParticipantFlow() {
             const urlParams = new URLSearchParams(window.location.search);
@@ -3432,22 +3432,16 @@ overflow: hidden;
         }
 
         function getStoredAdminAuth() {
-            try {
-                const raw = localStorage.getItem(ADMIN_AUTH_STORAGE_KEY);
-                if (!raw) return null;
-                const data = JSON.parse(raw);
-                if (!data || !data.expiresAt) return null;
-                if (Date.now() > data.expiresAt) return null;
-                return data;
-            } catch (e) {
-                return null;
-            }
+            // ⚠️ SEGURIDAD: NUNCA cargamos sesión previa
+            // La contraseña SIEMPRE debe ser ingresada
+            return null;
         }
 
         function setStoredAdminAuth() {
-            const ttlMs = ADMIN_AUTH_TTL_HOURS * 60 * 60 * 1000;
-            const payload = { ok: true, expiresAt: Date.now() + ttlMs };
-            localStorage.setItem(ADMIN_AUTH_STORAGE_KEY, JSON.stringify(payload));
+            // ⚠️ SEGURIDAD: NUNCA guardamos la contraseña
+            // Esta función no hace nada intencionalmente
+            // Cada acceso requiere ingresar la contraseña nuevamente
+            console.log('✅ Contraseña validada para esta sesión (no se almacena)');
         }
 
         async function validateAdminPassword(password) {
@@ -3465,22 +3459,25 @@ overflow: hidden;
         }
 
         async function enforceAdminPassword() {
-            // Si ya hay sesión válida, no pedir de nuevo
-            if (getStoredAdminAuth()) {
-                document.body.classList.add('authenticated');
-                return true;
+            // ⚠️ SEGURIDAD: Siempre pedir contraseña, nunca usar sesión previa
+            // Limpiar cualquier dato de autenticación guardado
+            try {
+                localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
+            } catch (e) {
+                // No hacer nada si localStorage no está disponible
             }
 
             // Pedir contraseña hasta que sea correcta
+            console.log('🔐 SEGURIDAD: Pidiendo contraseña administrativa...');
             while (true) {
                 const result = await Swal.fire({
-                    title: 'Acceso Administrativo',
-                    text: 'Ingresa la contraseña para administrar el sistema',
+                    title: '🔐 Acceso Administrativo',
+                    text: 'Ingresa la contraseña para administrar el sistema\n(Se pide cada vez que accedes)',
                     input: 'password',
                     inputPlaceholder: 'Contraseña',
                     inputAttributes: {
                         autocapitalize: 'off',
-                        autocomplete: 'current-password'
+                        autocomplete: 'off' // No autocompletar para mayor seguridad
                     },
                     confirmButtonText: 'Ingresar',
                     showCancelButton: false,
@@ -3503,7 +3500,8 @@ overflow: hidden;
                 });
 
                 if (result.isConfirmed) {
-                    setStoredAdminAuth();
+                    setStoredAdminAuth(); // No hace nada (por seguridad)
+                    console.log('✅ Autenticado - Contraseña NO guardada');
                     document.body.classList.add('authenticated');
                     return true;
                 }
