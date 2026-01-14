@@ -6630,18 +6630,18 @@ function makeCronogramaFilterFormula(year, tipo) {
                     <style>
                         table { border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 10pt; }
                         th, td { border: 1px solid #000; padding: 6px 8px; vertical-align: top; }
-                        .header-title { font-size: 12pt; font-weight: bold; text-align: center; background-color: #F2FFFA; }
-                        .header-code { text-align: right; font-weight: bold; }
-                        .section-title { background-color: #F2FFFA; font-weight: bold; text-align: center; }
-                        .field-label { background-color: #F2FFFA; font-weight: bold; width: 25%; }
-                        .field-value { width: 75%; }
-                        .participants-header { background-color: #F2FFFA; color: #F2FFFA; font-weight: bold; text-align: center; }
-                        .participants-row td { text-align: center; }
+                        .header-title { font-size: 12pt; font-weight: bold; text-align: center; background-color: #2e7d32; color: #ffffff; }
+                        .header-code { text-align: right; font-weight: bold; color: #1f2937; }
+                        .section-title { background-color: #2e7d32; color: #ffffff; font-weight: bold; text-align: center; }
+                        .field-label { background-color: #e0e0e0; color: #1f2937; font-weight: bold; width: 25%; }
+                        .field-value { width: 75%; color: #1f2937; }
+                        .participants-header { background-color: #2e7d32; color: #ffffff; font-weight: bold; text-align: center; }
+                        .participants-row td { text-align: center; color: #1f2937; }
                         .participants-row td:nth-child(2) { text-align: left; }
                         .participants-row td:nth-child(3) { text-align: left; }
-                        .results-header { background-color: #F2FFFA; color: #F2FFFA; font-weight: bold; }
-                        .results-value { text-align: center; font-weight: bold; }
-                        .signature-cell { height: 60px; vertical-align: bottom; text-align: center; }
+                        .results-header { background-color: #2e7d32; color: #ffffff; font-weight: bold; }
+                        .results-value { text-align: center; font-weight: bold; color: #1f2937; }
+                        .signature-cell { height: 60px; vertical-align: bottom; text-align: center; color: #1f2937; }
                         .logo-cell { text-align: center; vertical-align: middle; }
                     </style>
                 </head>
@@ -6657,8 +6657,8 @@ function makeCronogramaFilterFormula(year, tipo) {
                                         <span style="color: #F2FFFA; font-size: 24px;">⭐</span>
                                     </div>
                                     <div style="margin-top: 5px;">
-                                        <strong style="font-size: 9pt; color: #F2FFFA;">REPÚBLICA DE COLOMBIA</strong><br>
-                                        <small style="font-size: 8pt; color: #F2FFFA;">Departamento del Cauca</small>
+                                        <strong style="font-size: 9pt; color: #1f2937;">REPÚBLICA DE COLOMBIA</strong><br>
+                                        <small style="font-size: 8pt; color: #1f2937;">Departamento del Cauca</small>
                                     </div>
                                 </div>
                             </td>
@@ -6669,15 +6669,15 @@ function makeCronogramaFilterFormula(year, tipo) {
                             <td colspan="2" class="logo-cell" style="width: 20%; padding: 10px;">
                                 <div style="text-align: center;">
                                     <div style="display: inline-block; padding: 5px;">
-                                        <div style="color: #F2FFFA; font-size: 28px; margin-bottom: 3px;">🏥</div>
-                                        <div style="font-size: 7pt; color: #F2FFFA;">HOSPITAL</div>
-                                        <div style="font-size: 14pt; color: #F2FFFA; font-weight: bold;">Susana</div>
-                                        <div style="font-size: 7pt; color: #F2FFFA;">López de Valencia E.S.E.</div>
+                                        <div style="color: #1f2937; font-size: 28px; margin-bottom: 3px;">🏥</div>
+                                        <div style="font-size: 7pt; color: #1f2937;">HOSPITAL</div>
+                                        <div style="font-size: 14pt; color: #1f2937; font-weight: bold;">Susana</div>
+                                        <div style="font-size: 7pt; color: #1f2937;">López de Valencia E.S.E.</div>
                                     </div>
                                     <div style="display: inline-block; margin-left: 10px; vertical-align: top;">
                                         <div style="border: 2px solid #003087; padding: 3px; font-size: 6pt; text-align: center;">
-                                            <div style="color: #F2FFFA; font-weight: bold;">ACREDITACIÓN</div>
-                                            <div style="color: #F2FFFA;">EN SALUD</div>
+                                            <div style="color: #ffffff; font-weight: bold; background: #2e7d32; padding: 2px;">ACREDITACIÓN</div>
+                                            <div style="color: #ffffff; background: #2e7d32; padding: 2px;">EN SALUD</div>
                                         </div>
                                     </div>
                                 </div>
@@ -6884,7 +6884,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                         <!-- ═══════════════════════════════════════════════════════════ -->
                         <tr><td colspan="7" style="border: none; height: 10px;"></td></tr>
                         <tr>
-                            <td colspan="7" style="text-align: center; font-size: 8pt; color: #F2FFFA; border: none;">
+                            <td colspan="7" style="text-align: center; font-size: 8pt; color: #1f2937; border: none;">
                                 Documento generado automáticamente por el Sistema de Capacitaciones - Hospital Susana López de Valencia E.S.E.<br>
                                 Fecha de generación: ${new Date().toLocaleString('es-CO')}
                             </td>
@@ -6977,9 +6977,9 @@ function makeCronogramaFilterFormula(year, tipo) {
     <button class="close-btn" onclick="closePostestLinkModal()">✕</button>
     
     <div class="postest-modal-header">
-      <i class="fas fa-check-circle" style="font-size: 3rem; color: #F2FFFA; margin-bottom: 1rem;"></i>
+      <i class="fas fa-check-circle" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
       <h2>¡Pretest Completado!</h2>
-      <p style="color: #F2FFFA; margin-top: 0.5rem;">
+      <p style="color: #4b5563; margin-top: 0.5rem; font-weight: 500;">
         Tu respuesta ha sido guardada correctamente
       </p>
     </div>
@@ -6987,7 +6987,7 @@ function makeCronogramaFilterFormula(year, tipo) {
     <div class="postest-modal-body">
       <!-- Sección del QR -->
       <div class="postest-qr-section">
-        <h3 style="color: #F2FFFA; margin-bottom: 1rem; text-align: center;">
+        <h3 style="color: #1f2937; margin-bottom: 1rem; text-align: center;">
           <i class="fas fa-qrcode"></i> Código para Posttest
         </h3>
         
@@ -7020,7 +7020,7 @@ function makeCronogramaFilterFormula(year, tipo) {
 
       <!-- Sección del Link -->
       <div class="postest-link-section">
-        <h3 style="color: #F2FFFA; margin-bottom: 1rem;">
+        <h3 style="color: #1f2937; margin-bottom: 1rem;">
           <i class="fas fa-link"></i> Link Permanente
         </h3>
 
@@ -7052,7 +7052,7 @@ function makeCronogramaFilterFormula(year, tipo) {
           width: 100%;
           padding: 0.75rem 1.5rem;
           background: #2E7D32;
-          color: #F2FFFA;
+          color: #ffffff;
           border: none;
           border-radius: 8px;
           font-weight: 600;
@@ -7076,10 +7076,10 @@ function makeCronogramaFilterFormula(year, tipo) {
         border-radius: 4px;
         margin-top: 1.5rem;
       ">
-        <p style="color: #F2FFFA; margin: 0; font-weight: 500;">
+        <p style="color: #1f2937; margin: 0; font-weight: 600;">
           <i class="fas fa-info-circle"></i> Información Importante
         </p>
-        <ul style="color: #F2FFFA; font-size: 0.9rem; margin: 0.5rem 0 0 1.5rem; padding: 0;">
+        <ul style="color: #1f2937; font-size: 0.9rem; margin: 0.5rem 0 0 1.5rem; padding: 0; font-weight: 500;">
           <li>Este link es único para ti y permanecerá válido durante toda la capacitación</li>
           <li>Guarda el link o escanea el QR para usarlo después de la capacitación</li>
           <li>Podrás responder el postest desde cualquier dispositivo usando este código</li>
@@ -7095,13 +7095,13 @@ function makeCronogramaFilterFormula(year, tipo) {
         text-align: center;
         margin-top: 1.5rem;
       ">
-        <p style="color: #F2FFFA; font-size: 0.9rem; margin: 0 0 0.5rem 0;">
+        <p style="color: #1f2937; font-size: 0.9rem; margin: 0 0 0.5rem 0; font-weight: 600;">
           O usa este código:
         </p>
         <div style="
           font-size: 1.3rem;
           font-weight: bold;
-          color: #F2FFFA;
+          color: #1f2937;
           font-family: 'Courier New', monospace;
           letter-spacing: 2px;
         " id="postestCodeDisplay">
@@ -7164,7 +7164,7 @@ function makeCronogramaFilterFormula(year, tipo) {
   }
 
   .postest-modal-header h2 {
-    color: #F2FFFA;
+    color: #1f2937;
     font-size: 1.8rem;
     margin: 1rem 0 0.5rem 0;
   }
