@@ -1027,7 +1027,8 @@ overflow: hidden;
         .empty-state {
             text-align: center;
             padding: 4rem 2rem;
-            color: #F2FFFA;
+            color: #1f2937;
+            font-weight: 500;
         }
 
         .empty-state i {
@@ -2147,9 +2148,9 @@ overflow: hidden;
                 </div>
 
 <div id="scheduleEmpty" class="card" style="text-align:center; padding: 2.5rem; display:none;">
-                    <i class="fas fa-info-circle" style="font-size: 3rem; color: #F2FFFA; margin-bottom: 1rem;"></i>
-                    <h3 style="color: #F2FFFA;">Sin capacitaciones activas</h3>
-                    <p style="color: #F2FFFA;">Crea o activa capacitaciones para poder generar el cronograma anual.</p>
+                    <i class="fas fa-info-circle" style="font-size: 3rem; color: var(--primary); margin-bottom: 1rem;"></i>
+                    <h3 style="color: #1f2937;">Sin capacitaciones activas</h3>
+                    <p style="color: #4b5563; font-weight: 500;">Crea o activa capacitaciones para poder generar el cronograma anual.</p>
                 </div>
 
                 <div id="scheduleContainer" style="display:none;">
@@ -5996,12 +5997,12 @@ function makeCronogramaFilterFormula(year, tipo) {
                 const tr = document.createElement('tr');
                 tr.style.borderBottom = '1px solid #eee';
                 tr.innerHTML = `
-                    <td style="padding: 0.75rem;">${item.index}</td>
-                    <td style="padding: 0.75rem;">${item.dateES}</td>
-                    <td style="padding: 0.75rem;">${item.time}</td>
-                    <td style="padding: 0.75rem;"><strong>${escapeHtml(item.title)}</strong></td>
-                    <td style="padding: 0.75rem;">${escapeHtml(item.department)}</td>
-                    <td style="padding: 0.75rem;">${escapeHtml(item.duration || '')}</td>
+                    <td style="padding: 0.75rem; color: #1f2937; font-weight: 500;">${item.index}</td>
+                    <td style="padding: 0.75rem; color: #1f2937;">${item.dateES}</td>
+                    <td style="padding: 0.75rem; color: #1f2937;">${item.time}</td>
+                    <td style="padding: 0.75rem; color: #1f2937;"><strong>${escapeHtml(item.title)}</strong></td>
+                    <td style="padding: 0.75rem; color: #1f2937;">${escapeHtml(item.department)}</td>
+                    <td style="padding: 0.75rem; color: #1f2937;">${escapeHtml(item.duration || '')}</td>
                 `;
                 tbody.appendChild(tr);
             });
@@ -6309,10 +6310,10 @@ function makeCronogramaFilterFormula(year, tipo) {
                 row.innerHTML = `
                     <td style="padding: 0.75rem; font-weight: bold; color: var(--primary);">${index + 1}</td>
                     <td style="padding: 0.75rem;">
-                        <div style="font-weight: 500;">${participant.nombre}</div>
+                        <div style="font-weight: 500; color: #1f2937;">${participant.nombre}</div>
                         ${participant.email ? `<div style="font-size: 0.95rem; color: #4b5563; font-weight: 500;">${participant.email}</div>` : ''}
                     </td>
-                    <td style="padding: 0.75rem; color: #F2FFFA;">${participant.departamento || '-'}</td>
+                    <td style="padding: 0.75rem; color: #1f2937; font-weight: 500;">${participant.departamento || '-'}</td>
                     <td style="padding: 0.75rem; text-align: center;">
                         <span class="score-badge ${pretestClass}">${participant.pretestScore > 0 ? participant.pretestScore + '%' : '-'}</span>
                     </td>
