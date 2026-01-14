@@ -932,7 +932,7 @@ overflow: hidden;
             align-items: center;
             gap: 0.5rem;
             font-size: 0.9rem;
-            color: #4B5563;
+            color: #F2FFFA;
         }
 
         .training-info-item i {
@@ -980,58 +980,42 @@ overflow: hidden;
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
-        
-            opacity: 1;
-            background-clip: padding-box;
-            text-shadow: none;
         }
 
         .btn-view {
-            background: #E8F5E9;
-            color: #1B5E20;
-            border: 1px solid #A5D6A7;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+            background: #e3f2fd;
+            color: #F2FFFA;
         }
 
         .btn-view:hover {
-            background: #2E7D32;
-            color: #ffffff;
-            border-color: #2E7D32;
-            transform: translateY(-1px);
+            background: #1976d2;
+            color: #F2FFFA;
         }
 
         .btn-qr {
-            background: #E3F2FD;
-            color: #0D47A1;
-            border: 1px solid #90CAF9;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+            background: #f3e5f5;
+            color: #F2FFFA;
         }
 
         .btn-qr:hover {
-            background: #1565C0;
-            color: #ffffff;
-            border-color: #1565C0;
-            transform: translateY(-1px);
+            background: #7b1fa2;
+            color: #F2FFFA;
         }
 
         .btn-delete {
-            background: #FFEBEE;
-            color: #B71C1C;
-            border: 1px solid #EF9A9A;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+            background: #ffebee;
+            color: #F2FFFA;
         }
 
         .btn-delete:hover {
-            background: #C62828;
-            color: #ffffff;
-            border-color: #C62828;
-            transform: translateY(-1px);
+            background: #c62828;
+            color: #F2FFFA;
         }
 
         .empty-state {
             text-align: center;
             padding: 4rem 2rem;
-            color: #374151;
+            color: #F2FFFA;
         }
 
         .empty-state i {
@@ -1043,7 +1027,7 @@ overflow: hidden;
         .empty-state h3 {
             font-size: 1.5rem;
             margin-bottom: 0.5rem;
-            color: #111827;
+            color: #F2FFFA;
         }
 
         .empty-state p {
@@ -1128,7 +1112,7 @@ overflow: hidden;
         .question-text {
             font-weight: 500;
             margin-bottom: 0.75rem;
-            color: #111827;
+            color: #F2FFFA;
         }
 
         .question-options {
@@ -1383,132 +1367,6 @@ overflow: hidden;
                 margin-top: 8px;
             }
         }
-
-
-        /* ═══════════════════════════════════════════════════════════════
-           BLOQUEO POR CONTRASEÑA (ADMIN) - overlay
-           ═══════════════════════════════════════════════════════════════ */
-        #authOverlay {
-            position: fixed;
-            inset: 0;
-            background: rgba(7, 20, 12, 0.72);
-            backdrop-filter: blur(6px);
-            z-index: 99999;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            padding: 1.5rem;
-        }
-        #authOverlay .auth-card {
-            width: 100%;
-            max-width: 460px;
-            background: #ffffff;
-            border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-            border: 1px solid rgba(46,125,50,0.18);
-            overflow: hidden;
-        }
-        #authOverlay .auth-head {
-            padding: 1.25rem 1.25rem 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-        #authOverlay .auth-badge {
-            width: 44px;
-            height: 44px;
-            border-radius: 12px;
-            background: linear-gradient(135deg, #2E7D32, #66BB6A);
-            display: grid;
-            place-items: center;
-            color: #fff;
-            font-size: 20px;
-        }
-        #authOverlay .auth-title {
-            margin: 0;
-            font-size: 1.2rem;
-            color: #111827;
-            font-weight: 800;
-        }
-        #authOverlay .auth-sub {
-            margin: 0.15rem 0 0;
-            font-size: 0.92rem;
-            color: #6b7280;
-        }
-        #authOverlay .auth-body {
-            padding: 0.75rem 1.25rem 1.25rem;
-        }
-        #authOverlay .auth-row {
-            display: grid;
-            gap: 0.6rem;
-            margin-top: 0.8rem;
-        }
-        #authOverlay input[type="password"] {
-            width: 100%;
-            padding: 0.85rem 0.95rem;
-            border-radius: 12px;
-            border: 1px solid #e5e7eb;
-            background: #f9fafb;
-            outline: none;
-            font-size: 1rem;
-        }
-        #authOverlay input[type="password"]:focus {
-            border-color: rgba(46,125,50,0.55);
-            box-shadow: 0 0 0 4px rgba(46,125,50,0.12);
-            background: #ffffff;
-        }
-        #authOverlay .auth-actions {
-            display: flex;
-            gap: 0.75rem;
-            margin-top: 0.9rem;
-        }
-        #authOverlay .auth-btn {
-            flex: 1;
-            padding: 0.85rem 0.95rem;
-            border: none;
-            border-radius: 12px;
-            cursor: pointer;
-            font-weight: 700;
-            font-size: 0.98rem;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-        #authOverlay .auth-btn.primary {
-            background: #2E7D32;
-            color: #ffffff;
-            box-shadow: 0 10px 20px rgba(46,125,50,0.20);
-        }
-        #authOverlay .auth-btn.primary:hover { background: #256b2b; }
-        #authOverlay .auth-btn.secondary {
-            background: #f3f4f6;
-            color: #111827;
-        }
-        #authOverlay .auth-btn.secondary:hover { background: #e5e7eb; }
-        #authOverlay .auth-msg {
-            margin-top: 0.65rem;
-            font-size: 0.92rem;
-            color: #b91c1c;
-            min-height: 1.2em;
-        }
-        #authOverlay .auth-foot {
-            padding: 0.9rem 1.25rem;
-            background: #f9fafb;
-            border-top: 1px solid #eef2f7;
-            font-size: 0.85rem;
-            color: #6b7280;
-            display: flex;
-            justify-content: space-between;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
-        #authOverlay .auth-foot b { color: #111827; }
-    
-
-        /* --- Fondo general blanco (sin afectar pantalla de inicio/splash) --- */
-        body { background: #ffffff !important; }
-        .tab-content, .card, .modal-content { background-color: #ffffff; }
 
 </style>
 </head>
@@ -1941,7 +1799,7 @@ overflow: hidden;
                 <!-- Selector de Capacitación -->
                 <div class="card">
                     <h3><i class="fas fa-graduation-cap"></i> Seleccionar Capacitación</h3>
-                    <p style="color: #6b7280; margin-bottom: 1rem;">Selecciona una capacitación para ver el listado de participantes y sus calificaciones</p>
+                    <p style="color: #F2FFFA; margin-bottom: 1rem;">Selecciona una capacitación para ver el listado de participantes y sus calificaciones</p>
                     
                     <div class="form-group">
                         <label><i class="fas fa-list"></i> Capacitación</label>
@@ -2078,7 +1936,7 @@ overflow: hidden;
                         </div>
                         
                         <!-- Mensaje cuando no hay participantes -->
-                        <div id="noParticipantsMessage" style="display: none; text-align: center; padding: 2rem; color: #6b7280;">
+                        <div id="noParticipantsMessage" style="display: none; text-align: center; padding: 2rem; color: #F2FFFA;">
                             <i class="fas fa-users" style="font-size: 3rem; opacity: 0.3; margin-bottom: 1rem;"></i>
                             <p>No hay participantes registrados en esta capacitación</p>
                         </div>
@@ -2249,7 +2107,7 @@ overflow: hidden;
                         </button>
                     </div>
 
-                    <div id="manualScheduleEmpty" style="margin-top: 1rem; color: #6b7280;">
+                    <div id="manualScheduleEmpty" style="margin-top: 1rem; color: #F2FFFA;">
                         Aún no has agregado eventos individuales.
                     </div>
 
@@ -2274,9 +2132,9 @@ overflow: hidden;
                 </div>
 
 <div id="scheduleEmpty" class="card" style="text-align:center; padding: 2.5rem; display:none;">
-                    <i class="fas fa-info-circle" style="font-size: 3rem; color: #2E7D32; margin-bottom: 1rem;"></i>
-                    <h3 style="color: #1f2937;">Sin capacitaciones activas</h3>
-                    <p style="color: #6b7280;">Crea o activa capacitaciones para poder generar el cronograma anual.</p>
+                    <i class="fas fa-info-circle" style="font-size: 3rem; color: #F2FFFA; margin-bottom: 1rem;"></i>
+                    <h3 style="color: #F2FFFA;">Sin capacitaciones activas</h3>
+                    <p style="color: #F2FFFA;">Crea o activa capacitaciones para poder generar el cronograma anual.</p>
                 </div>
 
                 <div id="scheduleContainer" style="display:none;">
@@ -3547,7 +3405,103 @@ overflow: hidden;
             setInterval(updateDateTime, 1000);
         });
 
-        function initializeApp() {
+        // ==================== BLOQUEO POR CONTRASEÑA (ADMIN) ====================
+        // 🔒 La contraseña se lee desde Airtable (tabla AppConfig) mediante una Netlify Function.
+        // ✅ Se omite el bloqueo cuando el usuario entra por QR con ?code=... (flujo participante).
+
+        const ADMIN_AUTH_STORAGE_KEY = 'HSLV_ADMIN_AUTH_V1';
+        const ADMIN_AUTH_TTL_HOURS = 8; // cambia si quieres (ej. 24)
+
+        function isParticipantFlow() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return !!urlParams.get('code'); // QR / postest siempre trae "code"
+        }
+
+        function getStoredAdminAuth() {
+            try {
+                const raw = localStorage.getItem(ADMIN_AUTH_STORAGE_KEY);
+                if (!raw) return null;
+                const data = JSON.parse(raw);
+                if (!data || !data.expiresAt) return null;
+                if (Date.now() > data.expiresAt) return null;
+                return data;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function setStoredAdminAuth() {
+            const ttlMs = ADMIN_AUTH_TTL_HOURS * 60 * 60 * 1000;
+            const payload = { ok: true, expiresAt: Date.now() + ttlMs };
+            localStorage.setItem(ADMIN_AUTH_STORAGE_KEY, JSON.stringify(payload));
+        }
+
+        async function validateAdminPassword(password) {
+            const res = await fetch('/.netlify/functions/validate-app-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ password })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                const msg = data?.error || 'Contraseña incorrecta';
+                throw new Error(msg);
+            }
+            return true;
+        }
+
+        async function enforceAdminPassword() {
+            // Si ya hay sesión válida, no pedir de nuevo
+            if (getStoredAdminAuth()) return true;
+
+            // Pedir contraseña hasta que sea correcta
+            while (true) {
+                const result = await Swal.fire({
+                    title: 'Acceso Administrativo',
+                    text: 'Ingresa la contraseña para administrar el sistema',
+                    input: 'password',
+                    inputPlaceholder: 'Contraseña',
+                    inputAttributes: {
+                        autocapitalize: 'off',
+                        autocomplete: 'current-password'
+                    },
+                    confirmButtonText: 'Ingresar',
+                    showCancelButton: false,
+                    allowOutsideClick: false,
+                    allowEscapeKey: false,
+                    showLoaderOnConfirm: true,
+                    preConfirm: async (pwd) => {
+                        if (!pwd || String(pwd).trim().length < 6) {
+                            Swal.showValidationMessage('Ingresa una contraseña válida');
+                            return false;
+                        }
+                        try {
+                            await validateAdminPassword(String(pwd));
+                            return true;
+                        } catch (e) {
+                            Swal.showValidationMessage(e.message || 'Contraseña incorrecta');
+                            return false;
+                        }
+                    }
+                });
+
+                if (result.isConfirmed) {
+                    setStoredAdminAuth();
+                    return true;
+                }
+            }
+        }
+
+        function startAdminApp() {
+            // Inicializar gráficos y dashboard (ahora SOLO después de autenticar)
+            setTimeout(() => initializeCharts(), 200);
+            setTimeout(() => loadDashboardStats(), 600);
+            setTimeout(() => loadTrainings(), 600);
+        }
+        
+
+        async function initializeApp() {
+            // Mantener splash / pantalla de inicio
             setTimeout(() => {
                 document.getElementById('loadingScreen').style.opacity = '0';
                 setTimeout(() => {
@@ -3555,15 +3509,22 @@ overflow: hidden;
                 }, 250);
             }, 5000);
 
-            setTimeout(() => initializeCharts(), 2000);
-            
-            // Cargar estadísticas del dashboard después de que los gráficos estén listos
-            setTimeout(() => loadDashboardStats(), 2500);
-            
-            // Cargar capacitaciones al inicio (sin mostrar, solo en background)
-            setTimeout(() => loadTrainings(), 2500);
-            
-            // Verificar si viene con código QR en la URL
+            // Si viene por QR (participante), NO pedir contraseña
+            if (isParticipantFlow()) {
+                checkForAccessCode();
+                return;
+            }
+
+            // Esperar a que se oculte la pantalla de inicio antes de pedir contraseña
+            await new Promise(resolve => setTimeout(resolve, 5200));
+
+            // Pedir contraseña (guardada en Airtable)
+            await enforceAdminPassword();
+
+            // Cargar el modo administrador
+            startAdminApp();
+
+            // (Por si en el futuro agregas otros parámetros)
             checkForAccessCode();
         }
         
@@ -6134,9 +6095,9 @@ function makeCronogramaFilterFormula(year, tipo) {
 
             const rowsHtml = combined.map(r => `
                 <tr>
-                    <td style="text-align:center;">${r._exportIndex}</td>
-                    <td>${escapeHtml(r.date || '')}</td>
-                    <td>${escapeHtml(r.time || '')}</td>
+                    <td>${r._exportIndex}</td>
+                    <td>${r.dateISO}</td>
+                    <td>${r.time}</td>
                     <td><strong>${escapeHtml(r.title || '')}</strong></td>
                     <td>${escapeHtml(r.department || '')}</td>
                     <td>${escapeHtml(r.duration || '')}</td>
@@ -6152,19 +6113,19 @@ function makeCronogramaFilterFormula(year, tipo) {
                     <meta charset="utf-8" />
                     <title>Cronograma Capacitaciones ${year}</title>
                     <style>
-                        body { font-family: Arial, sans-serif; margin: 24px; color: #111827; }
+                        body { font-family: Arial, sans-serif; margin: 24px; color: #F2FFFA; }
                         .title { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
-                        .subtitle { font-size: 12px; color: #4b5563; margin-bottom: 16px; }
+                        .subtitle { font-size: 12px; color: #F2FFFA; margin-bottom: 16px; }
                         table { width: 100%; border-collapse: collapse; font-size: 12px; }
                         th, td { border: 1px solid #e5e7eb; padding: 8px; vertical-align: top; }
-                        th { background: #2e7d32; color: #ffffff; text-align: center; }
+                        th { background: #111827; color: #F2FFFA; text-align: center; }
                         tr:nth-child(even) td { background: #f9fafb; }
-                        @media print { body { margin: 0; } }
                     </style>
                 </head>
                 <body>
-                    <div class="title">Cronograma de Capacitaciones - ${year}</div>
-                    <div class="subtitle">Generado: ${generatedAt}</div>
+                    <div class="title">Cronograma Anual de Capacitaciones - ${year}</div>
+                    <div class="subtitle">Hospital Susana López de Valencia | Generado: ${generatedAt}</div>
+
                     <table>
                         <thead>
                             <tr>
@@ -6181,14 +6142,14 @@ function makeCronogramaFilterFormula(year, tipo) {
                         </thead>
                         <tbody>${rowsHtml}</tbody>
                     </table>
+
                 </body>
                 </html>
             `);
-
             w.document.close();
-            // dar un pequeño tiempo a que renderice
             setTimeout(() => { try { w.focus(); w.print(); } catch (e) {} }, 300);
         }
+
         // ═════════════════════════════════════════════════════════════════
         // CARGAR REPORTE DE UNA CAPACITACIÓN
         // ═════════════════════════════════════════════════════════════════
@@ -6320,9 +6281,8 @@ function makeCronogramaFilterFormula(year, tipo) {
                 // Determinar clases para las calificaciones
                 const pretestClass = getScoreClass(participant.pretestScore);
                 const postestClass = getScoreClass(participant.postestScore);
-                let improvementClass = 'neutral';
-                if (participant.improvement > 0) improvementClass = 'positive';
-                else if (participant.improvement < 0) improvementClass = 'negative';
+                const improvementClass = participant.improvement > 0 ? 'positive' : 
+                                        participant.improvement < 0 ? 'negative' : 'neutral';
                 
                 // Determinar clase para el estado
                 let statusClass = 'pending';
@@ -6333,9 +6293,9 @@ function makeCronogramaFilterFormula(year, tipo) {
                     <td style="padding: 0.75rem; font-weight: bold; color: var(--primary);">${index + 1}</td>
                     <td style="padding: 0.75rem;">
                         <div style="font-weight: 500;">${participant.nombre}</div>
-                        ${participant.email ? `<div style="font-size: 0.8rem; color: #6b7280;">${participant.email}</div>` : ''}
+                        ${participant.email ? `<div style="font-size: 0.8rem; color: #F2FFFA;">${participant.email}</div>` : ''}
                     </td>
-                    <td style="padding: 0.75rem; color: #374151;">${participant.departamento || '-'}</td>
+                    <td style="padding: 0.75rem; color: #F2FFFA;">${participant.departamento || '-'}</td>
                     <td style="padding: 0.75rem; text-align: center;">
                         <span class="score-badge ${pretestClass}">${participant.pretestScore > 0 ? participant.pretestScore + '%' : '-'}</span>
                     </td>
@@ -6657,7 +6617,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                         .section-title { background-color: #F2FFFA; font-weight: bold; text-align: center; }
                         .field-label { background-color: #F2FFFA; font-weight: bold; width: 25%; }
                         .field-value { width: 75%; }
-                        .participants-header { background-color: #2E7D32; color: #ffffff; font-weight: bold; text-align: center; }
+                        .participants-header { background-color: #F2FFFA; color: #F2FFFA; font-weight: bold; text-align: center; }
                         .participants-row td { text-align: center; }
                         .participants-row td:nth-child(2) { text-align: left; }
                         .participants-row td:nth-child(3) { text-align: left; }
@@ -6986,229 +6946,8 @@ function makeCronogramaFilterFormula(year, tipo) {
             return `${year}-${month}-${day}`;
         }
 
-
-        // ═════════════════════════════════════════════════════════════════
-        // BLOQUEO POR CONTRASEÑA (ADMIN) - valida contra Netlify Function
-        // Function: /.netlify/functions/validate-app-password
-        // Airtable: AppConfig(Key='APP_PASSWORD', Value='...')
-        // ═════════════════════════════════════════════════════════════════
-        (function () {
-          const AUTH = {
-            sessionKey: 'hslv_auth_ok_until',
-            attemptsKey: 'hslv_auth_attempts',
-            lockKey: 'hslv_auth_lock_until',
-            maxAttempts: 5,
-            lockMinutes: 10,
-            sessionHours: 4,
-            bypassParam: 'code' // si viene ?code=XXXX (QR), NO pedimos contraseña
-          };
-
-          function qs(name) {
-            return new URLSearchParams(window.location.search).get(name);
-          }
-
-          function now() { return Date.now(); }
-
-          function getNum(key, def = 0) {
-            const v = Number(localStorage.getItem(key));
-            return Number.isFinite(v) ? v : def;
-          }
-
-          function setNum(key, val) {
-            localStorage.setItem(key, String(val));
-          }
-
-          function showOverlay() {
-            const ov = document.getElementById('authOverlay');
-            if (!ov) return;
-            ov.style.display = 'flex';
-            ov.setAttribute('aria-hidden', 'false');
-            document.body.style.overflow = 'hidden';
-          }
-
-          function hideOverlay() {
-            const ov = document.getElementById('authOverlay');
-            if (!ov) return;
-            ov.style.display = 'none';
-            ov.setAttribute('aria-hidden', 'true');
-            document.body.style.overflow = '';
-          }
-
-          function fmtMs(ms) {
-            const s = Math.max(0, Math.floor(ms / 1000));
-            const m = Math.floor(s / 60);
-            const r = s % 60;
-            if (m <= 0) return `${r}s`;
-            return `${m}m ${r}s`;
-          }
-
-          function updateLockInfo() {
-            const lockUntil = getNum(AUTH.lockKey, 0);
-            const el = document.getElementById('authLockInfo');
-            if (!el) return;
-            if (lockUntil > now()) {
-              el.textContent = `Bloqueado: ${fmtMs(lockUntil - now())}`;
-            } else {
-              el.textContent = '';
-            }
-          }
-
-          async function validatePassword(pw) {
-            const res = await fetch('/.netlify/functions/validate-app-password', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ password: pw })
-            });
-
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data && data.success) return true;
-
-            const msg = data && data.error ? data.error : 'Contraseña incorrecta';
-            throw new Error(msg);
-          }
-
-          async function tryLogin() {
-            const msgEl = document.getElementById('authMsg');
-            const pwEl = document.getElementById('authPassword');
-            const btnEl = document.getElementById('authLoginBtn');
-
-            const lockUntil = getNum(AUTH.lockKey, 0);
-            if (lockUntil > now()) {
-              if (msgEl) msgEl.textContent = `Demasiados intentos. Intenta en ${fmtMs(lockUntil - now())}.`;
-              updateLockInfo();
-              return;
-            }
-
-            const pw = (pwEl && pwEl.value ? pwEl.value : '').trim();
-            if (!pw) {
-              if (msgEl) msgEl.textContent = 'Escribe la contraseña.';
-              return;
-            }
-
-            if (msgEl) msgEl.textContent = '';
-            if (btnEl) {
-              btnEl.disabled = true;
-              btnEl.style.opacity = '0.85';
-              btnEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...';
-            }
-
-            try {
-              const ok = await validatePassword(pw);
-              if (ok) {
-                // sesión por 4 horas
-                const until = now() + AUTH.sessionHours * 60 * 60 * 1000;
-                setNum(AUTH.sessionKey, until);
-                setNum(AUTH.attemptsKey, 0);
-                setNum(AUTH.lockKey, 0);
-                hideOverlay();
-                return;
-              }
-            } catch (e) {
-              const attempts = getNum(AUTH.attemptsKey, 0) + 1;
-              setNum(AUTH.attemptsKey, attempts);
-
-              if (attempts >= AUTH.maxAttempts) {
-                const lockUntil2 = now() + AUTH.lockMinutes * 60 * 1000;
-                setNum(AUTH.lockKey, lockUntil2);
-                if (msgEl) msgEl.textContent = `Bloqueado por ${AUTH.lockMinutes} min (muchos intentos).`;
-              } else {
-                if (msgEl) msgEl.textContent = `${e.message} (Intento ${attempts}/${AUTH.maxAttempts})`;
-              }
-              updateLockInfo();
-            } finally {
-              if (btnEl) {
-                btnEl.disabled = false;
-                btnEl.style.opacity = '';
-                btnEl.innerHTML = '<i class="fas fa-unlock"></i> Entrar';
-              }
-            }
-          }
-
-          function bindAuthUI() {
-            const btn = document.getElementById('authLoginBtn');
-            const reload = document.getElementById('authReloadBtn');
-            const pw = document.getElementById('authPassword');
-
-            if (btn) btn.addEventListener('click', tryLogin);
-            if (reload) reload.addEventListener('click', () => window.location.reload());
-            if (pw) pw.addEventListener('keydown', (e) => {
-              if (e.key === 'Enter') tryLogin();
-            });
-            updateLockInfo();
-          }
-
-          function shouldBypass() {
-            // si viene un code (QR), NO pedimos contraseña
-            const c = qs(AUTH.bypassParam);
-            return !!(c && String(c).trim().length > 0);
-          }
-
-          function initAuthGate() {
-            try {
-              if (shouldBypass()) return; // participantes
-              const okUntil = getNum(AUTH.sessionKey, 0);
-              const lockUntil = getNum(AUTH.lockKey, 0);
-
-              if (lockUntil > now()) {
-                showOverlay();
-              } else if (okUntil > now()) {
-                hideOverlay();
-              } else {
-                showOverlay();
-              }
-
-              bindAuthUI();
-              // foco
-              setTimeout(() => document.getElementById('authPassword')?.focus(), 300);
-            } catch (e) {
-              // si falla algo, igual bloqueamos
-              showOverlay();
-              bindAuthUI();
-            }
-          }
-
-          // Ejecutar cuando el DOM esté listo
-          if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initAuthGate);
-          } else {
-            initAuthGate();
-          }
-        })();
-
         console.log('📊 Módulo de Reportes cargado correctamente');
     </script>
-
-    <!-- ═══════════════════════════════════════════════════════════════
-         OVERLAY DE CONTRASEÑA (ADMIN)
-         ═══════════════════════════════════════════════════════════════ -->
-    <div id="authOverlay" aria-hidden="true">
-        <div class="auth-card" role="dialog" aria-modal="true" aria-labelledby="authTitle">
-            <div class="auth-head">
-                <div class="auth-badge"><i class="fas fa-lock"></i></div>
-                <div>
-                    <h2 class="auth-title" id="authTitle">Acceso restringido</h2>
-                    <p class="auth-sub">Ingresa la contraseña para continuar.</p>
-                </div>
-            </div>
-            <div class="auth-body">
-                <div class="auth-row">
-                    <label style="font-weight:700; color:#111827;">Contraseña</label>
-                    <input id="authPassword" type="password" autocomplete="current-password" placeholder="••••••••••••••••" />
-                    <div class="auth-actions">
-                        <button class="auth-btn primary" id="authLoginBtn"><i class="fas fa-unlock"></i> Entrar</button>
-                        <button class="auth-btn secondary" id="authReloadBtn"><i class="fas fa-rotate"></i> Recargar</button>
-                    </div>
-                    <div class="auth-msg" id="authMsg"></div>
-                </div>
-            </div>
-            <div class="auth-foot">
-                <span>✔ Cambiable desde <b>Airtable</b> (AppConfig → APP_PASSWORD)</span>
-                <span id="authLockInfo"></span>
-            </div>
-        </div>
-    </div>
-    
-
 
 <!-- ═════════════════════════════════════════════════════════════════
      MODAL DE LINK POSTTEST - PRETEST → POSTTEST
