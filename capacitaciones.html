@@ -602,7 +602,8 @@
             top: 1rem;
             font-size: 2rem;
             cursor: pointer;
-            color: #F2FFFA;
+            color: #6b7280;
+            font-weight: bold;
         }
 
         .close:hover {
@@ -990,33 +991,36 @@ overflow: hidden;
         }
 
         .btn-view {
-            background: #e3f2fd;
-            color: #F2FFFA;
+            background: linear-gradient(135deg, #1565c0 0%, #1a3a8a 100%);
+            color: #ffffff;
+            font-weight: 600;
         }
 
         .btn-view:hover {
-            background: #1976d2;
-            color: #F2FFFA;
+            background: #0d47a1;
+            color: #ffffff;
         }
 
         .btn-qr {
-            background: #f3e5f5;
-            color: #F2FFFA;
+            background: linear-gradient(135deg, #6f42c1 0%, #5a32a3 100%);
+            color: #ffffff;
+            font-weight: 600;
         }
 
         .btn-qr:hover {
-            background: #7b1fa2;
-            color: #F2FFFA;
+            background: #4a235a;
+            color: #ffffff;
         }
 
         .btn-delete {
-            background: #ffebee;
-            color: #F2FFFA;
+            background: linear-gradient(135deg, #b71c1c 0%, #d32f2f 100%);
+            color: #ffffff;
+            font-weight: 600;
         }
 
         .btn-delete:hover {
-            background: #c62828;
-            color: #F2FFFA;
+            background: #7f0000;
+            color: #ffffff;
         }
 
         .empty-state {
@@ -1955,7 +1959,7 @@ overflow: hidden;
                     <!-- Acciones de la Capacitación -->
                     <div class="card" style="background: #f8f9fa; border: 2px dashed #dee2e6;">
                         <h3><i class="fas fa-cog"></i> Acciones de la Capacitación</h3>
-                        <p style="color: #F2FFFA; margin-bottom: 1.5rem;">
+                        <p style="color: #1f2937; margin-bottom: 1.5rem; font-weight: 500;">
                             Cuando una capacitación ha finalizado, puedes marcarla como completada para poder reutilizarla en el futuro.
                         </p>
                         
@@ -1968,14 +1972,14 @@ overflow: hidden;
                 <!-- Estado de carga -->
                 <div id="reportLoading" style="display: none; text-align: center; padding: 3rem;">
                     <i class="fas fa-spinner fa-spin" style="font-size: 3rem; color: var(--primary);"></i>
-                    <p style="color: #F2FFFA; margin-top: 1rem;">Cargando reporte...</p>
+                    <p style="color: #1f2937; margin-top: 1rem; font-weight: 600;">Cargando reporte...</p>
                 </div>
                 
                 <!-- Mensaje inicial -->
                 <div id="reportInitialMessage" class="card" style="text-align: center; padding: 3rem;">
-                    <i class="fas fa-chart-pie" style="font-size: 4rem; color: #F2FFFA; margin-bottom: 1rem;"></i>
-                    <h3 style="color: #F2FFFA;">Selecciona una Capacitación</h3>
-                    <p style="color: #F2FFFA;">Elige una capacitación del listado para ver el reporte de participantes</p>
+                    <i class="fas fa-chart-pie" style="font-size: 4rem; color: var(--primary); margin-bottom: 1rem;"></i>
+                    <h3 style="color: #1f2937;">Selecciona una Capacitación</h3>
+                    <p style="color: #4b5563; font-weight: 500;">Elige una capacitación del listado para ver el reporte de participantes</p>
                 </div>
             </section>
 
@@ -2210,7 +2214,7 @@ overflow: hidden;
             <h2 style="text-align: center; margin-bottom: 0.5rem; color: var(--primary);">
                 <i class="fas fa-user-plus"></i> Registro de Participante
             </h2>
-            <p style="text-align: center; color: #F2FFFA; margin-bottom: 1.5rem;">
+            <p style="text-align: center; color: #4b5563; margin-bottom: 1.5rem; font-weight: 500;">
                 Por favor completa tu información para acceder a la capacitación
             </p>
             
@@ -6379,11 +6383,11 @@ function makeCronogramaFilterFormula(year, tipo) {
                 `;
             } else {
                 container.innerHTML = `
-                    <div style="background: #fff3e0; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #ff9800;">
-                        <p style="margin: 0; color: #F2FFFA;">
+                    <div style="background: linear-gradient(135deg, #e65100 0%, #bf360c 100%); padding: 1rem; border-radius: 8px; margin-bottom: 1rem; border-left: 4px solid #ff6f00;">
+                        <p style="margin: 0; color: #ffffff; font-weight: 600;">
                             <i class="fas fa-exclamation-triangle"></i> <strong>¿Ha finalizado la capacitación?</strong>
                         </p>
-                        <p style="margin: 0.5rem 0 0 0; color: #F2FFFA; font-size: 0.9rem;">
+                        <p style="margin: 0.5rem 0 0 0; color: #ffffff; font-size: 0.9rem;">
                             Al finalizar una capacitación, las sesiones activas se desactivarán y podrá crear nuevas sesiones en el futuro.
                         </p>
                     </div>
