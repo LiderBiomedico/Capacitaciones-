@@ -45,6 +45,11 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: #ffffff;
             min-height: 100vh;
+            transition: background 0.3s ease;
+        }
+
+        body.authenticated {
+            background: linear-gradient(135deg, #f5f7fa 0%, #e9ecf1 100%);
         }
 
         .container {
@@ -3452,7 +3457,10 @@ overflow: hidden;
 
         async function enforceAdminPassword() {
             // Si ya hay sesión válida, no pedir de nuevo
-            if (getStoredAdminAuth()) return true;
+            if (getStoredAdminAuth()) {
+                document.body.classList.add('authenticated');
+                return true;
+            }
 
             // Pedir contraseña hasta que sea correcta
             while (true) {
@@ -3487,6 +3495,7 @@ overflow: hidden;
 
                 if (result.isConfirmed) {
                     setStoredAdminAuth();
+                    document.body.classList.add('authenticated');
                     return true;
                 }
             }
