@@ -1385,6 +1385,91 @@ overflow: hidden;
             }
         }
 
+
+/* ============================
+   PRE/POST TEST - OPCIONES EN COLUMNA (MÓVIL + ESCRITORIO)
+   Fuerza A), B), C), D) una debajo de otra, con espacio y área táctil grande
+   ============================ */
+#pretestQuestionsContainer .quiz-options,
+#posttestQuestionsContainer .quiz-options{
+    display:flex !important;
+    flex-direction:column !important;
+    gap:12px !important;
+    width:100% !important;
+    margin-top:10px !important;
+}
+
+#pretestQuestionsContainer label.quiz-option,
+#posttestQuestionsContainer label.quiz-option{
+    display:flex !important;
+    align-items:flex-start !important;
+    gap:12px !important;
+    width:100% !important;
+    padding:12px 14px !important;
+    border:2px solid #e2e2e2 !important;
+    border-radius:14px !important;
+    background:#ffffff !important;
+    cursor:pointer !important;
+    user-select:none !important;
+    white-space:normal !important;
+}
+
+#pretestQuestionsContainer label.quiz-option input[type="radio"],
+#posttestQuestionsContainer label.quiz-option input[type="radio"]{
+    flex:0 0 auto !important;
+    width:22px !important;
+    height:22px !important;
+    margin:2px 0 0 0 !important;
+    accent-color: var(--primary) !important;
+}
+
+#pretestQuestionsContainer .quiz-option-letter,
+#posttestQuestionsContainer .quiz-option-letter{
+    flex:0 0 auto !important;
+    min-width:30px !important;
+    font-weight:900 !important;
+    color:#111 !important;
+}
+
+#pretestQuestionsContainer .quiz-option-text,
+#posttestQuestionsContainer .quiz-option-text{
+    flex:1 1 auto !important;
+    display:block !important;
+    font-size:16px !important;
+    line-height:1.35 !important;
+    color:#111 !important;
+    word-break:break-word !important;
+}
+
+/* Resaltado al seleccionar (se añade clase is-selected desde JS) */
+#pretestQuestionsContainer label.quiz-option.is-selected,
+#posttestQuestionsContainer label.quiz-option.is-selected{
+    border-color: var(--primary) !important;
+    background: #f0fff8 !important;
+    box-shadow: 0 0 0 3px rgba(46,125,50,0.12) !important;
+}
+
+/* Extra: en pantallas grandes, mantener igualmente en columna (no en línea) */
+@media (min-width: 769px){
+    #pretestQuestionsContainer .quiz-options,
+    #posttestQuestionsContainer .quiz-options{
+        gap:10px !important;
+    }
+}
+
+/* Extra: en móviles, más aire y botón más grande */
+@media (max-width: 768px){
+    #pretestQuestionsContainer label.quiz-option,
+    #posttestQuestionsContainer label.quiz-option{
+        padding:14px 14px !important;
+    }
+    #pretestQuestionsContainer label.quiz-option input[type="radio"],
+    #posttestQuestionsContainer label.quiz-option input[type="radio"]{
+        width:24px !important;
+        height:24px !important;
+    }
+}
+
 </style>
 </head>
 <body>
