@@ -2561,74 +2561,108 @@ overflow: hidden;
             }
         }
         
+        
+        // ==============================
+        // UI helpers para opciones (móvil)
+        // ==============================
+        function bindQuizOptionSelectionUI() {
+            if (window.__quizHandlersBound) return;
+            window.__quizHandlersBound = true;
+
+            document.addEventListener('change', (e) => {
+                const input = e.target;
+                if (!(input && input.matches && input.matches('.quiz-option input[type="radio"]'))) return;
+
+                const opt = input.closest('.quiz-option');
+                if (!opt) return;
+
+                const group = opt.getAttribute('data-group') || input.name;
+                if (group) {
+                    const esc = (window.CSS && CSS.escape) ? CSS.escape(group) : group.replace(/"/g, '\"');
+                    document.querySelectorAll('.quiz-option[data-group="' + esc + '"]').forEach(el => {
+                        el.classList.remove('is-selected');
+                    });
+                }
+                opt.classList.add('is-selected');
+            });
+
+            // Permitir click en toda la tarjeta
+            document.addEventListener('click', (e) => {
+                const opt = e.target.closest('.quiz-option');
+                if (!opt) return;
+                const radio = opt.querySelector('input[type="radio"]');
+                if (radio && !radio.checked) radio.checked = true;
+            }, { passive: true });
+        }
+
+
         function displayPretestQuestions(questions) {
+            bindQuizOptionSelectionUI();
+
             const container = document.getElementById('pretestQuestionsContainer');
             container.innerHTML = '';
-            
+
             if (!questions || questions.length === 0) {
                 container.innerHTML = `
-                    <div style="text-align: center; padding: 2rem; background: #fff3cd; border-radius: 8px; border: 2px solid #ffc107;">
-                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #b45309; margin-bottom: 1rem; display: block;"></i>
-                        <p style="color: #1f2937; margin: 0; font-size: 1.1rem;">
-                            <strong>⚠️ No hay preguntas de pretest configuradas</strong>
-                        </p>
-                        <p style="color: #4b5563; margin: 0.5rem 0 0 0; font-size: 1rem; font-weight: 500;">
-                            En Airtable, crea preguntas con Tipo = "Pretest" enlazadas a esta capacitación
-                        </p>
+                    <div class="quiz-empty">
+                        <i class="fas fa-exclamation-triangle quiz-empty-icon"></i>
+                        <p class="quiz-empty-title"><strong>⚠️ No hay preguntas de pretest configuradas</strong></p>
+                        <p class="quiz-empty-text">En Airtable, crea preguntas con Tipo = "Pretest" enlazadas a esta capacitación</p>
                     </div>
                 `;
                 return;
             }
-            
+
             questions.forEach((question, index) => {
                 const fields = question.fields;
                 const questionNumber = index + 1;
                 const questionId = `pretest-q${question.id}`;
-                
-                // Buscar el nombre de la pregunta (intentar diferentes campos)
-                const questionText = fields['name'] || fields['Nombre'] || fields['Pregunta'] || fields['Título'] || 'Sin pregunta';
-                
-                // Obtener opciones (intentar variaciones de nombres)
+
+                const questionText =
+                    fields['name'] || fields['Nombre'] || fields['Pregunta'] || fields['Título'] || 'Sin pregunta';
+
                 const options = [
                     { letter: 'A', text: fields['Opción A'] || fields['opción a'] || fields['Option A'] || fields['A'] || '' },
                     { letter: 'B', text: fields['Opción B'] || fields['opción b'] || fields['Option B'] || fields['B'] || '' },
                     { letter: 'C', text: fields['Opción C'] || fields['opción c'] || fields['Option C'] || fields['C'] || '' },
                     { letter: 'D', text: fields['Opción D'] || fields['opción d'] || fields['Option D'] || fields['D'] || '' }
-                ].filter(opt => opt.text && opt.text.trim());
-                
-                // Si no hay opciones, intentar búsqueda más amplia
+                ].filter(opt => opt.text && String(opt.text).trim());
+
                 if (options.length === 0) {
                     console.warn(`⚠️ Pregunta ${questionNumber} no tiene opciones configuradas:`, fields);
                 }
-                
+
+                const optsHTML = options.length > 0
+                    ? options.map(option => {
+                        const isChecked = (pretestAnswers && pretestAnswers[question.id] === option.letter);
+                        return `
+                            <label class="quiz-option ${isChecked ? 'is-selected' : ''}" data-group="${questionId}">
+                                <input type="radio"
+                                       name="${questionId}"
+                                       value="${option.letter}"
+                                       ${isChecked ? 'checked' : ''}
+                                       onchange="pretestAnswers['${question.id}'] = this.value">
+                                <span class="quiz-option-letter">${option.letter})</span>
+                                <span class="quiz-option-text">${option.text}</span>
+                            </label>
+                        `;
+                    }).join('')
+                    : `<p class="quiz-warning">⚠️ Sin opciones de respuesta</p>`;
+
                 const questionHTML = `
-                    <div class="question-card pretest-question-card">
-                        <h4 class="pretest-question-title">
+                    <div class="question-card quiz-question-card">
+                        <h4 class="quiz-question-title">
                             <i class="fas fa-question-circle"></i> Pregunta ${questionNumber} / ${questions.length}
                         </h4>
-                        <p class="pretest-question-text">${questionText}</p>
-
-                        <div class="pretest-options">
-                            ${options.length > 0 ? options.map(option => `
-                                <label class="pretest-option" for="${questionId}-${option.letter}">
-                                    <input id="${questionId}-${option.letter}"
-                                           type="radio" 
-                                           name="${questionId}" 
-                                           value="${option.letter}" 
-                                           onchange="pretestAnswers['${question.id}'] = this.value">
-                                    <span class="pretest-option-content">
-                                        <strong class="pretest-option-letter">${option.letter})</strong>
-                                        <span class="pretest-option-text">${option.text}</span>
-                                    </span>
-                                </label>
-                            `).join('') : '<p class="pretest-no-options">⚠️ Sin opciones de respuesta</p>'}
-                        </div>
+                        <p class="quiz-question-text">${questionText}</p>
+                        <div class="quiz-options">${optsHTML}</div>
                     </div>
                 `;
-                
-                container.innerHTML += questionHTML;
+
+                container.insertAdjacentHTML('beforeend', questionHTML);
             });
         }
+
         
         async function submitPretest() {
             const answers = Object.keys(pretestAnswers).length;
@@ -3080,75 +3114,74 @@ overflow: hidden;
             }
         }
         
+        
         function displayPosttestQuestions(questions) {
+            bindQuizOptionSelectionUI();
+
             const container = document.getElementById('postestQuestionsContainer');
             container.innerHTML = '';
-            
+
             if (!questions || questions.length === 0) {
                 container.innerHTML = `
-                    <div style="text-align: center; padding: 2rem; background: #fff3cd; border-radius: 8px; border: 2px solid #ffc107;">
-                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #F2FFFA; margin-bottom: 1rem; display: block;"></i>
-                        <p style="color: #F2FFFA; margin: 0; font-size: 1.1rem;">
-                            <strong>⚠️ No hay preguntas de postest configuradas</strong>
-                        </p>
-                        <p style="color: #F2FFFA; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
-                            En Airtable, crea preguntas con Tipo = "Postest" enlazadas a esta capacitación
-                        </p>
+                    <div class="quiz-empty">
+                        <i class="fas fa-exclamation-triangle quiz-empty-icon"></i>
+                        <p class="quiz-empty-title"><strong>⚠️ No hay preguntas de postest configuradas</strong></p>
+                        <p class="quiz-empty-text">En Airtable, crea preguntas con Tipo = "Postest" enlazadas a esta capacitación</p>
                     </div>
                 `;
                 return;
             }
-            
+
             questions.forEach((question, index) => {
                 const fields = question.fields;
                 const questionNumber = index + 1;
                 const questionId = `postest-q${question.id}`;
-                
-                // Buscar el nombre de la pregunta (intentar diferentes campos)
-                const questionText = fields['name'] || fields['Nombre'] || fields['Pregunta'] || fields['Título'] || 'Sin pregunta';
-                
-                // Obtener opciones (intentar variaciones de nombres)
+
+                const questionText =
+                    fields['name'] || fields['Nombre'] || fields['Pregunta'] || fields['Título'] || 'Sin pregunta';
+
                 const options = [
                     { letter: 'A', text: fields['Opción A'] || fields['opción a'] || fields['Option A'] || fields['A'] || '' },
                     { letter: 'B', text: fields['Opción B'] || fields['opción b'] || fields['Option B'] || fields['B'] || '' },
                     { letter: 'C', text: fields['Opción C'] || fields['opción c'] || fields['Option C'] || fields['C'] || '' },
                     { letter: 'D', text: fields['Opción D'] || fields['opción d'] || fields['Option D'] || fields['D'] || '' }
-                ].filter(opt => opt.text && opt.text.trim());
-                
-                // Si no hay opciones, intentar búsqueda más amplia
+                ].filter(opt => opt.text && String(opt.text).trim());
+
                 if (options.length === 0) {
                     console.warn(`⚠️ Pregunta ${questionNumber} no tiene opciones configuradas:`, fields);
                 }
-                
+
+                const optsHTML = options.length > 0
+                    ? options.map(option => {
+                        const isChecked = (postestAnswers && postestAnswers[question.id] === option.letter);
+                        return `
+                            <label class="quiz-option ${isChecked ? 'is-selected' : ''}" data-group="${questionId}">
+                                <input type="radio"
+                                       name="${questionId}"
+                                       value="${option.letter}"
+                                       ${isChecked ? 'checked' : ''}
+                                       onchange="postestAnswers['${question.id}'] = this.value">
+                                <span class="quiz-option-letter">${option.letter})</span>
+                                <span class="quiz-option-text">${option.text}</span>
+                            </label>
+                        `;
+                    }).join('')
+                    : `<p class="quiz-warning">⚠️ Sin opciones de respuesta</p>`;
+
                 const questionHTML = `
-                    <div class="question-card" style="margin-bottom: 1.5rem; padding: 1.5rem; background: #f8f9fa; border-radius: 8px; border-left: 4px solid var(--primary);">
-                        <h4 style="margin-top: 0; color: var(--primary); margin-bottom: 0.75rem;">
+                    <div class="question-card quiz-question-card">
+                        <h4 class="quiz-question-title">
                             <i class="fas fa-question-circle"></i> Pregunta ${questionNumber} / ${questions.length}
                         </h4>
-                        <p style="margin: 0 0 1rem 0; font-weight: 500; color: #F2FFFA; font-size: 1.05rem;">
-                            ${questionText}
-                        </p>
-                        
-                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                            ${options.length > 0 ? options.map(option => `
-                                <label style="display: flex; align-items: flex-start; padding: 0.75rem; background: white; border-radius: 6px; cursor: pointer; transition: all 0.3s; border: 2px solid #e0e0e0; hover: border-color: var(--primary);">
-                                    <input type="radio" 
-                                           name="${questionId}" 
-                                           value="${option.letter}" 
-                                           onchange="postestAnswers['${question.id}'] = this.value"
-                                           style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); margin-top: 2px; flex-shrink: 0;">
-                                    <span style="margin-left: 0.75rem; flex: 1;">
-                                        <strong style="color: var(--primary);">${option.letter})</strong> <span style="color: #F2FFFA;">${option.text}</span>
-                                    </span>
-                                </label>
-                            `).join('') : '<p style="color: #F2FFFA; font-weight: bold;">⚠️ Sin opciones de respuesta</p>'}
-                        </div>
+                        <p class="quiz-question-text">${questionText}</p>
+                        <div class="quiz-options">${optsHTML}</div>
                     </div>
                 `;
-                
-                container.innerHTML += questionHTML;
+
+                container.insertAdjacentHTML('beforeend', questionHTML);
             });
         }
+
         
         async function submitPosttest() {
             const answers = Object.keys(postestAnswers).length;
