@@ -25,6 +25,11 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
     
+    <!-- jsPDF para generación de PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    
     <style>
         * {
             margin: 0;
@@ -1868,6 +1873,9 @@ overflow: hidden;
                         <button id="btnQuarterlyExcel" class="btn btn-success" onclick="exportQuarterlyReportExcel()" disabled>
                             <i class="fas fa-file-excel"></i> Exportar Excel
                         </button>
+                        <button id="btnQuarterlyPDF" class="btn btn-danger" onclick="exportQuarterlyReportPDF()" disabled style="background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);">
+                            <i class="fas fa-file-pdf"></i> Exportar PDF
+                        </button>
                         <button id="btnQuarterlyCSV" class="btn btn-info" onclick="exportQuarterlyReportCSV()" disabled>
                             <i class="fas fa-file-csv"></i> Exportar CSV
                         </button>
@@ -2123,6 +2131,9 @@ overflow: hidden;
                                 </button>
                                 <button class="btn btn-success" onclick="exportReportExcel()" style="margin: 0;">
                                     <i class="fas fa-file-excel"></i> Exportar Excel
+                                </button>
+                                <button class="btn btn-danger" onclick="exportReportPDF()" style="margin: 0; background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);">
+                                    <i class="fas fa-file-pdf"></i> Exportar PDF
                                 </button>
                                 <button class="btn btn-secondary" onclick="printReport()" style="margin: 0;">
                                     <i class="fas fa-print"></i> Imprimir
@@ -5348,9 +5359,11 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const b1 = document.getElementById('btnQuarterlyExcel');
             const b2 = document.getElementById('btnQuarterlyCSV');
             const b3 = document.getElementById('btnQuarterlyPrint');
+            const b4 = document.getElementById('btnQuarterlyPDF');
             if (b1) b1.disabled = !enabled;
             if (b2) b2.disabled = !enabled;
             if (b3) b3.disabled = !enabled;
+            if (b4) b4.disabled = !enabled;
         }
 
         function safeNumber(n, fallback = 0) {
@@ -5865,6 +5878,593 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 timer: 2200,
                 showConfirmButton: false
             });
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // EXPORTACIÓN PDF - REPORTE TRIMESTRAL
+        // ═══════════════════════════════════════════════════════════════
+        
+        // Logo del hospital en Base64 para incluir en PDFs
+        const HOSPITAL_LOGO_BASE64 = 'data:image/png;base64,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';
+
+        async function exportQuarterlyReportPDF() {
+            if (!currentQuarterlyReportData) {
+                Swal.fire({ icon: 'warning', title: 'Sin datos', text: 'Primero genera el reporte trimestral' });
+                return;
+            }
+
+            try {
+                Swal.fire({
+                    title: 'Generando PDF...',
+                    text: 'Por favor espere mientras se crea el documento',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const pageHeight = doc.internal.pageSize.getHeight();
+                const margin = 15;
+                let yPos = margin;
+
+                const data = currentQuarterlyReportData;
+                const p = data.period || {};
+                const k = data.kpis || {};
+
+                // ═══════════════════════════════════════════════════════════
+                // ENCABEZADO CON LOGO
+                // ═══════════════════════════════════════════════════════════
+                
+                // Logo del hospital
+                try {
+                    doc.addImage(HOSPITAL_LOGO_BASE64, 'PNG', margin, yPos, 25, 25);
+                } catch(e) {
+                    console.warn('No se pudo agregar el logo:', e);
+                }
+
+                // Título principal
+                doc.setFontSize(14);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(46, 125, 50); // Verde hospital
+                doc.text('HOSPITAL SUSANA LÓPEZ DE VALENCIA E.S.E.', pageWidth / 2, yPos + 8, { align: 'center' });
+                
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(100);
+                doc.text('Departamento de Ingeniería Clínica', pageWidth / 2, yPos + 14, { align: 'center' });
+
+                // Código del documento
+                doc.setFontSize(8);
+                doc.setTextColor(50);
+                doc.text('SLV-SR-03-F06', pageWidth - margin, yPos + 5, { align: 'right' });
+
+                yPos += 30;
+
+                // Línea separadora
+                doc.setDrawColor(46, 125, 50);
+                doc.setLineWidth(0.5);
+                doc.line(margin, yPos, pageWidth - margin, yPos);
+                yPos += 8;
+
+                // Título del reporte
+                doc.setFontSize(16);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(30);
+                const periodLabel = p.label || `T${p.quarter || ''} ${p.year || ''}`;
+                doc.text(`REPORTE TRIMESTRAL DE CAPACITACIONES`, pageWidth / 2, yPos, { align: 'center' });
+                yPos += 7;
+                
+                doc.setFontSize(12);
+                doc.setTextColor(46, 125, 50);
+                doc.text(periodLabel, pageWidth / 2, yPos, { align: 'center' });
+                yPos += 5;
+
+                doc.setFontSize(9);
+                doc.setTextColor(100);
+                doc.text(`Período: ${p.startDate || ''} a ${p.endDate || ''}`, pageWidth / 2, yPos, { align: 'center' });
+                yPos += 10;
+
+                // ═══════════════════════════════════════════════════════════
+                // SECCIÓN 1: KPIs
+                // ═══════════════════════════════════════════════════════════
+                doc.setFillColor(46, 125, 50);
+                doc.rect(margin, yPos, pageWidth - 2 * margin, 7, 'F');
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(255);
+                doc.text('1. INDICADORES CLAVE DE DESEMPEÑO (KPI)', margin + 3, yPos + 5);
+                yPos += 12;
+
+                // Tabla de KPIs
+                const kpiData = [
+                    ['Capacitaciones (trimestre)', safeNumber(k.trainingsCount).toString(), 'Participaciones', safeNumber(k.participationsCount).toString()],
+                    ['Participantes únicos', safeNumber(k.uniqueParticipants).toString(), 'Adherencia (Post-test)', `${safeNumber(k.adherenceRate)}%`],
+                    ['Promedio Pre-test', `${safeNumber(k.avgPretestScore)}% (${(safeNumber(k.avgPretestScore)/20).toFixed(1)}/5.0)`, 'Promedio Post-test', `${safeNumber(k.avgPostestScore)}% (${(safeNumber(k.avgPostestScore)/20).toFixed(1)}/5.0)`],
+                    ['Mejora promedio', `${safeNumber(k.avgImprovement) >= 0 ? '+' : ''}${safeNumber(k.avgImprovement)}%`, 'Aprobación Post-test (≥60%)', `${safeNumber(k.passRatePostest)}%`]
+                ];
+
+                doc.autoTable({
+                    startY: yPos,
+                    head: [],
+                    body: kpiData,
+                    theme: 'grid',
+                    styles: { fontSize: 9, cellPadding: 3 },
+                    columnStyles: {
+                        0: { fontStyle: 'bold', fillColor: [240, 240, 240], cellWidth: 45 },
+                        1: { halign: 'center', cellWidth: 35 },
+                        2: { fontStyle: 'bold', fillColor: [240, 240, 240], cellWidth: 45 },
+                        3: { halign: 'center', cellWidth: 35 }
+                    },
+                    margin: { left: margin, right: margin }
+                });
+
+                yPos = doc.lastAutoTable.finalY + 10;
+
+                // ═══════════════════════════════════════════════════════════
+                // SECCIÓN 2: CAPACITACIONES DEL TRIMESTRE
+                // ═══════════════════════════════════════════════════════════
+                doc.setFillColor(46, 125, 50);
+                doc.rect(margin, yPos, pageWidth - 2 * margin, 7, 'F');
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(255);
+                doc.text('2. CAPACITACIONES DEL TRIMESTRE', margin + 3, yPos + 5);
+                yPos += 12;
+
+                const trainings = [...(data.trainings || [])].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+                
+                const trainingsTableData = trainings.map(t => {
+                    const state = t.finalizada ? 'Finalizada' : (t.activa ? 'Activa' : 'Inactiva');
+                    return [
+                        t.dateLabel || '',
+                        t.title || '',
+                        t.department || '',
+                        state,
+                        safeNumber(t.participations).toString(),
+                        `${safeNumber(t.adherenceRate)}%`,
+                        `${safeNumber(t.avgPostestScore)}%`
+                    ];
+                });
+
+                doc.autoTable({
+                    startY: yPos,
+                    head: [['Fecha', 'Capacitación', 'Departamento', 'Estado', 'Part.', 'Adh.%', 'Post%']],
+                    body: trainingsTableData,
+                    theme: 'striped',
+                    headStyles: { fillColor: [46, 125, 50], fontSize: 8 },
+                    styles: { fontSize: 7, cellPadding: 2 },
+                    columnStyles: {
+                        0: { cellWidth: 20 },
+                        1: { cellWidth: 50 },
+                        2: { cellWidth: 35 },
+                        3: { cellWidth: 20 },
+                        4: { halign: 'center', cellWidth: 12 },
+                        5: { halign: 'center', cellWidth: 15 },
+                        6: { halign: 'center', cellWidth: 15 }
+                    },
+                    margin: { left: margin, right: margin }
+                });
+
+                yPos = doc.lastAutoTable.finalY + 10;
+
+                // Verificar si necesitamos nueva página
+                if (yPos > pageHeight - 60) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // SECCIÓN 3: DISTRIBUCIONES
+                // ═══════════════════════════════════════════════════════════
+                doc.setFillColor(46, 125, 50);
+                doc.rect(margin, yPos, pageWidth - 2 * margin, 7, 'F');
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(255);
+                doc.text('3. DISTRIBUCIÓN POR DEPARTAMENTO/SERVICIO', margin + 3, yPos + 5);
+                yPos += 12;
+
+                const byDept = [...(data.distributions?.byDept || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count)).slice(0, 10);
+                
+                const deptTableData = byDept.map(d => [
+                    d.name || '',
+                    safeNumber(d.count).toString(),
+                    safeNumber(d.unique).toString()
+                ]);
+
+                doc.autoTable({
+                    startY: yPos,
+                    head: [['Departamento/Servicio', 'Participaciones', 'Únicos']],
+                    body: deptTableData,
+                    theme: 'striped',
+                    headStyles: { fillColor: [46, 125, 50], fontSize: 8 },
+                    styles: { fontSize: 8, cellPadding: 2 },
+                    columnStyles: {
+                        0: { cellWidth: 100 },
+                        1: { halign: 'center', cellWidth: 35 },
+                        2: { halign: 'center', cellWidth: 30 }
+                    },
+                    margin: { left: margin, right: margin }
+                });
+
+                yPos = doc.lastAutoTable.finalY + 10;
+
+                // Verificar si necesitamos nueva página
+                if (yPos > pageHeight - 60) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // SECCIÓN 4: HALLAZGOS Y RECOMENDACIONES
+                // ═══════════════════════════════════════════════════════════
+                doc.setFillColor(46, 125, 50);
+                doc.rect(margin, yPos, pageWidth - 2 * margin, 7, 'F');
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(255);
+                doc.text('4. HALLAZGOS Y RECOMENDACIONES', margin + 3, yPos + 5);
+                yPos += 12;
+
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(50);
+
+                const insights = data.insights && data.insights.length ? data.insights : ['Sin hallazgos automáticos (no hay datos suficientes).'];
+                insights.forEach((insight, index) => {
+                    const lines = doc.splitTextToSize(`• ${insight}`, pageWidth - 2 * margin - 10);
+                    lines.forEach(line => {
+                        if (yPos > pageHeight - 30) {
+                            doc.addPage();
+                            yPos = margin;
+                        }
+                        doc.text(line, margin + 5, yPos);
+                        yPos += 5;
+                    });
+                    yPos += 2;
+                });
+
+                // ═══════════════════════════════════════════════════════════
+                // PIE DE PÁGINA
+                // ═══════════════════════════════════════════════════════════
+                const totalPages = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= totalPages; i++) {
+                    doc.setPage(i);
+                    doc.setFontSize(8);
+                    doc.setTextColor(150);
+                    doc.text(
+                        `Documento generado automáticamente - Sistema de Capacitaciones HSLV | Página ${i} de ${totalPages}`,
+                        pageWidth / 2,
+                        pageHeight - 10,
+                        { align: 'center' }
+                    );
+                    doc.text(
+                        `Fecha de generación: ${new Date().toLocaleString('es-CO')}`,
+                        pageWidth / 2,
+                        pageHeight - 5,
+                        { align: 'center' }
+                    );
+                }
+
+                // Descargar el PDF
+                const filename = `Reporte_Trimestral_${periodLabel.replace(/[^\w]+/g, '_')}.pdf`;
+                doc.save(filename);
+
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡PDF Generado!',
+                    text: `Se descargó: ${filename}`,
+                    timer: 2500,
+                    showConfirmButton: false
+                });
+
+            } catch (error) {
+                console.error('Error generando PDF:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo generar el PDF: ' + error.message
+                });
+            }
+        }
+
+        // ═══════════════════════════════════════════════════════════════
+        // EXPORTACIÓN PDF - REPORTE MENSUAL/INDIVIDUAL
+        // ═══════════════════════════════════════════════════════════════
+        
+        async function exportReportPDF() {
+            if (!currentReportData || !currentReportData.participants || currentReportData.participants.length === 0) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Sin datos',
+                    text: 'No hay participantes para exportar'
+                });
+                return;
+            }
+
+            try {
+                Swal.fire({
+                    title: 'Generando PDF...',
+                    text: 'Por favor espere mientras se crea el documento',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('p', 'mm', 'a4');
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const pageHeight = doc.internal.pageSize.getHeight();
+                const margin = 15;
+                let yPos = margin;
+
+                const training = currentReportData.training;
+                const participants = currentReportData.participants;
+                const stats = currentReportData.statistics;
+
+                // ═══════════════════════════════════════════════════════════
+                // ENCABEZADO CON LOGO
+                // ═══════════════════════════════════════════════════════════
+                
+                // Logo del hospital
+                try {
+                    doc.addImage(HOSPITAL_LOGO_BASE64, 'PNG', margin, yPos, 25, 25);
+                } catch(e) {
+                    console.warn('No se pudo agregar el logo:', e);
+                }
+
+                // Título principal
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(46, 125, 50);
+                doc.text('HOSPITAL SUSANA LÓPEZ DE VALENCIA E.S.E.', pageWidth / 2, yPos + 6, { align: 'center' });
+                
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'normal');
+                doc.setTextColor(100);
+                doc.text('Departamento de Ingeniería Clínica', pageWidth / 2, yPos + 11, { align: 'center' });
+
+                // Código del documento
+                doc.setFontSize(8);
+                doc.setTextColor(50);
+                doc.text('SLV-SR-03-F05', pageWidth - margin, yPos + 5, { align: 'right' });
+
+                yPos += 28;
+
+                // Línea separadora
+                doc.setDrawColor(46, 125, 50);
+                doc.setLineWidth(0.5);
+                doc.line(margin, yPos, pageWidth - margin, yPos);
+                yPos += 6;
+
+                // Título del reporte
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(30);
+                doc.text('INFORME DE PLANEACIÓN, EJECUCIÓN Y EVALUACIÓN', pageWidth / 2, yPos, { align: 'center' });
+                yPos += 5;
+                doc.text('DE CAPACITACIONES INTERNAS', pageWidth / 2, yPos, { align: 'center' });
+                yPos += 8;
+
+                // ═══════════════════════════════════════════════════════════
+                // SECCIÓN I: INFORMACIÓN GENERAL
+                // ═══════════════════════════════════════════════════════════
+                doc.setFillColor(46, 125, 50);
+                doc.rect(margin, yPos, pageWidth - 2 * margin, 6, 'F');
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(255);
+                doc.text('I. INFORMACIÓN GENERAL', margin + 3, yPos + 4.5);
+                yPos += 10;
+
+                const infoData = [
+                    ['CAPACITACIÓN:', training.titulo || ''],
+                    ['OBJETIVO:', training.descripcion || 'Explicar al personal el uso adecuado del equipo/tema'],
+                    ['TEMAS A TRATAR:', `Funcionamiento adecuado - ${training.titulo || ''}`],
+                    ['METODOLOGÍA:', 'Presencial'],
+                    ['FECHA:', training.fecha || 'No especificada']
+                ];
+
+                doc.autoTable({
+                    startY: yPos,
+                    body: infoData,
+                    theme: 'plain',
+                    styles: { fontSize: 8, cellPadding: 2 },
+                    columnStyles: {
+                        0: { fontStyle: 'bold', cellWidth: 35, fillColor: [240, 240, 240] },
+                        1: { cellWidth: 130 }
+                    },
+                    margin: { left: margin, right: margin }
+                });
+
+                yPos = doc.lastAutoTable.finalY + 8;
+
+                // ═══════════════════════════════════════════════════════════
+                // SECCIÓN II: LISTADO DE PARTICIPANTES
+                // ═══════════════════════════════════════════════════════════
+                doc.setFillColor(46, 125, 50);
+                doc.rect(margin, yPos, pageWidth - 2 * margin, 6, 'F');
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(255);
+                doc.text('II. LISTADO DE PARTICIPANTES', margin + 3, yPos + 4.5);
+                yPos += 10;
+
+                const participantsData = participants.map((p, i) => [
+                    (i + 1).toString(),
+                    p.nombre || '',
+                    p.departamento || '',
+                    p.pretestScore > 0 ? (p.pretestScore / 20).toFixed(1) : '-',
+                    p.postestScore > 0 ? (p.postestScore / 20).toFixed(1) : '-',
+                    p.postestScore > 0 ? (p.postestScore >= 60 ? 'Aprobado' : 'Reprobado') : 'Pendiente'
+                ]);
+
+                // Agregar filas vacías si hay menos de 10 participantes
+                const filasVacias = Math.max(0, 10 - participants.length);
+                for (let i = 0; i < filasVacias; i++) {
+                    participantsData.push([
+                        (participants.length + i + 1).toString(),
+                        '', '', '', '', ''
+                    ]);
+                }
+
+                doc.autoTable({
+                    startY: yPos,
+                    head: [['#', 'Nombre Completo', 'Servicio/Área', 'Pre (5.0)', 'Post (5.0)', 'Estado']],
+                    body: participantsData,
+                    theme: 'grid',
+                    headStyles: { fillColor: [46, 125, 50], fontSize: 7, halign: 'center' },
+                    styles: { fontSize: 7, cellPadding: 1.5 },
+                    columnStyles: {
+                        0: { halign: 'center', cellWidth: 8 },
+                        1: { cellWidth: 55 },
+                        2: { cellWidth: 45 },
+                        3: { halign: 'center', cellWidth: 20 },
+                        4: { halign: 'center', cellWidth: 20 },
+                        5: { halign: 'center', cellWidth: 20 }
+                    },
+                    margin: { left: margin, right: margin }
+                });
+
+                yPos = doc.lastAutoTable.finalY + 8;
+
+                // Verificar si necesitamos nueva página
+                if (yPos > pageHeight - 80) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // SECCIÓN III: RESULTADOS DE LA EVALUACIÓN
+                // ═══════════════════════════════════════════════════════════
+                doc.setFillColor(46, 125, 50);
+                doc.rect(margin, yPos, pageWidth - 2 * margin, 6, 'F');
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(255);
+                doc.text('III. RESULTADOS DE LA EVALUACIÓN', margin + 3, yPos + 4.5);
+                yPos += 10;
+
+                const resultsData = [
+                    ['Total de participantes:', stats.totalParticipants.toString(), ''],
+                    ['Completaron Pre-Test:', stats.completedPretest.toString(), ''],
+                    ['Completaron Post-Test:', stats.completedPostest.toString(), ''],
+                    ['Promedio Pre-Test:', `${(stats.avgPretestScore / 20).toFixed(1)} / 5.0`, `${stats.avgPretestScore}%`],
+                    ['Promedio Post-Test:', `${(stats.avgPostestScore / 20).toFixed(1)} / 5.0`, `${stats.avgPostestScore}%`],
+                    ['Mejora Promedio:', `+${stats.avgImprovement}%`, ''],
+                    ['Tasa de Adherencia:', `${stats.adherenceRate}%`, stats.adherenceRate >= 80 ? 'Meta cumplida' : 'Requiere plan de mejora']
+                ];
+
+                doc.autoTable({
+                    startY: yPos,
+                    head: [['INDICADOR', 'VALOR', 'OBSERVACIONES']],
+                    body: resultsData,
+                    theme: 'grid',
+                    headStyles: { fillColor: [46, 125, 50], fontSize: 8 },
+                    styles: { fontSize: 8, cellPadding: 2 },
+                    columnStyles: {
+                        0: { fontStyle: 'bold', cellWidth: 55 },
+                        1: { halign: 'center', cellWidth: 40 },
+                        2: { cellWidth: 70 }
+                    },
+                    margin: { left: margin, right: margin },
+                    didParseCell: function(data) {
+                        // Colorear la celda de adherencia según el resultado
+                        if (data.row.index === 6 && data.column.index === 1) {
+                            if (stats.adherenceRate >= 80) {
+                                data.cell.styles.fillColor = [198, 239, 206]; // Verde claro
+                            } else if (stats.adherenceRate >= 60) {
+                                data.cell.styles.fillColor = [255, 235, 156]; // Amarillo claro
+                            } else {
+                                data.cell.styles.fillColor = [255, 199, 206]; // Rojo claro
+                            }
+                        }
+                    }
+                });
+
+                yPos = doc.lastAutoTable.finalY + 15;
+
+                // Verificar si necesitamos nueva página para firmas
+                if (yPos > pageHeight - 50) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // SECCIÓN IV: FIRMAS
+                // ═══════════════════════════════════════════════════════════
+                doc.setFillColor(46, 125, 50);
+                doc.rect(margin, yPos, pageWidth - 2 * margin, 6, 'F');
+                doc.setFontSize(9);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(255);
+                doc.text('IV. FIRMAS DE RESPONSABLES', margin + 3, yPos + 4.5);
+                yPos += 25;
+
+                // Líneas de firma
+                const firmaWidth = 60;
+                const firmaX1 = margin + 20;
+                const firmaX2 = pageWidth - margin - firmaWidth - 20;
+
+                doc.setDrawColor(0);
+                doc.setLineWidth(0.3);
+                doc.line(firmaX1, yPos, firmaX1 + firmaWidth, yPos);
+                doc.line(firmaX2, yPos, firmaX2 + firmaWidth, yPos);
+
+                yPos += 4;
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'bold');
+                doc.setTextColor(50);
+                doc.text('EXPOSITOR RESPONSABLE', firmaX1 + firmaWidth / 2, yPos, { align: 'center' });
+                doc.text('COORDINADOR DE CAPACITACIÓN', firmaX2 + firmaWidth / 2, yPos, { align: 'center' });
+
+                yPos += 4;
+                doc.setFont('helvetica', 'normal');
+                doc.text('Ing. Biomédico', firmaX1 + firmaWidth / 2, yPos, { align: 'center' });
+                doc.text('Ing. Biomédico', firmaX2 + firmaWidth / 2, yPos, { align: 'center' });
+
+                // ═══════════════════════════════════════════════════════════
+                // PIE DE PÁGINA
+                // ═══════════════════════════════════════════════════════════
+                const totalPages = doc.internal.getNumberOfPages();
+                for (let i = 1; i <= totalPages; i++) {
+                    doc.setPage(i);
+                    doc.setFontSize(7);
+                    doc.setTextColor(150);
+                    doc.text(
+                        `Documento generado automáticamente - Sistema de Capacitaciones HSLV | Página ${i} de ${totalPages}`,
+                        pageWidth / 2,
+                        pageHeight - 10,
+                        { align: 'center' }
+                    );
+                    doc.text(
+                        `Fecha de generación: ${new Date().toLocaleString('es-CO')}`,
+                        pageWidth / 2,
+                        pageHeight - 6,
+                        { align: 'center' }
+                    );
+                }
+
+                // Descargar el PDF
+                const filename = `SLV-SR-03-F05_${training.titulo.replace(/[^a-zA-Z0-9]/g, '_')}_${formatDateForFile(new Date())}.pdf`;
+                doc.save(filename);
+
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡PDF Generado!',
+                    text: `Se descargó: ${filename}`,
+                    timer: 2500,
+                    showConfirmButton: false
+                });
+
+            } catch (error) {
+                console.error('Error generando PDF:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo generar el PDF: ' + error.message
+                });
+            }
         }
 
 
