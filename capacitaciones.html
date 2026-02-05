@@ -5638,94 +5638,235 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             URL.revokeObjectURL(url);
         }
 
+        
         function exportQuarterlyReportExcel() {
             if (!currentQuarterlyReportData) return;
-            if (typeof XLSX === 'undefined') {
-                Swal.fire({ icon:'error', title:'Excel no disponible', text:'No se cargó la librería para Excel.' });
-                return;
-            }
 
             const data = currentQuarterlyReportData;
             const p = data.period || {};
             const k = data.kpis || {};
             const generatedAt = new Date().toLocaleString('es-CO');
 
-            // Hoja 1: Resumen
-            const aoa1 = [];
-            aoa1.push([`REPORTE TRIMESTRAL - ${p.label || ''}`]);
-            aoa1.push([`Hospital Susana López de Valencia | Generado: ${generatedAt}`]);
-            aoa1.push([]);
-            aoa1.push(['Rango', `${p.startDate || ''} a ${p.endDate || ''}`]);
-            aoa1.push(['Capacitaciones (trimestre)', safeNumber(k.trainingsCount)]);
-            aoa1.push(['Participaciones', safeNumber(k.participationsCount)]);
-            aoa1.push(['Participantes únicos', safeNumber(k.uniqueParticipants)]);
-            aoa1.push(['Adherencia (Post-test)', `${safeNumber(k.adherenceRate)}%`]);
-            aoa1.push(['Promedio Pre-test', `${safeNumber(k.avgPretestScore)}%`]);
-            aoa1.push(['Promedio Post-test', `${safeNumber(k.avgPostestScore)}%`]);
-            aoa1.push(['Mejora promedio', `${safeNumber(k.avgImprovement) >= 0 ? '+' : ''}${safeNumber(k.avgImprovement)}%`]);
-            aoa1.push(['Aprobación Post-test (≥60%)', `${safeNumber(k.passRatePostest)}%`]);
-            aoa1.push([]);
-            aoa1.push(['Hallazgos automáticos']);
-            (data.insights || []).forEach(s => aoa1.push([s]));
+            // Intentar capturar imágenes de las gráficas (Chart.js canvas)
+            const getCanvasDataUrl = (id) => {
+                try {
+                    const c = document.getElementById(id);
+                    if (!c || typeof c.toDataURL !== 'function') return '';
+                    return c.toDataURL('image/png', 1.0) || '';
+                } catch (e) {
+                    return '';
+                }
+            };
 
-            const ws1 = XLSX.utils.aoa_to_sheet(aoa1);
-            ws1['!merges'] = [
-                { s: { r: 0, c: 0 }, e: { r: 0, c: 5 } },
-                { s: { r: 1, c: 0 }, e: { r: 1, c: 5 } }
-            ];
-            ws1['!cols'] = [{ wch: 38 }, { wch: 40 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }];
+            const imgDept = getCanvasDataUrl('qChartParticipantsByDept');
+            const imgCargo = getCanvasDataUrl('qChartByCargo');
+            const imgProf  = getCanvasDataUrl('qChartByProfession');
+            const imgMonth = getCanvasDataUrl('qChartTrainingsByMonth');
 
-            // Hoja 2: Capacitaciones
-            const aoa2 = [];
-            aoa2.push(['Fecha', 'Capacitación', 'Departamento', 'Estado', 'Participaciones', 'Adherencia %', 'Prom. Pre %', 'Prom. Post %', 'Mejora %', 'Aprobación Post %']);
-            (data.trainings || []).forEach(t => {
-                const state = t.finalizada ? 'Finalizada' : (t.activa ? 'Activa' : 'Inactiva');
-                aoa2.push([
-                    t.dateLabel || '',
-                    t.title || '',
-                    t.department || '',
-                    state,
-                    safeNumber(t.participations),
-                    safeNumber(t.adherenceRate),
-                    safeNumber(t.avgPretestScore),
-                    safeNumber(t.avgPostestScore),
-                    safeNumber(t.avgImprovement),
-                    safeNumber(t.passRatePostest)
-                ]);
+            // Datos ordenados
+            const trainings = [...(data.trainings || [])].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+            const byDept = [...(data.distributions?.byDept || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count));
+            const byCargo = [...(data.distributions?.byCargo || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count));
+            const byProf = [...(data.distributions?.byProfession || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count));
+            const byMonth = [...(data.distributions?.trainingsByMonth || [])].sort((a, b) => safeNumber(a.month) - safeNumber(b.month));
+
+            const escape = (s) => escapeHtml(String(s ?? ''));
+
+            const periodLabel = p.label || (p.quarter && p.year ? `T${p.quarter} ${p.year}` : 'Reporte Trimestral');
+            const filename = `Reporte_Trimestral_${(periodLabel || '').replace(/[^\w]+/g, '_')}.xls`;
+
+            // Nota: este export usa HTML+Excel para permitir incluir imágenes de las gráficas.
+            const html = `
+                <html xmlns:o="urn:schemas-microsoft-com:office:office"
+                      xmlns:x="urn:schemas-microsoft-com:office:excel"
+                      xmlns="http://www.w3.org/TR/REC-html40">
+                <head>
+                    <meta charset="utf-8"/>
+                    <!--[if gte mso 9]>
+                    <xml>
+                        <x:ExcelWorkbook>
+                            <x:ExcelWorksheets>
+                                <x:ExcelWorksheet>
+                                    <x:Name>Reporte</x:Name>
+                                    <x:WorksheetOptions>
+                                        <x:DisplayGridlines/>
+                                    </x:WorksheetOptions>
+                                </x:ExcelWorksheet>
+                            </x:ExcelWorksheets>
+                        </x:ExcelWorkbook>
+                    </xml>
+                    <![endif]-->
+                    <style>
+                        body { font-family: Arial, sans-serif; color:#111827; }
+                        table { border-collapse: collapse; width: 100%; }
+                        th, td { border: 1px solid #111827; padding: 6px 8px; font-size: 10pt; vertical-align: top; }
+                        .title { background: #0f172a; color: #ffffff; font-weight: 900; font-size: 14pt; text-align:center; }
+                        .subtitle { background: #e2e8f0; font-weight: 800; text-align:center; }
+                        .sec { background: #16a34a; color:#ffffff; font-weight: 900; text-align:left; }
+                        .k { background:#f1f5f9; font-weight: 800; width: 34%; }
+                        .v { font-weight: 800; width: 66%; }
+                        .muted { color:#334155; }
+                        .center { text-align:center; }
+                        .right { text-align:right; }
+                        .nowrap { white-space:nowrap; }
+                        .small { font-size: 9pt; }
+                        .imgwrap { text-align:center; border:1px solid #e2e8f0; padding:10px; }
+                        .no-border td { border:none; }
+                        .tblhead th { background:#f8fafc; font-weight:900; }
+                    </style>
+                </head>
+                <body>
+                    <table>
+                        <tr><td class="title" colspan="8">REPORTE TRIMESTRAL - ${escape(periodLabel)}</td></tr>
+                        <tr><td class="subtitle" colspan="8">Hospital Susana López de Valencia E.S.E. | Rango: ${escape((p.startDate||'') + ' a ' + (p.endDate||''))} | Generado: ${escape(generatedAt)}</td></tr>
+
+                        <tr><td class="sec" colspan="8">1) Indicadores clave (KPI)</td></tr>
+                        <tr>
+                            <td class="k">Capacitaciones (trimestre)</td><td class="v">${safeNumber(k.trainingsCount)}</td>
+                            <td class="k">Participaciones</td><td class="v">${safeNumber(k.participationsCount)}</td>
+                            <td class="k">Participantes únicos</td><td class="v">${safeNumber(k.uniqueParticipants)}</td>
+                            <td class="k">Adherencia (Post-test)</td><td class="v">${safeNumber(k.adherenceRate)}%</td>
+                        </tr>
+                        <tr>
+                            <td class="k">Promedio Pre-test</td><td class="v">${safeNumber(k.avgPretestScore)}% (${(safeNumber(k.avgPretestScore)/20).toFixed(1)}/5.0)</td>
+                            <td class="k">Promedio Post-test</td><td class="v">${safeNumber(k.avgPostestScore)}% (${(safeNumber(k.avgPostestScore)/20).toFixed(1)}/5.0)</td>
+                            <td class="k">Mejora promedio</td><td class="v">${safeNumber(k.avgImprovement) >= 0 ? '+' : ''}${safeNumber(k.avgImprovement)}%</td>
+                            <td class="k">Aprobación Post-test (≥60%)</td><td class="v">${safeNumber(k.passRatePostest)}%</td>
+                        </tr>
+
+                        <tr><td class="sec" colspan="8">2) Gráficas (capturadas del dashboard)</td></tr>
+                        <tr class="no-border"><td colspan="8" class="small muted">
+                            Si tu Excel no muestra imágenes embebidas, los datos de cada gráfica están incluidos en las tablas del reporte (secciones 3 a 6).
+                        </td></tr>
+                        <tr>
+                            <td colspan="4" class="imgwrap">
+                                <div style="font-weight:900; margin-bottom:6px;">Participaciones por Servicio (Top 10)</div>
+                                ${imgDept ? `<img src="${imgDept}" width="520" />` : `<div class="muted">Gráfica no disponible</div>`}
+                            </td>
+                            <td colspan="4" class="imgwrap">
+                                <div style="font-weight:900; margin-bottom:6px;">Capacitaciones por mes (trimestre)</div>
+                                ${imgMonth ? `<img src="${imgMonth}" width="520" />` : `<div class="muted">Gráfica no disponible</div>`}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td colspan="4" class="imgwrap">
+                                <div style="font-weight:900; margin-bottom:6px;">Distribución por Cargo</div>
+                                ${imgCargo ? `<img src="${imgCargo}" width="520" />` : `<div class="muted">Gráfica no disponible</div>`}
+                            </td>
+                            <td colspan="4" class="imgwrap">
+                                <div style="font-weight:900; margin-bottom:6px;">Distribución por Profesión</div>
+                                ${imgProf ? `<img src="${imgProf}" width="520" />` : `<div class="muted">Gráfica no disponible</div>`}
+                            </td>
+                        </tr>
+
+                        <tr><td class="sec" colspan="8">3) Capacitaciones del trimestre (ordenadas por fecha)</td></tr>
+                        <tr class="tblhead">
+                            <th class="nowrap">Fecha</th>
+                            <th>Capacitación</th>
+                            <th>Departamento</th>
+                            <th class="center">Estado</th>
+                            <th class="center">Participaciones</th>
+                            <th class="center">Adherencia %</th>
+                            <th class="center">Post prom. %</th>
+                            <th class="center">Aprobación post %</th>
+                        </tr>
+                        ${trainings.map(t => {
+                            const state = t.finalizada ? 'Finalizada' : (t.activa ? 'Activa' : 'Inactiva');
+                            return `
+                                <tr>
+                                    <td class="nowrap">${escape(t.dateLabel || '')}</td>
+                                    <td>${escape(t.title || '')}</td>
+                                    <td>${escape(t.department || '')}</td>
+                                    <td class="center">${state}</td>
+                                    <td class="center">${safeNumber(t.participations)}</td>
+                                    <td class="center">${safeNumber(t.adherenceRate)}%</td>
+                                    <td class="center">${safeNumber(t.avgPostestScore)}%</td>
+                                    <td class="center">${safeNumber(t.passRatePostest)}%</td>
+                                </tr>
+                            `;
+                        }).join('')}
+
+                        <tr><td class="sec" colspan="8">4) Participaciones por Departamento/Servicio (ordenado desc.)</td></tr>
+                        <tr class="tblhead">
+                            <th colspan="5">Departamento/Servicio</th>
+                            <th class="center" colspan="2">Participaciones</th>
+                            <th class="center">Únicos</th>
+                        </tr>
+                        ${byDept.map(d => `
+                            <tr>
+                                <td colspan="5">${escape(d.name || '')}</td>
+                                <td class="center" colspan="2">${safeNumber(d.count)}</td>
+                                <td class="center">${safeNumber(d.unique)}</td>
+                            </tr>
+                        `).join('')}
+
+                        <tr><td class="sec" colspan="8">5) Distribución por Cargo (ordenado desc.)</td></tr>
+                        <tr class="tblhead">
+                            <th colspan="6">Cargo</th>
+                            <th class="center" colspan="2">Cantidad</th>
+                        </tr>
+                        ${byCargo.map(x => `
+                            <tr>
+                                <td colspan="6">${escape(x.name || '')}</td>
+                                <td class="center" colspan="2">${safeNumber(x.count)}</td>
+                            </tr>
+                        `).join('')}
+
+                        <tr><td class="sec" colspan="8">6) Distribución por Profesión (ordenado desc.)</td></tr>
+                        <tr class="tblhead">
+                            <th colspan="6">Profesión</th>
+                            <th class="center" colspan="2">Cantidad</th>
+                        </tr>
+                        ${byProf.map(x => `
+                            <tr>
+                                <td colspan="6">${escape(x.name || '')}</td>
+                                <td class="center" colspan="2">${safeNumber(x.count)}</td>
+                            </tr>
+                        `).join('')}
+
+                        <tr><td class="sec" colspan="8">7) Capacitaciones por mes (datos fuente)</td></tr>
+                        <tr class="tblhead">
+                            <th colspan="6">Mes</th>
+                            <th class="center" colspan="2">Capacitaciones</th>
+                        </tr>
+                        ${byMonth.map(m => `
+                            <tr>
+                                <td colspan="6">${escape(m.label || m.month || '')}</td>
+                                <td class="center" colspan="2">${safeNumber(m.count)}</td>
+                            </tr>
+                        `).join('')}
+
+                        <tr><td class="sec" colspan="8">8) Hallazgos y recomendaciones automáticas</td></tr>
+                        ${(data.insights && data.insights.length ? data.insights : ['Sin hallazgos automáticos (no hay datos suficientes).'])
+                            .map(s => `<tr><td colspan="8">${escape(s)}</td></tr>`).join('')}
+
+                        <tr class="no-border"><td colspan="8" class="small muted" style="text-align:center; padding-top: 10px;">
+                            Documento generado automáticamente por el Sistema de Capacitaciones - Hospital Susana López de Valencia E.S.E.
+                        </td></tr>
+                    </table>
+                </body>
+                </html>
+            `;
+
+            const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+
+            Swal.fire({
+                icon: 'success',
+                title: '¡Exportado!',
+                text: 'Se descargó el Excel con tablas ordenadas y gráficas.',
+                timer: 2200,
+                showConfirmButton: false
             });
-            const ws2 = XLSX.utils.aoa_to_sheet(aoa2);
-            ws2['!cols'] = [{ wch: 14 }, { wch: 48 }, { wch: 22 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 18 }];
-            ws2['!autofilter'] = { ref: `A1:J${aoa2.length}` };
-            ws2['!freeze'] = { xSplit: 0, ySplit: 1, topLeftCell: 'A2', activePane: 'bottomLeft', state: 'frozen' };
-
-            // Hoja 3: Departamentos
-            const aoa3 = [];
-            aoa3.push(['Departamento/Servicio', 'Participaciones', 'Participantes únicos']);
-            (data.distributions?.byDept || []).forEach(d => {
-                aoa3.push([d.name || '', safeNumber(d.count), safeNumber(d.unique)]);
-            });
-            const ws3 = XLSX.utils.aoa_to_sheet(aoa3);
-            ws3['!cols'] = [{ wch: 34 }, { wch: 16 }, { wch: 20 }];
-            ws3['!autofilter'] = { ref: `A1:C${aoa3.length}` };
-
-            // Hoja 4: Cargo y Profesión
-            const aoa4 = [];
-            aoa4.push(['Tipo', 'Nombre', 'Cantidad']);
-            (data.distributions?.byCargo || []).forEach(x => aoa4.push(['Cargo', x.name || '', safeNumber(x.count)]));
-            (data.distributions?.byProfession || []).forEach(x => aoa4.push(['Profesión', x.name || '', safeNumber(x.count)]));
-            const ws4 = XLSX.utils.aoa_to_sheet(aoa4);
-            ws4['!cols'] = [{ wch: 12 }, { wch: 34 }, { wch: 12 }];
-            ws4['!autofilter'] = { ref: `A1:C${aoa4.length}` };
-
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws1, 'Resumen');
-            XLSX.utils.book_append_sheet(wb, ws2, 'Capacitaciones');
-            XLSX.utils.book_append_sheet(wb, ws3, 'Departamentos');
-            XLSX.utils.book_append_sheet(wb, ws4, 'Cargo_Profesion');
-
-            const filename = `Reporte_Trimestral_${p.label ? p.label.replace(/\s+/g, '_') : `T${p.quarter}_${p.year}`}.xlsx`;
-            XLSX.writeFile(wb, filename);
         }
+
 
         function printQuarterlyReport() {
             if (!currentQuarterlyReportData) return;
