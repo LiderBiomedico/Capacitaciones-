@@ -941,12 +941,17 @@ overflow: hidden;
             border-radius: 8px;
         }
 
+        /*
+           FIX VISIBILIDAD (Gestionar Capacitaciones)
+           Antes: texto casi blanco (#F2FFFA) sobre fondo claro (#f8f9fa),
+           lo que hacía que "solo se viera" al seleccionar/hover.
+        */
         .training-info-item {
             display: flex;
             align-items: center;
             gap: 0.5rem;
             font-size: 0.9rem;
-            color: #F2FFFA;
+            color: #1f2937;
         }
 
         .training-info-item i {
