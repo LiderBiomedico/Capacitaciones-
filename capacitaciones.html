@@ -946,7 +946,12 @@ overflow: hidden;
             align-items: center;
             gap: 0.5rem;
             font-size: 0.9rem;
-            color: #F2FFFA;
+            /*
+              FIX: el texto se veía solo al seleccionarlo porque era casi blanco
+              sobre un fondo claro (#f8f9fa). Usamos un color oscuro legible.
+            */
+            color: #1f2937;
+            font-weight: 500;
         }
 
         .training-info-item i {
@@ -5164,6 +5169,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const duration = fields['Duración'] || '';
             const accessCode = fields['Código de Acceso'] || '';
             const status = fields['Estado'] || 'active';
+            const reactivations = Number(fields['Reactivaciones'] || 0);
             
             const formattedDate = date ? new Date(date).toLocaleDateString('es-ES', { 
                 year: 'numeric', 
@@ -5192,6 +5198,10 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         <div class="training-info-item">
                             <i class="fas fa-clock"></i>
                             <span>${duration}</span>
+                        </div>
+                        <div class="training-info-item" title="Número de veces que se ha reactivado esta capacitación">
+                            <i class="fas fa-redo"></i>
+                            <span><strong>Reactivaciones:</strong> ${reactivations}</span>
                         </div>
                     </div>
                     
@@ -8464,6 +8474,8 @@ function makeCronogramaFilterFormula(year, tipo) {
                     loadTrainingReport();
                     // Recargar opciones del select
                     loadReportOptions();
+                    // Refrescar listado en "Gestionar" (estado/contador)
+                    loadTrainings();
                 });
                 
             } catch (error) {
@@ -8523,6 +8535,8 @@ function makeCronogramaFilterFormula(year, tipo) {
                 }).then(() => {
                     loadTrainingReport();
                     loadReportOptions();
+                    // Refrescar listado en "Gestionar" (estado/contador)
+                    loadTrainings();
                 });
                 
             } catch (error) {
