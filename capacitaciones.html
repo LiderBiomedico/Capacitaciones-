@@ -946,12 +946,7 @@ overflow: hidden;
             align-items: center;
             gap: 0.5rem;
             font-size: 0.9rem;
-            /*
-              FIX: el texto se veía solo al seleccionarlo porque era casi blanco
-              sobre un fondo claro (#f8f9fa). Usamos un color oscuro legible.
-            */
-            color: #1f2937;
-            font-weight: 500;
+            color: #F2FFFA;
         }
 
         .training-info-item i {
@@ -1565,32 +1560,9 @@ overflow: hidden;
                             </div>
                         </div>
 
-                        <!-- NUEVO: Módulo de certificación -->
-                        <div class="form-row" style="margin-top: .5rem;">
-                            <div class="form-group" style="min-width: 260px;">
-                                <label><i class="fas fa-certificate"></i> Certificación</label>
-                                <div style="display:flex; align-items:center; gap:.75rem; padding:.75rem; border:2px solid #e0e0e0; border-radius:8px; background:#f8f9fa;">
-                                    <input type="checkbox" id="trainingHasCertificate" style="width:18px; height:18px; accent-color: var(--primary); cursor:pointer;">
-                                    <div style="display:flex; flex-direction:column; gap:.15rem;">
-                                        <strong style="color:#1f2937;">Generar certificado</strong>
-                                        <span style="color:#4b5563; font-size:.9rem; font-weight:500;">Habilita certificación automática si el Post-Test supera el umbral.</span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="form-group" style="min-width: 260px;">
-                                <label><i class="fas fa-percentage"></i> Nota mínima para certificado</label>
-                                <input type="number" id="trainingCertificateMinScore" min="0" max="100" value="80" disabled>
-                                <small class="help-text">Recomendado: 80%. Solo aplica cuando la certificación está activa.</small>
-                            </div>
-
-                            <div class="form-group" style="flex:1;">
-                                <label><i class="fas fa-list-ol"></i> Reglas del módulo</label>
-                                <div style="padding:.75rem; border:2px dashed rgba(46,125,50,.35); border-radius:8px; background: rgba(46,125,50,.05); color:#1f2937; font-weight:600;">
-                                    <div>• Con certificado: Pretest 20 preguntas + Post-test 20 preguntas (obligatorio)</div>
-                                    <div style="margin-top:.25rem; font-weight:500; color:#4b5563;">• Sin certificado: puedes usar el flujo normal.</div>
-                                </div>
-                            </div>
+                        <div class="form-group">
+                            <label><i class="fas fa-user-tie"></i> Responsable de la Capacitación</label>
+                            <input type="text" id="trainingResponsable" placeholder="Ej: Dr. Juan Pérez">
                         </div>
 
                         <div class="form-group">
@@ -2564,43 +2536,7 @@ overflow: hidden;
         // ==================== VARIABLES GLOBALES ====================
         let pretestQuestionCount = 0;
         let postestQuestionCount = 0;
-
-        // ==================== CONFIGURACIÓN DE LÍMITES ====================
-        // Flujo normal (sin certificado): 10 (legacy)
-        // Nuevo módulo con certificado: 20 preguntas en pretest y 20 en postest
-        const MAX_QUESTIONS_DEFAULT = 10;
-        const MAX_QUESTIONS_CERT = 20;
-
-        function isCertificateTrainingSelectedInBuilder() {
-            return !!document.getElementById('trainingHasCertificate')?.checked;
-        }
-
-        function getBuilderMaxQuestions() {
-            return isCertificateTrainingSelectedInBuilder() ? MAX_QUESTIONS_CERT : MAX_QUESTIONS_DEFAULT;
-        }
-
-        // Detecta si una capacitación (desde Airtable) tiene certificado habilitado
-        function trainingHasCertificate(fields = {}) {
-            const raw = fields['Con Certificado'] ?? fields['Certificado'] ?? fields['Genera Certificado'] ?? fields['certificate'] ?? false;
-            if (typeof raw === 'boolean') return raw;
-            if (typeof raw === 'number') return raw > 0;
-            if (typeof raw === 'string') {
-                const v = raw.trim().toLowerCase();
-                return ['si','sí','true','1','yes','y','checked'].includes(v);
-            }
-            return false;
-        }
-
-        function getTrainingCertificateMinScore(fields = {}) {
-            const raw = fields['Nota Mínima Certificado'] ?? fields['Nota minima certificado'] ?? fields['Min Score Certificado'] ?? fields['min_score_cert'] ?? 80;
-            const n = Number(raw);
-            return Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : 80;
-        }
-
-        function getParticipantQuestionLimit() {
-            if (!currentTrainingRecord?.fields) return MAX_QUESTIONS_DEFAULT;
-            return trainingHasCertificate(currentTrainingRecord.fields) ? MAX_QUESTIONS_CERT : MAX_QUESTIONS_DEFAULT;
-        }
+        const MAX_QUESTIONS = 10;
         
         // Variables para el flujo de pretest
         let currentAccessCode = null;
@@ -2831,7 +2767,7 @@ overflow: hidden;
                 console.log('📋 Registro de capacitación actual:', currentTrainingRecord);
                 
                 // Filtrar preguntas en JavaScript - más robusto
-                let pretestQuestions = allQuestionsData.records.filter(q => {
+                const pretestQuestions = allQuestionsData.records.filter(q => {
                     const fields = q.fields;
                     
                     // Obtener el tipo de pregunta (intentar diferentes nombres)
@@ -2861,18 +2797,8 @@ overflow: hidden;
                     
                     return isMatch;
                 });
-
-                // Ordenar por "Número" si existe y aplicar límite según configuración
-                const limit = getParticipantQuestionLimit();
-                pretestQuestions = pretestQuestions
-                    .sort((a, b) => {
-                        const na = Number(a.fields?.['Número'] ?? a.fields?.['Numero'] ?? 0);
-                        const nb = Number(b.fields?.['Número'] ?? b.fields?.['Numero'] ?? 0);
-                        return na - nb;
-                    })
-                    .slice(0, limit);
                 
-                console.log(`✅ Preguntas de pretest encontradas (límite ${limit}): ${pretestQuestions.length}`);
+                console.log(`✅ Preguntas de pretest encontradas: ${pretestQuestions.length}`);
                 
                 Swal.close();
                 
@@ -3338,7 +3264,7 @@ overflow: hidden;
                 // FILTRO CORRECTO: Por tipo Y por capacitación
                 // ═══════════════════════════════════════════════════════════
                 
-                let postestQuestions = questionsData.records.filter(q => {
+                const postestQuestions = questionsData.records.filter(q => {
                     const fields = q.fields;
                     
                     // 1. Obtener el tipo de examen
@@ -3373,18 +3299,8 @@ overflow: hidden;
                     // RETORNAR TRUE solo si cumple AMBAS condiciones
                     return esPosttest && perteneceACapacitacion;
                 });
-
-                // Ordenar por "Número" si existe y aplicar límite según configuración
-                const limit = getParticipantQuestionLimit();
-                postestQuestions = postestQuestions
-                    .sort((a, b) => {
-                        const na = Number(a.fields?.['Número'] ?? a.fields?.['Numero'] ?? 0);
-                        const nb = Number(b.fields?.['Número'] ?? b.fields?.['Numero'] ?? 0);
-                        return na - nb;
-                    })
-                    .slice(0, limit);
                 
-                console.log(`✅ Preguntas de postest filtradas (límite ${limit}):`, postestQuestions.length);
+                console.log('✅ Preguntas de postest filtradas:', postestQuestions.length);
                 console.log('📋 IDs de preguntas:', postestQuestions.map(p => p.id));
                 
                 // Verificar que haya preguntas
@@ -3692,12 +3608,7 @@ overflow: hidden;
                     congratsMessage = 'Te recomendamos revisar el contenido nuevamente';
                 }
                 
-                // NUEVO: Certificado (si está habilitado en la capacitación y supera umbral)
-                const certEnabled = trainingHasCertificate(currentTrainingRecord?.fields || {});
-                const certMinScore = getTrainingCertificateMinScore(currentTrainingRecord?.fields || {});
-                const eligibleForCertificate = certEnabled && postestScore >= certMinScore;
-
-                const resultModal = {
+                Swal.fire({
                     icon: scoreIcon,
                     title: congratsMessage,
                     html: `
@@ -3718,42 +3629,12 @@ overflow: hidden;
                             <p style="margin: 0.5rem 0 0 0; color: #1f2937; font-size: 0.95rem; font-weight: 600;">
                                 Tu evaluación ha sido completada y registrada
                             </p>
-                            ${eligibleForCertificate ? `
-                                <div style="margin-top: 1rem; padding: .9rem; border-radius: 12px; border: 2px solid rgba(46,125,50,.35); background: rgba(46,125,50,.06); color:#1f2937;">
-                                    <div style="font-weight: 800; margin-bottom: .25rem;"><i class="fas fa-certificate"></i> Certificado disponible</div>
-                                    <div style="font-weight: 600; color:#4b5563;">Superaste el umbral de ${certMinScore}%.</div>
-                                </div>
-                            ` : ''}
                         </div>
                     `,
-                    confirmButtonText: eligibleForCertificate ? 'Descargar Certificado' : 'Volver al Inicio',
-                    showCancelButton: eligibleForCertificate,
-                    cancelButtonText: 'Volver al Inicio',
+                    confirmButtonText: 'Volver al Inicio',
                     confirmButtonColor: '#2E7D32',
                     allowOutsideClick: false
-                };
-
-                Swal.fire(resultModal).then(async (r) => {
-                    if (eligibleForCertificate && r.isConfirmed) {
-                        try {
-                            await generateCertificatePDF({
-                                participantName: currentParticipantData.name,
-                                participantDepartment: currentParticipantData.department,
-                                trainingTitle: currentTrainingRecord?.fields?.['Título'] || currentTrainingRecord?.fields?.['name'] || 'Capacitación',
-                                score: postestScore,
-                                minScore: certMinScore,
-                                date: new Date()
-                            });
-                            await tryUpdateParticipationCertificate(currentParticipationId);
-                        } catch (e) {
-                            console.error('❌ Error generando certificado:', e);
-                            Swal.fire({
-                                icon: 'warning',
-                                title: 'No se pudo generar el certificado',
-                                text: e.message || 'Ocurrió un error al generar el PDF'
-                            });
-                        }
-                    }
+                }).then(() => {
                     cancelTraining();
                 });
                 
@@ -3769,165 +3650,6 @@ overflow: hidden;
                     footer: '<small>Revisa la consola (F12) para más detalles</small>'
                 });
             }
-        }
-
-        // ==================== CERTIFICADOS ====================
-
-        async function tryUpdateParticipationCertificate(participationId) {
-            if (!participationId) return;
-            // Intenta actualizar campos si existen; si no, ignora silenciosamente.
-            const now = new Date();
-            const yyyy = now.getFullYear();
-            const mm = String(now.getMonth() + 1).padStart(2, '0');
-            const dd = String(now.getDate()).padStart(2, '0');
-            const fecha = `${yyyy}-${mm}-${dd}`;
-
-            const payload = {
-                fields: {
-                    'Certificado Emitido': true,
-                    'Fecha Certificado': fecha
-                }
-            };
-
-            try {
-                const resp = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'PATCH',
-                        path: `/Participaciones/${participationId}`,
-                        body: payload
-                    })
-                });
-                const txt = await resp.text();
-                if (!resp.ok) {
-                    // Si el error es por campos desconocidos, no interrumpir al usuario
-                    if (txt.includes('UNKNOWN_FIELD_NAME') || txt.includes('unknown field name')) {
-                        console.warn('⚠️ Campos de certificado no existen en Participaciones. Ignorando.');
-                        return;
-                    }
-                    console.warn('⚠️ No se pudo actualizar Participaciones con certificado:', txt);
-                }
-            } catch (e) {
-                console.warn('⚠️ Error actualizando Participaciones (certificado):', e);
-            }
-        }
-
-        let __cachedLogoDataUrl = null;
-        async function getLogoDataUrl() {
-            if (__cachedLogoDataUrl) return __cachedLogoDataUrl;
-            // Intentar varias rutas comunes
-            const candidates = [
-                'assets/logo.png',
-                'assets/img/logo.png',
-                'img/logo.png',
-                'logo.png'
-            ];
-
-            for (const p of candidates) {
-                try {
-                    const res = await fetch(p);
-                    if (!res.ok) continue;
-                    const blob = await res.blob();
-                    const dataUrl = await new Promise((resolve, reject) => {
-                        const reader = new FileReader();
-                        reader.onload = () => resolve(reader.result);
-                        reader.onerror = reject;
-                        reader.readAsDataURL(blob);
-                    });
-                    __cachedLogoDataUrl = dataUrl;
-                    return dataUrl;
-                } catch (_) {}
-            }
-            return null;
-        }
-
-        async function generateCertificatePDF({ participantName, participantDepartment, trainingTitle, score, minScore, date }) {
-            if (!window.jspdf || !window.jspdf.jsPDF) {
-                throw new Error('jsPDF no está disponible en la página');
-            }
-
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
-
-            const pageW = doc.internal.pageSize.getWidth();
-            const pageH = doc.internal.pageSize.getHeight();
-            const margin = 50;
-
-            // Marco
-            doc.setLineWidth(2);
-            doc.rect(margin, margin, pageW - margin * 2, pageH - margin * 2);
-
-            // Logo (si existe)
-            const logo = await getLogoDataUrl();
-            if (logo) {
-                try {
-                    doc.addImage(logo, 'PNG', margin + 20, margin + 20, 90, 90);
-                } catch (_) {
-                    // Puede fallar si el logo no es PNG; ignorar
-                }
-            }
-
-            // Encabezados
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(26);
-            doc.text('CERTIFICADO DE CAPACITACIÓN', pageW / 2, margin + 60, { align: 'center' });
-
-            doc.setFontSize(12);
-            doc.setFont('helvetica', 'normal');
-            doc.text('Hospital Susana López de Valencia E.S.E.', pageW / 2, margin + 85, { align: 'center' });
-
-            // Cuerpo
-            const y0 = margin + 150;
-            doc.setFont('times', 'normal');
-            doc.setFontSize(16);
-            doc.text('Se certifica que:', pageW / 2, y0, { align: 'center' });
-
-            doc.setFont('times', 'bold');
-            doc.setFontSize(28);
-            doc.text((participantName || '').toUpperCase(), pageW / 2, y0 + 45, { align: 'center' });
-
-            doc.setFont('times', 'normal');
-            doc.setFontSize(14);
-            doc.text(`Departamento/Servicio: ${participantDepartment || '—'}`, pageW / 2, y0 + 78, { align: 'center' });
-
-            doc.setFontSize(16);
-            const text1 = `Ha aprobado satisfactoriamente la capacitación:`;
-            doc.text(text1, pageW / 2, y0 + 120, { align: 'center' });
-
-            doc.setFont('times', 'bold');
-            doc.setFontSize(20);
-            doc.text(trainingTitle, pageW / 2, y0 + 150, { align: 'center', maxWidth: pageW - 2 * margin - 40 });
-
-            doc.setFont('times', 'normal');
-            doc.setFontSize(14);
-            doc.text(`Calificación Post-Test: ${score}% (umbral: ${minScore}%)`, pageW / 2, y0 + 190, { align: 'center' });
-
-            // Fecha
-            const options = { year: 'numeric', month: 'long', day: 'numeric' };
-            const dateStr = (date || new Date()).toLocaleDateString('es-CO', options);
-            doc.text(`Emitido el: ${dateStr}`, pageW / 2, y0 + 220, { align: 'center' });
-
-            // Firmas (líneas)
-            const sigY = pageH - margin - 110;
-            const sigW = 220;
-
-            doc.setLineWidth(1);
-            doc.line(pageW / 2 - sigW - 60, sigY, pageW / 2 - 60, sigY);
-            doc.line(pageW / 2 + 60, sigY, pageW / 2 + sigW + 60, sigY);
-
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(11);
-            doc.text('Coordinación / Instructor', pageW / 2 - sigW / 2 - 60, sigY + 18, { align: 'center' });
-            doc.text('Líder de Ingeniería Biomédica', pageW / 2 + sigW / 2 + 60, sigY + 18, { align: 'center' });
-
-            doc.setFont('helvetica', 'normal');
-            doc.setFontSize(10);
-            doc.text('Sistema de Capacitaciones - Gestión del Ambiente y la Tecnología', pageW / 2, pageH - margin - 25, { align: 'center' });
-
-            const safeTitle = (trainingTitle || 'Capacitacion').replace(/[^a-z0-9\- _]/gi, '').slice(0, 60).trim().replace(/\s+/g, '_');
-            const safeName = (participantName || 'Participante').replace(/[^a-z0-9\- _]/gi, '').slice(0, 60).trim().replace(/\s+/g, '_');
-            doc.save(`Certificado_${safeName}_${safeTitle}.pdf`);
         }
         
         function cancelTraining() {
@@ -3960,59 +3682,7 @@ overflow: hidden;
             initializeApp();
             updateDateTime();
             setInterval(updateDateTime, 1000);
-
-            // Inicializar controles del nuevo módulo de certificación
-            bindCertificateBuilderControls();
         });
-
-        function bindCertificateBuilderControls() {
-            const chk = document.getElementById('trainingHasCertificate');
-            const minScore = document.getElementById('trainingCertificateMinScore');
-            if (!chk || !minScore) return;
-
-            const refreshCounters = () => {
-                updateQuestionCounter('pretest');
-                updateQuestionCounter('postest');
-            };
-
-            const applyState = () => {
-                const enabled = chk.checked;
-                minScore.disabled = !enabled;
-                if (enabled) {
-                    if (!minScore.value) minScore.value = '80';
-                }
-                refreshCounters();
-            };
-
-            chk.addEventListener('change', () => {
-                // Si desactiva y ya hay más de 10 preguntas, evitar inconsistencia
-                if (!chk.checked) {
-                    const maxNormal = MAX_QUESTIONS_DEFAULT;
-                    if (pretestQuestionCount > maxNormal || postestQuestionCount > maxNormal) {
-                        chk.checked = true;
-                        Swal.fire({
-                            icon: 'warning',
-                            title: 'No se puede desactivar',
-                            html: `Tienes más de <strong>${maxNormal}</strong> preguntas cargadas.<br>Elimina preguntas hasta quedar en ${maxNormal} o menos para desactivar la certificación.`,
-                            confirmButtonText: 'Entendido'
-                        });
-                    }
-                }
-                applyState();
-            });
-
-            minScore.addEventListener('input', () => {
-                const v = Number(minScore.value);
-                if (!Number.isFinite(v)) {
-                    minScore.value = '80';
-                    return;
-                }
-                if (v < 0) minScore.value = '0';
-                if (v > 100) minScore.value = '100';
-            });
-
-            applyState();
-        }
 
         // ==================== BLOQUEO POR CONTRASEÑA (ADMIN) ====================
         // 🔒 La contraseña se lee desde Airtable (tabla AppConfig) mediante una Netlify Function.
@@ -4301,13 +3971,12 @@ overflow: hidden;
         function addQuestion(type) {
             const container = document.getElementById(`${type}Questions`);
             const currentCount = type === 'pretest' ? pretestQuestionCount : postestQuestionCount;
-            const maxQ = getBuilderMaxQuestions();
             
-            if (currentCount >= maxQ) {
+            if (currentCount >= MAX_QUESTIONS) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'Límite Alcanzado',
-                    text: `Solo puedes agregar hasta ${maxQ} preguntas por test`,
+                    text: `Solo puedes agregar hasta ${MAX_QUESTIONS} preguntas por test`,
                     confirmButtonText: 'Entendido'
                 });
                 return;
@@ -4432,7 +4101,6 @@ overflow: hidden;
         function updateQuestionCounter(type) {
             const container = document.getElementById(`${type}Questions`);
             const count = type === 'pretest' ? pretestQuestionCount : postestQuestionCount;
-            const maxQ = getBuilderMaxQuestions();
             
             let counter = container.parentElement.querySelector('.question-counter');
             if (!counter) {
@@ -4443,7 +4111,7 @@ overflow: hidden;
             
             counter.innerHTML = `
                 <i class="fas fa-list-ol"></i> 
-                <span>${count} de ${maxQ} preguntas agregadas</span>
+                <span>${count} de ${MAX_QUESTIONS} preguntas agregadas</span>
             `;
         }
 
@@ -4518,16 +4186,14 @@ function getSelectedStaff() {
     const dateInput = document.getElementById('trainingDate');
     const deptInput = document.getElementById('trainingDepartment');
     const durationInput = document.getElementById('trainingDuration');
-    const certChk = document.getElementById('trainingHasCertificate');
-    const certMinInput = document.getElementById('trainingCertificateMinScore');
+    const responsableInput = document.getElementById('trainingResponsable');
 
     const title = titleInput ? titleInput.value.trim() : '';
     const description = descInput ? descInput.value.trim() : '';
     const trainingDate = dateInput ? dateInput.value : '';
     const department = deptInput ? deptInput.value : '';
     const duration = durationInput ? durationInput.value : '';
-    const hasCertificate = !!certChk?.checked;
-    const certificateMinScore = Math.max(0, Math.min(100, Number(certMinInput?.value ?? 80) || 80));
+    const responsable = responsableInput ? responsableInput.value.trim() : '';
 
     // Solo el personal marcado (checkboxes)
     const selectedStaff = getSelectedStaff();
@@ -4569,20 +4235,6 @@ function getSelectedStaff() {
         return;
     }
 
-    // NUEVO: Si la capacitación genera certificado, debe tener exactamente 20 preguntas en cada test
-    if (hasCertificate) {
-        if (pretestQuestions.length !== MAX_QUESTIONS_CERT || postestQuestions.length !== MAX_QUESTIONS_CERT) {
-            Swal.fire({
-                icon: 'warning',
-                title: 'Módulo con Certificado',
-                html: `Para habilitar certificado debes configurar exactamente <strong>${MAX_QUESTIONS_CERT}</strong> preguntas en Pretest y <strong>${MAX_QUESTIONS_CERT}</strong> en Post-test.<br><br>` +
-                      `Actualmente: Pretest <strong>${pretestQuestions.length}</strong> / Post-test <strong>${postestQuestions.length}</strong>.`,
-                confirmButtonText: 'Entendido'
-            });
-            return;
-        }
-    }
-
     const accessCode = generateAccessCode();
     const createdAtISO = new Date().toISOString();
 
@@ -4592,14 +4244,13 @@ function getSelectedStaff() {
         trainingDate,
         department,
         duration,
+        responsable,
         staffList: selectedStaff,
         accessCode,
         status: 'active',
         createdAtISO,
         pretestQuestions: pretestQuestions,
-        postestQuestions: postestQuestions,
-        hasCertificate,
-        certificateMinScore
+        postestQuestions: postestQuestions
     };
 
     // Mostrar indicador de carga
@@ -4611,9 +4262,6 @@ function getSelectedStaff() {
             Swal.showLoading();
         }
     });
-
-    // Reset bandera de reintento por campos desconocidos
-    window.__certFieldsMissingInAirtable = false;
 
     // PASO 1: Guardar la capacitación
     const trainingResult = await sendTrainingToAirtable(trainingData);
@@ -4654,15 +4302,9 @@ function getSelectedStaff() {
     if (dateInput) dateInput.value = '';
     if (deptInput) deptInput.value = '';
     if (durationInput) durationInput.value = '';
+    if (responsableInput) responsableInput.value = '';
     document.querySelectorAll('input.trainingStaff:checked, .trainingStaff:checked, input[name="personalCapacitado[]"]:checked')
         .forEach(cb => cb.checked = false);
-
-    // Limpiar módulo certificado
-    if (certChk) certChk.checked = false;
-    if (certMinInput) {
-        certMinInput.value = '80';
-        certMinInput.disabled = true;
-    }
     
     // Limpiar preguntas
     document.getElementById('pretestQuestions').innerHTML = '';
@@ -4670,8 +4312,6 @@ function getSelectedStaff() {
     pretestQuestionCount = 0;
     postestQuestionCount = 0;
     document.querySelectorAll('.question-counter').forEach(c => c.remove());
-    updateQuestionCounter('pretest');
-    updateQuestionCounter('postest');
 
     // Mensaje final
     Swal.fire({
@@ -4682,13 +4322,6 @@ function getSelectedStaff() {
                 <p>Código de Acceso:</p>
                 <h2 style="color: #F2FFFA; margin: 10px 0;">${accessCode}</h2>
                 <p style="font-size: 0.9em; color: #F2FFFA;">Comparte este código con los participantes</p>
-                ${trainingData.hasCertificate && window.__certFieldsMissingInAirtable ? `
-                    <div style="margin-top: 12px; padding: 10px; border-radius: 10px; border: 2px solid #ffc107; background: #fff3cd; color:#1f2937; font-weight:600;">
-                        ⚠️ <strong>Campos de certificación no existen en Airtable</strong><br>
-                        Crea en la tabla <em>Capacitaciones</em> los campos: <strong>"Con Certificado"</strong> (checkbox) y <strong>"Nota Mínima Certificado"</strong> (número).<br>
-                        La capacitación se guardó, pero el módulo de certificado no quedará activo hasta crear esos campos.
-                    </div>
-                ` : ''}
                 <hr style="margin: 15px 0;">
                 <p style="font-size: 0.85em;">
                     ✅ Capacitación guardada en Airtable<br>
@@ -4725,16 +4358,12 @@ async function sendTrainingToAirtable(trainingData) {
                 "Fecha": trainingData.trainingDate,
                 "Departamento": trainingData.department,
                 "Duración": trainingData.duration,
+                "Responsable de la capacitacion": trainingData.responsable,
                 "Código de Acceso": trainingData.accessCode,
                 "Estado": trainingData.status
+                // Campos "Personal" y "Creado En" omitidos (no existen o causan errores)
             }
         };
-
-        // NUEVO: Campos opcionales del módulo de certificación (requieren existir en Airtable)
-        if (trainingData.hasCertificate) {
-            airtableRecord.fields["Con Certificado"] = true;
-            airtableRecord.fields["Nota Mínima Certificado"] = trainingData.certificateMinScore;
-        }
 
         console.log('📋 Record a enviar:', JSON.stringify(airtableRecord, null, 2));
 
@@ -4754,37 +4383,6 @@ async function sendTrainingToAirtable(trainingData) {
         if (!response.ok) {
             console.error('❌ Error HTTP:', response.status);
             console.error('Detalle:', responseText);
-
-            // Si falló por campos desconocidos del módulo de certificación, reintentar sin ellos
-            const unknownField = responseText.includes('UNKNOWN_FIELD_NAME') || responseText.includes('unknown field name');
-            const certFieldMentioned = responseText.includes('Con Certificado') || responseText.includes('Nota Mínima Certificado');
-            if (unknownField && certFieldMentioned) {
-                console.warn('⚠️ Airtable no tiene campos de certificación. Reintentando sin esos campos...');
-                delete airtableRecord.fields["Con Certificado"];
-                delete airtableRecord.fields["Nota Mínima Certificado"];
-
-                const retry = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'POST',
-                        path: '/Capacitaciones',
-                        body: airtableRecord
-                    })
-                });
-
-                const retryText = await retry.text();
-                console.log(`📥 Reintento HTTP ${retry.status}:`, retryText);
-                if (!retry.ok) return false;
-
-                const retryData = JSON.parse(retryText);
-                if (retryData?.id) {
-                    // Marcar en el objeto global para mostrar alerta informativa al finalizar
-                    window.__certFieldsMissingInAirtable = true;
-                    return { success: true, id: retryData.id };
-                }
-            }
-
             return false;
         }
 
@@ -4968,23 +4566,11 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
         function performReset() {
             document.getElementById('trainingForm').reset();
-            // Reset explícito del módulo de certificación
-            const chk = document.getElementById('trainingHasCertificate');
-            const minScore = document.getElementById('trainingCertificateMinScore');
-            if (chk) chk.checked = false;
-            if (minScore) {
-                minScore.value = '80';
-                minScore.disabled = true;
-            }
             document.getElementById('pretestQuestions').innerHTML = '';
             document.getElementById('postestQuestions').innerHTML = '';
             pretestQuestionCount = 0;
             postestQuestionCount = 0;
             document.querySelectorAll('.question-counter').forEach(c => c.remove());
-
-            // Re-crear contadores con el límite normal
-            updateQuestionCounter('pretest');
-            updateQuestionCounter('postest');
             
             Swal.fire({
                 icon: 'success',
@@ -5169,7 +4755,6 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const duration = fields['Duración'] || '';
             const accessCode = fields['Código de Acceso'] || '';
             const status = fields['Estado'] || 'active';
-            const reactivations = Number(fields['Reactivaciones'] || 0);
             
             const formattedDate = date ? new Date(date).toLocaleDateString('es-ES', { 
                 year: 'numeric', 
@@ -5198,10 +4783,6 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         <div class="training-info-item">
                             <i class="fas fa-clock"></i>
                             <span>${duration}</span>
-                        </div>
-                        <div class="training-info-item" title="Número de veces que se ha reactivado esta capacitación">
-                            <i class="fas fa-redo"></i>
-                            <span><strong>Reactivaciones:</strong> ${reactivations}</span>
                         </div>
                     </div>
                     
@@ -8474,8 +8055,6 @@ function makeCronogramaFilterFormula(year, tipo) {
                     loadTrainingReport();
                     // Recargar opciones del select
                     loadReportOptions();
-                    // Refrescar listado en "Gestionar" (estado/contador)
-                    loadTrainings();
                 });
                 
             } catch (error) {
@@ -8535,8 +8114,6 @@ function makeCronogramaFilterFormula(year, tipo) {
                 }).then(() => {
                     loadTrainingReport();
                     loadReportOptions();
-                    // Refrescar listado en "Gestionar" (estado/contador)
-                    loadTrainings();
                 });
                 
             } catch (error) {
