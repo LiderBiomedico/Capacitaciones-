@@ -459,12 +459,16 @@
             font-size: 1rem;
             resize: vertical;
             transition: all 0.3s;
+            color: #333333;
+            background: #ffffff;
         }
 
         .question-text:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+            color: #333333;
+            background: #ffffff;
         }
 
         .options-container {
@@ -510,11 +514,15 @@
             border: 1px solid #e0e0e0;
             border-radius: 6px;
             font-size: 0.95rem;
+            color: #333333;
+            background: #ffffff;
         }
 
         .option-text:focus {
             outline: none;
             border-color: var(--primary);
+            color: #333333;
+            background: #ffffff;
         }
 
         .help-text {
@@ -1558,11 +1566,6 @@ overflow: hidden;
                                 <label><i class="fas fa-clock"></i> Duración</label>
                                 <input type="text" id="trainingDuration" placeholder="Ej: 30 minutos">
                             </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label><i class="fas fa-user-tie"></i> Responsable de la Capacitación</label>
-                            <input type="text" id="trainingResponsable" placeholder="Ej: Dr. Juan Pérez">
                         </div>
 
                         <div class="form-group">
@@ -4186,14 +4189,12 @@ function getSelectedStaff() {
     const dateInput = document.getElementById('trainingDate');
     const deptInput = document.getElementById('trainingDepartment');
     const durationInput = document.getElementById('trainingDuration');
-    const responsableInput = document.getElementById('trainingResponsable');
 
     const title = titleInput ? titleInput.value.trim() : '';
     const description = descInput ? descInput.value.trim() : '';
     const trainingDate = dateInput ? dateInput.value : '';
     const department = deptInput ? deptInput.value : '';
     const duration = durationInput ? durationInput.value : '';
-    const responsable = responsableInput ? responsableInput.value.trim() : '';
 
     // Solo el personal marcado (checkboxes)
     const selectedStaff = getSelectedStaff();
@@ -4244,7 +4245,6 @@ function getSelectedStaff() {
         trainingDate,
         department,
         duration,
-        responsable,
         staffList: selectedStaff,
         accessCode,
         status: 'active',
@@ -4302,7 +4302,6 @@ function getSelectedStaff() {
     if (dateInput) dateInput.value = '';
     if (deptInput) deptInput.value = '';
     if (durationInput) durationInput.value = '';
-    if (responsableInput) responsableInput.value = '';
     document.querySelectorAll('input.trainingStaff:checked, .trainingStaff:checked, input[name="personalCapacitado[]"]:checked')
         .forEach(cb => cb.checked = false);
     
@@ -4358,7 +4357,6 @@ async function sendTrainingToAirtable(trainingData) {
                 "Fecha": trainingData.trainingDate,
                 "Departamento": trainingData.department,
                 "Duración": trainingData.duration,
-                "Responsable de la capacitacion": trainingData.responsable,
                 "Código de Acceso": trainingData.accessCode,
                 "Estado": trainingData.status
                 // Campos "Personal" y "Creado En" omitidos (no existen o causan errores)
