@@ -182,20 +182,20 @@
 
         .connection-indicator.connected {
             background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
-            border-color: #a5d6a7;
-            color: #2d6a4f;
+            border-color: #F2FFFA;
+            color: #F2FFFA;
         }
 
         .connection-indicator.disconnected {
             background: linear-gradient(135deg, #ffebee 0%, #fce4ec 100%);
-            border-color: #ef9a9a;
-            color: #b71c1c;
+            border-color: #F2FFFA;
+            color: #F2FFFA;
         }
 
         .connection-indicator.checking {
             background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-            border-color: #ffcc80;
-            color: #e65100;
+            border-color: #F2FFFA;
+            color: #F2FFFA;
         }
 
         .connection-dot {
@@ -309,6 +309,19 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.1);
         }
 
+        /* ===== FIX GLOBAL: texto visible en todos los campos ===== */
+        input[type="text"],
+        input[type="date"],
+        input[type="number"],
+        input[type="email"],
+        input[type="password"],
+        textarea,
+        select {
+            color: #333333 !important;
+            background-color: #ffffff !important;
+        }
+        /* ========================================================= */
+
         .card h3 {
             color: var(--primary);
             margin-bottom: 1rem;
@@ -370,6 +383,8 @@
             border-radius: 8px;
             font-size: 1rem;
             transition: all 0.3s;
+            color: #333333 !important;
+            background-color: #ffffff !important;
         }
 
         .form-group input:focus,
@@ -378,6 +393,8 @@
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+            color: #333333 !important;
+            background-color: #ffffff !important;
         }
 
         .form-row {
@@ -459,12 +476,16 @@
             font-size: 1rem;
             resize: vertical;
             transition: all 0.3s;
+            color: #333333 !important;
+            background: #ffffff !important;
         }
 
         .question-text:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(102,126,234,0.1);
+            color: #333333 !important;
+            background: #ffffff !important;
         }
 
         .options-container {
@@ -499,9 +520,25 @@
 
         .radio-label {
             font-size: 0.85rem;
-            color: #F2FFFA;
+            color: #555555;
             min-width: 70px;
             font-weight: 500;
+        }
+
+        .option-item:has(input[type="radio"]:checked) {
+            border-color: var(--primary);
+            background: #eaf7ee;
+        }
+
+        .option-item:has(input[type="radio"]:checked) .radio-label {
+            color: #2e7d32;
+            font-weight: 700;
+        }
+
+        .option-item:has(input[type="radio"]:checked) .option-text {
+            border-color: var(--primary);
+            color: #1a1a1a;
+            font-weight: 600;
         }
 
         .option-text {
@@ -510,11 +547,15 @@
             border: 1px solid #e0e0e0;
             border-radius: 6px;
             font-size: 0.95rem;
+            color: #333333 !important;
+            background: #ffffff !important;
         }
 
         .option-text:focus {
             outline: none;
             border-color: var(--primary);
+            color: #333333 !important;
+            background: #ffffff !important;
         }
 
         .help-text {
@@ -749,18 +790,16 @@
         }
 
         .loader-credit {
-    position: fixed;
-    left: 18px;
-    bottom: 14px;
-    margin: 0;
-    font-weight: 500;
-    letter-spacing: 0.3px;
-    font-size: clamp(0.45rem, 0.95vw, 0.65rem); /* ~mitad del título */
-    opacity: 0.85;
-    text-shadow: 0 0 12px rgba(0,0,0,0.30);
-    text-align: left;
-    z-index: 2;
-}
+            position: static;
+            margin-top: 18px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            font-size: clamp(0.85rem, 2vw, 1.1rem);
+            opacity: 0.9;
+            text-align: center;
+            color: #2e7d32;
+            z-index: 2;
+        }
 
         .splash-logo {
             width: 160px;
@@ -946,7 +985,7 @@ overflow: hidden;
             align-items: center;
             gap: 0.5rem;
             font-size: 0.9rem;
-            color: #1a3c2e;
+            color: #F2FFFA;
         }
 
         .training-info-item i {
@@ -1131,7 +1170,7 @@ overflow: hidden;
         .question-text {
             font-weight: 500;
             margin-bottom: 0.75rem;
-            color: #1f2937;
+            color: #F2FFFA;
         }
 
         .question-options {
@@ -1524,15 +1563,20 @@ overflow: hidden;
                 
                 <div class="card">
                     <h3>📋 Información General</h3>
-                    <form id="trainingForm">
+                    <form id="trainingForm" novalidate>
                         <div class="form-group">
                             <label><i class="fas fa-graduation-cap"></i> Capacitación *</label>
                             <input type="text" id="trainingTitle" required placeholder="Ej: Protocolo de Higiene de Manos">
                         </div>
                         
                         <div class="form-group">
-                            <label><i class="fas fa-align-left"></i> Descripción</label>
-                            <textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos..."></textarea>
+                            <label><i class="fas fa-user-tie"></i> Expositor *</label>
+                            <input type="text" id="trainingResponsable" required placeholder="Ej: Dr. Juan Pérez">
+                        </div>
+
+                        <div class="form-group">
+                            <label><i class="fas fa-align-left"></i> Objetivo *</label>
+                            <textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos de la capacitación..."></textarea>
                         </div>
                         
                         <div class="form-row">
@@ -1542,7 +1586,7 @@ overflow: hidden;
                             </div>
                             
                             <div class="form-group">
-                                <label><i class="fas fa-building"></i> Departamento *</label>
+                                <label><i class="fas fa-hospital-alt"></i> Proceso de Atención *</label>
                                 <select id="trainingDepartment" required>
                                     <option value="">Seleccione...</option>
                                     <option value="General">General</option>
@@ -1561,76 +1605,68 @@ overflow: hidden;
                         </div>
 
                         <div class="form-group">
-                            <label><i class="fas fa-users-cog"></i> Personal Capacitado *</label>
+                            <label><i class="fas fa-users-cog"></i> Dirigido a *</label>
                             <div id="trainingStaffContainer" style="background: #f8f9fa; border: 2px solid #e0e0e0; border-radius: 8px; padding: 1rem; max-height: 300px; overflow-y: auto;">
                                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem;">
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Jefe de Enfermería" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Jefe de Enfermería</span>
                                     </label>
-                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Médico General" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Médico General</span>
                                     </label>
-                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Médico Especialista" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Médico Especialista</span>
                                     </label>
-                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
-                                        <input type="checkbox" value="Ingeniero Biomédico" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
-                                        <span>Ingeniero Biomédico</span>
+                                        <input type="checkbox" value="Ingeniero Biomedico" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Ingeniero Biomedico</span>
                                     </label>
-                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Estudiante" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Estudiante</span>
                                     </label>
-                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
-                                        <input type="checkbox" value="Auxiliar de Enfermería" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
-                                        <span>Auxiliar de Enfermería</span>
+                                        <input type="checkbox" value="Auxiliar de enfermería" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Auxiliar de enfermería</span>
                                     </label>
-                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Terapeuta Respiratorio" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Terapeuta Respiratorio</span>
                                     </label>
-                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Fisioterapeuta" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Fisioterapeuta</span>
                                     </label>
-                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Conductor" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Conductor</span>
                                     </label>
-                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Técnico de Rayos X" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Técnico de Rayos X</span>
                                     </label>
-                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Fonoaudiólogo" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Fonoaudiólogo</span>
                                     </label>
-                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Instrumentador Quirúrgico" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Instrumentador Quirúrgico</span>
                                     </label>
-                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Administrativo" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Administrativo</span>
                                     </label>
+                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
+                                        <input type="checkbox" value="Otro" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Otro</span>
+                                    </label>
                                 </div>
                             </div>
-                            <small class="help-text">Selecciona el personal que recibirá esta capacitación</small>
+                            <small class="help-text">Selecciona el personal al que va dirigida esta capacitación</small>
                         </div>
                     </form>
                 </div>
@@ -1652,10 +1688,10 @@ overflow: hidden;
                 </div>
 
                 <div class="form-actions">
-                    <button class="btn btn-primary" onclick="saveTraining()">
+                    <button type="button" class="btn btn-primary" onclick="saveTraining()">
                         <i class="fas fa-save"></i> Guardar Capacitación
                     </button>
-                    <button class="btn btn-secondary" onclick="resetForm()">
+                    <button type="button" class="btn btn-secondary" onclick="resetForm()">
                         <i class="fas fa-undo"></i> Limpiar Formulario
                     </button>
                 </div>
@@ -1688,13 +1724,18 @@ overflow: hidden;
             <!-- Modal para mostrar QR generado -->
             <div id="qrModal" class="modal" style="display: none;">
                 <div class="modal-content" style="max-width: 500px; padding: 2rem; text-align: center;">
-                    <button class="modal-close" onclick="closeQRModal()">&times;</button>
                     
-                    <h3 style="margin-bottom: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem; color: #1a1a1a;">
                         <i class="fas fa-qrcode"></i> Código QR Generado
                     </h3>
+
+                    <!-- Código de acceso visible -->
+                    <div style="background: #e8f5e9; border: 2px solid #2E7D32; border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem;">
+                        <p style="margin: 0; color: #1a1a1a; font-size: 0.9rem; font-weight: 500;">Código de Acceso:</p>
+                        <p id="qrAccessCode" style="margin: 0; color: #2E7D32; font-size: 1.5rem; font-weight: 700; letter-spacing: 3px;"></p>
+                    </div>
                     
-                    <p style="color: #1f2937; margin-bottom: 1.5rem;">
+                    <p style="color: #333333; margin-bottom: 1.5rem; font-size: 0.95rem;">
                         Captura este código QR o comparte el enlace con tu personal
                     </p>
                     
@@ -1705,11 +1746,11 @@ overflow: hidden;
                     
                     <!-- URL para compartir -->
                     <div style="margin-bottom: 1.5rem;">
-                        <label style="font-weight: bold; color: #1f2937; display: block; margin-bottom: 0.5rem;">
+                        <label style="font-weight: bold; color: #333333; display: block; margin-bottom: 0.5rem;">
                             <i class="fas fa-link"></i> Enlace de Acceso
                         </label>
                         <div style="display: flex; gap: 0.5rem;">
-                            <input type="text" id="qrUrl" readonly style="flex: 1; padding: 0.75rem; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 1rem; background: #f8f9fa;">
+                            <input type="text" id="qrUrl" readonly style="flex: 1; padding: 0.75rem; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 0.9rem; background: #f8f9fa; color: #333333 !important;">
                             <button class="btn btn-secondary" onclick="copyQRUrl()" style="padding: 0.75rem 1rem; white-space: nowrap;">
                                 <i class="fas fa-copy"></i> Copiar
                             </button>
@@ -1748,7 +1789,7 @@ overflow: hidden;
                 <!-- Acceso con código -->
                 <div class="card" id="accessSection">
                     <h3><i class="fas fa-key"></i> Acceso a Capacitación</h3>
-                    <p style="color: #1f2937; margin-bottom: 1.5rem;">Ingresa el código de acceso que recibiste para acceder a la capacitación</p>
+                    <p style="color: #F2FFFA; margin-bottom: 1.5rem;">Ingresa el código de acceso que recibiste para acceder a la capacitación</p>
                     
                     <div class="form-group">
                         <label><i class="fas fa-barcode"></i> Código de Acceso *</label>
@@ -1821,7 +1862,7 @@ overflow: hidden;
                 <!-- Selector de Capacitación -->
                 <div class="card">
                     <h3><i class="fas fa-graduation-cap"></i> Seleccionar Capacitación</h3>
-                    <p style="color: #1f2937; margin-bottom: 1rem;">Selecciona una capacitación para ver el listado de participantes y sus calificaciones</p>
+                    <p style="color: #F2FFFA; margin-bottom: 1rem;">Selecciona una capacitación para ver el listado de participantes y sus calificaciones</p>
                     
                     <div class="form-group">
                         <label><i class="fas fa-list"></i> Capacitación</label>
@@ -1835,7 +1876,7 @@ overflow: hidden;
                 <!-- Reportes Trimestrales -->
                 <div class="card" style="margin-top: 1.25rem;">
                     <h3><i class="fas fa-calendar-check"></i> Reporte Trimestral (Estadística Global)</h3>
-                    <p style="color: #1f2937; margin-bottom: 1rem;">
+                    <p style="color: #F2FFFA; margin-bottom: 1rem;">
                         Genera un consolidado trimestral con estadísticas de capacitaciones y participantes (adherencia, desempeño, distribución por servicio/cargo/profesión, rankings y exportables).
                     </p>
 
@@ -2054,7 +2095,7 @@ overflow: hidden;
                     <div class="card" style="background: linear-gradient(135deg, #2E7D32 0%, #66BB6A 100%); color: #F2FFFA;">
                         <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 1rem;">
                             <div>
-                                <h3 style="color: #1f2937; margin: 0;"><i class="fas fa-book"></i> <span id="reportTrainingTitle">-</span></h3>
+                                <h3 style="color: #F2FFFA; margin: 0;"><i class="fas fa-book"></i> <span id="reportTrainingTitle">-</span></h3>
                                 <p style="margin: 0.5rem 0 0 0; opacity: 0.9;"><span id="reportTrainingDescription">-</span></p>
                                 <p style="margin: 0.5rem 0 0 0; font-size: 1rem; font-weight: 500;">
                                     <i class="fas fa-building"></i> <span id="reportTrainingDepartment">-</span> | 
@@ -2210,7 +2251,7 @@ overflow: hidden;
                         </div>
                         
                         <!-- Mensaje cuando no hay participantes -->
-                        <div id="noParticipantsMessage" style="display: none; text-align: center; padding: 2rem; color: #6b7280;">
+                        <div id="noParticipantsMessage" style="display: none; text-align: center; padding: 2rem; color: #F2FFFA;">
                             <i class="fas fa-users" style="font-size: 3rem; opacity: 0.3; margin-bottom: 1rem;"></i>
                             <p>No hay participantes registrados en esta capacitación</p>
                         </div>
@@ -2251,7 +2292,7 @@ overflow: hidden;
 
                 <div class="card">
                     <h3><i class="fas fa-sliders-h"></i> Configuración</h3>
-                    <p style="color: #1f2937; margin-bottom: 1rem;">
+                    <p style="color: #F2FFFA; margin-bottom: 1rem;">
                         Genera un cronograma para un <strong>año completo</strong> usando las capacitaciones <strong>activas</strong> (no finalizadas)
                         registradas en el sistema.
                     </p>
@@ -2323,14 +2364,14 @@ overflow: hidden;
                         </button>
                     </div>
 
-                    <div style="margin-top: 0.75rem; color: #374151; font-size: 0.9em;">
+                    <div style="margin-top: 0.75rem; color: #F2FFFA; font-size: 0.9em;">
                         Consejo: si tienes más de 12 capacitaciones activas, se distribuirán en el año con múltiples eventos por mes.
                     </div>
                 </div>
 
                                 <div class="card" style="margin-top: 1.25rem;">
                     <h3><i class="fas fa-calendar-plus"></i> Capacitaciones individuales (fecha específica)</h3>
-                    <p style="color: #1f2937; margin-bottom: 1rem;">
+                    <p style="color: #F2FFFA; margin-bottom: 1rem;">
                         Agrega eventos puntuales con fecha y hora exactas. Se incluyen en <strong>Excel</strong>, <strong>.ICS</strong> e <strong>Impresión</strong>.
                     </p>
 
@@ -2338,7 +2379,7 @@ overflow: hidden;
                         <div class="form-group" style="margin:0; min-width: 260px; flex:1;">
                             <label><i class="fas fa-chalkboard-teacher"></i> Capacitación</label>
                             <select id="manualTrainingSelect"></select>
-                            <small style="color: #1f2937;">Si no aparece, selecciona “Otra…” y escribe el nombre.</small>
+                            <small style="color: #F2FFFA;">Si no aparece, selecciona “Otra…” y escribe el nombre.</small>
                         </div>
 
                         <div class="form-group" style="margin:0; min-width: 240px; flex:1; display:none;" id="manualTrainingOtherWrap">
@@ -2381,7 +2422,7 @@ overflow: hidden;
                         </button>
                     </div>
 
-                    <div id="manualScheduleEmpty" style="margin-top: 1rem; color: #6b7280;">
+                    <div id="manualScheduleEmpty" style="margin-top: 1rem; color: #F2FFFA;">
                         Aún no has agregado eventos individuales.
                     </div>
 
@@ -2501,26 +2542,6 @@ overflow: hidden;
                 </select>
             </div>
             
-            <div class="form-group">
-                <label><i class="fas fa-id-badge"></i> Profesión *</label>
-                <select id="participantProfession" required>
-                    <option value="">Seleccione su profesión...</option>
-                    <option value="Jefe de Enfermería">Jefe de Enfermería</option>
-                    <option value="Médico General">Médico General</option>
-                    <option value="Médico Especialista">Médico Especialista</option>
-                    <option value="Ingeniero Biomédico">Ingeniero Biomédico</option>
-                    <option value="Estudiante">Estudiante</option>
-                    <option value="Auxiliar de Enfermería">Auxiliar de Enfermería</option>
-                    <option value="Terapeuta Respiratorio">Terapeuta Respiratorio</option>
-                    <option value="Fisioterapeuta">Fisioterapeuta</option>
-                    <option value="Conductor">Conductor</option>
-                    <option value="Técnico de RX">Técnico de RX</option>
-                    <option value="Fonoaudiólogo">Fonoaudiólogo</option>
-                    <option value="Instrumentador Quirúrgico">Instrumentador Quirúrgico</option>
-                    <option value="Administrativo">Administrativo</option>
-                </select>
-            </div>
-            
             <div class="modal-actions" style="flex-direction: column; gap: 0.75rem;">
                 <button class="btn btn-success" onclick="proceedToPretest()" style="width: 100%;">
                     <i class="fas fa-check"></i> Continuar al Pre-Test
@@ -2588,106 +2609,101 @@ overflow: hidden;
                     didOpen: () => Swal.showLoading()
                 });
                 
-                // Buscar la capacitación directamente por código de acceso
+                // Buscar todas las sesiones para debugging
                 const allResponse = await fetch('/.netlify/functions/airtable-proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         method: 'GET',
-                        path: `/Capacitaciones`
+                        path: `/Sesiones`
                     })
                 });
                 
                 const allData = await allResponse.json();
-                console.log('📋 Capacitaciones cargadas:', allData.records ? allData.records.length : 0);
+                console.log('📋 Todas las sesiones:', allData.records);
                 
-                // Buscar la capacitación por código de acceso
-                let trainingRecord = null;
+                // Buscar la sesión específica
+                let session = null;
                 
                 if (allData.success && allData.records) {
-                    trainingRecord = allData.records.find(t => {
-                        const codigoAcceso = t.fields['Código de Acceso'] || t.fields['Código Acceso'] || t.fields['Codigo Acceso'] || '';
-                        const estado = t.fields['Status'] || t.fields['Estado'] || '';
-                        // Aceptar si está activa o si no tiene campo estado definido
-                        const estaActiva = estado === '' || estado === 'activa' || estado === 'Activa' || estado === 'ACTIVA' || estado !== 'inactiva';
-                        return codigoAcceso.toUpperCase().trim() === code && estaActiva;
+                    session = allData.records.find(s => {
+                        const codigoAcceso = s.fields['Código Acceso'] || '';
+                        const activa = s.fields['Activa'] !== false;
+                        return codigoAcceso.toUpperCase() === code && activa;
                     });
                 }
                 
-                // Si no se encontró en Capacitaciones, intentar en Sesiones como respaldo
-                if (!trainingRecord) {
-                    console.log('🔍 No encontrado en Capacitaciones, buscando en Sesiones...');
-                    const sesionesResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            method: 'GET',
-                            path: `/Sesiones`
-                        })
-                    });
-                    
-                    const sesionesData = await sesionesResponse.json();
-                    console.log('📋 Sesiones cargadas:', sesionesData.records ? sesionesData.records.length : 0);
-                    
-                    let session = null;
-                    if (sesionesData.success && sesionesData.records) {
-                        session = sesionesData.records.find(s => {
-                            const codigoAcceso = s.fields['Código de Acceso'] || s.fields['Código Acceso'] || s.fields['Codigo Acceso'] || s.fields['codigo_acceso'] || '';
-                            const activa = s.fields['Activa'] !== false;
-                            return codigoAcceso.toUpperCase().trim() === code && activa;
-                        });
-                    }
-                    
-                    if (session) {
-                        // Obtener ID de capacitación desde la sesión
-                        let trainingId = null;
-                        if (session.fields['Capacitaciones'] && Array.isArray(session.fields['Capacitaciones']) && session.fields['Capacitaciones'].length > 0) {
-                            trainingId = session.fields['Capacitaciones'][0];
-                        } else if (session.fields['Capacitación'] && Array.isArray(session.fields['Capacitación']) && session.fields['Capacitación'].length > 0) {
-                            trainingId = session.fields['Capacitación'][0];
-                        }
-                        
-                        if (trainingId) {
-                            const trainingResp = await fetch('/.netlify/functions/airtable-proxy', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ method: 'GET', path: `/Capacitaciones/${trainingId}` })
-                            });
-                            const trainingRespData = await trainingResp.json();
-                            if (trainingRespData.success && trainingRespData.fields) {
-                                trainingRecord = { id: trainingId, fields: trainingRespData.fields };
-                            }
-                        }
-                    }
-                }
-                
-                if (!trainingRecord) {
+                if (!session) {
                     Swal.close();
                     Swal.fire({
                         icon: 'error',
                         title: 'Código Inválido',
-                        text: 'El código "' + code + '" no existe o la capacitación no está activa. Verifica que el código sea correcto e inténtalo nuevamente.'
+                        text: 'El código "' + code + '" no existe o la sesión no está activa.\n\nVerifica en Airtable que:\n1. El código exista en la tabla Sesiones\n2. El campo "Activa" esté marcado ✅\n3. El código sea exactamente: ' + code
                     });
                     return;
                 }
                 
-                console.log('✅ Capacitación encontrada:', trainingRecord.id || trainingRecord.fields);
+                console.log('✅ Sesión encontrada:', session);
+                
+                // Obtener ID de capacitación - probar múltiples nombres de campos
+                let trainingId = null;
+                
+                // Intentar diferentes nombres de campo
+                if (session.fields['Capacitaciones'] && Array.isArray(session.fields['Capacitaciones']) && session.fields['Capacitaciones'].length > 0) {
+                    trainingId = session.fields['Capacitaciones'][0];
+                    console.log('✅ Campo "Capacitaciones" encontrado');
+                } else if (session.fields['Capacitación'] && Array.isArray(session.fields['Capacitación']) && session.fields['Capacitación'].length > 0) {
+                    trainingId = session.fields['Capacitación'][0];
+                    console.log('✅ Campo "Capacitación" encontrado');
+                } else if (session.fields['capacitacion'] && Array.isArray(session.fields['capacitacion']) && session.fields['capacitacion'].length > 0) {
+                    trainingId = session.fields['capacitacion'][0];
+                    console.log('✅ Campo "capacitacion" encontrado');
+                }
+                
+                if (!trainingId) {
+                    Swal.close();
+                    console.error('❌ Campo de capacitación vacío:', session.fields);
+                    Swal.fire({
+                        icon: 'error',
+                        title: 'Error de Configuración',
+                        html: `<p>La sesión con código <strong>${code}</strong> no tiene capacitación enlazada.</p>
+                               <p><strong>En Airtable:</strong></p>
+                               <p>1. Abre tabla "Sesiones"</p>
+                               <p>2. Busca el registro con código "${code}"</p>
+                               <p>3. En el campo "Capacitaciones" (o "Capacitación"), haz click y selecciona una capacitación</p>
+                               <p>4. Guarda y vuelve a intentar</p>`
+                    });
+                    return;
+                }
+                
+                console.log('🎓 ID de Capacitación:', trainingId);
+                
+                // Obtener datos de la capacitación
+                const trainingResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Capacitaciones/${trainingId}`
+                    })
+                });
+                
+                const trainingData = await trainingResponse.json();
+                
+                console.log('📚 Datos de Capacitación:', trainingData);
+                
+                if (!trainingData.success || !trainingData.fields) {
+                    throw new Error('No se pudieron obtener los datos de la capacitación');
+                }
                 
                 // Guardar datos actuales
                 currentAccessCode = code;
-                currentTrainingRecord = trainingRecord.id 
-                    ? trainingRecord 
-                    : { id: trainingRecord.id, fields: trainingRecord.fields };
+                currentTrainingRecord = {
+                    id: trainingId,
+                    fields: trainingData.fields
+                };
                 
-                // Si trainingRecord es de Capacitaciones directamente (tiene fields pero no id separado)
-                if (!currentTrainingRecord.id && allData.records) {
-                    const found = allData.records.find(t => {
-                        const c = t.fields['Código de Acceso'] || t.fields['Código Acceso'] || '';
-                        return c.toUpperCase().trim() === code;
-                    });
-                    if (found) currentTrainingRecord = found;
-                }
-                
+                console.log('✅ Datos guardados - ID de capacitación:', trainingId);
                 console.log('✅ currentTrainingRecord:', currentTrainingRecord);
                 
                 Swal.close();
@@ -2717,7 +2733,6 @@ overflow: hidden;
         async function proceedToPretest() {
             const name = document.getElementById('participantName').value.trim();
             const department = document.getElementById('participantDepartment').value;
-            const profession = document.getElementById('participantProfession').value;
             
             if (!name) {
                 Swal.fire({
@@ -2738,22 +2753,11 @@ overflow: hidden;
                 });
                 return;
             }
-
-            if (!profession) {
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Profesión Requerida',
-                    text: 'Por favor selecciona tu profesión',
-                    confirmButtonText: 'Entendido'
-                });
-                return;
-            }
             
             // Guardar datos del participante
             currentParticipantData = {
                 name: name,
                 department: department,
-                profession: profession,
                 accessCode: currentAccessCode
             };
             
@@ -2862,7 +2866,7 @@ overflow: hidden;
             if (!questions || questions.length === 0) {
                 container.innerHTML = `
                     <div style="text-align: center; padding: 2rem; background: #fff3cd; border-radius: 8px; border: 2px solid #ffc107;">
-                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #f59e0b; margin-bottom: 1rem; display: block;"></i>
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #F2FFFA; margin-bottom: 1rem; display: block;"></i>
                         <p style="color: #1f2937; margin: 0; font-size: 1.1rem;">
                             <strong>⚠️ No hay preguntas de pretest configuradas</strong>
                         </p>
@@ -2900,7 +2904,7 @@ overflow: hidden;
                         <h4 style="margin-top: 0; color: var(--primary); margin-bottom: 0.75rem;">
                             <i class="fas fa-question-circle"></i> Pregunta ${questionNumber} / ${questions.length}
                         </h4>
-                        <p style="margin: 0 0 1rem 0; font-weight: 500; color: #1f2937; font-size: 1.05rem;">
+                        <p style="margin: 0 0 1rem 0; font-weight: 500; color: #F2FFFA; font-size: 1.05rem;">
                             ${questionText}
                         </p>
                         
@@ -2913,10 +2917,10 @@ overflow: hidden;
                                            onchange="pretestAnswers['${question.id}'] = this.value"
                                            style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); margin-top: 2px; flex-shrink: 0;">
                                     <span style="margin-left: 0.75rem; flex: 1;">
-                                        <strong style="color: var(--primary);">${option.letter})</strong> <span style="color: #1f2937;">${option.text}</span>
+                                        <strong style="color: var(--primary);">${option.letter})</strong> <span style="color: #F2FFFA;">${option.text}</span>
                                     </span>
                                 </label>
-                            `).join('') : '<p style="color: #1f2937; font-weight: bold;">⚠️ Sin opciones de respuesta</p>'}
+                            `).join('') : '<p style="color: #F2FFFA; font-weight: bold;">⚠️ Sin opciones de respuesta</p>'}
                         </div>
                     </div>
                 `;
@@ -2962,37 +2966,35 @@ overflow: hidden;
                 console.log('📋 Respuestas:', pretestAnswers);
                 
                 // ==========================================
-                // PASO 1: Verificar que tenemos la capacitación actual
+                // PASO 1: Buscar la sesión actual
                 // ==========================================
                 
-                // Usar currentTrainingRecord que ya fue cargado al validar el código
-                let currentSession = null;
+                const sessionResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Sesiones`
+                    })
+                });
                 
-                // Intentar buscar sesión en tabla Sesiones (si existe)
-                try {
-                    const sessionResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            method: 'GET',
-                            path: `/Sesiones`
-                        })
-                    });
-                    
-                    const sessionData = await sessionResponse.json();
-                    
-                    if (sessionData.success && sessionData.records && sessionData.records.length > 0) {
-                        currentSession = sessionData.records.find(s => {
-                            const codigo = s.fields['Código de Acceso'] || s.fields['Código Acceso'] || s.fields['Codigo Acceso'] || s.fields['codigo_acceso'] || '';
-                            return codigo.toUpperCase().trim() === currentAccessCode.toUpperCase().trim();
-                        });
-                    }
-                } catch(e) {
-                    console.log('ℹ️ Tabla Sesiones no disponible, continuando sin sesión');
+                const sessionData = await sessionResponse.json();
+                
+                if (!sessionData.success || !sessionData.records) {
+                    throw new Error('No se pudieron obtener las sesiones');
                 }
                 
-                console.log('🎓 Usando capacitación:', currentTrainingRecord?.id);
-                console.log('📋 Sesión:', currentSession?.id || 'ninguna');
+                // Encontrar la sesión por código de acceso
+                const currentSession = sessionData.records.find(s => {
+                    const codigo = s.fields['Código Acceso'] || '';
+                    return codigo.toUpperCase() === currentAccessCode.toUpperCase();
+                });
+                
+                if (!currentSession) {
+                    throw new Error('No se encontró la sesión con código: ' + currentAccessCode);
+                }
+                
+                console.log('✅ Sesión encontrada:', currentSession.id);
                 
                 // ==========================================
                 // PASO 2: Obtener preguntas para calcular score
@@ -3078,26 +3080,20 @@ overflow: hidden;
                 const horaFormato = `${hours}:${minutes}:${seconds}`;
                 const fechaHoraCompleta = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
                 
-                // Construir campos de participación - nombres exactos de Airtable
-                const participacionFields = {
-                    'Name': currentParticipantData.name,
-                    'Cargo': currentParticipantData.profession || '',
-                    'Departamento': currentParticipantData.department,
-                    'Profesión': currentParticipantData.profession || '',
-                    'Fecha Registro': fechaFormato,
-                    'Hora Registro': horaFormato,
-                    'Fecha de Inicio': fechaFormato,
-                    'Pretest Score': pretestScore,
-                    'Completado Pretest': true
+                const participationData = {
+                    fields: {
+                        'Nombre': currentParticipantData.name,
+                        'Departamento': currentParticipantData.department,
+                        'Sesión': [currentSession.id],
+                        'Pretest Score': pretestScore,
+                        'Fecha de Inicio': fechaFormato,
+                        'Completado Pretest': true
+                    }
                 };
-                
-                // NO agregar link a Sesión ni Capacitación como linked record
-                
-                const participationData = { fields: participacionFields };
                 
                 console.log('📤 Creando participación:', participationData);
                 
-                let createParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                const createParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -3107,53 +3103,7 @@ overflow: hidden;
                     })
                 });
                 
-                let participationResult = await createParticipationResponse.json();
-                
-                // Si falla por campo inválido, reintentar con campos mínimos confirmados en Airtable
-                const errorMsg422 = (participationResult.error || '').toLowerCase();
-                const esCampoInvalido = !participationResult.success && (
-                    errorMsg422.includes('unknown field') || 
-                    errorMsg422.includes('cannot accept') ||
-                    errorMsg422.includes('invalid') ||
-                    participationResult.airtableStatus === 422
-                );
-                
-                if (esCampoInvalido) {
-                    console.warn('⚠️ Error de campo (422), reintentando con campos confirmados:', participationResult.error);
-                    // Campos 100% confirmados en Airtable según capturas:
-                    // Name, Departamento, Fecha Registro, Hora Registro, Completado Pretest, Profesión, Pretest Score
-                    const camposMinimos = { fields: {
-                        'Name': currentParticipantData.name,
-                        'Departamento': currentParticipantData.department,
-                        'Profesión': currentParticipantData.profession || '',
-                        'Fecha Registro': fechaFormato,
-                        'Hora Registro': horaFormato,
-                        'Pretest Score': pretestScore,
-                        'Completado Pretest': true
-                    }};
-                    const retry = await fetch('/.netlify/functions/airtable-proxy', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ method: 'POST', path: `/Participaciones`, body: camposMinimos })
-                    });
-                    participationResult = await retry.json();
-                    
-                    // Segundo reintento: solo Name y Departamento (mínimo absoluto)
-                    if (!participationResult.success) {
-                        console.warn('⚠️ Segundo reintento con mínimo absoluto...');
-                        const camposAbsolutos = { fields: {
-                            'Name': currentParticipantData.name,
-                            'Departamento': currentParticipantData.department,
-                            'Completado Pretest': true
-                        }};
-                        const retry2 = await fetch('/.netlify/functions/airtable-proxy', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ method: 'POST', path: `/Participaciones`, body: camposAbsolutos })
-                        });
-                        participationResult = await retry2.json();
-                    }
-                }
+                const participationResult = await createParticipationResponse.json();
                 
                 if (!participationResult.success) {
                     console.error('❌ Error creando participación:', participationResult);
@@ -3251,7 +3201,7 @@ overflow: hidden;
                     if (result.isConfirmed) {
                         // GUARDAR participationId para uso posterior en postest
                         currentParticipationId = participationResult.id;
-                        currentSessionId = currentSession ? currentSession.id : null;
+                        currentSessionId = currentSession.id;
                         
                         Swal.fire({
                             icon: 'info',
@@ -3437,10 +3387,10 @@ overflow: hidden;
                 container.innerHTML = `
                     <div style="text-align: center; padding: 2rem; background: #fff3cd; border-radius: 8px; border: 2px solid #ffc107;">
                         <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #F2FFFA; margin-bottom: 1rem; display: block;"></i>
-                        <p style="color: #1f2937; margin: 0; font-size: 1.1rem;">
+                        <p style="color: #F2FFFA; margin: 0; font-size: 1.1rem;">
                             <strong>⚠️ No hay preguntas de postest configuradas</strong>
                         </p>
-                        <p style="color: #1f2937; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                        <p style="color: #F2FFFA; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
                             En Airtable, crea preguntas con Tipo = "Postest" enlazadas a esta capacitación
                         </p>
                     </div>
@@ -3474,7 +3424,7 @@ overflow: hidden;
                         <h4 style="margin-top: 0; color: var(--primary); margin-bottom: 0.75rem;">
                             <i class="fas fa-question-circle"></i> Pregunta ${questionNumber} / ${questions.length}
                         </h4>
-                        <p style="margin: 0 0 1rem 0; font-weight: 500; color: #1f2937; font-size: 1.05rem;">
+                        <p style="margin: 0 0 1rem 0; font-weight: 500; color: #F2FFFA; font-size: 1.05rem;">
                             ${questionText}
                         </p>
                         
@@ -3487,10 +3437,10 @@ overflow: hidden;
                                            onchange="postestAnswers['${question.id}'] = this.value"
                                            style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); margin-top: 2px; flex-shrink: 0;">
                                     <span style="margin-left: 0.75rem; flex: 1;">
-                                        <strong style="color: var(--primary);">${option.letter})</strong> <span style="color: #1f2937;">${option.text}</span>
+                                        <strong style="color: var(--primary);">${option.letter})</strong> <span style="color: #F2FFFA;">${option.text}</span>
                                     </span>
                                 </label>
-                            `).join('') : '<p style="color: #1f2937; font-weight: bold;">⚠️ Sin opciones de respuesta</p>'}
+                            `).join('') : '<p style="color: #F2FFFA; font-weight: bold;">⚠️ Sin opciones de respuesta</p>'}
                         </div>
                     </div>
                 `;
@@ -3621,7 +3571,7 @@ overflow: hidden;
                         body: {
                             fields: {
                                 'Post-test Score': postestScore,
-                                'Completado Posttest': true
+                                'Fecha Fin': fechaFormato
                             }
                         }
                     })
@@ -3753,7 +3703,6 @@ overflow: hidden;
             document.getElementById('accessCode').value = '';
             document.getElementById('participantName').value = '';
             document.getElementById('participantDepartment').value = '';
-            document.getElementById('participantProfession').value = '';
             
             // Mostrar/ocultar secciones
             document.getElementById('accessSection').style.display = 'block';
@@ -4273,17 +4222,19 @@ function getSelectedStaff() {
     const dateInput = document.getElementById('trainingDate');
     const deptInput = document.getElementById('trainingDepartment');
     const durationInput = document.getElementById('trainingDuration');
+    const responsableInput = document.getElementById('trainingResponsable');
 
     const title = titleInput ? titleInput.value.trim() : '';
     const description = descInput ? descInput.value.trim() : '';
     const trainingDate = dateInput ? dateInput.value : '';
     const department = deptInput ? deptInput.value : '';
     const duration = durationInput ? durationInput.value : '';
+    const responsable = responsableInput ? responsableInput.value.trim() : '';
 
     // Solo el personal marcado (checkboxes)
     const selectedStaff = getSelectedStaff();
 
-    if (!title || !description || !trainingDate || !department || !duration || selectedStaff.length === 0) {
+    if (!title || !description || !trainingDate || !department || !duration || !responsable || selectedStaff.length === 0) {
         let missingMsg = 'Por favor completa todos los campos requeridos (*)';
         if (selectedStaff.length === 0) {
             missingMsg += ' y marca al menos una casilla en "Personal Capacitado".';
@@ -4329,6 +4280,7 @@ function getSelectedStaff() {
         trainingDate,
         department,
         duration,
+        responsable,
         staffList: selectedStaff,
         accessCode,
         status: 'active',
@@ -4386,6 +4338,7 @@ function getSelectedStaff() {
     if (dateInput) dateInput.value = '';
     if (deptInput) deptInput.value = '';
     if (durationInput) durationInput.value = '';
+    if (responsableInput) responsableInput.value = '';
     document.querySelectorAll('input.trainingStaff:checked, .trainingStaff:checked, input[name="personalCapacitado[]"]:checked')
         .forEach(cb => cb.checked = false);
     
@@ -4402,11 +4355,11 @@ function getSelectedStaff() {
         title: '¡Capacitación Guardada!',
         html: `
             <div style="margin: 20px 0;">
-                <p>Código de Acceso:</p>
-                <h2 style="color: #1f2937; margin: 10px 0;">${accessCode}</h2>
-                <p style="font-size: 0.9em; color: #F2FFFA;">Comparte este código con los participantes</p>
+                <p style="color:#333;">Código de Acceso:</p>
+                <h2 style="color: #2E7D32; font-size: 2rem; letter-spacing: 4px; margin: 10px 0;">${accessCode}</h2>
+                <p style="font-size: 0.9em; color: #555;">Comparte este código con los participantes</p>
                 <hr style="margin: 15px 0;">
-                <p style="font-size: 0.85em;">
+                <p style="font-size: 0.85em; color:#333;">
                     ✅ Capacitación guardada en Airtable<br>
                     ${pretestSaved ? '✅' : '⚠️'} ${pretestQuestions.length} preguntas de pretest ${pretestSaved ? 'guardadas' : 'con error'}<br>
                     ${postestSaved ? '✅' : '⚠️'} ${postestQuestions.length} preguntas de postest ${postestSaved ? 'guardadas' : 'con error'}
@@ -4433,19 +4386,44 @@ async function sendTrainingToAirtable(trainingData) {
         console.log('📤 Enviando capacitación a Airtable...');
         console.log('Datos originales:', trainingData);
 
-        // Usar solo los campos que existen en Airtable
+        // Usar solo los campos confirmados en Airtable
         const airtableRecord = {
             fields: {
                 "Título": trainingData.title,
-                "Descripción": trainingData.description,
-                "Fecha": trainingData.trainingDate,
-                "Departamento": trainingData.department,
+                "Capacitacion": trainingData.title,
+                "Objetivo": trainingData.description,
+                "Fecha Creación": trainingData.trainingDate,
                 "Duración": trainingData.duration,
+                "Expositor": trainingData.responsable,
+                "Departamento": trainingData.department,
                 "Código de Acceso": trainingData.accessCode,
-                "Status": trainingData.status
-                // Campos "Personal" y "Creado En" omitidos (no existen o causan errores)
+                "Estado": trainingData.status
             }
         };
+
+        // Agregar "Dirigido a" solo con opciones que existen en Airtable
+        if (trainingData.staffList && trainingData.staffList.length > 0) {
+            const opcionesValidas = [
+                "Jefe de Enfermería",
+                "Médico General",
+                "Médico Especialista",
+                "Ingeniero Biomedico",
+                "Estudiante",
+                "Auxiliar de enfermería",
+                "Terapeuta Respiratorio",
+                "Fisioterapeuta",
+                "Conductor",
+                "Técnico de Rayos X",
+                "Fonoaudiólogo",
+                "Instrumentador Quirúrgico",
+                "Administrativo",
+                "Otro"
+            ];
+            const filtradas = trainingData.staffList.filter(v => opcionesValidas.includes(v));
+            if (filtradas.length > 0) {
+                airtableRecord.fields["Dirigido a"] = filtradas;
+            }
+        }
 
         console.log('📋 Record a enviar:', JSON.stringify(airtableRecord, null, 2));
 
@@ -4500,7 +4478,6 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             fields: {
                 "Capacitación": [trainingRecordId],  // Link al registro de la capacitación
                 "Tipo": type === 'pretest' ? 'Pretest' : 'Postest',
-                "Número": q.number,
                 "Pregunta": q.question,
                 "Opción A": q.options.a,
                 "Opción B": q.options.b,
@@ -4555,10 +4532,10 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
         function showQRCode(accessCode, title) {
             const modal = document.getElementById('qrModal');
-            const qrContainer = document.getElementById('qrcode');
-            
+            const qrContainer = document.getElementById('qrCode') || document.getElementById('qrcode');
+
             qrContainer.innerHTML = '';
-            
+
             const accessUrl = `${window.location.origin}?code=${accessCode}`;
             new QRCode(qrContainer, {
                 text: accessUrl,
@@ -4568,10 +4545,24 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 colorLight: '#ffffff',
                 correctLevel: QRCode.CorrectLevel.H
             });
-            
-            document.getElementById('modalAccessCode').textContent = accessCode;
-            document.getElementById('modalAccessLink').textContent = accessUrl;
-            
+
+            // Rellenar código de acceso grande
+            const accessCodeEl = document.getElementById('qrAccessCode');
+            if (accessCodeEl) accessCodeEl.textContent = accessCode;
+
+            // Rellenar URL
+            const urlInput = document.getElementById('qrUrl');
+            if (urlInput) urlInput.value = accessUrl;
+
+            // Campos del segundo modal si existen
+            const codeEl = document.getElementById('modalAccessCode');
+            if (codeEl) codeEl.textContent = accessCode;
+            const linkEl = document.getElementById('modalAccessLink');
+            if (linkEl) linkEl.textContent = accessUrl;
+
+            // Guardar para descarga
+            window.currentQRData = { code: accessCode, title: title, url: accessUrl };
+
             modal.style.display = 'flex';
         }
 
@@ -4836,7 +4827,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const department = fields['Departamento'] || '';
             const duration = fields['Duración'] || '';
             const accessCode = fields['Código de Acceso'] || '';
-            const status = fields['Status'] || fields['Estado'] || 'active';
+            const status = fields['Estado'] || 'active';
             
             const formattedDate = date ? new Date(date).toLocaleDateString('es-ES', { 
                 year: 'numeric', 
@@ -4962,15 +4953,15 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                                             <div class="question-options">
                                                 <div class="question-option ${correctAnswer === 'B' ? 'correct' : ''}">
                                                     <strong>B)</strong> ${qFields['Opción B'] || 'N/A'}
-                                                    ${correctAnswer === 'B' ? '<i class="fas fa-check-circle" style="color: #1f2937; margin-left: auto;"></i>' : ''}
+                                                    ${correctAnswer === 'B' ? '<i class="fas fa-check-circle" style="color: #F2FFFA; margin-left: auto;"></i>' : ''}
                                                 </div>
                                                 <div class="question-option ${correctAnswer === 'C' ? 'correct' : ''}">
                                                     <strong>C)</strong> ${qFields['Opción C'] || 'N/A'}
-                                                    ${correctAnswer === 'C' ? '<i class="fas fa-check-circle" style="color: #1f2937; margin-left: auto;"></i>' : ''}
+                                                    ${correctAnswer === 'C' ? '<i class="fas fa-check-circle" style="color: #F2FFFA; margin-left: auto;"></i>' : ''}
                                                 </div>
                                                 <div class="question-option ${correctAnswer === 'D' ? 'correct' : ''}">
                                                     <strong>D)</strong> ${qFields['Opción D'] || 'N/A'}
-                                                    ${correctAnswer === 'D' ? '<i class="fas fa-check-circle" style="color: #1f2937; margin-left: auto;"></i>' : ''}
+                                                    ${correctAnswer === 'D' ? '<i class="fas fa-check-circle" style="color: #F2FFFA; margin-left: auto;"></i>' : ''}
                                                 </div>
                                             </div>
                                         </div>
@@ -5088,92 +5079,41 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             try {
                 console.log('📊 Cargando estadísticas del dashboard...');
                 
-                // Cargar capacitaciones y participaciones directamente desde Airtable
-                const [capsResp, partsResp] = await Promise.all([
-                    fetch('/.netlify/functions/airtable-proxy', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ method: 'GET', path: '/Capacitaciones' })
-                    }),
-                    fetch('/.netlify/functions/airtable-proxy', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ method: 'GET', path: '/Participaciones' })
-                    })
-                ]);
-                
-                const capsData  = await capsResp.json();
-                const partsData = await partsResp.json();
-                
-                const caps  = (capsData.success  && capsData.records)  ? capsData.records  : [];
-                const parts = (partsData.success && partsData.records) ? partsData.records : [];
-                
-                // Calcular estadísticas
-                const totalTrainings    = caps.length;
-                const totalParticipants = parts.length;
-                const completados = parts.filter(p => 
-                    p.fields?.['Completado Posttest'] === true || 
-                    Number(p.fields?.['Post-test Score'] || 0) > 0
-                ).length;
-                const adherenceRate = totalParticipants > 0 
-                    ? Math.round((completados / totalParticipants) * 100) : 0;
-                
-                const conMejora = parts.filter(p => {
-                    const pre  = Number(p.fields?.['Pretest Score']  || 0);
-                    const post = Number(p.fields?.['Post-test Score'] || p.fields?.['Post-test score'] || 0);
-                    return post > 0 && pre >= 0;
+                const response = await fetch('/.netlify/functions/get-dashboard-stats', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({})
                 });
-                const avgImprovement = conMejora.length > 0
-                    ? Math.round(conMejora.reduce((s, p) => {
-                        const pre  = Number(p.fields?.['Pretest Score']  || 0);
-                        const post = Number(p.fields?.['Post-test Score'] || p.fields?.['Post-test score'] || 0);
-                        return s + (post - pre);
-                    }, 0) / conMejora.length)
-                    : 0;
                 
-                // Actualizar cards del dashboard
-                const el = id => document.getElementById(id);
-                if (el('totalTrainings'))    el('totalTrainings').textContent    = totalTrainings;
-                if (el('totalParticipants')) el('totalParticipants').textContent = totalParticipants;
-                if (el('adherenceRate'))     el('adherenceRate').textContent     = adherenceRate + '%';
-                if (el('avgImprovement'))    el('avgImprovement').textContent    = '+' + Math.max(0, avgImprovement) + '%';
+                const data = await response.json();
                 
-                // Gráfico de participaciones por día (últimos 7 días)
-                if (participationsChart) {
-                    const dias = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
-                    const counts = Array(7).fill(0);
-                    const hoy = new Date();
-                    parts.forEach(p => {
-                        const fechaStr = p.fields?.['Fecha Registro'] || p.fields?.['Fecha de Inicio'] || '';
-                        if (!fechaStr) return;
-                        const fecha = new Date(fechaStr);
-                        const diffDias = Math.floor((hoy - fecha) / (1000 * 60 * 60 * 24));
-                        if (diffDias >= 0 && diffDias < 7) counts[6 - diffDias]++;
-                    });
-                    const labels = [];
-                    for (let i = 6; i >= 0; i--) {
-                        const d = new Date(hoy);
-                        d.setDate(d.getDate() - i);
-                        labels.push(dias[d.getDay()]);
+                if (data.success) {
+                    console.log('✅ Estadísticas recibidas:', data.statistics);
+                    
+                    // Actualizar cards del dashboard
+                    document.getElementById('totalTrainings').textContent = data.statistics.totalTrainings;
+                    document.getElementById('totalParticipants').textContent = data.statistics.totalParticipants;
+                    document.getElementById('adherenceRate').textContent = data.statistics.adherenceRate + '%';
+                    document.getElementById('avgImprovement').textContent = '+' + data.statistics.avgImprovement + '%';
+                    
+                    // Actualizar gráfico de participaciones por día
+                    if (participationsChart && data.charts && data.charts.participationsByDay) {
+                        participationsChart.data.labels = data.charts.participationsByDay.labels;
+                        participationsChart.data.datasets[0].data = data.charts.participationsByDay.data;
+                        participationsChart.update();
                     }
-                    participationsChart.data.labels = labels;
-                    participationsChart.data.datasets[0].data = counts;
-                    participationsChart.update();
+                    
+                    // Actualizar gráfico de departamentos
+                    if (departmentChart && data.charts && data.charts.departmentPerformance) {
+                        departmentChart.data.labels = data.charts.departmentPerformance.labels;
+                        departmentChart.data.datasets[0].data = data.charts.departmentPerformance.data;
+                        departmentChart.update();
+                    }
+                    
+                    console.log('✅ Dashboard actualizado correctamente');
+                } else {
+                    console.error('❌ Error en respuesta:', data.error);
                 }
-                
-                // Gráfico de departamentos
-                if (departmentChart) {
-                    const deptCount = {};
-                    parts.forEach(p => {
-                        const dept = p.fields?.['Departamento'] || 'General';
-                        deptCount[dept] = (deptCount[dept] || 0) + 1;
-                    });
-                    const sorted = Object.entries(deptCount).sort((a,b) => b[1]-a[1]).slice(0,6);
-                    departmentChart.data.labels = sorted.map(e => e[0]);
-                    departmentChart.data.datasets[0].data = sorted.map(e => e[1]);
-                    departmentChart.update();
-                }
-                
-                console.log('✅ Estadísticas recibidas:', { totalTrainings, totalParticipants, adherenceRate, avgImprovement });
-                console.log('✅ Dashboard actualizado correctamente');
                 
             } catch (error) {
                 console.error('❌ Error cargando estadísticas del dashboard:', error);
@@ -5355,35 +5295,86 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
          */
         function downloadQRCode() {
             try {
-                const qrContainer = document.getElementById('qrCode');
-                const qrImage = qrContainer.querySelector('img');
-                
-                if (!qrImage) {
-                    throw new Error('No se encontró la imagen del QR');
+                const code = window.currentQRData?.code || 'QR';
+                const title = window.currentQRData?.title || 'capacitacion';
+
+                // Buscar canvas o img en cualquier contenedor QR
+                const containers = ['qrCode', 'qrcode', 'qrCodeContainer'];
+                let canvas = null;
+                let qrImg = null;
+
+                for (const id of containers) {
+                    const el = document.getElementById(id);
+                    if (!el) continue;
+                    canvas = el.querySelector('canvas');
+                    if (canvas) break;
+                    qrImg = el.querySelector('img');
+                    if (qrImg) break;
                 }
-                
-                // Crear elemento de descarga
-                const link = document.createElement('a');
-                link.href = qrImage.src;
-                link.download = `QR-${window.currentQRData.code}-${window.currentQRData.title.replace(/\s+/g, '-')}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
+
+                if (canvas) {
+                    // Descargar desde canvas directamente
+                    const link = document.createElement('a');
+                    link.download = `QR-${code}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                } else if (qrImg) {
+                    // Crear canvas temporal para convertir img a png descargable
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = qrImg.naturalWidth || 256;
+                    tempCanvas.height = qrImg.naturalHeight || 256;
+                    const ctx = tempCanvas.getContext('2d');
+                    ctx.drawImage(qrImg, 0, 0);
+                    const link = document.createElement('a');
+                    link.download = `QR-${code}.png`;
+                    link.href = tempCanvas.toDataURL('image/png');
+                    link.click();
+                } else {
+                    // Último recurso: generar nuevo QR en canvas temporal
+                    const url = window.currentQRData?.url || document.getElementById('qrUrl')?.value;
+                    if (!url) throw new Error('No hay URL del QR');
+
+                    const tempDiv = document.createElement('div');
+                    tempDiv.style.position = 'fixed';
+                    tempDiv.style.left = '-9999px';
+                    document.body.appendChild(tempDiv);
+
+                    new QRCode(tempDiv, {
+                        text: url,
+                        width: 512,
+                        height: 512,
+                        colorDark: '#2E7D32',
+                        colorLight: '#ffffff',
+                        correctLevel: QRCode.CorrectLevel.H
+                    });
+
+                    setTimeout(() => {
+                        const c = tempDiv.querySelector('canvas');
+                        if (c) {
+                            const link = document.createElement('a');
+                            link.download = `QR-${code}.png`;
+                            link.href = c.toDataURL('image/png');
+                            link.click();
+                        }
+                        document.body.removeChild(tempDiv);
+                    }, 300);
+                    return;
+                }
+
                 Swal.fire({
                     icon: 'success',
                     title: 'Descargado',
-                    text: 'El código QR ha sido descargado',
+                    text: `QR-${code}.png descargado correctamente`,
                     timer: 1500,
                     showConfirmButton: false
                 });
-                
+
             } catch (error) {
                 console.error('❌ Error descargando QR:', error);
                 Swal.fire({
                     icon: 'error',
                     title: 'Error',
-                    text: 'No se pudo descargar el QR'
+                    text: 'No se pudo descargar el QR: ' + error.message
                 });
             }
         }
@@ -7348,7 +7339,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                     const f = r.fields || {};
                     const activa = f['Activa'] !== false; // por defecto true
                     const finalizada = f['Finalizada'] === true; // por defecto false
-                    const estado = String(f['Status'] || f['Estado'] || '').toLowerCase();
+                    const estado = String(f['Estado'] || '').toLowerCase();
                     const estadoFinal = estado.includes('final') || estado.includes('complet');
                     return activa && !finalizada && !estadoFinal;
                 })
@@ -7803,11 +7794,13 @@ function makeCronogramaFilterFormula(year, tipo) {
         async function loadTrainingReport() {
             const trainingId = document.getElementById('reportTrainingSelect').value;
             
+            // Elementos del DOM
             const reportContainer = document.getElementById('reportContainer');
             const reportLoading = document.getElementById('reportLoading');
             const reportInitialMessage = document.getElementById('reportInitialMessage');
             
             if (!trainingId) {
+                // Mostrar mensaje inicial
                 reportContainer.style.display = 'none';
                 reportLoading.style.display = 'none';
                 reportInitialMessage.style.display = 'block';
@@ -7816,186 +7809,82 @@ function makeCronogramaFilterFormula(year, tipo) {
             }
             
             try {
+                // Mostrar loading
                 reportContainer.style.display = 'none';
                 reportInitialMessage.style.display = 'none';
                 reportLoading.style.display = 'block';
                 
-                console.log('📊 Cargando reporte directo desde Airtable para:', trainingId);
+                console.log('📊 Cargando reporte para capacitación:', trainingId);
                 
-                // 1. Obtener datos de la capacitación
-                const trainingResp = await fetch('/.netlify/functions/airtable-proxy', {
+                // Llamar a la función serverless
+                const response = await fetch('/.netlify/functions/get-training-participants', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ method: 'GET', path: `/Capacitaciones/${trainingId}` })
-                });
-                const trainingData = await trainingResp.json();
-                
-                // 2. Obtener TODAS las participaciones y filtrar por código de acceso de la capacitación
-                const accessCode = (trainingData.fields || trainingData.record?.fields || {})['Código de Acceso'] || '';
-                
-                const partResp = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ method: 'GET', path: `/Participaciones` })
-                });
-                const partData = await partResp.json();
-                
-                const allParts = (partData.success && partData.records) ? partData.records : [];
-                
-                // Mapear participantes con los campos reales de Airtable
-                const participants = allParts.map(r => {
-                    const f = r.fields || {};
-                    const pretestScore  = Number(f['Pretest Score']  || f['Pretest score']  || 0);
-                    const postestScore  = Number(f['Post-test Score'] || f['Post-test score'] || f['Posttest Score'] || 0);
-                    const improvement   = postestScore > 0 ? postestScore - pretestScore : 0;
-                    const completado    = f['Completado Posttest'] === true || postestScore > 0;
-                    
-                    return {
-                        id:           r.id,
-                        nombre:       f['Name'] || f['Nombre'] || 'Sin nombre',
-                        email:        f['Email'] || f['Correo'] || '',
-                        departamento: f['Departamento'] || '-',
-                        cargo:        f['Cargo'] || f['Profesión'] || '-',
-                        profesion:    f['Profesión'] || f['Cargo'] || '-',
-                        pretestScore,
-                        postestScore,
-                        improvement,
-                        fechaRegistro: f['Fecha Registro'] || f['Fecha de Inicio'] || '',
-                        horaRegistro:  f['Hora Registro'] || '',
-                        completadoPretest:  f['Completado Pretest']  === true,
-                        completadoPosttest: f['Completado Posttest'] === true,
-                        status: completado ? 'Completado' : (pretestScore > 0 ? 'Pretest Completado' : 'Pendiente')
-                    };
+                    body: JSON.stringify({ trainingId })
                 });
                 
-                // Calcular estadísticas
-                const total = participants.length;
-                const completados = participants.filter(p => p.completadoPosttest || p.postestScore > 0).length;
-                const conPretest  = participants.filter(p => p.pretestScore > 0).length;
+                const data = await response.json();
                 
-                const avgPretest  = conPretest > 0
-                    ? Math.round(participants.filter(p => p.pretestScore > 0).reduce((s, p) => s + p.pretestScore, 0) / conPretest)
-                    : 0;
-                const avgPostest  = completados > 0
-                    ? Math.round(participants.filter(p => p.postestScore > 0).reduce((s, p) => s + p.postestScore, 0) / completados)
-                    : 0;
-                const avgImprovement = completados > 0
-                    ? Math.round(participants.filter(p => p.postestScore > 0).reduce((s, p) => s + p.improvement, 0) / completados)
-                    : 0;
-                const adherenceRate = total > 0 ? Math.round((completados / total) * 100) : 0;
+                if (!data.success) {
+                    throw new Error(data.error || 'Error al obtener el reporte');
+                }
                 
-                // Guardar datos globales
-                currentReportData = { training: trainingData.fields, participants, statistics: { total, completados, avgPretest, avgPostest, avgImprovement, adherenceRate } };
-                allParticipantsData = participants;
+                console.log('✅ Datos del reporte recibidos:', data);
                 
-                // Actualizar info de la capacitación
-                const tf = trainingData.fields || trainingData.record?.fields || {};
-                document.getElementById('reportTrainingTitle').textContent       = tf['Título'] || 'Sin título';
-                document.getElementById('reportTrainingDescription').textContent = tf['Descripción'] || 'Sin descripción';
-                document.getElementById('reportTrainingDepartment').textContent  = tf['Departamento'] || 'General';
-                document.getElementById('reportTrainingDate').textContent        = formatDateForReport(tf['Fecha'] || tf['Fecha de Inicio'] || '');
+                // Guardar datos globalmente
+                currentReportData = data;
+                allParticipantsData = data.participants || [];
                 
+                // Llenar información de la capacitación
+                document.getElementById('reportTrainingTitle').textContent = data.training.titulo;
+                document.getElementById('reportTrainingDescription').textContent = data.training.descripcion || 'Sin descripción';
+                document.getElementById('reportTrainingDepartment').textContent = data.training.departamento || 'General';
+                document.getElementById('reportTrainingDate').textContent = formatDateForReport(data.training.fechaCreacion);
+                
+                // Estado de la capacitación
                 const statusBadge = document.getElementById('reportTrainingStatus');
-                const estadoActual = (tf['Status'] || tf['Estado'] || '').toLowerCase();
-                if (estadoActual.includes('final')) {
+                if (data.training.finalizada) {
                     statusBadge.textContent = 'Finalizada';
-                    statusBadge.style.background = 'rgba(220,53,69,0.3)';
-                } else {
+                    statusBadge.style.background = 'rgba(255,255,255,0.2)';
+                } else if (data.training.activa) {
                     statusBadge.textContent = 'Activa';
                     statusBadge.style.background = 'rgba(40,167,69,0.3)';
-                }
-                
-                // Actualizar estadísticas en pantalla
-                document.getElementById('reportTotalParticipants').textContent    = total;
-                document.getElementById('reportCompletedPostest').textContent     = completados;
-                document.getElementById('reportAvgImprovement').textContent       = `+${avgImprovement}%`;
-                document.getElementById('reportAdherenceRate').textContent        = `${adherenceRate}%`;
-                document.getElementById('reportAvgPretest').textContent           = `${avgPretest}%`;
-                document.getElementById('reportAvgPostest').textContent           = `${avgPostest}%`;
-                document.getElementById('reportAvgImprovementBig').textContent    = `+${avgImprovement}%`;
-                
-                // Llenar tabla
-                fillParticipantsTable(participants);
-                updateTrainingActions({ 
-                    activa: !estadoActual.includes('final'), 
-                    finalizada: estadoActual.includes('final'),
-                    titulo: tf['Título'] || ''
-                });
-                
-                // ── Cargar PDF guardado en Airtable (si existe) ──────────
-                const listaAsistencia = tf['Lista asistencia'];
-                if (listaAsistencia && Array.isArray(listaAsistencia) && listaAsistencia.length > 0) {
-                    const pdfAttachment = listaAsistencia[0];
-                    const savedPdfUrl   = pdfAttachment.url;
-                    const savedPdfName  = pdfAttachment.filename || 'lista_asistencia.pdf';
-
-                    // Limpiar URL local anterior si existía
-                    if (participantsPdfUrl && participantsPdfUrl.startsWith('blob:')) {
-                        try { URL.revokeObjectURL(participantsPdfUrl); } catch(e) {}
-                    }
-
-                    // Usar la URL de Airtable directamente
-                    participantsPdfUrl  = savedPdfUrl;
-                    participantsPdfFile = { name: savedPdfName }; // objeto simulado para el nombre
-
-                    // Mostrar el preview y habilitar botones
-                    const wrapper = document.getElementById('participantsPdfPreviewWrapper');
-                    const iframe  = document.getElementById('participantsPdfPreview');
-                    if (iframe)  iframe.src            = savedPdfUrl;
-                    if (wrapper) wrapper.style.display = 'block';
-
-                    const btnOpen     = document.getElementById('btnOpenParticipantsPdf');
-                    const btnDownload = document.getElementById('btnDownloadParticipantsPdf');
-                    const btnClear    = document.getElementById('btnClearParticipantsPdf');
-                    if (btnOpen)     btnOpen.disabled     = false;
-                    if (btnDownload) btnDownload.disabled = false;
-                    if (btnClear)    btnClear.disabled    = false;
-
-                    // Actualizar input label para mostrar el nombre del archivo guardado
-                    const pdfInput = document.getElementById('participantsPdfInput');
-                    if (pdfInput) {
-                        // Mostrar nombre junto al input
-                        const pdfInputLabel = pdfInput.parentElement?.querySelector('.pdf-saved-label');
-                        if (!pdfInputLabel) {
-                            const lbl = document.createElement('span');
-                            lbl.className = 'pdf-saved-label';
-                            lbl.style.cssText = 'margin-left:8px; color:#1a6b3c; font-size:0.85rem; font-weight:600;';
-                            lbl.innerHTML = `<i class="fas fa-check-circle"></i> Guardado: ${savedPdfName}`;
-                            pdfInput.parentElement?.appendChild(lbl);
-                        } else {
-                            pdfInputLabel.innerHTML = `<i class="fas fa-check-circle"></i> Guardado: ${savedPdfName}`;
-                        }
-                    }
-
-                    console.log('📄 PDF cargado desde Airtable:', savedPdfName);
                 } else {
-                    // No hay PDF guardado — resetear estado
-                    participantsPdfUrl  = null;
-                    participantsPdfFile = null;
-                    const wrapper = document.getElementById('participantsPdfPreviewWrapper');
-                    const iframe  = document.getElementById('participantsPdfPreview');
-                    if (iframe)  iframe.src            = '';
-                    if (wrapper) wrapper.style.display = 'none';
-                    const btnOpen     = document.getElementById('btnOpenParticipantsPdf');
-                    const btnDownload = document.getElementById('btnDownloadParticipantsPdf');
-                    const btnClear    = document.getElementById('btnClearParticipantsPdf');
-                    if (btnOpen)     btnOpen.disabled     = true;
-                    if (btnDownload) btnDownload.disabled = true;
-                    if (btnClear)    btnClear.disabled    = true;
-                    // Limpiar label de guardado si existía
-                    document.querySelectorAll('.pdf-saved-label').forEach(el => el.remove());
+                    statusBadge.textContent = 'Inactiva';
+                    statusBadge.style.background = 'rgba(220,53,69,0.3)';
                 }
-                // ─────────────────────────────────────────────────────────
-
+                
+                // Estadísticas
+                const stats = data.statistics;
+                document.getElementById('reportTotalParticipants').textContent = stats.totalParticipants;
+                document.getElementById('reportCompletedPostest').textContent = stats.completedPostest;
+                document.getElementById('reportAvgImprovement').textContent = `+${stats.avgImprovement}%`;
+                document.getElementById('reportAdherenceRate').textContent = `${stats.adherenceRate}%`;
+                
+                // Promedios de calificaciones
+                document.getElementById('reportAvgPretest').textContent = `${stats.avgPretestScore}%`;
+                document.getElementById('reportAvgPostest').textContent = `${stats.avgPostestScore}%`;
+                document.getElementById('reportAvgImprovementBig').textContent = `+${stats.avgImprovement}%`;
+                
+                // Llenar tabla de participantes
+                fillParticipantsTable(allParticipantsData);
+                
+                // Actualizar acciones de la capacitación
+                updateTrainingActions(data.training);
+                
+                // Mostrar contenedor
                 reportLoading.style.display = 'none';
                 reportContainer.style.display = 'block';
-                
-                console.log(`✅ Reporte cargado: ${total} participantes`);
                 
             } catch (error) {
                 console.error('❌ Error cargando reporte:', error);
                 reportLoading.style.display = 'none';
-                Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo cargar el reporte: ' + error.message });
+                
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo cargar el reporte: ' + error.message
+                });
             }
         }
 
@@ -8076,7 +7965,7 @@ function makeCronogramaFilterFormula(year, tipo) {
         // CARGAR / VISTA PREVIA DE LISTADO PDF
         // ═════════════════════════════════════════════════════════════════
 
-        async function handleParticipantsPdfUpload(event) {
+        function handleParticipantsPdfUpload(event) {
             const file = event?.target?.files?.[0];
             if (!file) return;
 
@@ -8086,6 +7975,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                 return;
             }
 
+            // Permitir hasta 10MB (ajustable)
             const maxSize = 10 * 1024 * 1024;
             if (file.size > maxSize) {
                 Swal.fire({ icon: 'warning', title: 'Archivo muy grande', text: 'El PDF supera 10 MB. Por favor comprímelo e intenta de nuevo.' });
@@ -8102,130 +7992,24 @@ function makeCronogramaFilterFormula(year, tipo) {
             participantsPdfUrl = URL.createObjectURL(file);
 
             // Habilitar botones
-            const btnOpen     = document.getElementById('btnOpenParticipantsPdf');
+            const btnOpen = document.getElementById('btnOpenParticipantsPdf');
             const btnDownload = document.getElementById('btnDownloadParticipantsPdf');
-            const btnClear    = document.getElementById('btnClearParticipantsPdf');
-            if (btnOpen)     btnOpen.disabled     = false;
+            const btnClear = document.getElementById('btnClearParticipantsPdf');
+            if (btnOpen) btnOpen.disabled = false;
             if (btnDownload) btnDownload.disabled = false;
-            if (btnClear)    btnClear.disabled    = false;
+            if (btnClear) btnClear.disabled = false;
 
             // Mostrar preview
             const wrapper = document.getElementById('participantsPdfPreviewWrapper');
-            const iframe  = document.getElementById('participantsPdfPreview');
-            if (iframe)  iframe.src             = participantsPdfUrl;
-            if (wrapper) wrapper.style.display  = 'block';
-
-            // ── Guardar en Airtable via proxy ────────────────────────────
-            const trainingId = document.getElementById('reportTrainingSelect')?.value;
-            if (!trainingId) {
-                Swal.fire({
-                    icon: 'info',
-                    title: 'PDF cargado',
-                    text: 'El PDF está disponible para consulta y descarga en este reporte.'
-                });
-                return;
-            }
+            const iframe = document.getElementById('participantsPdfPreview');
+            if (iframe) iframe.src = participantsPdfUrl;
+            if (wrapper) wrapper.style.display = 'block';
 
             Swal.fire({
-                title: 'Guardando en Airtable…',
-                text: 'Subiendo el PDF, por favor espera.',
-                allowOutsideClick: false,
-                didOpen: () => Swal.showLoading()
+                icon: 'success',
+                title: 'PDF cargado',
+                text: 'El listado PDF quedó disponible en el reporte.'
             });
-
-                // ── El campo "Lista asistencia" está en la tabla Capacitaciones ──
-                const targetTable    = 'Capacitaciones';
-                const targetRecordId = trainingId;
-                console.log('📁 Guardando PDF en Capacitaciones:', targetRecordId);
-                // ────────────────────────────────────────────────────────────────
-
-            try {
-                // Paso 1: convertir el PDF a base64 (data URI)
-                const base64DataUri = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload  = () => resolve(reader.result);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-
-                console.log('✅ PDF convertido a base64, tamaño:', Math.round(base64DataUri.length / 1024), 'KB');
-
-                // Paso 2: PATCH en Sesiones con data URI base64
-                console.log('📎 Guardando PDF en tabla:', targetTable, '| registro:', targetRecordId);
-
-                const patchResp = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'PATCH',
-                        path: `/${targetTable}/${targetRecordId}`,
-                        body: { fields: { 'Lista asistencia': [{ url: base64DataUri, filename: file.name }] } }
-                    })
-                });
-
-                const patchData = await patchResp.json();
-                console.log('📋 Respuesta PATCH Airtable:', patchData);
-
-                if (patchData.success) {
-                    Swal.fire({
-                        icon: 'success',
-                        title: '¡PDF guardado!',
-                        text: 'El listado PDF se guardó correctamente en Airtable en el campo "Lista asistencia".'
-                    });
-                } else {
-                    // Si data URI es rechazado, intentar con tmpfiles.org
-                    console.warn('⚠️ Primer intento falló, intentando con tmpfiles.org...', patchData.error);
-                    throw new Error('RETRY_UPLOAD');
-                }
-
-            } catch (firstErr) {
-                if (firstErr.message === 'RETRY_UPLOAD') {
-                    try {
-                        const formData = new FormData();
-                        formData.append('file', file);
-                        const uploadResp = await fetch('https://tmpfiles.org/api/v1/upload', {
-                            method: 'POST',
-                            body: formData
-                        });
-                        if (!uploadResp.ok) throw new Error('tmpfiles respondió ' + uploadResp.status);
-                        const uploadJson = await uploadResp.json();
-                        const pageUrl   = uploadJson?.data?.url || '';
-                        const directUrl = pageUrl.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
-                        if (!directUrl) throw new Error('No se obtuvo URL de tmpfiles.org');
-                        console.log('✅ PDF en tmpfiles.org:', directUrl);
-
-                        const patchResp2 = await fetch('/.netlify/functions/airtable-proxy', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                method: 'PATCH',
-                                path: `/${targetTable}/${targetRecordId}`,
-                                body: { fields: { 'Lista asistencia': [{ url: directUrl, filename: file.name }] } }
-                            })
-                        });
-                        const patchData2 = await patchResp2.json();
-                        if (patchData2.success) {
-                            Swal.fire({ icon: 'success', title: '¡PDF guardado!', text: 'El listado PDF se guardó correctamente en Airtable.' });
-                        } else {
-                            throw new Error(patchData2.error || JSON.stringify(patchData2));
-                        }
-                    } catch (retryErr) {
-                        console.error('❌ Reintento falló:', retryErr);
-                        Swal.fire({
-                            icon: 'warning',
-                            title: 'PDF cargado localmente',
-                            html: `El PDF está disponible en este reporte,<br>pero <b>no se pudo guardar en Airtable</b>.<br><small style="color:#666">${retryErr.message}</small>`
-                        });
-                    }
-                } else {
-                    console.error('❌ Error guardando PDF:', firstErr);
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'PDF cargado localmente',
-                        html: `El PDF está disponible en este reporte,<br>pero <b>no se pudo guardar en Airtable</b>:<br><small style="color:#666">${firstErr.message}</small>`
-                    });
-                }
-            }
         }
 
         function openParticipantsPdf() {
@@ -8588,7 +8372,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                             <td rowspan="2" class="logo-cell" style="width: 15%; padding: 10px;">
                                 <div style="text-align: center;">
                                     <div style="width: 60px; height: 60px; margin: 0 auto; border: 2px solid #003087; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #003087 0%, #001a4d 100%);">
-                                        <span style="color: #1f2937; font-size: 24px;">⭐</span>
+                                        <span style="color: #F2FFFA; font-size: 24px;">⭐</span>
                                     </div>
                                     <div style="margin-top: 5px;">
                                         <strong style="font-size: 9pt; color: #1f2937;">REPÚBLICA DE COLOMBIA</strong><br>
