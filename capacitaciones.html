@@ -2587,7 +2587,7 @@ overflow: hidden;
                 if (allData.success && allData.records) {
                     trainingRecord = allData.records.find(t => {
                         const codigoAcceso = t.fields['Código de Acceso'] || t.fields['Código Acceso'] || t.fields['Codigo Acceso'] || '';
-                        const estado = t.fields['Estado'] || '';
+                        const estado = t.fields['Status'] || t.fields['Estado'] || '';
                         // Aceptar si está activa o si no tiene campo estado definido
                         const estaActiva = estado === '' || estado === 'activa' || estado === 'Activa' || estado === 'ACTIVA' || estado !== 'inactiva';
                         return codigoAcceso.toUpperCase().trim() === code && estaActiva;
@@ -4364,7 +4364,7 @@ async function sendTrainingToAirtable(trainingData) {
                 "Departamento": trainingData.department,
                 "Duración": trainingData.duration,
                 "Código de Acceso": trainingData.accessCode,
-                "Estado": trainingData.status
+                "Status": trainingData.status
                 // Campos "Personal" y "Creado En" omitidos (no existen o causan errores)
             }
         };
@@ -4696,7 +4696,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         method: 'GET',
-                        path: '/Capacitaciones?sort[0][field]=Creado%20En&sort[0][direction]=desc',
+                        path: '/Capacitaciones',
                         body: null
                     })
                 });
@@ -4758,7 +4758,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const department = fields['Departamento'] || '';
             const duration = fields['Duración'] || '';
             const accessCode = fields['Código de Acceso'] || '';
-            const status = fields['Estado'] || 'active';
+            const status = fields['Status'] || fields['Estado'] || 'active';
             
             const formattedDate = date ? new Date(date).toLocaleDateString('es-ES', { 
                 year: 'numeric', 
@@ -7219,7 +7219,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                     const f = r.fields || {};
                     const activa = f['Activa'] !== false; // por defecto true
                     const finalizada = f['Finalizada'] === true; // por defecto false
-                    const estado = String(f['Estado'] || '').toLowerCase();
+                    const estado = String(f['Status'] || f['Estado'] || '').toLowerCase();
                     const estadoFinal = estado.includes('final') || estado.includes('complet');
                     return activa && !finalizada && !estadoFinal;
                 })
