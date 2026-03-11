@@ -1734,7 +1734,6 @@ overflow: hidden;
             <!-- Modal para mostrar QR generado -->
             <div id="qrModal" class="modal" style="display: none;">
                 <div class="modal-content" style="max-width: 500px; padding: 2rem; text-align: center;">
-                    <button class="modal-close" onclick="closeQRModal()">&times;</button>
                     
                     <h3 style="margin-bottom: 1rem; color: #1a1a1a;">
                         <i class="fas fa-qrcode"></i> Código QR Generado
@@ -4402,9 +4401,10 @@ async function sendTrainingToAirtable(trainingData) {
             fields: {
                 "Título": trainingData.title,
                 "Objetivo": trainingData.description,
-                "Fecha": trainingData.trainingDate,
+                "Fecha Creación": trainingData.trainingDate,
                 "Duración": trainingData.duration,
                 "Expositor": trainingData.responsable,
+                "Departamento": trainingData.department,
                 "Código de Acceso": trainingData.accessCode,
                 "Estado": trainingData.status
             }
