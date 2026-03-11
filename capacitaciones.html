@@ -4749,7 +4749,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         method: 'GET',
-                        path: '/Capacitaciones?sort[0][field]=Fecha%20Creaci%C3%B3n&sort[0][direction]=desc',
+                        path: '/Capacitaciones',
                         body: null
                     })
                 });
