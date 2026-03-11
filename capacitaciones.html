@@ -5252,17 +5252,36 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
          */
         function downloadQRCode() {
             try {
-                const qrContainer = document.getElementById('qrCode');
-                const qrImage = qrContainer.querySelector('img');
+                // QRCode.js puede generar en el modal (id="qrcode") o en la sección (id="qrCode")
+                const qrContainer = document.getElementById('qrcode') || document.getElementById('qrCode');
                 
-                if (!qrImage) {
+                if (!qrContainer) {
+                    throw new Error('No se encontró el contenedor del QR');
+                }
+
+                // QRCode.js genera un <canvas> o un <img> según el navegador
+                const canvas = qrContainer.querySelector('canvas');
+                const qrImage = qrContainer.querySelector('img');
+
+                let dataUrl;
+                if (canvas) {
+                    dataUrl = canvas.toDataURL('image/png');
+                } else if (qrImage) {
+                    dataUrl = qrImage.src;
+                } else {
                     throw new Error('No se encontró la imagen del QR');
                 }
-                
-                // Crear elemento de descarga
+
+                const code = window.currentQRData?.code 
+                    || document.getElementById('modalAccessCode')?.textContent 
+                    || 'QR';
+                const title = window.currentQRData?.title 
+                    || document.getElementById('modalAccessLink')?.textContent?.split('?')[0]?.split('/').pop() 
+                    || 'capacitacion';
+
                 const link = document.createElement('a');
-                link.href = qrImage.src;
-                link.download = `QR-${window.currentQRData.code}-${window.currentQRData.title.replace(/\s+/g, '-')}.png`;
+                link.href = dataUrl;
+                link.download = `QR-${code}-${title.replace(/\s+/g, '-')}.png`;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
