@@ -4449,7 +4449,6 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             fields: {
                 "Capacitación": [trainingRecordId],  // Link al registro de la capacitación
                 "Tipo": type === 'pretest' ? 'Pretest' : 'Postest',
-                "Número": q.number,
                 "Pregunta": q.question,
                 "Opción A": q.options.a,
                 "Opción B": q.options.b,
