@@ -4176,25 +4176,35 @@ function getSelectedStaff() {
 }
 
         async function saveTraining() {
-    const titleInput = document.getElementById('trainingTitle');
-    const descInput = document.getElementById('trainingDescription');
-    const dateInput = document.getElementById('trainingDate');
-    const deptInput = document.getElementById('trainingDepartment');
+    const titleInput    = document.getElementById('trainingTitle');
+    const descInput     = document.getElementById('trainingDescription');
+    const dateInput     = document.getElementById('trainingDate');
+    const deptInput     = document.getElementById('trainingDepartment');
     const durationInput = document.getElementById('trainingDuration');
+    const expositorInput  = document.getElementById('trainingExpositor');
+    const referenteInput  = document.getElementById('trainingReferente');
+    const methodInput     = document.getElementById('trainingMethodology');
+    const placeInput      = document.getElementById('trainingPlace');
+    const eventDateInput  = document.getElementById('trainingEventDate');
 
-    const title = titleInput ? titleInput.value.trim() : '';
-    const description = descInput ? descInput.value.trim() : '';
-    const trainingDate = dateInput ? dateInput.value : '';
-    const department = deptInput ? deptInput.value : '';
-    const duration = durationInput ? durationInput.value : '';
+    const title       = titleInput    ? titleInput.value.trim()    : '';
+    const description = descInput     ? descInput.value.trim()     : '';
+    const trainingDate= dateInput     ? dateInput.value            : '';
+    const department  = deptInput     ? deptInput.value            : '';
+    const duration    = durationInput ? durationInput.value.trim() : '';
+    const expositor   = expositorInput  ? expositorInput.value.trim()  : '';
+    const referente   = referenteInput  ? referenteInput.value.trim()  : '';
+    const methodology = methodInput     ? methodInput.value            : '';
+    const place       = placeInput      ? placeInput.value.trim()      : '';
+    const eventDate   = eventDateInput  ? eventDateInput.value         : '';
 
     // Solo el personal marcado (checkboxes)
     const selectedStaff = getSelectedStaff();
 
-    if (!title || !description || !trainingDate || !department || !duration || selectedStaff.length === 0) {
+    if (!title || !trainingDate || !department || selectedStaff.length === 0) {
         let missingMsg = 'Por favor completa todos los campos requeridos (*)';
         if (selectedStaff.length === 0) {
-            missingMsg += ' y marca al menos una casilla en "Personal Capacitado".';
+            missingMsg += ' y marca al menos una casilla en "Dirigido a".';
         }
         Swal.fire({ icon: 'warning', title: 'Campos Incompletos', text: missingMsg });
         if (titleInput) titleInput.scrollIntoView({ behavior: 'smooth' });
@@ -4237,6 +4247,11 @@ function getSelectedStaff() {
         trainingDate,
         department,
         duration,
+        expositor,
+        referente,
+        methodology,
+        place,
+        eventDate,
         staffList: selectedStaff,
         accessCode,
         status: 'active',
@@ -4341,28 +4356,26 @@ async function sendTrainingToAirtable(trainingData) {
         console.log('📤 Enviando capacitación a Airtable...');
         console.log('Datos originales:', trainingData);
 
-        // Campos base que siempre existen en Airtable
-        const fields = {
-            "Título": trainingData.title || '',
-            "Fecha": trainingData.trainingDate || '',
-            "Departamento": trainingData.department || '',
-            "Código de Acceso": trainingData.accessCode || '',
-            "Estado": trainingData.status || 'active'
+        // Construir solo los campos que existen en Airtable (nombres exactos)
+        const _fields = {
+            "Título":          trainingData.title        || '',
+            "Fecha":           trainingData.trainingDate || '',
+            "Departamento":    trainingData.department   || '',
+            "Código de Acceso": trainingData.accessCode  || '',
+            "Estado":          trainingData.status       || 'active'
         };
+        // Opcionales — se incluyen solo si tienen valor para evitar errores 422
+        if (trainingData.description) _fields["Descripción"]                 = trainingData.description;
+        if (trainingData.duration)    _fields["Duración"]                    = trainingData.duration;
+        if (trainingData.expositor)   _fields["Expositor"]                   = trainingData.expositor;
+        if (trainingData.referente)   _fields["Referente de Capacitaciones"] = trainingData.referente;
+        if (trainingData.methodology) _fields["Metodología"]                 = trainingData.methodology;
+        if (trainingData.place)       _fields["Lugar"]                       = trainingData.place;
+        if (trainingData.eventDate)   _fields["Fecha de la capacitación"]    = trainingData.eventDate;
+        if (trainingData.staffList && trainingData.staffList.length > 0)
+            _fields["Dirigido a"] = trainingData.staffList.join(', ');
 
-        // Campos opcionales — solo se envían si tienen valor (nombres exactos de Airtable)
-        if (trainingData.description)  fields["Descripción"]                  = trainingData.description;
-        if (trainingData.duration)     fields["Duración"]                     = trainingData.duration;
-        if (trainingData.expositor)    fields["Expositor"]                    = trainingData.expositor;
-        if (trainingData.referente)    fields["Referente de Capacitaciones"]  = trainingData.referente;
-        if (trainingData.methodology)  fields["Metodología"]                  = trainingData.methodology;
-        if (trainingData.place)        fields["Lugar"]                        = trainingData.place;
-        if (trainingData.eventDate)    fields["Fecha de la capacitación"]     = trainingData.eventDate;
-        if (trainingData.staffList && trainingData.staffList.length > 0) {
-            fields["Dirigido a"] = trainingData.staffList.join(', ');
-        }
-
-        const airtableRecord = { fields };
+        const airtableRecord = { fields: _fields };
 
         console.log('📋 Record a enviar:', JSON.stringify(airtableRecord, null, 2));
 
@@ -4691,7 +4704,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         method: 'GET',
-                        path: '/Capacitaciones?sort%5B0%5D%5Bfield%5D=Fecha&sort%5B0%5D%5Bdirection%5D=desc',
+                        path: '/Capacitaciones',
                         body: null
                     })
                 });
@@ -4754,12 +4767,6 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const duration = fields['Duración'] || '';
             const accessCode = fields['Código de Acceso'] || '';
             const status = fields['Estado'] || 'active';
-            const expositor = fields['Expositor'] || '';
-            const referente = fields['Referente de Capacitaciones'] || '';
-            const methodology = fields['Metodología'] || '';
-            const place = fields['Lugar'] || '';
-            const eventDate = fields['Fecha de la capacitación'] || '';
-            const dirigidoA = fields['Dirigido a'] || '';
             
             const formattedDate = date ? new Date(date).toLocaleDateString('es-ES', { 
                 year: 'numeric', 
@@ -4782,15 +4789,13 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                             <span>${formattedDate}</span>
                         </div>
                         <div class="training-info-item">
-                            <i class="fas fa-hospital"></i>
+                            <i class="fas fa-building"></i>
                             <span>${department}</span>
                         </div>
-                        ${duration ? `<div class="training-info-item"><i class="fas fa-clock"></i><span>${duration}</span></div>` : ''}
-                        ${expositor ? `<div class="training-info-item"><i class="fas fa-user"></i><span>${expositor}</span></div>` : ''}
-                        ${methodology ? `<div class="training-info-item"><i class="fas fa-chalkboard-teacher"></i><span>${methodology}</span></div>` : ''}
-                        ${place ? `<div class="training-info-item"><i class="fas fa-map-marker-alt"></i><span>${place}</span></div>` : ''}
-                        ${eventDate ? `<div class="training-info-item"><i class="fas fa-calendar-check"></i><span>Evento: ${new Date(eventDate).toLocaleDateString('es-ES')}</span></div>` : ''}
-                        ${dirigidoA ? `<div class="training-info-item" style="grid-column:1/-1"><i class="fas fa-users"></i><span style="font-size:0.85rem">${dirigidoA}</span></div>` : ''}
+                        <div class="training-info-item">
+                            <i class="fas fa-clock"></i>
+                            <span>${duration}</span>
+                        </div>
                     </div>
                     
                     <div class="training-code">
