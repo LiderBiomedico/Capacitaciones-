@@ -8021,7 +8021,6 @@ function makeCronogramaFilterFormula(year, tipo) {
                 return;
             }
 
-            // Permitir hasta 10MB (ajustable)
             const maxSize = 10 * 1024 * 1024;
             if (file.size > maxSize) {
                 Swal.fire({ icon: 'warning', title: 'Archivo muy grande', text: 'El PDF supera 10 MB. Por favor comprímelo e intenta de nuevo.' });
@@ -8038,83 +8037,133 @@ function makeCronogramaFilterFormula(year, tipo) {
             participantsPdfUrl = URL.createObjectURL(file);
 
             // Habilitar botones
-            const btnOpen = document.getElementById('btnOpenParticipantsPdf');
+            const btnOpen     = document.getElementById('btnOpenParticipantsPdf');
             const btnDownload = document.getElementById('btnDownloadParticipantsPdf');
-            const btnClear = document.getElementById('btnClearParticipantsPdf');
-            if (btnOpen) btnOpen.disabled = false;
+            const btnClear    = document.getElementById('btnClearParticipantsPdf');
+            if (btnOpen)     btnOpen.disabled     = false;
             if (btnDownload) btnDownload.disabled = false;
-            if (btnClear) btnClear.disabled = false;
+            if (btnClear)    btnClear.disabled    = false;
 
             // Mostrar preview
             const wrapper = document.getElementById('participantsPdfPreviewWrapper');
-            const iframe = document.getElementById('participantsPdfPreview');
-            if (iframe) iframe.src = participantsPdfUrl;
-            if (wrapper) wrapper.style.display = 'block';
+            const iframe  = document.getElementById('participantsPdfPreview');
+            if (iframe)  iframe.src             = participantsPdfUrl;
+            if (wrapper) wrapper.style.display  = 'block';
 
-            // ── Guardar en Airtable ──────────────────────────────────────
-            // Obtener el ID del registro de la capacitación seleccionada
+            // ── Guardar en Airtable via proxy ────────────────────────────
             const trainingId = document.getElementById('reportTrainingSelect')?.value;
             if (!trainingId) {
                 Swal.fire({
-                    icon: 'warning',
-                    title: 'PDF cargado localmente',
-                    text: 'El PDF está disponible en este reporte, pero no se guardó en Airtable porque no hay una capacitación seleccionada.'
+                    icon: 'info',
+                    title: 'PDF cargado',
+                    text: 'El PDF está disponible para consulta y descarga en este reporte.'
                 });
                 return;
             }
 
-            // Convertir a base64 para enviarlo al servidor
-            const toBase64 = (f) => new Promise((res, rej) => {
-                const reader = new FileReader();
-                reader.onload = () => res(reader.result.split(',')[1]); // solo la parte base64
-                reader.onerror = rej;
-                reader.readAsDataURL(f);
-            });
-
             Swal.fire({
                 title: 'Guardando en Airtable…',
-                text: 'Por favor espera',
+                text: 'Subiendo el PDF, por favor espera.',
                 allowOutsideClick: false,
                 didOpen: () => Swal.showLoading()
             });
 
             try {
-                const fileBase64 = await toBase64(file);
+                // Paso 1: convertir el PDF a base64 (data URI)
+                const base64DataUri = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload  = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
 
-                const response = await fetch('/.netlify/functions/upload-pdf-attachment', {
+                console.log('✅ PDF convertido a base64, tamaño:', Math.round(base64DataUri.length / 1024), 'KB');
+
+                // Paso 2: PATCH en Airtable via proxy con data URI
+                const patchResp = await fetch('/.netlify/functions/airtable-proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        recordId: trainingId,
-                        fileName: file.name,
-                        fileBase64: fileBase64,
-                        contentType: 'application/pdf'
+                        method: 'PATCH',
+                        path: `/Capacitaciones/${trainingId}`,
+                        body: {
+                            fields: {
+                                'Lista asistencia': [
+                                    { url: base64DataUri, filename: file.name }
+                                ]
+                            }
+                        }
                     })
                 });
 
-                const result = await response.json();
+                const patchData = await patchResp.json();
+                console.log('📋 Respuesta PATCH Airtable:', patchData);
 
-                if (result.success) {
+                if (patchData.success) {
                     Swal.fire({
                         icon: 'success',
                         title: '¡PDF guardado!',
-                        text: 'El listado PDF se guardó correctamente en el campo "Lista asistencia" de Airtable.'
+                        text: 'El listado PDF se guardó correctamente en Airtable en el campo "Lista asistencia".'
                     });
                 } else {
-                    console.error('Error Airtable upload:', result.error);
+                    // Si data URI es rechazado, intentar con tmpfiles.org
+                    console.warn('⚠️ Primer intento falló, intentando con tmpfiles.org...', patchData.error);
+                    throw new Error('RETRY_UPLOAD');
+                }
+
+            } catch (firstErr) {
+                if (firstErr.message === 'RETRY_UPLOAD') {
+                    try {
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        const uploadResp = await fetch('https://tmpfiles.org/api/v1/upload', {
+                            method: 'POST',
+                            body: formData
+                        });
+                        if (!uploadResp.ok) throw new Error('tmpfiles respondió ' + uploadResp.status);
+                        const uploadJson = await uploadResp.json();
+                        const pageUrl   = uploadJson?.data?.url || '';
+                        const directUrl = pageUrl.replace('tmpfiles.org/', 'tmpfiles.org/dl/');
+                        if (!directUrl) throw new Error('No se obtuvo URL de tmpfiles.org');
+                        console.log('✅ PDF en tmpfiles.org:', directUrl);
+
+                        const patchResp2 = await fetch('/.netlify/functions/airtable-proxy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                method: 'PATCH',
+                                path: `/Capacitaciones/${trainingId}`,
+                                body: {
+                                    fields: {
+                                        'Lista asistencia': [
+                                            { url: directUrl, filename: file.name }
+                                        ]
+                                    }
+                                }
+                            })
+                        });
+                        const patchData2 = await patchResp2.json();
+                        if (patchData2.success) {
+                            Swal.fire({ icon: 'success', title: '¡PDF guardado!', text: 'El listado PDF se guardó correctamente en Airtable.' });
+                        } else {
+                            throw new Error(patchData2.error || JSON.stringify(patchData2));
+                        }
+                    } catch (retryErr) {
+                        console.error('❌ Reintento falló:', retryErr);
+                        Swal.fire({
+                            icon: 'warning',
+                            title: 'PDF cargado localmente',
+                            html: `El PDF está disponible en este reporte,<br>pero <b>no se pudo guardar en Airtable</b>.<br><small style="color:#666">${retryErr.message}</small>`
+                        });
+                    }
+                } else {
+                    console.error('❌ Error guardando PDF:', firstErr);
                     Swal.fire({
                         icon: 'warning',
                         title: 'PDF cargado localmente',
-                        text: 'El PDF está disponible en este reporte, pero hubo un error al guardarlo en Airtable: ' + (result.error?.message || JSON.stringify(result.error) || 'Error desconocido')
+                        html: `El PDF está disponible en este reporte,<br>pero <b>no se pudo guardar en Airtable</b>:<br><small style="color:#666">${firstErr.message}</small>`
                     });
                 }
-            } catch (err) {
-                console.error('Error al guardar PDF en Airtable:', err);
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'PDF cargado localmente',
-                    text: 'El PDF está disponible en este reporte, pero no se pudo guardar en Airtable: ' + err.message
-                });
             }
         }
 
