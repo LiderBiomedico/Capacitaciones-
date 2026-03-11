@@ -1575,6 +1575,11 @@ overflow: hidden;
                         </div>
 
                         <div class="form-group">
+                            <label><i class="fas fa-user-tie"></i> Referente de Capacitaciones</label>
+                            <input type="text" id="trainingReferente" placeholder="Ej: Coordinador de Capacitaciones">
+                        </div>
+
+                        <div class="form-group">
                             <label><i class="fas fa-align-left"></i> Objetivo *</label>
                             <textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos de la capacitación..."></textarea>
                         </div>
@@ -1601,6 +1606,26 @@ overflow: hidden;
                             <div class="form-group">
                                 <label><i class="fas fa-clock"></i> Duración</label>
                                 <input type="text" id="trainingDuration" placeholder="Ej: 30 minutos">
+                            </div>
+
+                            <div class="form-group">
+                                <label><i class="fas fa-chalkboard-teacher"></i> Metodología</label>
+                                <select id="trainingMetodologia">
+                                    <option value="">Seleccione...</option>
+                                    <option value="Presencial">Presencial</option>
+                                    <option value="Virtual">Virtual</option>
+                                    <option value="Hibrida">Hibrida</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label><i class="fas fa-map-marker-alt"></i> Lugar</label>
+                                <input type="text" id="trainingLugar" placeholder="Ej: Sala de conferencias, Piso 2">
+                            </div>
+
+                            <div class="form-group">
+                                <label><i class="fas fa-calendar-alt"></i> Fecha de la capacitación</label>
+                                <input type="date" id="trainingFechaCapacitacion">
                             </div>
                         </div>
 
@@ -4223,6 +4248,10 @@ function getSelectedStaff() {
     const deptInput = document.getElementById('trainingDepartment');
     const durationInput = document.getElementById('trainingDuration');
     const responsableInput = document.getElementById('trainingResponsable');
+    const metodologiaInput = document.getElementById('trainingMetodologia');
+    const lugarInput = document.getElementById('trainingLugar');
+    const fechaCapacitacionInput = document.getElementById('trainingFechaCapacitacion');
+    const referenteInput = document.getElementById('trainingReferente');
 
     const title = titleInput ? titleInput.value.trim() : '';
     const description = descInput ? descInput.value.trim() : '';
@@ -4230,6 +4259,10 @@ function getSelectedStaff() {
     const department = deptInput ? deptInput.value : '';
     const duration = durationInput ? durationInput.value : '';
     const responsable = responsableInput ? responsableInput.value.trim() : '';
+    const metodologia = metodologiaInput ? metodologiaInput.value : '';
+    const lugar = lugarInput ? lugarInput.value.trim() : '';
+    const fechaCapacitacion = fechaCapacitacionInput ? fechaCapacitacionInput.value : '';
+    const referente = referenteInput ? referenteInput.value.trim() : '';
 
     // Solo el personal marcado (checkboxes)
     const selectedStaff = getSelectedStaff();
@@ -4280,6 +4313,10 @@ function getSelectedStaff() {
         trainingDate,
         department,
         duration,
+        metodologia,
+        lugar,
+        fechaCapacitacion,
+        referente,
         responsable,
         staffList: selectedStaff,
         accessCode,
@@ -4400,6 +4437,20 @@ async function sendTrainingToAirtable(trainingData) {
                 "Estado": trainingData.status
             }
         };
+
+        // Agregar Metodología solo si tiene valor
+        if (trainingData.metodologia) {
+            airtableRecord.fields["Metodología"] = trainingData.metodologia;
+        }
+        if (trainingData.lugar) {
+            airtableRecord.fields["Lugar"] = trainingData.lugar;
+        }
+        if (trainingData.fechaCapacitacion) {
+            airtableRecord.fields["Fecha de la capacitación"] = trainingData.fechaCapacitacion;
+        }
+        if (trainingData.referente) {
+            airtableRecord.fields["Referente de Capacitaciones"] = trainingData.referente;
+        }
 
         // Agregar "Dirigido a" solo con opciones que existen en Airtable
         if (trainingData.staffList && trainingData.staffList.length > 0) {
