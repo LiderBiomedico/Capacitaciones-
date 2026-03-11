@@ -1565,7 +1565,7 @@ overflow: hidden;
                 
                 <div class="card">
                     <h3>📋 Información General</h3>
-                    <form id="trainingForm">
+                    <form id="trainingForm" novalidate>
                         <div class="form-group">
                             <label><i class="fas fa-graduation-cap"></i> Capacitación *</label>
                             <input type="text" id="trainingTitle" required placeholder="Ej: Protocolo de Higiene de Manos">
@@ -1698,10 +1698,10 @@ overflow: hidden;
                 </div>
 
                 <div class="form-actions">
-                    <button class="btn btn-primary" onclick="saveTraining()">
+                    <button type="button" class="btn btn-primary" onclick="saveTraining()">
                         <i class="fas fa-save"></i> Guardar Capacitación
                     </button>
-                    <button class="btn btn-secondary" onclick="resetForm()">
+                    <button type="button" class="btn btn-secondary" onclick="resetForm()">
                         <i class="fas fa-undo"></i> Limpiar Formulario
                     </button>
                 </div>
@@ -4366,11 +4366,11 @@ function getSelectedStaff() {
         title: '¡Capacitación Guardada!',
         html: `
             <div style="margin: 20px 0;">
-                <p>Código de Acceso:</p>
-                <h2 style="color: #F2FFFA; margin: 10px 0;">${accessCode}</h2>
-                <p style="font-size: 0.9em; color: #F2FFFA;">Comparte este código con los participantes</p>
+                <p style="color:#333;">Código de Acceso:</p>
+                <h2 style="color: #2E7D32; font-size: 2rem; letter-spacing: 4px; margin: 10px 0;">${accessCode}</h2>
+                <p style="font-size: 0.9em; color: #555;">Comparte este código con los participantes</p>
                 <hr style="margin: 15px 0;">
-                <p style="font-size: 0.85em;">
+                <p style="font-size: 0.85em; color:#333;">
                     ✅ Capacitación guardada en Airtable<br>
                     ${pretestSaved ? '✅' : '⚠️'} ${pretestQuestions.length} preguntas de pretest ${pretestSaved ? 'guardadas' : 'con error'}<br>
                     ${postestSaved ? '✅' : '⚠️'} ${postestQuestions.length} preguntas de postest ${postestSaved ? 'guardadas' : 'con error'}
