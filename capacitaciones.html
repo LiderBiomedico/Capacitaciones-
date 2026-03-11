@@ -503,9 +503,25 @@
 
         .radio-label {
             font-size: 0.85rem;
-            color: #F2FFFA;
+            color: #555555;
             min-width: 70px;
             font-weight: 500;
+        }
+
+        .option-item:has(input[type="radio"]:checked) {
+            border-color: var(--primary);
+            background: #eaf7ee;
+        }
+
+        .option-item:has(input[type="radio"]:checked) .radio-label {
+            color: #2e7d32;
+            font-weight: 700;
+        }
+
+        .option-item:has(input[type="radio"]:checked) .option-text {
+            border-color: var(--primary);
+            color: #1a1a1a;
+            font-weight: 600;
         }
 
         .option-text {
