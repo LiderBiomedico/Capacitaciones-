@@ -8011,7 +8011,7 @@ function makeCronogramaFilterFormula(year, tipo) {
         // CARGAR / VISTA PREVIA DE LISTADO PDF
         // ═════════════════════════════════════════════════════════════════
 
-        function handleParticipantsPdfUpload(event) {
+        async function handleParticipantsPdfUpload(event) {
             const file = event?.target?.files?.[0];
             if (!file) return;
 
@@ -8051,11 +8051,71 @@ function makeCronogramaFilterFormula(year, tipo) {
             if (iframe) iframe.src = participantsPdfUrl;
             if (wrapper) wrapper.style.display = 'block';
 
-            Swal.fire({
-                icon: 'success',
-                title: 'PDF cargado',
-                text: 'El listado PDF quedó disponible en el reporte.'
+            // ── Guardar en Airtable ──────────────────────────────────────
+            // Obtener el ID del registro de la capacitación seleccionada
+            const trainingId = document.getElementById('reportTrainingSelect')?.value;
+            if (!trainingId) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'PDF cargado localmente',
+                    text: 'El PDF está disponible en este reporte, pero no se guardó en Airtable porque no hay una capacitación seleccionada.'
+                });
+                return;
+            }
+
+            // Convertir a base64 para enviarlo al servidor
+            const toBase64 = (f) => new Promise((res, rej) => {
+                const reader = new FileReader();
+                reader.onload = () => res(reader.result.split(',')[1]); // solo la parte base64
+                reader.onerror = rej;
+                reader.readAsDataURL(f);
             });
+
+            Swal.fire({
+                title: 'Guardando en Airtable…',
+                text: 'Por favor espera',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
+
+            try {
+                const fileBase64 = await toBase64(file);
+
+                const response = await fetch('/.netlify/functions/upload-pdf-attachment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        recordId: trainingId,
+                        fileName: file.name,
+                        fileBase64: fileBase64,
+                        contentType: 'application/pdf'
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡PDF guardado!',
+                        text: 'El listado PDF se guardó correctamente en el campo "Lista asistencia" de Airtable.'
+                    });
+                } else {
+                    console.error('Error Airtable upload:', result.error);
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'PDF cargado localmente',
+                        text: 'El PDF está disponible en este reporte, pero hubo un error al guardarlo en Airtable: ' + (result.error?.message || JSON.stringify(result.error) || 'Error desconocido')
+                    });
+                }
+            } catch (err) {
+                console.error('Error al guardar PDF en Airtable:', err);
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'PDF cargado localmente',
+                    text: 'El PDF está disponible en este reporte, pero no se pudo guardar en Airtable: ' + err.message
+                });
+            }
         }
 
         function openParticipantsPdf() {

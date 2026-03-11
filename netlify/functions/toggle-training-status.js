@@ -65,30 +65,6 @@ export async function handler(event) {
     console.log(`📋 ${isFinalize ? 'Finalizando' : 'Reactivando'} capacitación:`, trainingId);
 
     // ═════════════════════════════════════════════════════════════
-    // PASO 0: Leer valores actuales (para contador de reactivaciones)
-    // ═════════════════════════════════════════════════════════════
-
-    let currentReactivations = 0;
-    try {
-      const getTrainingUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Capacitaciones/${trainingId}`;
-      const getTrainingRes = await fetch(getTrainingUrl, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      if (getTrainingRes.ok) {
-        const getTrainingData = await getTrainingRes.json();
-        const raw = getTrainingData?.fields?.['Reactivaciones'];
-        currentReactivations = Number(raw || 0);
-      }
-    } catch (e) {
-      // No bloquea el flujo si el campo no existe o si falla la lectura
-      console.warn('⚠️ No se pudo leer Reactivaciones (continuando):', e?.message || e);
-    }
-
-    // ═════════════════════════════════════════════════════════════
     // PASO 1: Actualizar la capacitación
     // ═════════════════════════════════════════════════════════════
 
@@ -99,12 +75,6 @@ export async function handler(event) {
       'Fecha Finalización': isFinalize ? new Date().toISOString().split('T')[0] : null
     };
 
-    // Contador de reactivaciones (solo cuando action === 'reactivate')
-    if (!isFinalize) {
-      trainingFields['Reactivaciones'] = currentReactivations + 1;
-      trainingFields['Fecha Última Reactivación'] = new Date().toISOString().split('T')[0];
-    }
-
     const trainingResponse = await fetch(updateTrainingUrl, {
       method: 'PATCH',
       headers: {
@@ -114,43 +84,12 @@ export async function handler(event) {
       body: JSON.stringify({ fields: trainingFields })
     });
 
-    let trainingData = null;
     if (!trainingResponse.ok) {
       const errorData = await trainingResponse.json();
       console.error('❌ Error actualizando capacitación:', errorData);
-
-      // Si el error es por campos inexistentes, reintentamos con campos mínimos
-      if (errorData.error?.type === 'INVALID_REQUEST_UNKNOWN_FIELD_NAME') {
-        console.warn('⚠️ Campos no encontrados en Airtable. Reintentando con campos mínimos...');
-
-        const minimalFields = {
-          'Finalizada': isFinalize
-        };
-
-        const retryRes = await fetch(updateTrainingUrl, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ fields: minimalFields })
-        });
-
-        if (!retryRes.ok) {
-          const retryErr = await retryRes.json();
-          return {
-            statusCode: retryRes.status,
-            headers,
-            body: JSON.stringify({
-              success: false,
-              error: 'No se pudo actualizar la capacitación (campos inválidos en Airtable)',
-              details: retryErr
-            })
-          };
-        }
-
-        trainingData = await retryRes.json();
-      } else {
+      
+      // Si el campo no existe, continuamos de todas formas
+      if (errorData.error?.type !== 'INVALID_REQUEST_UNKNOWN_FIELD_NAME') {
         return {
           statusCode: trainingResponse.status,
           headers,
@@ -161,9 +100,9 @@ export async function handler(event) {
           })
         };
       }
-    } else {
-      trainingData = await trainingResponse.json();
     }
+
+    const trainingData = await trainingResponse.json();
     console.log('✅ Capacitación actualizada');
 
     // ═════════════════════════════════════════════════════════════
@@ -229,8 +168,7 @@ export async function handler(event) {
         training: {
           id: trainingId,
           finalizada: isFinalize,
-          fechaFinalizacion: isFinalize ? new Date().toISOString().split('T')[0] : null,
-          reactivaciones: !isFinalize ? (currentReactivations + 1) : currentReactivations
+          fechaFinalizacion: isFinalize ? new Date().toISOString().split('T')[0] : null
         },
         sessionsUpdated: updatedSessions
       })
