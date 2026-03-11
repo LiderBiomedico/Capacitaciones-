@@ -4397,16 +4397,16 @@ async function sendTrainingToAirtable(trainingData) {
         console.log('📤 Enviando capacitación a Airtable...');
         console.log('Datos originales:', trainingData);
 
-        // Usar solo los campos que existen en Airtable
+        // Usar solo los campos confirmados en Airtable
         const airtableRecord = {
             fields: {
                 "Capacitacion": trainingData.title,
                 "Objetivo": trainingData.description,
                 "Fecha": trainingData.trainingDate,
                 "Duración": trainingData.duration,
-                "Responsable": trainingData.responsable,
                 "Código de Acceso": trainingData.accessCode,
                 "Estado": trainingData.status
+                // "Responsable": se agrega cuando el campo exista en Airtable
             }
         };
 
