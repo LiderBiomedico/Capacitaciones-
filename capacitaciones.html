@@ -7831,7 +7831,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                 const trainingData = await trainingResp.json();
                 
                 // 2. Obtener TODAS las participaciones y filtrar por código de acceso de la capacitación
-                const accessCode = trainingData.fields?.['Código de Acceso'] || '';
+                const accessCode = (trainingData.fields || trainingData.record?.fields || {})['Código de Acceso'] || '';
                 
                 const partResp = await fetch('/.netlify/functions/airtable-proxy', {
                     method: 'POST',
@@ -7889,7 +7889,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                 allParticipantsData = participants;
                 
                 // Actualizar info de la capacitación
-                const tf = trainingData.fields || {};
+                const tf = trainingData.fields || trainingData.record?.fields || {};
                 document.getElementById('reportTrainingTitle').textContent       = tf['Título'] || 'Sin título';
                 document.getElementById('reportTrainingDescription').textContent = tf['Descripción'] || 'Sin descripción';
                 document.getElementById('reportTrainingDepartment').textContent  = tf['Departamento'] || 'General';
@@ -7922,6 +7922,71 @@ function makeCronogramaFilterFormula(year, tipo) {
                     titulo: tf['Título'] || ''
                 });
                 
+                // ── Cargar PDF guardado en Airtable (si existe) ──────────
+                const listaAsistencia = tf['Lista asistencia'];
+                if (listaAsistencia && Array.isArray(listaAsistencia) && listaAsistencia.length > 0) {
+                    const pdfAttachment = listaAsistencia[0];
+                    const savedPdfUrl   = pdfAttachment.url;
+                    const savedPdfName  = pdfAttachment.filename || 'lista_asistencia.pdf';
+
+                    // Limpiar URL local anterior si existía
+                    if (participantsPdfUrl && participantsPdfUrl.startsWith('blob:')) {
+                        try { URL.revokeObjectURL(participantsPdfUrl); } catch(e) {}
+                    }
+
+                    // Usar la URL de Airtable directamente
+                    participantsPdfUrl  = savedPdfUrl;
+                    participantsPdfFile = { name: savedPdfName }; // objeto simulado para el nombre
+
+                    // Mostrar el preview y habilitar botones
+                    const wrapper = document.getElementById('participantsPdfPreviewWrapper');
+                    const iframe  = document.getElementById('participantsPdfPreview');
+                    if (iframe)  iframe.src            = savedPdfUrl;
+                    if (wrapper) wrapper.style.display = 'block';
+
+                    const btnOpen     = document.getElementById('btnOpenParticipantsPdf');
+                    const btnDownload = document.getElementById('btnDownloadParticipantsPdf');
+                    const btnClear    = document.getElementById('btnClearParticipantsPdf');
+                    if (btnOpen)     btnOpen.disabled     = false;
+                    if (btnDownload) btnDownload.disabled = false;
+                    if (btnClear)    btnClear.disabled    = false;
+
+                    // Actualizar input label para mostrar el nombre del archivo guardado
+                    const pdfInput = document.getElementById('participantsPdfInput');
+                    if (pdfInput) {
+                        // Mostrar nombre junto al input
+                        const pdfInputLabel = pdfInput.parentElement?.querySelector('.pdf-saved-label');
+                        if (!pdfInputLabel) {
+                            const lbl = document.createElement('span');
+                            lbl.className = 'pdf-saved-label';
+                            lbl.style.cssText = 'margin-left:8px; color:#1a6b3c; font-size:0.85rem; font-weight:600;';
+                            lbl.innerHTML = `<i class="fas fa-check-circle"></i> Guardado: ${savedPdfName}`;
+                            pdfInput.parentElement?.appendChild(lbl);
+                        } else {
+                            pdfInputLabel.innerHTML = `<i class="fas fa-check-circle"></i> Guardado: ${savedPdfName}`;
+                        }
+                    }
+
+                    console.log('📄 PDF cargado desde Airtable:', savedPdfName);
+                } else {
+                    // No hay PDF guardado — resetear estado
+                    participantsPdfUrl  = null;
+                    participantsPdfFile = null;
+                    const wrapper = document.getElementById('participantsPdfPreviewWrapper');
+                    const iframe  = document.getElementById('participantsPdfPreview');
+                    if (iframe)  iframe.src            = '';
+                    if (wrapper) wrapper.style.display = 'none';
+                    const btnOpen     = document.getElementById('btnOpenParticipantsPdf');
+                    const btnDownload = document.getElementById('btnDownloadParticipantsPdf');
+                    const btnClear    = document.getElementById('btnClearParticipantsPdf');
+                    if (btnOpen)     btnOpen.disabled     = true;
+                    if (btnDownload) btnDownload.disabled = true;
+                    if (btnClear)    btnClear.disabled    = true;
+                    // Limpiar label de guardado si existía
+                    document.querySelectorAll('.pdf-saved-label').forEach(el => el.remove());
+                }
+                // ─────────────────────────────────────────────────────────
+
                 reportLoading.style.display = 'none';
                 reportContainer.style.display = 'block';
                 
