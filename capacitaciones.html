@@ -4409,11 +4409,15 @@ async function sendTrainingToAirtable(trainingData) {
                 "Duración": trainingData.duration,
                 "Expositor": trainingData.responsable,
                 "Departamento": trainingData.department,
-                "Metologia": trainingData.metodologia,
                 "Código de Acceso": trainingData.accessCode,
                 "Estado": trainingData.status
             }
         };
+
+        // Agregar Metodología solo si tiene valor
+        if (trainingData.metodologia) {
+            airtableRecord.fields["Metologia"] = trainingData.metodologia;
+        }
 
         // Agregar "Dirigido a" solo con opciones que existen en Airtable
         if (trainingData.staffList && trainingData.staffList.length > 0) {
