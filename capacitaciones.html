@@ -1612,6 +1612,16 @@ overflow: hidden;
                                     <option value="Hibrida">Hibrida</option>
                                 </select>
                             </div>
+
+                            <div class="form-group">
+                                <label><i class="fas fa-map-marker-alt"></i> Lugar</label>
+                                <input type="text" id="trainingLugar" placeholder="Ej: Sala de conferencias, Piso 2">
+                            </div>
+
+                            <div class="form-group">
+                                <label><i class="fas fa-calendar-alt"></i> Fecha de la capacitación</label>
+                                <input type="date" id="trainingFechaCapacitacion">
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -4234,6 +4244,8 @@ function getSelectedStaff() {
     const durationInput = document.getElementById('trainingDuration');
     const responsableInput = document.getElementById('trainingResponsable');
     const metodologiaInput = document.getElementById('trainingMetodologia');
+    const lugarInput = document.getElementById('trainingLugar');
+    const fechaCapacitacionInput = document.getElementById('trainingFechaCapacitacion');
 
     const title = titleInput ? titleInput.value.trim() : '';
     const description = descInput ? descInput.value.trim() : '';
@@ -4242,6 +4254,8 @@ function getSelectedStaff() {
     const duration = durationInput ? durationInput.value : '';
     const responsable = responsableInput ? responsableInput.value.trim() : '';
     const metodologia = metodologiaInput ? metodologiaInput.value : '';
+    const lugar = lugarInput ? lugarInput.value.trim() : '';
+    const fechaCapacitacion = fechaCapacitacionInput ? fechaCapacitacionInput.value : '';
 
     // Solo el personal marcado (checkboxes)
     const selectedStaff = getSelectedStaff();
@@ -4293,6 +4307,8 @@ function getSelectedStaff() {
         department,
         duration,
         metodologia,
+        lugar,
+        fechaCapacitacion,
         responsable,
         staffList: selectedStaff,
         accessCode,
@@ -4417,6 +4433,12 @@ async function sendTrainingToAirtable(trainingData) {
         // Agregar Metodología solo si tiene valor
         if (trainingData.metodologia) {
             airtableRecord.fields["Metodología"] = trainingData.metodologia;
+        }
+        if (trainingData.lugar) {
+            airtableRecord.fields["Lugar"] = trainingData.lugar;
+        }
+        if (trainingData.fechaCapacitacion) {
+            airtableRecord.fields["Fecha de la capacitación"] = trainingData.fechaCapacitacion;
         }
 
         // Agregar "Dirigido a" solo con opciones que existen en Airtable
