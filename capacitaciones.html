@@ -1736,11 +1736,17 @@ overflow: hidden;
                 <div class="modal-content" style="max-width: 500px; padding: 2rem; text-align: center;">
                     <button class="modal-close" onclick="closeQRModal()">&times;</button>
                     
-                    <h3 style="margin-bottom: 1.5rem;">
+                    <h3 style="margin-bottom: 1rem; color: #1a1a1a;">
                         <i class="fas fa-qrcode"></i> Código QR Generado
                     </h3>
+
+                    <!-- Código de acceso visible -->
+                    <div style="background: #e8f5e9; border: 2px solid #2E7D32; border-radius: 8px; padding: 0.75rem; margin-bottom: 1rem;">
+                        <p style="margin: 0; color: #1a1a1a; font-size: 0.9rem; font-weight: 500;">Código de Acceso:</p>
+                        <p id="qrAccessCode" style="margin: 0; color: #2E7D32; font-size: 1.5rem; font-weight: 700; letter-spacing: 3px;"></p>
+                    </div>
                     
-                    <p style="color: #F2FFFA; margin-bottom: 1.5rem;">
+                    <p style="color: #333333; margin-bottom: 1.5rem; font-size: 0.95rem;">
                         Captura este código QR o comparte el enlace con tu personal
                     </p>
                     
@@ -1751,11 +1757,11 @@ overflow: hidden;
                     
                     <!-- URL para compartir -->
                     <div style="margin-bottom: 1.5rem;">
-                        <label style="font-weight: bold; color: #F2FFFA; display: block; margin-bottom: 0.5rem;">
+                        <label style="font-weight: bold; color: #333333; display: block; margin-bottom: 0.5rem;">
                             <i class="fas fa-link"></i> Enlace de Acceso
                         </label>
                         <div style="display: flex; gap: 0.5rem;">
-                            <input type="text" id="qrUrl" readonly style="flex: 1; padding: 0.75rem; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 1rem; background: #f8f9fa;">
+                            <input type="text" id="qrUrl" readonly style="flex: 1; padding: 0.75rem; border: 1px solid #e0e0e0; border-radius: 6px; font-size: 0.9rem; background: #f8f9fa; color: #333333 !important;">
                             <button class="btn btn-secondary" onclick="copyQRUrl()" style="padding: 0.75rem 1rem; white-space: nowrap;">
                                 <i class="fas fa-copy"></i> Copiar
                             </button>
@@ -4397,7 +4403,7 @@ async function sendTrainingToAirtable(trainingData) {
                 "Capacitacion": trainingData.title,
                 "Objetivo": trainingData.description,
                 "Fecha": trainingData.trainingDate,
-                "Expositor": trainingData.responsable,
+                "Responsable de la capacitacion": trainingData.responsable,
                 "Duración": trainingData.duration,
                 "Código de Acceso": trainingData.accessCode,
                 "Estado": trainingData.status
@@ -4511,10 +4517,10 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
         function showQRCode(accessCode, title) {
             const modal = document.getElementById('qrModal');
-            const qrContainer = document.getElementById('qrcode');
-            
+            const qrContainer = document.getElementById('qrCode') || document.getElementById('qrcode');
+
             qrContainer.innerHTML = '';
-            
+
             const accessUrl = `${window.location.origin}?code=${accessCode}`;
             new QRCode(qrContainer, {
                 text: accessUrl,
@@ -4524,10 +4530,24 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 colorLight: '#ffffff',
                 correctLevel: QRCode.CorrectLevel.H
             });
-            
-            document.getElementById('modalAccessCode').textContent = accessCode;
-            document.getElementById('modalAccessLink').textContent = accessUrl;
-            
+
+            // Rellenar código de acceso grande
+            const accessCodeEl = document.getElementById('qrAccessCode');
+            if (accessCodeEl) accessCodeEl.textContent = accessCode;
+
+            // Rellenar URL
+            const urlInput = document.getElementById('qrUrl');
+            if (urlInput) urlInput.value = accessUrl;
+
+            // Campos del segundo modal si existen
+            const codeEl = document.getElementById('modalAccessCode');
+            if (codeEl) codeEl.textContent = accessCode;
+            const linkEl = document.getElementById('modalAccessLink');
+            if (linkEl) linkEl.textContent = accessUrl;
+
+            // Guardar para descarga
+            window.currentQRData = { code: accessCode, title: title, url: accessUrl };
+
             modal.style.display = 'flex';
         }
 
