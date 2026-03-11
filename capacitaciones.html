@@ -1602,6 +1602,16 @@ overflow: hidden;
                                 <label><i class="fas fa-clock"></i> Duración</label>
                                 <input type="text" id="trainingDuration" placeholder="Ej: 30 minutos">
                             </div>
+
+                            <div class="form-group">
+                                <label><i class="fas fa-chalkboard-teacher"></i> Metodología</label>
+                                <select id="trainingMetodologia">
+                                    <option value="">Seleccione...</option>
+                                    <option value="Presencial">Presencial</option>
+                                    <option value="Virtual">Virtual</option>
+                                    <option value="Hibrida">Hibrida</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div class="form-group">
@@ -4223,6 +4233,7 @@ function getSelectedStaff() {
     const deptInput = document.getElementById('trainingDepartment');
     const durationInput = document.getElementById('trainingDuration');
     const responsableInput = document.getElementById('trainingResponsable');
+    const metodologiaInput = document.getElementById('trainingMetodologia');
 
     const title = titleInput ? titleInput.value.trim() : '';
     const description = descInput ? descInput.value.trim() : '';
@@ -4230,6 +4241,7 @@ function getSelectedStaff() {
     const department = deptInput ? deptInput.value : '';
     const duration = durationInput ? durationInput.value : '';
     const responsable = responsableInput ? responsableInput.value.trim() : '';
+    const metodologia = metodologiaInput ? metodologiaInput.value : '';
 
     // Solo el personal marcado (checkboxes)
     const selectedStaff = getSelectedStaff();
@@ -4280,6 +4292,7 @@ function getSelectedStaff() {
         trainingDate,
         department,
         duration,
+        metodologia,
         responsable,
         staffList: selectedStaff,
         accessCode,
@@ -4396,6 +4409,7 @@ async function sendTrainingToAirtable(trainingData) {
                 "Duración": trainingData.duration,
                 "Expositor": trainingData.responsable,
                 "Departamento": trainingData.department,
+                "Metologia": trainingData.metodologia,
                 "Código de Acceso": trainingData.accessCode,
                 "Estado": trainingData.status
             }
