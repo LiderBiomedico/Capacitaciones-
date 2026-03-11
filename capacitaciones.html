@@ -1572,13 +1572,13 @@ overflow: hidden;
                         </div>
                         
                         <div class="form-group">
-                            <label><i class="fas fa-user-tie"></i> Responsable de la Capacitación *</label>
+                            <label><i class="fas fa-user-tie"></i> Expositor *</label>
                             <input type="text" id="trainingResponsable" required placeholder="Ej: Dr. Juan Pérez">
                         </div>
 
                         <div class="form-group">
-                            <label><i class="fas fa-align-left"></i> Descripción</label>
-                            <textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos..."></textarea>
+                            <label><i class="fas fa-align-left"></i> Objetivo *</label>
+                            <textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos de la capacitación..."></textarea>
                         </div>
                         
                         <div class="form-row">
@@ -4394,12 +4394,11 @@ async function sendTrainingToAirtable(trainingData) {
         // Usar solo los campos que existen en Airtable
         const airtableRecord = {
             fields: {
-                "name": trainingData.title,
-                "Descripción": trainingData.description,
+                "Capacitacion": trainingData.title,
+                "Objetivo": trainingData.description,
                 "Fecha": trainingData.trainingDate,
-                "Departamento": trainingData.department,
+                "Expositor": trainingData.responsable,
                 "Duración": trainingData.duration,
-                "Responsable de la capacitacion": trainingData.responsable,
                 "Código de Acceso": trainingData.accessCode,
                 "Estado": trainingData.status
             }
