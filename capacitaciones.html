@@ -2501,6 +2501,26 @@ overflow: hidden;
                 </select>
             </div>
             
+            <div class="form-group">
+                <label><i class="fas fa-id-badge"></i> Profesión *</label>
+                <select id="participantProfession" required>
+                    <option value="">Seleccione su profesión...</option>
+                    <option value="Jefe de Enfermería">Jefe de Enfermería</option>
+                    <option value="Médico General">Médico General</option>
+                    <option value="Médico Especialista">Médico Especialista</option>
+                    <option value="Ingeniero Biomédico">Ingeniero Biomédico</option>
+                    <option value="Estudiante">Estudiante</option>
+                    <option value="Auxiliar de Enfermería">Auxiliar de Enfermería</option>
+                    <option value="Terapeuta Respiratorio">Terapeuta Respiratorio</option>
+                    <option value="Fisioterapeuta">Fisioterapeuta</option>
+                    <option value="Conductor">Conductor</option>
+                    <option value="Técnico de RX">Técnico de RX</option>
+                    <option value="Fonoaudiólogo">Fonoaudiólogo</option>
+                    <option value="Instrumentador Quirúrgico">Instrumentador Quirúrgico</option>
+                    <option value="Administrativo">Administrativo</option>
+                </select>
+            </div>
+            
             <div class="modal-actions" style="flex-direction: column; gap: 0.75rem;">
                 <button class="btn btn-success" onclick="proceedToPretest()" style="width: 100%;">
                     <i class="fas fa-check"></i> Continuar al Pre-Test
@@ -2697,6 +2717,7 @@ overflow: hidden;
         async function proceedToPretest() {
             const name = document.getElementById('participantName').value.trim();
             const department = document.getElementById('participantDepartment').value;
+            const profession = document.getElementById('participantProfession').value;
             
             if (!name) {
                 Swal.fire({
@@ -2717,11 +2738,22 @@ overflow: hidden;
                 });
                 return;
             }
+
+            if (!profession) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Profesión Requerida',
+                    text: 'Por favor selecciona tu profesión',
+                    confirmButtonText: 'Entendido'
+                });
+                return;
+            }
             
             // Guardar datos del participante
             currentParticipantData = {
                 name: name,
                 department: department,
+                profession: profession,
                 accessCode: currentAccessCode
             };
             
@@ -3050,6 +3082,7 @@ overflow: hidden;
                 const participacionFields = {
                     'Nombre': currentParticipantData.name,
                     'Departamento': currentParticipantData.department,
+                    'Profesión': currentParticipantData.profession || '',
                     'Pretest Score': pretestScore,
                     'Fecha de Inicio': fechaFormato,
                     'Completado Pretest': true
@@ -3676,6 +3709,7 @@ overflow: hidden;
             document.getElementById('accessCode').value = '';
             document.getElementById('participantName').value = '';
             document.getElementById('participantDepartment').value = '';
+            document.getElementById('participantProfession').value = '';
             
             // Mostrar/ocultar secciones
             document.getElementById('accessSection').style.display = 'block';
