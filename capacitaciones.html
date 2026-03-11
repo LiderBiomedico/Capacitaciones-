@@ -1572,6 +1572,11 @@ overflow: hidden;
                         </div>
                         
                         <div class="form-group">
+                            <label><i class="fas fa-user-tie"></i> Responsable de la Capacitación *</label>
+                            <input type="text" id="trainingResponsable" required placeholder="Ej: Dr. Juan Pérez">
+                        </div>
+
+                        <div class="form-group">
                             <label><i class="fas fa-align-left"></i> Descripción</label>
                             <textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos..."></textarea>
                         </div>
@@ -4222,17 +4227,19 @@ function getSelectedStaff() {
     const dateInput = document.getElementById('trainingDate');
     const deptInput = document.getElementById('trainingDepartment');
     const durationInput = document.getElementById('trainingDuration');
+    const responsableInput = document.getElementById('trainingResponsable');
 
     const title = titleInput ? titleInput.value.trim() : '';
     const description = descInput ? descInput.value.trim() : '';
     const trainingDate = dateInput ? dateInput.value : '';
     const department = deptInput ? deptInput.value : '';
     const duration = durationInput ? durationInput.value : '';
+    const responsable = responsableInput ? responsableInput.value.trim() : '';
 
     // Solo el personal marcado (checkboxes)
     const selectedStaff = getSelectedStaff();
 
-    if (!title || !description || !trainingDate || !department || !duration || selectedStaff.length === 0) {
+    if (!title || !description || !trainingDate || !department || !duration || !responsable || selectedStaff.length === 0) {
         let missingMsg = 'Por favor completa todos los campos requeridos (*)';
         if (selectedStaff.length === 0) {
             missingMsg += ' y marca al menos una casilla en "Personal Capacitado".';
@@ -4278,6 +4285,7 @@ function getSelectedStaff() {
         trainingDate,
         department,
         duration,
+        responsable,
         staffList: selectedStaff,
         accessCode,
         status: 'active',
@@ -4335,6 +4343,7 @@ function getSelectedStaff() {
     if (dateInput) dateInput.value = '';
     if (deptInput) deptInput.value = '';
     if (durationInput) durationInput.value = '';
+    if (responsableInput) responsableInput.value = '';
     document.querySelectorAll('input.trainingStaff:checked, .trainingStaff:checked, input[name="personalCapacitado[]"]:checked')
         .forEach(cb => cb.checked = false);
     
@@ -4385,14 +4394,14 @@ async function sendTrainingToAirtable(trainingData) {
         // Usar solo los campos que existen en Airtable
         const airtableRecord = {
             fields: {
-                "Título": trainingData.title,
+                "name": trainingData.title,
                 "Descripción": trainingData.description,
                 "Fecha": trainingData.trainingDate,
                 "Departamento": trainingData.department,
                 "Duración": trainingData.duration,
+                "Responsable de la capacitacion": trainingData.responsable,
                 "Código de Acceso": trainingData.accessCode,
                 "Estado": trainingData.status
-                // Campos "Personal" y "Creado En" omitidos (no existen o causan errores)
             }
         };
 
