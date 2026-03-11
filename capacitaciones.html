@@ -3078,28 +3078,26 @@ overflow: hidden;
                 const horaFormato = `${hours}:${minutes}:${seconds}`;
                 const fechaHoraCompleta = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
                 
-                // Construir campos de participación
+                // Construir campos de participación - nombres exactos de Airtable
                 const participacionFields = {
-                    'Nombre': currentParticipantData.name,
+                    'Name': currentParticipantData.name,
+                    'Cargo': currentParticipantData.profession || '',
                     'Departamento': currentParticipantData.department,
                     'Profesión': currentParticipantData.profession || '',
-                    'Pretest Score': pretestScore,
+                    'Fecha Registro': fechaFormato,
+                    'Hora Registro': horaFormato,
                     'Fecha de Inicio': fechaFormato,
+                    'Pretest Score': pretestScore,
                     'Completado Pretest': true
                 };
                 
-                // Agregar link a Sesión si existe, o a Capacitación directamente
-                if (currentSession && currentSession.id) {
-                    participacionFields['Sesión'] = [currentSession.id];
-                } else if (currentTrainingRecord && currentTrainingRecord.id) {
-                    participacionFields['Capacitación'] = [currentTrainingRecord.id];
-                }
+                // NO agregar link a Sesión ni Capacitación como linked record
                 
                 const participationData = { fields: participacionFields };
                 
                 console.log('📤 Creando participación:', participationData);
                 
-                const createParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                let createParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -3109,7 +3107,53 @@ overflow: hidden;
                     })
                 });
                 
-                const participationResult = await createParticipationResponse.json();
+                let participationResult = await createParticipationResponse.json();
+                
+                // Si falla por campo inválido, reintentar con campos mínimos confirmados en Airtable
+                const errorMsg422 = (participationResult.error || '').toLowerCase();
+                const esCampoInvalido = !participationResult.success && (
+                    errorMsg422.includes('unknown field') || 
+                    errorMsg422.includes('cannot accept') ||
+                    errorMsg422.includes('invalid') ||
+                    participationResult.airtableStatus === 422
+                );
+                
+                if (esCampoInvalido) {
+                    console.warn('⚠️ Error de campo (422), reintentando con campos confirmados:', participationResult.error);
+                    // Campos 100% confirmados en Airtable según capturas:
+                    // Name, Departamento, Fecha Registro, Hora Registro, Completado Pretest, Profesión, Pretest Score
+                    const camposMinimos = { fields: {
+                        'Name': currentParticipantData.name,
+                        'Departamento': currentParticipantData.department,
+                        'Profesión': currentParticipantData.profession || '',
+                        'Fecha Registro': fechaFormato,
+                        'Hora Registro': horaFormato,
+                        'Pretest Score': pretestScore,
+                        'Completado Pretest': true
+                    }};
+                    const retry = await fetch('/.netlify/functions/airtable-proxy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ method: 'POST', path: `/Participaciones`, body: camposMinimos })
+                    });
+                    participationResult = await retry.json();
+                    
+                    // Segundo reintento: solo Name y Departamento (mínimo absoluto)
+                    if (!participationResult.success) {
+                        console.warn('⚠️ Segundo reintento con mínimo absoluto...');
+                        const camposAbsolutos = { fields: {
+                            'Name': currentParticipantData.name,
+                            'Departamento': currentParticipantData.department,
+                            'Completado Pretest': true
+                        }};
+                        const retry2 = await fetch('/.netlify/functions/airtable-proxy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ method: 'POST', path: `/Participaciones`, body: camposAbsolutos })
+                        });
+                        participationResult = await retry2.json();
+                    }
+                }
                 
                 if (!participationResult.success) {
                     console.error('❌ Error creando participación:', participationResult);
@@ -3577,7 +3621,7 @@ overflow: hidden;
                         body: {
                             fields: {
                                 'Post-test Score': postestScore,
-                                'Fecha Fin': fechaFormato
+                                'Completado Posttest': true
                             }
                         }
                     })
