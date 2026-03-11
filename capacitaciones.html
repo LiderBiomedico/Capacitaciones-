@@ -4341,28 +4341,28 @@ async function sendTrainingToAirtable(trainingData) {
         console.log('📤 Enviando capacitación a Airtable...');
         console.log('Datos originales:', trainingData);
 
-        // Usar solo los campos que existen en Airtable
-        // Campos opcionales: solo se incluyen si tienen valor, para evitar error 422
-        const baseFields = {
-            "Título": trainingData.title,
-            "Fecha": trainingData.trainingDate,
-            "Departamento": trainingData.department,
-            "Código de Acceso": trainingData.accessCode,
-            "Estado": trainingData.status
+        // Campos base que siempre existen en Airtable
+        const fields = {
+            "Título": trainingData.title || '',
+            "Fecha": trainingData.trainingDate || '',
+            "Departamento": trainingData.department || '',
+            "Código de Acceso": trainingData.accessCode || '',
+            "Estado": trainingData.status || 'active'
         };
-        // Agregar campos opcionales solo si tienen valor
-        if (trainingData.description) baseFields["Descripción"] = trainingData.description;
-        if (trainingData.duration) baseFields["Duración"] = trainingData.duration;
-        if (trainingData.expositor) baseFields["Expositor"] = trainingData.expositor;
-        if (trainingData.referente) baseFields["Referente"] = trainingData.referente;
-        if (trainingData.methodology) baseFields["Metodología"] = trainingData.methodology;
-        if (trainingData.place) baseFields["Lugar"] = trainingData.place;
-        if (trainingData.eventDate) baseFields["Fecha Capacitación"] = trainingData.eventDate;
+
+        // Campos opcionales — solo se envían si tienen valor (nombres exactos de Airtable)
+        if (trainingData.description)  fields["Descripción"]                  = trainingData.description;
+        if (trainingData.duration)     fields["Duración"]                     = trainingData.duration;
+        if (trainingData.expositor)    fields["Expositor"]                    = trainingData.expositor;
+        if (trainingData.referente)    fields["Referente de Capacitaciones"]  = trainingData.referente;
+        if (trainingData.methodology)  fields["Metodología"]                  = trainingData.methodology;
+        if (trainingData.place)        fields["Lugar"]                        = trainingData.place;
+        if (trainingData.eventDate)    fields["Fecha de la capacitación"]     = trainingData.eventDate;
         if (trainingData.staffList && trainingData.staffList.length > 0) {
-            baseFields["Dirigido a"] = trainingData.staffList.join(', ');
+            fields["Dirigido a"] = trainingData.staffList.join(', ');
         }
 
-        const airtableRecord = { fields: baseFields };
+        const airtableRecord = { fields };
 
         console.log('📋 Record a enviar:', JSON.stringify(airtableRecord, null, 2));
 
@@ -4697,28 +4697,6 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 });
                 
                 if (!response.ok) {
-                    const errText = await response.text().catch(() => '');
-                    console.error('❌ loadTrainings error:', response.status, errText);
-                    // Si es 422, intentar sin sort
-                    if (response.status === 422) {
-                        console.warn('⚠️ Sort inválido, reintentando sin sort...');
-                        const r2 = await fetch('/.netlify/functions/airtable-proxy', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ method: 'GET', path: '/Capacitaciones', body: null })
-                        });
-                        if (!r2.ok) throw new Error(`Error HTTP: ${r2.status}`);
-                        const data2 = await r2.json();
-                        document.getElementById('trainingsLoading').style.display = 'none';
-                        if (data2.success && data2.records && data2.records.length > 0) {
-                            allTrainings = data2.records;
-                            renderTrainingsList();
-                            updateDashboardStats();
-                        } else {
-                            document.getElementById('trainingsEmpty').style.display = 'block';
-                        }
-                        return;
-                    }
                     throw new Error(`Error HTTP: ${response.status}`);
                 }
                 
@@ -4776,6 +4754,12 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const duration = fields['Duración'] || '';
             const accessCode = fields['Código de Acceso'] || '';
             const status = fields['Estado'] || 'active';
+            const expositor = fields['Expositor'] || '';
+            const referente = fields['Referente de Capacitaciones'] || '';
+            const methodology = fields['Metodología'] || '';
+            const place = fields['Lugar'] || '';
+            const eventDate = fields['Fecha de la capacitación'] || '';
+            const dirigidoA = fields['Dirigido a'] || '';
             
             const formattedDate = date ? new Date(date).toLocaleDateString('es-ES', { 
                 year: 'numeric', 
@@ -4798,13 +4782,15 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                             <span>${formattedDate}</span>
                         </div>
                         <div class="training-info-item">
-                            <i class="fas fa-building"></i>
+                            <i class="fas fa-hospital"></i>
                             <span>${department}</span>
                         </div>
-                        <div class="training-info-item">
-                            <i class="fas fa-clock"></i>
-                            <span>${duration}</span>
-                        </div>
+                        ${duration ? `<div class="training-info-item"><i class="fas fa-clock"></i><span>${duration}</span></div>` : ''}
+                        ${expositor ? `<div class="training-info-item"><i class="fas fa-user"></i><span>${expositor}</span></div>` : ''}
+                        ${methodology ? `<div class="training-info-item"><i class="fas fa-chalkboard-teacher"></i><span>${methodology}</span></div>` : ''}
+                        ${place ? `<div class="training-info-item"><i class="fas fa-map-marker-alt"></i><span>${place}</span></div>` : ''}
+                        ${eventDate ? `<div class="training-info-item"><i class="fas fa-calendar-check"></i><span>Evento: ${new Date(eventDate).toLocaleDateString('es-ES')}</span></div>` : ''}
+                        ${dirigidoA ? `<div class="training-info-item" style="grid-column:1/-1"><i class="fas fa-users"></i><span style="font-size:0.85rem">${dirigidoA}</span></div>` : ''}
                     </div>
                     
                     <div class="training-code">
