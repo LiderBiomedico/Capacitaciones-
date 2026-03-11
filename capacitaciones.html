@@ -8068,32 +8068,11 @@ function makeCronogramaFilterFormula(year, tipo) {
                 didOpen: () => Swal.showLoading()
             });
 
-                // ── Buscar la Sesión asociada a la Capacitación ───────────
-                // El campo "Lista asistencia" está en la tabla Sesiones
-                let targetTable = 'Capacitaciones';
-                let targetRecordId = trainingId;
-
-                const sesionesResp = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: `/Sesiones`,
-                        params: { filterByFormula: `OR(FIND("${trainingId}", ARRAYJOIN({Capacitaciones})), FIND("${trainingId}", ARRAYJOIN({Capacitación})))` }
-                    })
-                });
-                const sesionesData = await sesionesResp.json();
-                console.log('🔍 Sesiones asociadas:', sesionesData);
-
-                if (sesionesData.success && sesionesData.records && sesionesData.records.length > 0) {
-                    targetTable    = 'Sesiones';
-                    targetRecordId = sesionesData.records[0].id;
-                    console.log('✅ Sesión encontrada para guardar PDF:', targetRecordId);
-                } else {
-                    // Si no hay sesión, guardar en Capacitaciones de todas formas
-                    console.warn('⚠️ No se encontró sesión asociada, guardando en Capacitaciones');
-                }
-                // ──────────────────────────────────────────────────────────
+                // ── El campo "Lista asistencia" está en la tabla Capacitaciones ──
+                const targetTable    = 'Capacitaciones';
+                const targetRecordId = trainingId;
+                console.log('📁 Guardando PDF en Capacitaciones:', targetRecordId);
+                // ────────────────────────────────────────────────────────────────
 
             try {
                 // Paso 1: convertir el PDF a base64 (data URI)
