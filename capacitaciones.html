@@ -1525,39 +1525,24 @@ overflow: hidden;
                 <div class="card">
                     <h3>📋 Información General</h3>
                     <form id="trainingForm">
-                        <!-- Capacitación -->
                         <div class="form-group">
                             <label><i class="fas fa-graduation-cap"></i> Capacitación *</label>
                             <input type="text" id="trainingTitle" required placeholder="Ej: Protocolo de Higiene de Manos">
                         </div>
-
-                        <!-- Expositor -->
+                        
                         <div class="form-group">
-                            <label><i class="fas fa-user"></i> Expositor *</label>
-                            <input type="text" id="trainingExpositor" required placeholder="Ej: Dr. Juan Pérez">
+                            <label><i class="fas fa-align-left"></i> Descripción</label>
+                            <textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos..."></textarea>
                         </div>
-
-                        <!-- Referente de Capacitaciones -->
-                        <div class="form-group">
-                            <label><i class="fas fa-user-tie"></i> Referente de Capacitaciones</label>
-                            <input type="text" id="trainingReferente" placeholder="Ej: Coordinador de Capacitaciones">
-                        </div>
-
-                        <!-- Objetivo -->
-                        <div class="form-group">
-                            <label><i class="fas fa-list-ul"></i> Objetivo *</label>
-                            <textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos de la capacitación..."></textarea>
-                        </div>
-
-                        <!-- Fila: Fecha Creación, Proceso Atención, Duración, Metodología, Lugar, Fecha Capacitación -->
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
-                            <div class="form-group" style="margin-bottom: 0;">
+                        
+                        <div class="form-row">
+                            <div class="form-group">
                                 <label><i class="fas fa-calendar"></i> Fecha de Creación *</label>
                                 <input type="date" id="trainingDate" required>
                             </div>
-
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label><i class="fas fa-hospital"></i> Proceso de Atención *</label>
+                            
+                            <div class="form-group">
+                                <label><i class="fas fa-building"></i> Departamento *</label>
                                 <select id="trainingDepartment" required>
                                     <option value="">Seleccione...</option>
                                     <option value="General">General</option>
@@ -1566,105 +1551,86 @@ overflow: hidden;
                                     <option value="Administración">Administración</option>
                                     <option value="Laboratorio">Laboratorio</option>
                                     <option value="Radiología">Radiología</option>
-                                    <option value="Urgencias">Urgencias</option>
-                                    <option value="UCI">UCI</option>
-                                    <option value="Cirugía">Cirugía</option>
-                                    <option value="Pediatría">Pediatría</option>
                                 </select>
                             </div>
-
-                            <div class="form-group" style="margin-bottom: 0;">
+                            
+                            <div class="form-group">
                                 <label><i class="fas fa-clock"></i> Duración</label>
                                 <input type="text" id="trainingDuration" placeholder="Ej: 30 minutos">
                             </div>
-
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label><i class="fas fa-chalkboard-teacher"></i> Metodología</label>
-                                <select id="trainingMethodology">
-                                    <option value="">Seleccione...</option>
-                                    <option value="Presencial">Presencial</option>
-                                    <option value="Virtual">Virtual</option>
-                                    <option value="Híbrida">Híbrida</option>
-                                    <option value="Simulación">Simulación</option>
-                                    <option value="Taller práctico">Taller práctico</option>
-                                </select>
-                            </div>
-
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label><i class="fas fa-map-marker-alt"></i> Lugar</label>
-                                <input type="text" id="trainingPlace" placeholder="Ej: Sala de conferencias, Piso 2">
-                            </div>
-
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <label><i class="fas fa-calendar-check"></i> Fecha de la capacitación</label>
-                                <input type="date" id="trainingEventDate">
-                            </div>
                         </div>
 
-                        <!-- Dirigido a -->
                         <div class="form-group">
-                            <label><i class="fas fa-users-cog"></i> Dirigido a *</label>
-                            <div id="trainingStaffContainer" style="background: #f8f9fa; border: 2px solid #e0e0e0; border-radius: 8px; padding: 1rem;">
+                            <label><i class="fas fa-users-cog"></i> Personal Capacitado *</label>
+                            <div id="trainingStaffContainer" style="background: #f8f9fa; border: 2px solid #e0e0e0; border-radius: 8px; padding: 1rem; max-height: 300px; overflow-y: auto;">
                                 <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem;">
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Jefe de Enfermería" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Jefe de Enfermería</span>
                                     </label>
+                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Médico General" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Médico General</span>
                                     </label>
+                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Médico Especialista" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Médico Especialista</span>
                                     </label>
+                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
-                                        <input type="checkbox" value="Ingeniero Biomedico" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
-                                        <span>Ingeniero Biomedico</span>
+                                        <input type="checkbox" value="Ingeniero Biomédico" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Ingeniero Biomédico</span>
                                     </label>
+                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Estudiante" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Estudiante</span>
                                     </label>
+                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
-                                        <input type="checkbox" value="Auxiliar de enfermería" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
-                                        <span>Auxiliar de enfermería</span>
+                                        <input type="checkbox" value="Auxiliar de Enfermería" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
+                                        <span>Auxiliar de Enfermería</span>
                                     </label>
+                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Terapeuta Respiratorio" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Terapeuta Respiratorio</span>
                                     </label>
+                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Fisioterapeuta" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Fisioterapeuta</span>
                                     </label>
+                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Conductor" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Conductor</span>
                                     </label>
+                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Técnico de Rayos X" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Técnico de Rayos X</span>
                                     </label>
+                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Fonoaudiólogo" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Fonoaudiólogo</span>
                                     </label>
+                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Instrumentador Quirúrgico" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Instrumentador Quirúrgico</span>
                                     </label>
+                                    
                                     <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Administrativo" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
                                         <span>Administrativo</span>
                                     </label>
-                                    <label style="display: flex; align-items: center; gap: 0.5rem; margin: 0; cursor: pointer; padding: 0.5rem; border-radius: 6px; transition: all 0.3s;" onmouseover="this.style.background='#e8f0ff'" onmouseout="this.style.background='transparent'">
-                                        <input type="checkbox" value="Otro" class="trainingStaff" style="width: 18px; height: 18px; cursor: pointer; accent-color: var(--primary);">
-                                        <span>Otro</span>
-                                    </label>
                                 </div>
                             </div>
-                            <small class="help-text">Selecciona el personal al que va dirigida esta capacitación</small>
+                            <small class="help-text">Selecciona el personal que recibirá esta capacitación</small>
                         </div>
                     </form>
                 </div>
@@ -4215,30 +4181,20 @@ function getSelectedStaff() {
     const dateInput = document.getElementById('trainingDate');
     const deptInput = document.getElementById('trainingDepartment');
     const durationInput = document.getElementById('trainingDuration');
-    const expositorInput = document.getElementById('trainingExpositor');
-    const referenteInput = document.getElementById('trainingReferente');
-    const methodologyInput = document.getElementById('trainingMethodology');
-    const placeInput = document.getElementById('trainingPlace');
-    const eventDateInput = document.getElementById('trainingEventDate');
 
     const title = titleInput ? titleInput.value.trim() : '';
     const description = descInput ? descInput.value.trim() : '';
     const trainingDate = dateInput ? dateInput.value : '';
     const department = deptInput ? deptInput.value : '';
-    const duration = durationInput ? durationInput.value.trim() : '';
-    const expositor = expositorInput ? expositorInput.value.trim() : '';
-    const referente = referenteInput ? referenteInput.value.trim() : '';
-    const methodology = methodologyInput ? methodologyInput.value : '';
-    const place = placeInput ? placeInput.value.trim() : '';
-    const eventDate = eventDateInput ? eventDateInput.value : '';
+    const duration = durationInput ? durationInput.value : '';
 
     // Solo el personal marcado (checkboxes)
     const selectedStaff = getSelectedStaff();
 
-    if (!title || !trainingDate || !department || selectedStaff.length === 0) {
+    if (!title || !description || !trainingDate || !department || !duration || selectedStaff.length === 0) {
         let missingMsg = 'Por favor completa todos los campos requeridos (*)';
         if (selectedStaff.length === 0) {
-            missingMsg += ' y marca al menos una casilla en "Dirigido a".';
+            missingMsg += ' y marca al menos una casilla en "Personal Capacitado".';
         }
         Swal.fire({ icon: 'warning', title: 'Campos Incompletos', text: missingMsg });
         if (titleInput) titleInput.scrollIntoView({ behavior: 'smooth' });
@@ -4281,11 +4237,6 @@ function getSelectedStaff() {
         trainingDate,
         department,
         duration,
-        expositor,
-        referente,
-        methodology,
-        place,
-        eventDate,
         staffList: selectedStaff,
         accessCode,
         status: 'active',
@@ -4391,18 +4342,27 @@ async function sendTrainingToAirtable(trainingData) {
         console.log('Datos originales:', trainingData);
 
         // Usar solo los campos que existen en Airtable
-        const airtableRecord = {
-            fields: {
-                "Título": trainingData.title,
-                "Descripción": trainingData.description,
-                "Fecha": trainingData.trainingDate,
-                "Departamento": trainingData.department,
-                "Duración": trainingData.duration,
-                "Código de Acceso": trainingData.accessCode,
-                "Estado": trainingData.status
-                // Campos "Personal" y "Creado En" omitidos (no existen o causan errores)
-            }
+        // Campos opcionales: solo se incluyen si tienen valor, para evitar error 422
+        const baseFields = {
+            "Título": trainingData.title,
+            "Fecha": trainingData.trainingDate,
+            "Departamento": trainingData.department,
+            "Código de Acceso": trainingData.accessCode,
+            "Estado": trainingData.status
         };
+        // Agregar campos opcionales solo si tienen valor
+        if (trainingData.description) baseFields["Descripción"] = trainingData.description;
+        if (trainingData.duration) baseFields["Duración"] = trainingData.duration;
+        if (trainingData.expositor) baseFields["Expositor"] = trainingData.expositor;
+        if (trainingData.referente) baseFields["Referente"] = trainingData.referente;
+        if (trainingData.methodology) baseFields["Metodología"] = trainingData.methodology;
+        if (trainingData.place) baseFields["Lugar"] = trainingData.place;
+        if (trainingData.eventDate) baseFields["Fecha Capacitación"] = trainingData.eventDate;
+        if (trainingData.staffList && trainingData.staffList.length > 0) {
+            baseFields["Dirigido a"] = trainingData.staffList.join(', ');
+        }
+
+        const airtableRecord = { fields: baseFields };
 
         console.log('📋 Record a enviar:', JSON.stringify(airtableRecord, null, 2));
 
@@ -4731,12 +4691,34 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         method: 'GET',
-                        path: '/Capacitaciones?sort[0][field]=Creado%20En&sort[0][direction]=desc',
+                        path: '/Capacitaciones?sort%5B0%5D%5Bfield%5D=Fecha&sort%5B0%5D%5Bdirection%5D=desc',
                         body: null
                     })
                 });
                 
                 if (!response.ok) {
+                    const errText = await response.text().catch(() => '');
+                    console.error('❌ loadTrainings error:', response.status, errText);
+                    // Si es 422, intentar sin sort
+                    if (response.status === 422) {
+                        console.warn('⚠️ Sort inválido, reintentando sin sort...');
+                        const r2 = await fetch('/.netlify/functions/airtable-proxy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ method: 'GET', path: '/Capacitaciones', body: null })
+                        });
+                        if (!r2.ok) throw new Error(`Error HTTP: ${r2.status}`);
+                        const data2 = await r2.json();
+                        document.getElementById('trainingsLoading').style.display = 'none';
+                        if (data2.success && data2.records && data2.records.length > 0) {
+                            allTrainings = data2.records;
+                            renderTrainingsList();
+                            updateDashboardStats();
+                        } else {
+                            document.getElementById('trainingsEmpty').style.display = 'block';
+                        }
+                        return;
+                    }
                     throw new Error(`Error HTTP: ${response.status}`);
                 }
                 
