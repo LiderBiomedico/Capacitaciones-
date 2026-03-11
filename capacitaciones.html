@@ -1575,6 +1575,11 @@ overflow: hidden;
                         </div>
 
                         <div class="form-group">
+                            <label><i class="fas fa-user-tie"></i> Referente de Capacitaciones</label>
+                            <input type="text" id="trainingReferente" placeholder="Ej: Coordinador de Capacitaciones">
+                        </div>
+
+                        <div class="form-group">
                             <label><i class="fas fa-align-left"></i> Objetivo *</label>
                             <textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos de la capacitación..."></textarea>
                         </div>
@@ -4246,6 +4251,7 @@ function getSelectedStaff() {
     const metodologiaInput = document.getElementById('trainingMetodologia');
     const lugarInput = document.getElementById('trainingLugar');
     const fechaCapacitacionInput = document.getElementById('trainingFechaCapacitacion');
+    const referenteInput = document.getElementById('trainingReferente');
 
     const title = titleInput ? titleInput.value.trim() : '';
     const description = descInput ? descInput.value.trim() : '';
@@ -4256,6 +4262,7 @@ function getSelectedStaff() {
     const metodologia = metodologiaInput ? metodologiaInput.value : '';
     const lugar = lugarInput ? lugarInput.value.trim() : '';
     const fechaCapacitacion = fechaCapacitacionInput ? fechaCapacitacionInput.value : '';
+    const referente = referenteInput ? referenteInput.value.trim() : '';
 
     // Solo el personal marcado (checkboxes)
     const selectedStaff = getSelectedStaff();
@@ -4309,6 +4316,7 @@ function getSelectedStaff() {
         metodologia,
         lugar,
         fechaCapacitacion,
+        referente,
         responsable,
         staffList: selectedStaff,
         accessCode,
@@ -4439,6 +4447,9 @@ async function sendTrainingToAirtable(trainingData) {
         }
         if (trainingData.fechaCapacitacion) {
             airtableRecord.fields["Fecha de la capacitación"] = trainingData.fechaCapacitacion;
+        }
+        if (trainingData.referente) {
+            airtableRecord.fields["Referente de Capacitaciones"] = trainingData.referente;
         }
 
         // Agregar "Dirigido a" solo con opciones que existen en Airtable
