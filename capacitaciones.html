@@ -2828,17 +2828,48 @@ overflow: hidden;
                     throw new Error('No se pudieron obtener las sesiones');
                 }
                 
-                // Encontrar la sesión por código de acceso
-                const currentSession = sessionData.records.find(s => {
-                    const codigo = s.fields['Código Acceso'] || s.fields['Código de Acceso'] || s.fields['Codigo Acceso'] || '';
-                    return codigo.toUpperCase() === currentAccessCode.toUpperCase();
+                // Encontrar la sesión por código de acceso o por vínculo a la capacitación
+                let currentSession = sessionData.records.find(s => {
+                    const fields = s.fields || {};
+                    const codigo = (fields['Código Acceso'] || fields['Código de Acceso'] || '').toString().toUpperCase().trim();
+                    const linkedTraining = (fields['Capacitación'] && Array.isArray(fields['Capacitación']) ? fields['Capacitación'][0] : null) ||
+                                          (fields['Capacitaciones'] && Array.isArray(fields['Capacitaciones']) ? fields['Capacitaciones'][0] : null);
+                    return codigo === currentAccessCode.toUpperCase() || linkedTraining === currentTrainingRecord?.id;
                 });
                 
-                if (!currentSession) {
-                    throw new Error('No se encontró la sesión con código: ' + currentAccessCode);
+                // Si no existe sesión, intentar crearla automáticamente
+                if (!currentSession && currentTrainingRecord?.id) {
+                    console.warn('⚠️ No se encontró sesión existente. Intentando crear una nueva...');
+                    try {
+                        const autoSessionResponse = await fetch('/.netlify/functions/create-session', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                code: currentAccessCode,
+                                trainingId: currentTrainingRecord.id
+                            })
+                        });
+                        const autoSessionData = await autoSessionResponse.json();
+                        if (autoSessionData.success && autoSessionData.sessionId) {
+                            currentSession = {
+                                id: autoSessionData.sessionId,
+                                fields: {
+                                    'Código Acceso': currentAccessCode,
+                                    'Capacitaciones': [currentTrainingRecord.id]
+                                }
+                            };
+                            console.log('✅ Sesión creada/recuperada automáticamente:', currentSession.id);
+                        }
+                    } catch (sessionCreateError) {
+                        console.warn('⚠️ No se pudo crear la sesión automáticamente:', sessionCreateError);
+                    }
                 }
                 
-                console.log('✅ Sesión encontrada:', currentSession.id);
+                if (currentSession) {
+                    console.log('✅ Sesión encontrada:', currentSession.id);
+                } else {
+                    console.warn('⚠️ Continuando sin sesión vinculada. Se guardará por código/capacitación.');
+                }
                 
                 // ==========================================
                 // PASO 2: Obtener preguntas para calcular score
@@ -2924,121 +2955,111 @@ overflow: hidden;
                 const horaFormato = `${hours}:${minutes}:${seconds}`;
                 const fechaHoraCompleta = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
                 
-                const participationCandidates = [
-                    {
-                        label: 'sesion_estandar',
+                const participationPayloads = [];
+
+                const baseFields = {
+                    'Nombre': currentParticipantData.name,
+                    'Departamento': currentParticipantData.department,
+                    'Profesión': currentParticipantData.profession || '',
+                    'Pretest Score': pretestScore,
+                    'Fecha de Inicio': fechaFormato,
+                    'Completado Pretest': true,
+                    'Estado': 'Pretest Completado'
+                };
+
+                // Intento 1: vincular por sesión + código
+                if (currentSession?.id) {
+                    participationPayloads.push({
                         fields: {
-                            'Nombre': currentParticipantData.name,
-                            'Departamento': currentParticipantData.department,
-                            'Profesión': currentParticipantData.profession || '',
-                            'Email': currentParticipantData.email || '',
-                            'Pretest Score': pretestScore,
-                            'Fecha de Inicio': fechaFormato,
-                            'Completado Pretest': true,
-                            'Estado': 'Pretest Completado',
-                            'Sesión': [currentSession.id]
-                        }
-                    },
-                    {
-                        label: 'sesion_sin_tilde',
-                        fields: {
-                            'Nombre': currentParticipantData.name,
-                            'Departamento': currentParticipantData.department,
-                            'Profesión': currentParticipantData.profession || '',
-                            'Email': currentParticipantData.email || '',
-                            'Pretest Score': pretestScore,
-                            'Fecha de Inicio': fechaFormato,
-                            'Completado Pretest': true,
-                            'Estado': 'Pretest Completado',
-                            'Sesion': [currentSession.id]
-                        }
-                    },
-                    {
-                        label: 'codigo_acceso',
-                        fields: {
-                            'Nombre': currentParticipantData.name,
-                            'Departamento': currentParticipantData.department,
-                            'Profesión': currentParticipantData.profession || '',
-                            'Email': currentParticipantData.email || '',
-                            'Pretest Score': pretestScore,
-                            'Fecha de Inicio': fechaFormato,
-                            'Completado Pretest': true,
-                            'Estado': 'Pretest Completado',
-                            'Código Acceso': currentAccessCode || ''
-                        }
-                    },
-                    {
-                        label: 'codigo_de_acceso',
-                        fields: {
-                            'Nombre': currentParticipantData.name,
-                            'Departamento': currentParticipantData.department,
-                            'Profesión': currentParticipantData.profession || '',
-                            'Email': currentParticipantData.email || '',
-                            'Pretest Score': pretestScore,
-                            'Fecha de Inicio': fechaFormato,
-                            'Completado Pretest': true,
-                            'Estado': 'Pretest Completado',
+                            ...baseFields,
+                            'Sesión': [currentSession.id],
                             'Código de Acceso': currentAccessCode || ''
                         }
-                    },
-                    {
-                        label: 'minimo',
+                    });
+                    participationPayloads.push({
                         fields: {
-                            'Nombre': currentParticipantData.name,
-                            'Departamento': currentParticipantData.department,
-                            'Pretest Score': pretestScore,
-                            'Estado': 'Pretest Completado',
-                            'Sesión': [currentSession.id]
+                            ...baseFields,
+                            'Sesion': [currentSession.id],
+                            'Código Acceso': currentAccessCode || ''
                         }
-                    },
-                    {
-                        label: 'minimo_puntuacion',
+                    });
+                }
+
+                // Intento 2: vincular por capacitación + código
+                if (currentTrainingRecord?.id) {
+                    participationPayloads.push({
                         fields: {
-                            'Nombre': currentParticipantData.name,
-                            'Departamento': currentParticipantData.department,
-                            'Puntuación Pretest': pretestScore,
-                            'Estado': 'Pretest Completado',
-                            'Sesión': [currentSession.id]
+                            ...baseFields,
+                            'Capacitación': [currentTrainingRecord.id],
+                            'Código de Acceso': currentAccessCode || ''
                         }
+                    });
+                    participationPayloads.push({
+                        fields: {
+                            ...baseFields,
+                            'Capacitaciones': [currentTrainingRecord.id],
+                            'Código Acceso': currentAccessCode || ''
+                        }
+                    });
+                }
+
+                // Intento 3: solo por código
+                participationPayloads.push({
+                    fields: {
+                        ...baseFields,
+                        'Código de Acceso': currentAccessCode || ''
                     }
-                ];
+                });
+                participationPayloads.push({
+                    fields: {
+                        ...baseFields,
+                        'Código Acceso': currentAccessCode || ''
+                    }
+                });
+
+                // Intento 4: mínimo viable
+                participationPayloads.push({
+                    fields: {
+                        'Nombre': currentParticipantData.name,
+                        'Departamento': currentParticipantData.department,
+                        'Pretest Score': pretestScore,
+                        'Fecha de Inicio': fechaFormato,
+                        'Completado Pretest': true
+                    }
+                });
 
                 let participationResult = null;
                 let lastParticipationError = null;
 
-                for (const participationData of participationCandidates) {
-                    try {
-                        console.log(`📤 Creando participación [${participationData.label}]:`, participationData);
+                for (let i = 0; i < participationPayloads.length; i++) {
+                    const participationData = participationPayloads[i];
+                    console.log(`📤 Intento ${i + 1} creando participación:`, participationData);
 
-                        const createParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    const createParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                method: 'POST',
-                                path: `/Participaciones`,
-                                body: { fields: participationData.fields }
-                            })
-                        });
+                            path: `/Participaciones`,
+                            body: participationData
+                        })
+                    });
 
-                        const candidateResult = await createParticipationResponse.json();
+                    const attemptResult = await createParticipationResponse.json();
 
-                        if (candidateResult.success) {
-                            participationResult = candidateResult;
-                            console.log(`✅ Participación creada con estrategia: ${participationData.label}`);
-                            break;
-                        }
-
-                        lastParticipationError = candidateResult;
-                        console.warn(`⚠️ Estrategia falló [${participationData.label}]:`, candidateResult);
-                    } catch (candidateError) {
-                        lastParticipationError = candidateError;
-                        console.warn(`⚠️ Error en estrategia [${participationData.label}]:`, candidateError);
+                    if (attemptResult.success) {
+                        participationResult = attemptResult;
+                        console.log(`✅ Participación creada en intento ${i + 1}:`, attemptResult.id);
+                        break;
                     }
+
+                    lastParticipationError = attemptResult.error || 'No se pudo crear el registro de participación';
+                    console.warn(`⚠️ Intento ${i + 1} falló:`, attemptResult);
                 }
 
                 if (!participationResult || !participationResult.success) {
                     console.error('❌ Error creando participación:', lastParticipationError);
-                    throw new Error((lastParticipationError && (lastParticipationError.error || lastParticipationError.message)) || 'No se pudo crear el registro de participación');
+                    throw new Error(lastParticipationError || 'No se pudo crear el registro de participación');
                 }
                 
                 console.log('✅ Participación creada:', participationResult.id);
@@ -3132,7 +3153,7 @@ overflow: hidden;
                     if (result.isConfirmed) {
                         // GUARDAR participationId para uso posterior en postest
                         currentParticipationId = participationResult.id;
-                        currentSessionId = currentSession.id;
+                        currentSessionId = currentSession?.id || null;
                         
                         Swal.fire({
                             icon: 'info',
