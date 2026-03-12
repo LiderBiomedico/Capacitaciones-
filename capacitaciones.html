@@ -752,15 +752,16 @@
 
         .loader-credit {
     position: fixed;
-    left: 18px;
-    bottom: 14px;
+    left: 0;
+    right: 0;
+    bottom: 24px;
     margin: 0;
     font-weight: 500;
     letter-spacing: 0.3px;
-    font-size: clamp(0.45rem, 0.95vw, 0.65rem); /* ~mitad del título */
+    font-size: clamp(0.9rem, 1.9vw, 1.3rem); /* doble del original */
     opacity: 0.85;
     text-shadow: 0 0 12px rgba(0,0,0,0.30);
-    text-align: left;
+    text-align: center;
     z-index: 2;
 }
 
@@ -2131,9 +2132,6 @@ overflow: hidden;
                                     </button>
                                     <button id="btnDownloadParticipantsPdf" class="btn btn-success" onclick="downloadParticipantsPdf()" disabled style="margin:0;">
                                         <i class="fas fa-download"></i> Descargar
-                                    </button>
-                                    <button id="btnSaveToAirtable" class="btn btn-primary" onclick="saveAttendancePdfToAirtable()" disabled style="margin:0;">
-                                        <i class="fas fa-cloud-upload-alt"></i> Guardar en Airtable
                                     </button>
                                     <button id="btnClearParticipantsPdf" class="btn btn-secondary" onclick="clearParticipantsPdf()" disabled style="margin:0;">
                                         <i class="fas fa-times"></i> Quitar
@@ -7643,11 +7641,9 @@ function makeCronogramaFilterFormula(year, tipo) {
             const btnOpen = document.getElementById('btnOpenParticipantsPdf');
             const btnDownload = document.getElementById('btnDownloadParticipantsPdf');
             const btnClear = document.getElementById('btnClearParticipantsPdf');
-            const btnSave = document.getElementById('btnSaveToAirtable');
             if (btnOpen) btnOpen.disabled = false;
             if (btnDownload) btnDownload.disabled = false;
             if (btnClear) btnClear.disabled = false;
-            if (btnSave) btnSave.disabled = false;
 
             // Mostrar preview
             const wrapper = document.getElementById('participantsPdfPreviewWrapper');
@@ -7690,90 +7686,14 @@ function makeCronogramaFilterFormula(year, tipo) {
             const btnOpen = document.getElementById('btnOpenParticipantsPdf');
             const btnDownload = document.getElementById('btnDownloadParticipantsPdf');
             const btnClear = document.getElementById('btnClearParticipantsPdf');
-            const btnSave = document.getElementById('btnSaveToAirtable');
             if (btnOpen) btnOpen.disabled = true;
             if (btnDownload) btnDownload.disabled = true;
             if (btnClear) btnClear.disabled = true;
-            if (btnSave) btnSave.disabled = true;
 
             const wrapper = document.getElementById('participantsPdfPreviewWrapper');
             const iframe = document.getElementById('participantsPdfPreview');
             if (iframe) iframe.src = '';
             if (wrapper) wrapper.style.display = 'none';
-        }
-
-        // ═════════════════════════════════════════════════════════════════
-        // GUARDAR PDF DE LISTA DE ASISTENCIA EN AIRTABLE
-        // ═════════════════════════════════════════════════════════════════
-
-        async function saveAttendancePdfToAirtable() {
-            if (!participantsPdfFile) {
-                Swal.fire({ icon: 'warning', title: 'Sin PDF', text: 'Primero carga un archivo PDF.' });
-                return;
-            }
-
-            // Necesitamos el ID de la capacitación actualmente seleccionada
-            const trainingId = document.getElementById('reportTrainingSelect')?.value;
-            if (!trainingId) {
-                Swal.fire({ icon: 'warning', title: 'Sin capacitación', text: 'Selecciona una capacitación antes de guardar.' });
-                return;
-            }
-
-            const btn = document.getElementById('btnSaveToAirtable');
-            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Subiendo...'; }
-
-            try {
-                // Convertir archivo a base64
-                const base64 = await new Promise((resolve, reject) => {
-                    const reader = new FileReader();
-                    reader.onload = () => {
-                        // Eliminar el prefijo "data:application/pdf;base64,"
-                        const result = reader.result;
-                        const base64Data = result.split(',')[1];
-                        resolve(base64Data);
-                    };
-                    reader.onerror = () => reject(new Error('Error leyendo el archivo'));
-                    reader.readAsDataURL(participantsPdfFile);
-                });
-
-                const response = await fetch('/.netlify/functions/upload-attendance-pdf', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        trainingId,
-                        fileName: participantsPdfFile.name || 'lista_asistencia.pdf',
-                        fileBase64: base64,
-                        mimeType: participantsPdfFile.type || 'application/pdf'
-                    })
-                });
-
-                const data = await response.json();
-
-                if (!data.success) {
-                    throw new Error(data.error || 'Error al subir el PDF');
-                }
-
-                Swal.fire({
-                    icon: 'success',
-                    title: '¡PDF Guardado!',
-                    text: 'El listado de asistencia fue subido correctamente al campo "Lista asistencia" en Airtable.',
-                    confirmButtonText: 'Aceptar'
-                });
-
-            } catch (error) {
-                console.error('❌ Error guardando PDF en Airtable:', error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Error al subir PDF',
-                    html: `<p>${error.message}</p>
-                           <p style="font-size:0.85rem; color:#6b7280; margin-top:0.5rem;">
-                             Verifica que el token de Airtable tenga permisos de escritura y que el campo "Lista asistencia" exista en la tabla Capacitaciones.
-                           </p>`,
-                    confirmButtonText: 'Entendido'
-                });
-            } finally {
-                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Guardar en Airtable'; }
-            }
         }
 
 
