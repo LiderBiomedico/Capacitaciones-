@@ -755,7 +755,7 @@
     margin: 0.9rem 0 0 0;
     font-weight: 600;
     letter-spacing: 0.4px;
-    font-size: clamp(0.9rem, 1.9vw, 1.3rem); /* doble de tamaño */
+    font-size: clamp(0.9rem, 1.9vw, 1.3rem);
     opacity: 0.95;
     text-shadow: 0 0 12px rgba(0,0,0,0.18);
     text-align: center;
@@ -766,6 +766,8 @@
             width: 160px;
             max-width: 45vw;
             height: auto;
+            border-radius: 18px;
+            background: #ffffff;
             border-radius: 18px;
             background: #ffffff;
             padding: 10px;
@@ -2478,8 +2480,8 @@ overflow: hidden;
                 <select id="participantProfession" required>
                     <option value="">Seleccione su profesión...</option>
                     <option value="Jefe de enfermería">Jefe de enfermería</option>
-                    <option value="medico general">Médico general</option>
-                    <option value="medico especialista">Médico especialista</option>
+                    <option value="Médico general">Médico general</option>
+                    <option value="Médico especialista">Médico especialista</option>
                     <option value="Ingeniero biomédico">Ingeniero biomédico</option>
                     <option value="Estudiante">Estudiante</option>
                     <option value="Auxiliar de enfermería">Auxiliar de enfermería</option>
@@ -2533,6 +2535,89 @@ overflow: hidden;
         let currentParticipationId = null;
         let currentSessionId = null;
         let postestCode = null;
+
+        const COMPLETED_TRAININGS_STORAGE_KEY = 'HSLV_COMPLETED_TRAININGS_V1';
+
+        function getCompletedTrainingsMap() {
+            try {
+                return JSON.parse(localStorage.getItem(COMPLETED_TRAININGS_STORAGE_KEY) || '{}') || {};
+            } catch (e) {
+                return {};
+            }
+        }
+
+        function buildCompletedTrainingKey(code, participantName) {
+            return `${String(code || '').trim().toUpperCase()}::${String(participantName || '').trim().toLowerCase()}`;
+        }
+
+        function markTrainingCompleted(code, participantName, extraData = {}) {
+            try {
+                const store = getCompletedTrainingsMap();
+                const key = buildCompletedTrainingKey(code, participantName);
+                store[key] = {
+                    completed: true,
+                    completedAt: new Date().toISOString(),
+                    code: String(code || '').trim().toUpperCase(),
+                    participantName: String(participantName || '').trim(),
+                    ...extraData
+                };
+                localStorage.setItem(COMPLETED_TRAININGS_STORAGE_KEY, JSON.stringify(store));
+            } catch (e) {
+                console.warn('⚠️ No se pudo guardar bloqueo local de capacitación finalizada:', e);
+            }
+        }
+
+        function isTrainingCompletedLocally(code, participantName) {
+            const key = buildCompletedTrainingKey(code, participantName);
+            const store = getCompletedTrainingsMap();
+            return !!store[key]?.completed;
+        }
+
+        function renderTrainingCompletedScreen(message = 'Capacitación terminada') {
+            try {
+                if (window.history && window.history.replaceState) {
+                    const cleanUrl = `${window.location.origin}${window.location.pathname}`;
+                    window.history.replaceState({}, document.title, cleanUrl);
+                }
+            } catch (e) {}
+
+            Swal.close();
+
+            const accessSection = document.getElementById('accessSection');
+            const pretestSection = document.getElementById('pretestSection');
+            const postestSection = document.getElementById('postestSection');
+            const participantModal = document.getElementById('participantRegistrationModal');
+            if (accessSection) accessSection.style.display = 'none';
+            if (pretestSection) pretestSection.style.display = 'none';
+            if (postestSection) postestSection.style.display = 'none';
+            if (participantModal) participantModal.style.display = 'none';
+
+            const examSection = document.getElementById('exam');
+            if (examSection) {
+                examSection.innerHTML = `
+                    <div class="section-header">
+                        <h2><i class="fas fa-check-circle"></i> Capacitación terminada</h2>
+                        <p>Este participante ya completó el proceso y el acceso quedó cerrado.</p>
+                    </div>
+                    <div class="card" style="max-width: 760px; margin: 1rem auto; text-align: center; padding: 2rem; border: 2px solid #2E7D32;">
+                        <div style="font-size: 4rem; color: #2E7D32; margin-bottom: 1rem;"><i class="fas fa-lock"></i></div>
+                        <h3 style="color: #2E7D32; margin-bottom: 1rem;">${message}</h3>
+                        <p style="font-size: 1.05rem; color: #374151; margin-bottom: 0.75rem;">La capacitación fue finalizada correctamente y no es posible volver a ingresar desde este dispositivo con este participante.</p>
+                        <p style="font-size: 0.95rem; color: #6b7280; margin: 0;">Si necesitas una nueva participación, debe ser habilitada por el administrador o coordinador.</p>
+                    </div>
+                `;
+            }
+
+            currentAccessCode = null;
+            currentTrainingRecord = null;
+            currentParticipantData = {};
+            pretestAnswers = {};
+            postestAnswers = {};
+            currentParticipationId = null;
+            currentSessionId = null;
+            postestCode = null;
+        }
+
 
         // ==================== FUNCIONES DE PARTICIPANTE ====================
         
@@ -2596,102 +2681,25 @@ overflow: hidden;
             document.getElementById('participantRegistrationModal').style.display = 'none';
         }
         
-        async function getParticipationFieldMap() {
-            try {
-                const response = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: `/Participaciones`
-                    })
-                });
-
-                const data = await response.json();
-                const discovered = new Set();
-                (data.records || []).forEach(record => {
-                    Object.keys(record.fields || {}).forEach(key => discovered.add(key));
-                });
-
-                return {
-                    success: !!data.success,
-                    names: Array.from(discovered)
-                };
-            } catch (error) {
-                console.warn('⚠️ No se pudieron inferir campos de Participaciones:', error);
-                return { success: false, names: [] };
-            }
-        }
-
-        function resolveExistingField(fieldNames, candidates, fallback = '') {
-            const normalizedMap = new Map();
-            (fieldNames || []).forEach(name => {
-                const normalized = String(name)
-                    .normalize('NFD')
-                    .replace(/[̀-ͯ]/g, '')
-                    .replace(/[^a-zA-Z0-9]/g, '')
-                    .toLowerCase();
-                if (!normalizedMap.has(normalized)) normalizedMap.set(normalized, name);
-            });
-
-            for (const candidate of candidates) {
-                if ((fieldNames || []).includes(candidate)) return candidate;
-                const normalizedCandidate = String(candidate)
-                    .normalize('NFD')
-                    .replace(/[̀-ͯ]/g, '')
-                    .replace(/[^a-zA-Z0-9]/g, '')
-                    .toLowerCase();
-                if (normalizedMap.has(normalizedCandidate)) {
-                    return normalizedMap.get(normalizedCandidate);
-                }
-            }
-
-            return fallback ? fallback : '';
-        }
-
-        function getUnknownFieldName(errorMessage) {
-            if (!errorMessage) return '';
-            const match = String(errorMessage).match(/Unknown field name:\s*"([^"]+)"/i);
-            return match ? match[1] : '';
-        }
-
-        function withoutUnknownField(fields, fieldName) {
-            if (!fieldName || !fields || typeof fields !== 'object') return fields;
-            const clone = { ...fields };
-            delete clone[fieldName];
-            return clone;
-        }
-
-        function normalizeProfessionForAirtable(value) {
-            const raw = String(value || '').trim();
-            const normalized = raw
-                .normalize('NFD')
-                .replace(/[̀-ͯ]/g, '')
-                .toLowerCase();
-
-            const map = {
-                'medico general': 'medico general',
-                'medico especialista': 'medico especialista',
-                'jefe de enfermeria': 'Jefe de enfermería',
-                'ingeniero biomedico': 'Ingeniero biomédico',
-                'auxiliar de enfermeria': 'Auxiliar de enfermería',
-                'terapeuta respiratorio': 'Terapeuta respiratorio',
-                'fisioterapeuta': 'Fisioterapeuta',
-                'conductor': 'Conductor',
-                'tecnico de rx': 'Técnico de rx',
-                'estudiante': 'Estudiante'
-            };
-
-            return map[normalized] || raw;
-        }
-        
         async function proceedToPretest() {
             const name = document.getElementById('participantName').value.trim();
             const department = document.getElementById('participantDepartment').value;
-            const profession = document.getElementById('participantProfession') ? normalizeProfessionForAirtable(document.getElementById('participantProfession').value) : '';
+            const profession = document.getElementById('participantProfession') ? document.getElementById('participantProfession').value : '';
             if (!name) { Swal.fire({ icon: 'warning', title: 'Nombre Requerido', text: 'Por favor ingresa tu nombre completo', confirmButtonText: 'Entendido' }); return; }
             if (!department) { Swal.fire({ icon: 'warning', title: 'Servicio Requerido', text: 'Por favor selecciona tu servicio', confirmButtonText: 'Entendido' }); return; }
             if (!profession) { Swal.fire({ icon: 'warning', title: 'Profesión Requerida', text: 'Por favor selecciona tu profesión o cargo', confirmButtonText: 'Entendido' }); return; }
+            if (isTrainingCompletedLocally(currentAccessCode, name)) {
+                closeParticipantModal();
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Capacitación terminada',
+                    text: 'Este participante ya finalizó la capacitación y no puede volver a ingresar desde este dispositivo.',
+                    confirmButtonText: 'Entendido'
+                }).then(() => {
+                    renderTrainingCompletedScreen('Capacitación terminada');
+                });
+                return;
+            }
             currentParticipantData = { name, department, profession, accessCode: currentAccessCode };
             closeParticipantModal();
             loadAndDisplayPretest();
@@ -2897,66 +2905,22 @@ overflow: hidden;
                 console.log('📋 Respuestas:', pretestAnswers);
                 
                 // ==========================================
-                // PASO 1: Buscar la sesión actual
+                // PASO 1: Usar la capacitación actual (ya validada al ingresar el código)
                 // ==========================================
                 
-                const sessionResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: `/Sesiones`
-                    })
-                });
-                
-                const sessionData = await sessionResponse.json();
-                
-                if (!sessionData.success || !sessionData.records) {
-                    throw new Error('No se pudieron obtener las sesiones');
+                // La capacitación ya fue cargada en currentTrainingRecord durante validateAndStartTraining
+                // No necesitamos buscar en Sesiones - usamos directamente el registro de Capacitaciones
+                if (!currentTrainingRecord || !currentTrainingRecord.id) {
+                    throw new Error('No se encontró la capacitación activa. Por favor recarga la página.');
                 }
                 
-                // Encontrar la sesión por código de acceso o por vínculo a la capacitación
-                let currentSession = sessionData.records.find(s => {
-                    const fields = s.fields || {};
-                    const codigo = (fields['Código Acceso'] || fields['Código de Acceso'] || '').toString().toUpperCase().trim();
-                    const linkedTraining = (fields['Capacitación'] && Array.isArray(fields['Capacitación']) ? fields['Capacitación'][0] : null) ||
-                                          (fields['Capacitaciones'] && Array.isArray(fields['Capacitaciones']) ? fields['Capacitaciones'][0] : null);
-                    return codigo === currentAccessCode.toUpperCase() || linkedTraining === currentTrainingRecord?.id;
-                });
+                // Simulamos el objeto sesión usando el registro de Capacitaciones
+                const currentSession = {
+                    id: currentTrainingRecord.id,
+                    fields: currentTrainingRecord.fields
+                };
                 
-                // Si no existe sesión, intentar crearla automáticamente
-                if (!currentSession && currentTrainingRecord?.id) {
-                    console.warn('⚠️ No se encontró sesión existente. Intentando crear una nueva...');
-                    try {
-                        const autoSessionResponse = await fetch('/.netlify/functions/create-session', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                code: currentAccessCode,
-                                trainingId: currentTrainingRecord.id
-                            })
-                        });
-                        const autoSessionData = await autoSessionResponse.json();
-                        if (autoSessionData.success && autoSessionData.sessionId) {
-                            currentSession = {
-                                id: autoSessionData.sessionId,
-                                fields: {
-                                    'Código Acceso': currentAccessCode,
-                                    'Capacitaciones': [currentTrainingRecord.id]
-                                }
-                            };
-                            console.log('✅ Sesión creada/recuperada automáticamente:', currentSession.id);
-                        }
-                    } catch (sessionCreateError) {
-                        console.warn('⚠️ No se pudo crear la sesión automáticamente:', sessionCreateError);
-                    }
-                }
-                
-                if (currentSession) {
-                    console.log('✅ Sesión encontrada:', currentSession.id);
-                } else {
-                    console.warn('⚠️ Continuando sin sesión vinculada. Se guardará por código/capacitación.');
-                }
+                console.log('✅ Capacitación/Sesión encontrada:', currentSession.id);
                 
                 // ==========================================
                 // PASO 2: Obtener preguntas para calcular score
@@ -3042,134 +3006,42 @@ overflow: hidden;
                 const horaFormato = `${hours}:${minutes}:${seconds}`;
                 const fechaHoraCompleta = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
                 
-                const participationPayloads = [];
+                const participationFieldKeys = await getTableFieldKeys('/Participaciones');
+                const participationFields = {};
+                
+                assignIfDetected(participationFields, participationFieldKeys, ['Nombre Completo', 'Nombre'], currentParticipantData.name);
+                assignIfDetected(participationFields, participationFieldKeys, ['Servicio', 'Departamento'], currentParticipantData.department);
+                assignIfDetected(participationFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.profession || '').trim());
+                assignIfDetected(participationFields, participationFieldKeys, ['Pretest Score', 'Pre-test Score'], pretestScore);
+                assignIfDetected(participationFields, participationFieldKeys, ['Fecha de Inicio', 'Fecha Inicio', 'Fecha'], fechaFormato);
+                assignIfDetected(participationFields, participationFieldKeys, ['Completado Pretest', 'Completado Pre-Test'], true);
+                assignIfDetected(participationFields, participationFieldKeys, ['Código Acceso', 'Código de Acceso'], (currentAccessCode || '').trim());
+                // Vincular a la Capacitación (campo de linked records)
+                assignIfDetected(participationFields, participationFieldKeys, ['Capacitación', 'Capacitacion', 'Sesión', 'Sesion'], [currentSession.id]);
 
-                const participantProfession = (currentParticipantData.profession || '').trim();
-                const participationFieldMeta = await getParticipationFieldMap();
-                console.log('🧭 Campos detectados en Participaciones:', participationFieldMeta.names);
+                if (!Object.keys(participationFields).length) {
+                    participationFields['Nombre Completo'] = currentParticipantData.name;
+                }
 
-                const participationFields = (participationFieldMeta.names && participationFieldMeta.names.length)
-                    ? participationFieldMeta.names
-                    : ['Nombre', 'Pretest Score', 'Post-test Score', 'Completado Pretest', 'Completado Posttest', 'Profesión', 'Capacitación', 'Departamento', 'Fecha de Inicio', 'Fecha Fin', 'Estado'];
-                const nameField = resolveExistingField(participationFields, ['Nombre', 'Nombre Completo', 'name', 'Name', 'Participante'], 'Nombre');
-                const departmentField = resolveExistingField(participationFields, ['Departamento', 'Servicio', 'Area', 'Área'], 'Departamento');
-                const pretestScoreField = resolveExistingField(participationFields, ['Pretest Score', 'Pre-Test Score', 'Puntuación Pretest'], 'Pretest Score');
-                const startDateField = resolveExistingField(participationFields, ['Fecha de Inicio', 'Fecha Inicio', 'Inicio'], 'Fecha de Inicio');
-                const pretestDoneField = resolveExistingField(participationFields, ['Completado Pretest', 'Pretest Completado', 'Pre-Test Completado'], 'Completado Pretest');
-                const statusField = resolveExistingField(participationFields, ['Estado', 'Status'], '');
-                const professionField = resolveExistingField(participationFields, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], '');
-                const codeField = resolveExistingField(participationFields, ['Código de Acceso', 'Codigo de Acceso', 'Código Acceso', 'Codigo Acceso'], '');
-                const sessionField = resolveExistingField(participationFields, ['Sesión', 'Sesion'], '');
-                const trainingField = resolveExistingField(participationFields, ['Capacitación', 'Capacitaciones', 'Capacitacion'], '');
-
-                const commonFields = {
-                    [nameField]: currentParticipantData.name,
-                    [departmentField]: currentParticipantData.department,
-                    [pretestScoreField]: pretestScore,
-                    [startDateField]: fechaFormato
-                };
-                if (pretestDoneField) commonFields[pretestDoneField] = true;
-                if (codeField) commonFields[codeField] = currentAccessCode || '';
-                if (currentSession?.id && sessionField) commonFields[sessionField] = [currentSession.id];
-                if (currentTrainingRecord?.id && trainingField) commonFields[trainingField] = [currentTrainingRecord.id];
-
-                const seenPayloads = new Set();
-                function addParticipationAttempt(extraFields = {}) {
-                    const fields = { ...commonFields, ...extraFields };
-                    Object.keys(fields).forEach(k => {
-                        if (!k || typeof k !== 'string') delete fields[k];
+                const participationData = { fields: participationFields };
+                
+                console.log('📤 Creando participación:', participationData);
+                
+                let participationResult;
+                try {
+                    participationResult = await airtableProxyRequest({
+                        method: 'POST',
+                        path: `/Participaciones`,
+                        body: participationData
                     });
-                    const key = JSON.stringify(fields);
-                    if (!seenPayloads.has(key)) {
-                        seenPayloads.add(key);
-                        participationPayloads.push({ fields });
-                    }
+                } catch (err) {
+                    console.error('❌ Error creando participación:', err);
+                    throw new Error(err.message || 'No se pudo crear el registro de participación');
                 }
-
-                const professionCandidates = Array.from(new Set([
-                    professionField,
-                    'Profesión',
-                    'Profesion',
-                    'Cargo',
-                    'Profesión / Cargo',
-                    'Profesion / Cargo'
-                ].filter(Boolean)));
-
-                const pretestDoneCandidates = Array.from(new Set([
-                    pretestDoneField,
-                    'Completado Pretest',
-                    'Pretest Completado',
-                    'Pre-Test Completado'
-                ].filter(Boolean)));
-
-                const statusCandidates = statusField ? [statusField] : [];
-
-                for (const pf of professionCandidates.length ? professionCandidates : ['']) {
-                    const extra = {};
-                    if (pf) extra[pf] = normalizeProfessionForAirtable(participantProfession);
-                    if (pretestDoneCandidates[0]) extra[pretestDoneCandidates[0]] = true;
-                    if (statusCandidates[0]) extra[statusCandidates[0]] = 'Pretest Completado';
-                    addParticipationAttempt(extra);
-                }
-
-                for (const pf of professionCandidates.length ? professionCandidates : ['']) {
-                    for (const doneField of pretestDoneCandidates) {
-                        const extra = {};
-                        if (pf) extra[pf] = normalizeProfessionForAirtable(participantProfession);
-                        extra[doneField] = true;
-                        addParticipationAttempt(extra);
-                    }
-                }
-
-                addParticipationAttempt();
-
-                let participationResult = null;
-                let lastParticipationError = null;
-
-                for (let i = 0; i < participationPayloads.length; i++) {
-                    let participationData = participationPayloads[i];
-                    console.log(`📤 Intento ${i + 1} creando participación:`, participationData);
-
-                    for (let retry = 0; retry < 8; retry++) {
-                        const createParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                method: 'POST',
-                                path: `/Participaciones`,
-                                body: participationData
-                            })
-                        });
-
-                        const attemptResult = await createParticipationResponse.json();
-
-                        if (attemptResult.success) {
-                            participationResult = attemptResult;
-                            console.log(`✅ Participación creada en intento ${i + 1}:`, attemptResult.id);
-                            break;
-                        }
-
-                        lastParticipationError = attemptResult.error || 'No se pudo crear el registro de participación';
-                        const unknownField = getUnknownFieldName(lastParticipationError);
-                        if (unknownField) {
-                            const cleanedFields = withoutUnknownField(participationData.fields, unknownField);
-                            if (JSON.stringify(cleanedFields) !== JSON.stringify(participationData.fields)) {
-                                console.warn(`⚠️ Eliminando campo no válido del pretest: ${unknownField}`);
-                                participationData = { fields: cleanedFields };
-                                continue;
-                            }
-                        }
-
-                        console.warn(`⚠️ Intento ${i + 1} falló:`, attemptResult);
-                        break;
-                    }
-
-                    if (participationResult && participationResult.success) break;
-                }
-
-                if (!participationResult || !participationResult.success) {
-                    console.error('❌ Error creando participación:', lastParticipationError);
-                    throw new Error(lastParticipationError || 'No se pudo crear el registro de participación');
+                
+                if (!participationResult || !participationResult.id) {
+                    console.error('❌ Error creando participación:', participationResult);
+                    throw new Error((participationResult && participationResult.error) || 'No se pudo crear el registro de participación');
                 }
                 
                 console.log('✅ Participación creada:', participationResult.id);
@@ -3263,7 +3135,7 @@ overflow: hidden;
                     if (result.isConfirmed) {
                         // GUARDAR participationId para uso posterior en postest
                         currentParticipationId = participationResult.id;
-                        currentSessionId = currentSession?.id || null;
+                        currentSessionId = currentSession.id;
                         
                         Swal.fire({
                             icon: 'info',
@@ -3624,102 +3496,25 @@ overflow: hidden;
                 const horaFormato = `${hours}:${minutes}:${seconds}`;
                 const fechaHoraCompleta = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
                 
-                const participationFieldMeta = await getParticipationFieldMap();
-                console.log('🧭 Campos detectados para actualizar posttest:', participationFieldMeta.names);
-                const participationFields = (participationFieldMeta.names && participationFieldMeta.names.length)
-                    ? participationFieldMeta.names
-                    : ['Nombre', 'Pretest Score', 'Post-test Score', 'Completado Pretest', 'Completado Posttest', 'Profesión', 'Capacitación', 'Departamento', 'Fecha de Inicio', 'Fecha Fin', 'Estado'];
-                const posttestScoreField = resolveExistingField(participationFields, ['Post-test Score', 'Post-test score', 'Posttest Score', 'Puntuación Posttest', 'Post-Test Score'], 'Post-test Score');
-                const endDateField = resolveExistingField(participationFields, ['Fecha Fin', 'Fecha de Fin', 'Fin'], 'Fecha Fin');
-                const posttestDoneField = resolveExistingField(participationFields, ['Completado Posttest', 'Completado Post-Test', 'Posttest Completado'], '');
-                const statusField = resolveExistingField(participationFields, ['Estado', 'Status'], '');
-                const professionField = resolveExistingField(participationFields, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], '');
+                const participationFieldKeys = await getTableFieldKeys('/Participaciones');
+                const updateFields = {};
 
-                const posttestDoneCandidates = Array.from(new Set([
-                    posttestDoneField,
-                    'Completado Posttest',
-                    'Completado Post-Test',
-                    'Posttest Completado'
-                ].filter(Boolean)));
-                const professionCandidates = Array.from(new Set([
-                    professionField,
-                    'Profesión',
-                    'Profesion',
-                    'Cargo',
-                    'Profesión / Cargo',
-                    'Profesion / Cargo'
-                ].filter(Boolean)));
+                assignIfDetected(updateFields, participationFieldKeys, ['Post-test Score', 'Posttest Score'], postestScore);
+                assignIfDetected(updateFields, participationFieldKeys, ['Fecha Fin', 'Fecha Final', 'Fecha de Finalización', 'Fecha Finalización'], fechaFormato);
+                assignIfDetected(updateFields, participationFieldKeys, ['Completado Posttest', 'Completado Post-Test'], true);
+                assignIfDetected(updateFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.profession || '').trim());
 
-                const updateAttempts = [];
-                const seenUpdateAttempts = new Set();
-                function addUpdateAttempt(extraFields = {}) {
-                    const fields = {
-                        [posttestScoreField]: postestScore,
-                        [endDateField]: fechaFormato,
-                        ...extraFields
-                    };
-                    Object.keys(fields).forEach(k => {
-                        if (!k || typeof k !== 'string') delete fields[k];
-                    });
-                    const key = JSON.stringify(fields);
-                    if (!seenUpdateAttempts.has(key)) {
-                        seenUpdateAttempts.add(key);
-                        updateAttempts.push(fields);
+                const updateParticipationData = await airtableProxyRequest({
+                    method: 'PATCH',
+                    path: `/Participaciones/${currentParticipationId}`,
+                    body: {
+                        fields: updateFields
                     }
-                }
-
-                for (const doneField of posttestDoneCandidates.length ? posttestDoneCandidates : ['']) {
-                    for (const pf of professionCandidates.length ? professionCandidates : ['']) {
-                        const extra = {};
-                        if (doneField) extra[doneField] = true;
-                        if (pf && currentParticipantData && currentParticipantData.profession) {
-                            extra[pf] = normalizeProfessionForAirtable(currentParticipantData.profession);
-                        }
-                        if (statusField) extra[statusField] = 'Posttest Completado';
-                        addUpdateAttempt(extra);
-                    }
-                }
-                for (const doneField of posttestDoneCandidates) {
-                    const extra = { [doneField]: true };
-                    addUpdateAttempt(extra);
-                }
-                addUpdateAttempt();
-
-                let updateParticipationData = null;
-                let lastUpdateError = null;
-                for (let idx = 0; idx < updateAttempts.length; idx++) {
-                    let fields = updateAttempts[idx];
-                    for (let retry = 0; retry < 8; retry++) {
-                        const updateParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                method: 'PATCH',
-                                path: `/Participaciones/${currentParticipationId}`,
-                                body: { fields }
-                            })
-                        });
-                        updateParticipationData = await updateParticipationResponse.json();
-                        if (updateParticipationData.success) break;
-                        lastUpdateError = updateParticipationData.error || 'No se pudo actualizar el registro';
-                        const unknownField = getUnknownFieldName(lastUpdateError);
-                        if (unknownField) {
-                            const cleanedFields = withoutUnknownField(fields, unknownField);
-                            if (JSON.stringify(cleanedFields) !== JSON.stringify(fields)) {
-                                console.warn(`⚠️ Eliminando campo no válido del posttest: ${unknownField}`);
-                                fields = cleanedFields;
-                                continue;
-                            }
-                        }
-                        console.warn('⚠️ Intento de actualización de posttest falló:', fields, updateParticipationData);
-                        break;
-                    }
-                    if (updateParticipationData && updateParticipationData.success) break;
-                }
+                });
                 
-                if (!updateParticipationData || !updateParticipationData.success) {
+                if (!updateParticipationData || (!updateParticipationData.id && !updateParticipationData.success)) {
                     console.error('❌ Error actualizando participación:', updateParticipationData);
-                    throw new Error(lastUpdateError || 'No se pudo actualizar el registro');
+                    throw new Error((updateParticipationData && updateParticipationData.error) || 'No se pudo actualizar el registro');
                 }
                 
                 console.log('✅ Participación actualizada:', currentParticipationId);
@@ -3805,11 +3600,16 @@ overflow: hidden;
                             </p>
                         </div>
                     `,
-                    confirmButtonText: 'Volver al Inicio',
+                    confirmButtonText: 'Capacitación terminada',
                     confirmButtonColor: '#2E7D32',
-                    allowOutsideClick: false
+                    allowOutsideClick: false,
+                    allowEscapeKey: false
                 }).then(() => {
-                    cancelTraining();
+                    markTrainingCompleted(currentAccessCode, currentParticipantData?.name, {
+                        participationId: currentParticipationId,
+                        trainingId: currentTrainingRecord?.id || null
+                    });
+                    renderTrainingCompletedScreen('Capacitación terminada');
                 });
                 
                 console.log('✅ Proceso de postest completado exitosamente');
@@ -6709,44 +6509,100 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         // CRONOGRAMA: Capacitaciones individuales (manual)
         // ======================
         
-async function airtableProxyRequest(payload) {
-    // Request helper with automatic fallback when Airtable rejects an "Unknown field name"
-    // (commonly due to accents/tilde differences like Observación vs Observacion).
-    const stripDiacritics = (s) => (s || '')
+
+const airtableFieldCache = {};
+
+async function getTableFieldKeys(tablePath) {
+    if (airtableFieldCache[tablePath]) return airtableFieldCache[tablePath];
+    try {
+        const res = await airtableProxyRequest({ method: 'GET', path: `${tablePath}` });
+        const records = Array.isArray(res?.records) ? res.records : [];
+        const keySet = new Set();
+        records.forEach(r => {
+            Object.keys(r?.fields || {}).forEach(k => keySet.add(k));
+        });
+        const keys = Array.from(keySet);
+        airtableFieldCache[tablePath] = keys;
+        return keys;
+    } catch (e) {
+        console.warn('⚠️ No se pudieron detectar campos de', tablePath, e);
+        airtableFieldCache[tablePath] = [];
+        return [];
+    }
+}
+
+function pickExistingFieldName(existingKeys, candidates) {
+    const normalize = (s) => (s || '')
         .toString()
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '');
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
 
-    // Deep-clone payload to avoid mutating caller objects
+    const map = new Map((existingKeys || []).map(k => [normalize(k), k]));
+    for (const candidate of candidates || []) {
+        const exact = map.get(normalize(candidate));
+        if (exact) return exact;
+    }
+    return null;
+}
+
+function assignIfDetected(targetFields, existingKeys, candidates, value) {
+    if (value === undefined || value === null || value === '') return;
+    const fieldName = pickExistingFieldName(existingKeys, candidates);
+    if (fieldName) targetFields[fieldName] = value;
+}
+
+async function airtableProxyRequest(payload) {
+    const normalizeKey = (s) => (s || '')
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+
     let current = JSON.parse(JSON.stringify(payload || {}));
 
-    const tryFixUnknownField = (msg) => {
+    const removeUnknownFieldVariant = (msg) => {
         if (!msg) return false;
-
-        // Common Airtable message: Unknown field name: "Observación"
-        const m = String(msg).match(/Unknown field name\s*:?\s*"?([^"\n]+)"?/i);
-        const unknown = m && m[1] ? m[1].trim() : null;
-        if (!unknown) return false;
-
+        // Maneja tanto "Unknown field name" como "cannot accept the provided value"
+        const matchUnknown = String(msg).match(/Unknown field name/i);
+        const matchInvalid = String(msg).match(/Field .([^.]+). cannot accept the provided value/i);
+        let unknown = '';
+        if (matchUnknown) {
+            const m = String(msg).match(/Unknown field name[^"]*"([^"]+)"/i) || String(msg).match(/Unknown field name\s*:?\s*([^
+"]+)/i);
+            unknown = m && m[1] ? m[1].trim() : '';
+        } else if (matchInvalid) {
+            unknown = matchInvalid[1] ? matchInvalid[1].trim() : '';
+        }
         const fields = current?.body?.fields;
-        if (!fields || typeof fields !== 'object') return false;
-        if (!(unknown in fields)) return false;
+        if (!unknown || !fields || typeof fields !== 'object') return false;
 
-        const alt = stripDiacritics(unknown);
+        const unknownNorm = normalizeKey(unknown);
+        const keys = Object.keys(fields);
+        const candidates = keys.filter((k) => {
+            const norm = normalizeKey(k);
+            return k === unknown || norm === unknownNorm || norm.replace(/\//g, ' ') === unknownNorm.replace(/\//g, ' ');
+        });
 
-        // 1) Prefer switching to the de-accented name (Observacion)
-        if (alt && alt !== unknown && !(alt in fields)) {
-            fields[alt] = fields[unknown];
-            delete fields[unknown];
-            return true;
+        if (!candidates.length) {
+            const compactUnknown = unknownNorm.replace(/\s+/g, '');
+            keys.forEach((k) => {
+                const compactKey = normalizeKey(k).replace(/\s+/g, '');
+                if (compactKey === compactUnknown) candidates.push(k);
+            });
         }
 
-        // 2) If de-accented already exists or no change, drop the unknown field to allow saving
-        delete fields[unknown];
+        if (!candidates.length) return false;
+        candidates.forEach((k) => delete fields[k]);
+        console.warn('⚠️ Campo no válido eliminado automáticamente:', unknown, '=>', candidates);
         return true;
     };
 
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 10; attempt++) {
         const res = await fetch('/.netlify/functions/airtable-proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -6761,8 +6617,7 @@ async function airtableProxyRequest(payload) {
 
         const msg = (data && (data.error || data.message)) ? (data.error || data.message) : rawText;
 
-        // Auto-fix: retry if Airtable complains about an unknown field name
-        if (res.status === 422 && attempt < 2 && tryFixUnknownField(msg)) {
+        if (res.status === 422 && attempt < 9 && removeUnknownFieldVariant(msg)) {
             continue;
         }
 
