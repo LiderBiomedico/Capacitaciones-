@@ -1527,124 +1527,77 @@ overflow: hidden;
                 <div class="card">
                     <h3>📋 Información General</h3>
                     <form id="trainingForm">
-                        <div class="form-group">
-                            <label style="color:#1a1a1a;"><i class="fas fa-graduation-cap"></i> Capacitación *</label>
-                            <input type="text" id="trainingTitle" required placeholder="Ej: Protocolo de Higiene de Manos" style="color:#1a1a1a;">
-                        </div>
-                        <div class="form-group">
-                            <label style="color:#1a1a1a;"><i class="fas fa-user"></i> Expositor *</label>
-                            <input type="text" id="trainingExpositor" required placeholder="Ej: Dr. Juan Pérez" style="color:#1a1a1a;">
-                        </div>
-                        <div class="form-group">
-                            <label style="color:#1a1a1a;"><i class="fas fa-user-tie"></i> Referente de Capacitaciones</label>
-                            <input type="text" id="trainingReferente" placeholder="Ej: Coordinador de Capacitaciones" style="color:#1a1a1a;">
-                        </div>
-                        <div class="form-group">
-                            <label style="color:#1a1a1a;"><i class="fas fa-list-ul"></i> Objetivo</label>
-                            <textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos de la capacitación..." style="color:#1a1a1a;"></textarea>
-                        </div>
+                        <div class="form-group"><label style="color:#1a1a1a;"><i class="fas fa-graduation-cap"></i> Capacitación *</label><input type="text" id="trainingTitle" required placeholder="Ej: Protocolo de Higiene de Manos" style="color:#1a1a1a;"></div>
+                        <div class="form-group"><label style="color:#1a1a1a;"><i class="fas fa-user"></i> Expositor *</label><input type="text" id="trainingExpositor" required placeholder="Ej: Dr. Juan Pérez" style="color:#1a1a1a;"></div>
+                        <div class="form-group"><label style="color:#1a1a1a;"><i class="fas fa-user-tie"></i> Referente de Capacitaciones</label><input type="text" id="trainingReferente" placeholder="Ej: Coordinador" style="color:#1a1a1a;"></div>
+                        <div class="form-group"><label style="color:#1a1a1a;"><i class="fas fa-list-ul"></i> Objetivo</label><textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos..." style="color:#1a1a1a;"></textarea></div>
                         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem;">
-                            <div class="form-group" style="margin-bottom:0;">
-                                <label style="color:#1a1a1a;"><i class="fas fa-calendar"></i> Fecha de Creación *</label>
-                                <input type="date" id="trainingDate" required style="color:#1a1a1a;">
-                            </div>
-                            <div class="form-group" style="margin-bottom:0;">
-                                <label style="color:#1a1a1a;"><i class="fas fa-hospital"></i> Proceso de Atención *</label>
-                                <select id="trainingDepartment" required style="color:#1a1a1a;">
-                                    <option value="">Seleccione...</option>
-                                    <option value="General">General</option>
-                                    <option value="Enfermería">Enfermería</option>
-                                    <option value="Medicina">Medicina</option>
-                                    <option value="Administración">Administración</option>
-                                    <option value="Laboratorio">Laboratorio</option>
-                                    <option value="Radiología">Radiología</option>
-                                    <option value="Urgencias">Urgencias</option>
-                                    <option value="UCI">UCI</option>
-                                    <option value="Cirugía">Cirugía</option>
-                                    <option value="Pediatría">Pediatría</option>
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin-bottom:0;">
-                                <label style="color:#1a1a1a;"><i class="fas fa-clock"></i> Duración</label>
-                                <input type="text" id="trainingDuration" placeholder="Ej: 30 minutos" style="color:#1a1a1a;">
-                            </div>
-                            <div class="form-group" style="margin-bottom:0;">
-                                <label style="color:#1a1a1a;"><i class="fas fa-chalkboard-teacher"></i> Metodología</label>
-                                <select id="trainingMethodology" style="color:#1a1a1a;">
-                                    <option value="">Seleccione...</option>
-                                    <option value="Presencial">Presencial</option>
-                                    <option value="Virtual">Virtual</option>
-                                    <option value="Híbrida">Híbrida</option>
-                                    <option value="Simulación">Simulación</option>
-                                    <option value="Taller práctico">Taller práctico</option>
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin-bottom:0;">
-                                <label style="color:#1a1a1a;"><i class="fas fa-map-marker-alt"></i> Lugar</label>
-                                <input type="text" id="trainingPlace" placeholder="Ej: Sala de conferencias, Piso 2" style="color:#1a1a1a;">
-                            </div>
-                            <div class="form-group" style="margin-bottom:0;">
-                                <label style="color:#1a1a1a;"><i class="fas fa-calendar-check"></i> Fecha de la capacitación</label>
-                                <input type="date" id="trainingEventDate" style="color:#1a1a1a;">
-                            </div>
+                            <div class="form-group" style="margin-bottom:0;"><label style="color:#1a1a1a;"><i class="fas fa-calendar"></i> Fecha de Creación *</label><input type="date" id="trainingDate" required style="color:#1a1a1a;"></div>
+                            <div class="form-group" style="margin-bottom:0;"><label style="color:#1a1a1a;"><i class="fas fa-hospital"></i> Proceso de Atención *</label>
+                                <select id="trainingDepartment" required style="color:#1a1a1a;"><option value="">Seleccione...</option><option value="General">General</option><option value="Enfermería">Enfermería</option><option value="Medicina">Medicina</option><option value="Administración">Administración</option><option value="Laboratorio">Laboratorio</option><option value="Radiología">Radiología</option><option value="Urgencias">Urgencias</option><option value="UCI">UCI</option><option value="Cirugía">Cirugía</option><option value="Pediatría">Pediatría</option></select></div>
+                            <div class="form-group" style="margin-bottom:0;"><label style="color:#1a1a1a;"><i class="fas fa-clock"></i> Duración</label><input type="text" id="trainingDuration" placeholder="Ej: 30 minutos" style="color:#1a1a1a;"></div>
+                            <div class="form-group" style="margin-bottom:0;"><label style="color:#1a1a1a;"><i class="fas fa-chalkboard-teacher"></i> Metodología</label>
+                                <select id="trainingMethodology" style="color:#1a1a1a;"><option value="">Seleccione...</option><option value="Presencial">Presencial</option><option value="Virtual">Virtual</option><option value="Híbrida">Híbrida</option><option value="Simulación">Simulación</option><option value="Taller práctico">Taller práctico</option></select></div>
+                            <div class="form-group" style="margin-bottom:0;"><label style="color:#1a1a1a;"><i class="fas fa-map-marker-alt"></i> Lugar</label><input type="text" id="trainingPlace" placeholder="Ej: Sala de conferencias" style="color:#1a1a1a;"></div>
+                            <div class="form-group" style="margin-bottom:0;"><label style="color:#1a1a1a;"><i class="fas fa-calendar-check"></i> Fecha de la capacitación</label><input type="date" id="trainingEventDate" style="color:#1a1a1a;"></div>
                         </div>
                         <div class="form-group">
                             <label style="color:#1a1a1a;"><i class="fas fa-users-cog"></i> Dirigido a *</label>
                             <div id="trainingStaffContainer" style="background:#f8f9fa;border:2px solid #e0e0e0;border-radius:8px;padding:1rem;">
                                 <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:0.75rem;">
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Jefe de Enfermería" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Jefe de Enfermería</span>
                                     </label>
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Médico General" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Médico General</span>
                                     </label>
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Médico Especialista" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Médico Especialista</span>
                                     </label>
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Ingeniero Biomedico" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Ingeniero Biomedico</span>
                                     </label>
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Estudiante" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Estudiante</span>
                                     </label>
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Auxiliar de enfermería" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Auxiliar de enfermería</span>
                                     </label>
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Terapeuta Respiratorio" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Terapeuta Respiratorio</span>
                                     </label>
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Fisioterapeuta" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Fisioterapeuta</span>
                                     </label>
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Conductor" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Conductor</span>
                                     </label>
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Técnico de Rayos X" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Técnico de Rayos X</span>
                                     </label>
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Fonoaudiólogo" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Fonoaudiólogo</span>
                                     </label>
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Instrumentador Quirúrgico" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Instrumentador Quirúrgico</span>
                                     </label>
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Administrativo" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Administrativo</span>
                                     </label>
-                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;transition:all 0.3s;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
+                                    <label style="display:flex;align-items:center;gap:0.5rem;margin:0;cursor:pointer;padding:0.5rem;border-radius:6px;color:#1a1a1a;" onmouseover="this.style.background='#e8f5e9'" onmouseout="this.style.background='transparent'">
                                         <input type="checkbox" value="Otro" class="trainingStaff" style="width:18px;height:18px;cursor:pointer;accent-color:var(--primary);">
                                         <span>Otro</span>
                                     </label>
@@ -4061,8 +4014,7 @@ overflow: hidden;
                 const textEl = document.getElementById(`${questionId}-text`);
                 const questionText = textEl ? textEl.value.trim() : '';
                 if (!questionText) {
-                    Swal.fire({ icon: 'error', title: 'Pregunta Vacía', text: `Escribe el texto de la pregunta ${i + 1} del ${typeName}`, confirmButtonText: 'Entendido' });
-                    if (textEl) textEl.focus();
+                    Swal.fire({ icon: 'error', title: 'Pregunta Vacía', text: `Escribe la pregunta ${i + 1} del ${typeName}` });
                     return null;
                 }
                 const options = {
@@ -4072,13 +4024,12 @@ overflow: hidden;
                     d: (document.getElementById(`${questionId}-text-d`) || {value:''}).value.trim()
                 };
                 if (!options.a || !options.b || !options.c || !options.d) {
-                    const missing = ['A','B','C','D'].filter((_,idx) => !Object.values(options)[idx]).join(', ');
-                    Swal.fire({ icon: 'error', title: 'Opciones Incompletas', text: `Completa las opciones ${missing} de la pregunta ${i + 1} del ${typeName}`, confirmButtonText: 'Entendido' });
+                    Swal.fire({ icon: 'error', title: 'Opciones Incompletas', text: `Completa todas las opciones de la pregunta ${i + 1} del ${typeName}` });
                     return null;
                 }
                 const correctAnswer = card.querySelector(`input[name="${questionId}-correct"]:checked`);
                 if (!correctAnswer) {
-                    Swal.fire({ icon: 'warning', title: 'Falta respuesta correcta', text: `Marca la opción correcta en la pregunta ${i + 1} del ${typeName}`, confirmButtonText: 'Entendido' });
+                    Swal.fire({ icon: 'warning', title: 'Respuesta correcta', text: `Marca la respuesta correcta en la pregunta ${i + 1} del ${typeName}` });
                     return null;
                 }
                 questions.push({ number: i + 1, question: questionText, options, correctAnswer: correctAnswer.value });
@@ -4128,14 +4079,14 @@ function getSelectedStaff() {
     const pretestQuestions = collectQuestions('pretest');
     if (pretestQuestions === null) return;
     if (pretestQuestions.length === 0) {
-        Swal.fire({ icon: 'warning', title: 'Sin Preguntas de Pretest', text: 'Agrega al menos una pregunta al Pretest', confirmButtonText: 'Entendido' });
+        Swal.fire({ icon: 'warning', title: 'Sin Preguntas de Pretest', text: 'Agrega al menos una pregunta al Pretest' });
         document.getElementById('pretestQuestions').scrollIntoView({ behavior: 'smooth' });
         return;
     }
     const postestQuestions = collectQuestions('postest');
     if (postestQuestions === null) return;
     if (postestQuestions.length === 0) {
-        Swal.fire({ icon: 'warning', title: 'Sin Preguntas de Post-test', text: 'Agrega al menos una pregunta al Post-test', confirmButtonText: 'Entendido' });
+        Swal.fire({ icon: 'warning', title: 'Sin Preguntas de Post-test', text: 'Agrega al menos una pregunta al Post-test' });
         document.getElementById('postestQuestions').scrollIntoView({ behavior: 'smooth' });
         return;
     }
@@ -4147,8 +4098,7 @@ function getSelectedStaff() {
         title, description, trainingDate, department, duration,
         expositor, referente, methodology, place, eventDate,
         staffList: selectedStaff, accessCode,
-        status: 'active', createdAtISO,
-        pretestQuestions, postestQuestions
+        status: 'active', createdAtISO, pretestQuestions, postestQuestions
     };
 
     // Mostrar indicador de carga
@@ -4313,16 +4263,16 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             return true;
         }
 
-        // Campos EXACTOS de la tabla Preguntas en Airtable
-        const records = questions.map(q => ({
+        // Campos exactos de la tabla Preguntas (campo se llama "Tipo", no "Tipo Examen")
+        const records = questions.map((q, idx) => ({
             fields: {
-                "Capacitación":      [trainingRecordId],
-                "Tipo Examen":       type === 'pretest' ? 'Pretest' : 'Posttest',
-                "Pregunta":          q.question,
-                "Opción A":          q.options.a,
-                "Opción B":          q.options.b,
-                "Opción C":          q.options.c,
-                "Opción D":          q.options.d,
+                "Capacitación":       [trainingRecordId],
+                "Tipo":               type === 'pretest' ? 'Pretest' : 'Postest',
+                "Pregunta":           q.question,
+                "Opción A":           q.options.a,
+                "Opción B":           q.options.b,
+                "Opción C":           q.options.c,
+                "Opción D":           q.options.d,
                 "Respuesta Correcta": q.correctAnswer.toUpperCase()
             }
         }));
@@ -4371,25 +4321,20 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         }
 
         function showQRCode(accessCode, title) {
-            const modal = document.getElementById('qrModal');
-            const qrContainer = document.getElementById('qrcode');
-            
+            const qrContainer = document.getElementById('qrCode');
+            if (!qrContainer) { console.error('No se encontró qrCode'); return; }
             qrContainer.innerHTML = '';
-            
-            const accessUrl = `${window.location.origin}?code=${accessCode}`;
+            const baseUrl = window.location.origin + window.location.pathname;
+            const accessUrl = `${baseUrl}?code=${accessCode}`;
             new QRCode(qrContainer, {
-                text: accessUrl,
-                width: 256,
-                height: 256,
-                colorDark: '#2E7D32',
-                colorLight: '#ffffff',
+                text: accessUrl, width: 300, height: 300,
+                colorDark: '#000000', colorLight: '#ffffff',
                 correctLevel: QRCode.CorrectLevel.H
             });
-            
-            document.getElementById('modalAccessCode').textContent = accessCode;
-            document.getElementById('modalAccessLink').textContent = accessUrl;
-            
-            modal.style.display = 'flex';
+            const qrUrlInput = document.getElementById('qrUrl');
+            if (qrUrlInput) qrUrlInput.value = accessUrl;
+            window.currentQRData = { url: accessUrl, code: accessCode, title: title || '' };
+            document.getElementById('qrModal').style.display = 'flex';
         }
 
         function closeModal() {
