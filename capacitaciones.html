@@ -1661,8 +1661,6 @@ overflow: hidden;
             <!-- Modal para mostrar QR generado -->
             <div id="qrModal" class="modal" style="display: none;">
                 <div class="modal-content" style="max-width: 500px; padding: 2rem; text-align: center;">
-                    <button class="modal-close" onclick="closeQRModal()">&times;</button>
-                    
                     <h3 style="margin-bottom: 1.5rem;">
                         <i class="fas fa-qrcode"></i> Código QR Generado
                     </h3>
@@ -4002,37 +4000,27 @@ overflow: hidden;
         }
 
         function collectQuestions(type) {
-            const container = document.getElementById(`${type}Questions`);
-            if (!container) return [];
-            const questionCards = container.querySelectorAll('.question-card');
-            if (questionCards.length === 0) return [];
-            const typeName = type === 'pretest' ? 'Pretest' : 'Post-test';
-            const questions = [];
-            for (let i = 0; i < questionCards.length; i++) {
-                const card = questionCards[i];
-                const questionId = card.id;
-                const textEl = document.getElementById(`${questionId}-text`);
-                const questionText = textEl ? textEl.value.trim() : '';
-                if (!questionText) {
-                    Swal.fire({ icon: 'error', title: 'Pregunta Vacía', text: `Escribe la pregunta ${i + 1} del ${typeName}` });
-                    return null;
-                }
-                const options = {
-                    a: (document.getElementById(`${questionId}-text-a`) || {value:''}).value.trim(),
-                    b: (document.getElementById(`${questionId}-text-b`) || {value:''}).value.trim(),
-                    c: (document.getElementById(`${questionId}-text-c`) || {value:''}).value.trim(),
-                    d: (document.getElementById(`${questionId}-text-d`) || {value:''}).value.trim()
+            const container=document.getElementById(`${type}Questions`);
+            if(!container)return[];
+            const questionCards=container.querySelectorAll('.question-card');
+            if(questionCards.length===0)return[];
+            const typeName=type==='pretest'?'Pretest':'Post-test';
+            const questions=[];
+            for(let i=0;i<questionCards.length;i++){
+                const card=questionCards[i],questionId=card.id;
+                const textEl=document.getElementById(`${questionId}-text`);
+                const questionText=textEl?textEl.value.trim():'';
+                if(!questionText){Swal.fire({icon:'error',title:'Pregunta Vacía',text:`Escribe la pregunta ${i+1} del ${typeName}`});return null;}
+                const options={
+                    a:(document.getElementById(`${questionId}-text-a`)||{value:''}).value.trim(),
+                    b:(document.getElementById(`${questionId}-text-b`)||{value:''}).value.trim(),
+                    c:(document.getElementById(`${questionId}-text-c`)||{value:''}).value.trim(),
+                    d:(document.getElementById(`${questionId}-text-d`)||{value:''}).value.trim()
                 };
-                if (!options.a || !options.b || !options.c || !options.d) {
-                    Swal.fire({ icon: 'error', title: 'Opciones Incompletas', text: `Completa todas las opciones de la pregunta ${i + 1} del ${typeName}` });
-                    return null;
-                }
-                const correctAnswer = card.querySelector(`input[name="${questionId}-correct"]:checked`);
-                if (!correctAnswer) {
-                    Swal.fire({ icon: 'warning', title: 'Respuesta correcta', text: `Marca la respuesta correcta en la pregunta ${i + 1} del ${typeName}` });
-                    return null;
-                }
-                questions.push({ number: i + 1, question: questionText, options, correctAnswer: correctAnswer.value });
+                if(!options.a||!options.b||!options.c||!options.d){Swal.fire({icon:'error',title:'Opciones Incompletas',text:`Completa todas las opciones de la pregunta ${i+1} del ${typeName}`});return null;}
+                const correctAnswer=card.querySelector(`input[name="${questionId}-correct"]:checked`);
+                if(!correctAnswer){Swal.fire({icon:'warning',title:'Respuesta correcta',text:`Marca la respuesta correcta en la pregunta ${i+1} del ${typeName}`});return null;}
+                questions.push({number:i+1,question:questionText,options,correctAnswer:correctAnswer.value});
             }
             return questions;
         }
@@ -4047,58 +4035,30 @@ function getSelectedStaff() {
 }
 
         async function saveTraining() {
-    const titleInput     = document.getElementById('trainingTitle');
-    const descInput      = document.getElementById('trainingDescription');
-    const dateInput      = document.getElementById('trainingDate');
-    const deptInput      = document.getElementById('trainingDepartment');
-    const durationInput  = document.getElementById('trainingDuration');
-    const expositorInput = document.getElementById('trainingExpositor');
-    const referenteInput = document.getElementById('trainingReferente');
-    const methodInput    = document.getElementById('trainingMethodology');
-    const placeInput     = document.getElementById('trainingPlace');
-    const eventDateInput = document.getElementById('trainingEventDate');
-    const title       = titleInput     ? titleInput.value.trim()    : '';
-    const description = descInput      ? descInput.value.trim()     : '';
-    const trainingDate= dateInput      ? dateInput.value            : '';
-    const department  = deptInput      ? deptInput.value            : '';
-    const duration    = durationInput  ? durationInput.value.trim() : '';
-    const expositor   = expositorInput ? expositorInput.value.trim(): '';
-    const referente   = referenteInput ? referenteInput.value.trim(): '';
-    const methodology = methodInput    ? methodInput.value          : '';
-    const place       = placeInput     ? placeInput.value.trim()    : '';
-    const eventDate   = eventDateInput ? eventDateInput.value       : '';
-    const selectedStaff = getSelectedStaff();
-    if (!title || !trainingDate || !department || selectedStaff.length === 0) {
-        let missingMsg = 'Por favor completa los campos requeridos (*)';
-        if (selectedStaff.length === 0) missingMsg += ' y selecciona al menos un cargo en "Dirigido a".';
-        Swal.fire({ icon: 'warning', title: 'Campos Incompletos', text: missingMsg });
-        if (titleInput) titleInput.scrollIntoView({ behavior: 'smooth' });
+    const titleInput=document.getElementById('trainingTitle'),descInput=document.getElementById('trainingDescription'),dateInput=document.getElementById('trainingDate'),deptInput=document.getElementById('trainingDepartment'),durationInput=document.getElementById('trainingDuration'),expositorInput=document.getElementById('trainingExpositor'),referenteInput=document.getElementById('trainingReferente'),methodInput=document.getElementById('trainingMethodology'),placeInput=document.getElementById('trainingPlace'),eventDateInput=document.getElementById('trainingEventDate');
+    const title=titleInput?titleInput.value.trim():'',description=descInput?descInput.value.trim():'',trainingDate=dateInput?dateInput.value:'',department=deptInput?deptInput.value:'',duration=durationInput?durationInput.value.trim():'',expositor=expositorInput?expositorInput.value.trim():'',referente=referenteInput?referenteInput.value.trim():'',methodology=methodInput?methodInput.value:'',place=placeInput?placeInput.value.trim():'',eventDate=eventDateInput?eventDateInput.value:'';
+    const selectedStaff=getSelectedStaff();
+    if(!title||!trainingDate||!department||selectedStaff.length===0){
+        Swal.fire({icon:'warning',title:'Campos Incompletos',text:'Por favor completa los campos requeridos (*)'+(selectedStaff.length===0?' y selecciona al menos un cargo en "Dirigido a".':'')});
+        if(titleInput)titleInput.scrollIntoView({behavior:'smooth'});
         return;
     }
 
-    const pretestQuestions = collectQuestions('pretest');
-    if (pretestQuestions === null) return;
-    if (pretestQuestions.length === 0) {
-        Swal.fire({ icon: 'warning', title: 'Sin Preguntas de Pretest', text: 'Agrega al menos una pregunta al Pretest' });
-        document.getElementById('pretestQuestions').scrollIntoView({ behavior: 'smooth' });
-        return;
-    }
-    const postestQuestions = collectQuestions('postest');
-    if (postestQuestions === null) return;
-    if (postestQuestions.length === 0) {
-        Swal.fire({ icon: 'warning', title: 'Sin Preguntas de Post-test', text: 'Agrega al menos una pregunta al Post-test' });
-        document.getElementById('postestQuestions').scrollIntoView({ behavior: 'smooth' });
-        return;
-    }
+    const pretestQuestions=collectQuestions('pretest');
+    if(pretestQuestions===null)return;
+    if(pretestQuestions.length===0){Swal.fire({icon:'warning',title:'Sin Preguntas de Pretest',text:'Agrega al menos una pregunta al Pretest'});document.getElementById('pretestQuestions').scrollIntoView({behavior:'smooth'});return;}
+    const postestQuestions=collectQuestions('postest');
+    if(postestQuestions===null)return;
+    if(postestQuestions.length===0){Swal.fire({icon:'warning',title:'Sin Preguntas de Post-test',text:'Agrega al menos una pregunta al Post-test'});document.getElementById('postestQuestions').scrollIntoView({behavior:'smooth'});return;}
 
     const accessCode = generateAccessCode();
     const createdAtISO = new Date().toISOString();
 
     const trainingData = {
-        title, description, trainingDate, department, duration,
-        expositor, referente, methodology, place, eventDate,
-        staffList: selectedStaff, accessCode,
-        status: 'active', createdAtISO, pretestQuestions, postestQuestions
+        title,description,trainingDate,department,duration,
+        expositor,referente,methodology,place,eventDate,
+        staffList:selectedStaff,accessCode,
+        status:'active',createdAtISO,pretestQuestions,postestQuestions
     };
 
     // Mostrar indicador de carga
@@ -4263,8 +4223,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             return true;
         }
 
-        // Campos exactos de la tabla Preguntas en Airtable
-        // "Respuesta Correcta" es Select con opciones en minúscula: a, b, c, d
+        // Campos exactos tabla Preguntas — Respuesta Correcta es Select con opciones en minúscula
         const records = questions.map(q => ({
             fields: {
                 "Capacitación":       [trainingRecordId],
@@ -4274,7 +4233,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 "Opción B":           q.options.b,
                 "Opción C":           q.options.c,
                 "Opción D":           q.options.d,
-                "Respuesta Correcta": q.correctAnswer.toLowerCase()  // Select: opciones son a,b,c,d
+                "Respuesta Correcta": q.correctAnswer.toLowerCase()
             }
         }));
 
@@ -4689,20 +4648,44 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                                 <strong>Título:</strong> ${fields['Título'] || 'N/A'}
                             </div>
                             <div class="training-info-item">
-                                <i class="fas fa-align-left"></i>
-                                <strong>Descripción:</strong> ${fields['Descripción'] || 'N/A'}
+                                <i class="fas fa-list-ul"></i>
+                                <strong>Objetivo:</strong> ${fields['Objetivo'] || 'N/A'}
+                            </div>
+                            <div class="training-info-item">
+                                <i class="fas fa-user"></i>
+                                <strong>Expositor:</strong> ${fields['Expositor'] || 'N/A'}
+                            </div>
+                            <div class="training-info-item">
+                                <i class="fas fa-user-tie"></i>
+                                <strong>Referente:</strong> ${fields['Referente de Capacitaciones'] || 'N/A'}
                             </div>
                             <div class="training-info-item">
                                 <i class="fas fa-calendar"></i>
-                                <strong>Fecha:</strong> ${fields['Fecha'] ? new Date(fields['Fecha']).toLocaleDateString('es-ES') : 'N/A'}
+                                <strong>Fecha de Creación:</strong> ${fields['Fecha Creación'] ? new Date(fields['Fecha Creación']).toLocaleDateString('es-ES') : 'N/A'}
                             </div>
                             <div class="training-info-item">
-                                <i class="fas fa-building"></i>
-                                <strong>Departamento:</strong> ${fields['Departamento'] || 'N/A'}
+                                <i class="fas fa-calendar-check"></i>
+                                <strong>Fecha Capacitación:</strong> ${fields['Fecha de la capacitación'] ? new Date(fields['Fecha de la capacitación']).toLocaleDateString('es-ES') : 'N/A'}
+                            </div>
+                            <div class="training-info-item">
+                                <i class="fas fa-hospital"></i>
+                                <strong>Proceso de Atención:</strong> ${fields['ProcesoAtencion'] || 'N/A'}
                             </div>
                             <div class="training-info-item">
                                 <i class="fas fa-clock"></i>
                                 <strong>Duración:</strong> ${fields['Duración'] || 'N/A'}
+                            </div>
+                            <div class="training-info-item">
+                                <i class="fas fa-chalkboard-teacher"></i>
+                                <strong>Metodología:</strong> ${fields['Metodología'] || 'N/A'}
+                            </div>
+                            <div class="training-info-item">
+                                <i class="fas fa-map-marker-alt"></i>
+                                <strong>Lugar:</strong> ${fields['Lugar'] || 'N/A'}
+                            </div>
+                            <div class="training-info-item">
+                                <i class="fas fa-users"></i>
+                                <strong>Dirigido a:</strong> ${Array.isArray(fields['Dirigido a']) ? fields['Dirigido a'].join(', ') : (fields['Dirigido a'] || 'N/A')}
                             </div>
                             <div class="training-info-item">
                                 <i class="fas fa-key"></i>
