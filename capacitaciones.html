@@ -3019,26 +3019,23 @@ overflow: hidden;
                 const horaFormato = `${hours}:${minutes}:${seconds}`;
                 const fechaHoraCompleta = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
                 
-                const participationData = {
-                    fields: {
-                        'Nombre': currentParticipantData.name,
-                        'Nombre Completo': currentParticipantData.name,
-                        'Departamento': currentParticipantData.department,
-                        'Servicio': currentParticipantData.department,
-                        'Profesión': currentParticipantData.profession || '',
-                        'Profesion': currentParticipantData.profession || '',
-                        'Cargo': currentParticipantData.profession || '',
-                        'Pretest Score': pretestScore,
-                        'Pre-test Score': pretestScore,
-                        'Fecha de Inicio': fechaFormato,
-                        'Completado Pretest': true,
-                        'Completado Pre-Test': true,
-                        'Código de Acceso': currentAccessCode || '',
-                        'Código Acceso': currentAccessCode || '',
-                        'Sesion': [currentSession.id],
-                        'Sesión': [currentSession.id]
-                    }
-                };
+                const participationFieldKeys = await getTableFieldKeys('/Participaciones');
+                const participationFields = {};
+                
+                assignIfDetected(participationFields, participationFieldKeys, ['Nombre Completo', 'Nombre'], currentParticipantData.name);
+                assignIfDetected(participationFields, participationFieldKeys, ['Servicio', 'Departamento'], currentParticipantData.department);
+                assignIfDetected(participationFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.profession || '').trim());
+                assignIfDetected(participationFields, participationFieldKeys, ['Pretest Score', 'Pre-test Score'], pretestScore);
+                assignIfDetected(participationFields, participationFieldKeys, ['Fecha de Inicio', 'Fecha Inicio', 'Fecha'], fechaFormato);
+                assignIfDetected(participationFields, participationFieldKeys, ['Completado Pretest', 'Completado Pre-Test'], true);
+                assignIfDetected(participationFields, participationFieldKeys, ['Código Acceso', 'Código de Acceso'], (currentAccessCode || '').trim());
+                assignIfDetected(participationFields, participationFieldKeys, ['Sesión', 'Sesion'], [currentSession.id]);
+
+                if (!Object.keys(participationFields).length) {
+                    participationFields['Nombre Completo'] = currentParticipantData.name;
+                }
+
+                const participationData = { fields: participationFields };
                 
                 console.log('📤 Creando participación:', participationData);
                 
@@ -3511,19 +3508,19 @@ overflow: hidden;
                 const horaFormato = `${hours}:${minutes}:${seconds}`;
                 const fechaHoraCompleta = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
                 
+                const participationFieldKeys = await getTableFieldKeys('/Participaciones');
+                const updateFields = {};
+
+                assignIfDetected(updateFields, participationFieldKeys, ['Post-test Score', 'Posttest Score'], postestScore);
+                assignIfDetected(updateFields, participationFieldKeys, ['Fecha Fin', 'Fecha Final', 'Fecha de Finalización', 'Fecha Finalización'], fechaFormato);
+                assignIfDetected(updateFields, participationFieldKeys, ['Completado Posttest', 'Completado Post-Test'], true);
+                assignIfDetected(updateFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.profession || '').trim());
+
                 const updateParticipationData = await airtableProxyRequest({
                     method: 'PATCH',
                     path: `/Participaciones/${currentParticipationId}`,
                     body: {
-                        fields: {
-                            'Post-test Score': postestScore,
-                            'Posttest Score': postestScore,
-                            'Fecha Fin': fechaFormato,
-                            'Completado Posttest': true,
-                            'Completado Post-Test': true,
-                            'Profesión': currentParticipantData.profession || '',
-                            'Profesion': currentParticipantData.profession || ''
-                        }
+                        fields: updateFields
                     }
                 });
                 
@@ -6524,6 +6521,51 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         // CRONOGRAMA: Capacitaciones individuales (manual)
         // ======================
         
+
+const airtableFieldCache = {};
+
+async function getTableFieldKeys(tablePath) {
+    if (airtableFieldCache[tablePath]) return airtableFieldCache[tablePath];
+    try {
+        const res = await airtableProxyRequest({ method: 'GET', path: `${tablePath}` });
+        const records = Array.isArray(res?.records) ? res.records : [];
+        const keySet = new Set();
+        records.forEach(r => {
+            Object.keys(r?.fields || {}).forEach(k => keySet.add(k));
+        });
+        const keys = Array.from(keySet);
+        airtableFieldCache[tablePath] = keys;
+        return keys;
+    } catch (e) {
+        console.warn('⚠️ No se pudieron detectar campos de', tablePath, e);
+        airtableFieldCache[tablePath] = [];
+        return [];
+    }
+}
+
+function pickExistingFieldName(existingKeys, candidates) {
+    const normalize = (s) => (s || '')
+        .toString()
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+
+    const map = new Map((existingKeys || []).map(k => [normalize(k), k]));
+    for (const candidate of candidates || []) {
+        const exact = map.get(normalize(candidate));
+        if (exact) return exact;
+    }
+    return null;
+}
+
+function assignIfDetected(targetFields, existingKeys, candidates, value) {
+    if (value === undefined || value === null || value === '') return;
+    const fieldName = pickExistingFieldName(existingKeys, candidates);
+    if (fieldName) targetFields[fieldName] = value;
+}
+
 async function airtableProxyRequest(payload) {
     const normalizeKey = (s) => (s || '')
         .toString()
