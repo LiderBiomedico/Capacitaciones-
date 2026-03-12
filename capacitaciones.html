@@ -751,17 +751,18 @@
         }
 
         .loader-credit {
-            margin: 0.65rem 0 0;
-            font-weight: 600;
-            letter-spacing: 0.4px;
-            font-size: clamp(0.9rem, 1.9vw, 1.3rem); /* doble de tamaño */
-            opacity: 0.95;
-            text-shadow: 0 0 12px rgba(0,0,0,0.18);
-            text-align: center;
-            color: #334155;
-            position: static;
-            z-index: 2;
-        }
+    position: fixed;
+    left: 18px;
+    bottom: 14px;
+    margin: 0;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    font-size: clamp(0.45rem, 0.95vw, 0.65rem); /* ~mitad del título */
+    opacity: 0.85;
+    text-shadow: 0 0 12px rgba(0,0,0,0.30);
+    text-align: left;
+    z-index: 2;
+}
 
         .splash-logo {
             width: 160px;
@@ -7483,11 +7484,11 @@ function makeCronogramaFilterFormula(year, tipo) {
                 currentReportData = data;
                 allParticipantsData = data.participants || [];
 
-                // Reiniciar filtros para evitar que quede una selección anterior ocultando resultados
-                const searchInput = document.getElementById('participantSearchInput');
-                const statusFilterSelect = document.getElementById('participantStatusFilter');
-                if (searchInput) searchInput.value = '';
-                if (statusFilterSelect) statusFilterSelect.value = '';
+                // Reiniciar filtros de la tabla al cambiar de capacitación
+                const participantSearchInput = document.getElementById('participantSearchInput');
+                const participantStatusFilter = document.getElementById('participantStatusFilter');
+                if (participantSearchInput) participantSearchInput.value = '';
+                if (participantStatusFilter) participantStatusFilter.value = '';
                 
                 // Llenar información de la capacitación
                 document.getElementById('reportTrainingTitle').textContent = data.training.titulo;
@@ -7557,20 +7558,18 @@ function makeCronogramaFilterFormula(year, tipo) {
             
             if (!participants || participants.length === 0) {
                 table.style.display = 'none';
-                noParticipantsMessage.style.display = 'block';
-                const messageTitle = noParticipantsMessage.querySelector('p');
-                const messageDetail = noParticipantsMessage.querySelector('small');
-                if (messageTitle) messageTitle.textContent = 'No hay participantes registrados con los filtros actuales';
-                if (messageDetail) messageDetail.textContent = 'Verifica el estado seleccionado o vuelve a “Todos los estados”.';
+                if (noParticipantsMessage) {
+                    const hasBaseData = Array.isArray(allParticipantsData) && allParticipantsData.length > 0;
+                    noParticipantsMessage.style.display = 'block';
+                    noParticipantsMessage.innerHTML = hasBaseData
+                        ? '<div style="padding:1rem; text-align:center; color:#6b7280;">No hay participantes que coincidan con el filtro aplicado.</div>'
+                        : '<div style="padding:1rem; text-align:center; color:#6b7280;">No se encontraron participantes registrados para esta capacitación.</div>';
+                }
                 return;
             }
             
             table.style.display = 'table';
             noParticipantsMessage.style.display = 'none';
-            const messageTitle = noParticipantsMessage.querySelector('p');
-            const messageDetail = noParticipantsMessage.querySelector('small');
-            if (messageTitle) messageTitle.textContent = 'No hay participantes registrados en esta capacitación';
-            if (messageDetail) messageDetail.textContent = '';
             
             participants.forEach((participant, index) => {
                 const row = document.createElement('tr');
