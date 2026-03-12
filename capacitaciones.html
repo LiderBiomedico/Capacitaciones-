@@ -2925,7 +2925,7 @@ overflow: hidden;
                 
                 // Encontrar la sesión por código de acceso
                 const currentSession = sessionData.records.find(s => {
-                    const codigo = s.fields['Código Acceso'] || '';
+                    const codigo = s.fields['Código Acceso'] || s.fields['Código de Acceso'] || '';
                     return codigo.toUpperCase() === currentAccessCode.toUpperCase();
                 });
                 
@@ -3027,27 +3027,30 @@ overflow: hidden;
                         'Pretest Score': pretestScore,
                         'Fecha de Inicio': fechaFormato,
                         'Completado Pretest': true,
-                        'Código de Acceso': currentAccessCode || ''
+                        'Código de Acceso': currentAccessCode || '',
+                        'Código Acceso': currentAccessCode || '',
+                        'Sesion': [currentSession.id],
+                        'Sesión': [currentSession.id]
                     }
                 };
                 
                 console.log('📤 Creando participación:', participationData);
                 
-                const createParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
+                let participationResult;
+                try {
+                    participationResult = await airtableProxyRequest({
                         method: 'POST',
                         path: `/Participaciones`,
                         body: participationData
-                    })
-                });
+                    });
+                } catch (err) {
+                    console.error('❌ Error creando participación:', err);
+                    throw new Error(err.message || 'No se pudo crear el registro de participación');
+                }
                 
-                const participationResult = await createParticipationResponse.json();
-                
-                if (!participationResult.success) {
+                if (!participationResult || !participationResult.id) {
                     console.error('❌ Error creando participación:', participationResult);
-                    throw new Error(participationResult.error || 'No se pudo crear el registro de participación');
+                    throw new Error((participationResult && participationResult.error) || 'No se pudo crear el registro de participación');
                 }
                 
                 console.log('✅ Participación creada:', participationResult.id);
@@ -3071,14 +3074,10 @@ overflow: hidden;
                             }
                         };
                         
-                        await fetch('/.netlify/functions/airtable-proxy', {
+                        await airtableProxyRequest({
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                method: 'POST',
-                                path: `/Respuestas`,
-                                body: answerData
-                            })
+                            path: `/Respuestas`,
+                            body: answerData
                         });
                         
                         console.log(`✅ Respuesta guardada para pregunta: ${answer.questionId}`);
@@ -3542,14 +3541,10 @@ overflow: hidden;
                             }
                         };
                         
-                        await fetch('/.netlify/functions/airtable-proxy', {
+                        await airtableProxyRequest({
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                method: 'POST',
-                                path: `/Respuestas`,
-                                body: answerData
-                            })
+                            path: `/Respuestas`,
+                            body: answerData
                         });
                         
                         console.log(`✅ Respuesta guardada para pregunta: ${answer.questionId}`);
