@@ -3018,53 +3018,72 @@ overflow: hidden;
                 const pretestScoreField = resolveExistingField(participationFields, ['Pretest Score', 'Pre-Test Score', 'Puntuación Pretest'], 'Pretest Score');
                 const startDateField = resolveExistingField(participationFields, ['Fecha de Inicio', 'Fecha Inicio', 'Inicio'], 'Fecha de Inicio');
                 const pretestDoneField = resolveExistingField(participationFields, ['Completado Pretest', 'Pretest Completado', 'Pre-Test Completado'], 'Completado Pretest');
-                const statusField = resolveExistingField(participationFields, ['Estado', 'Status'], 'Estado');
-                const professionField = resolveExistingField(participationFields, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], 'Profesión');
+                const statusField = resolveExistingField(participationFields, ['Estado', 'Status'], '');
+                const professionField = resolveExistingField(participationFields, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], '');
                 const codeField = resolveExistingField(participationFields, ['Código de Acceso', 'Codigo de Acceso', 'Código Acceso', 'Codigo Acceso'], '');
                 const sessionField = resolveExistingField(participationFields, ['Sesión', 'Sesion'], '');
                 const trainingField = resolveExistingField(participationFields, ['Capacitación', 'Capacitaciones', 'Capacitacion'], '');
 
-                const baseFields = {
+                const commonFields = {
                     [nameField]: currentParticipantData.name,
                     [departmentField]: currentParticipantData.department,
                     [pretestScoreField]: pretestScore,
-                    [startDateField]: fechaFormato,
-                    [pretestDoneField]: true,
-                    [statusField]: 'Pretest Completado',
-                    [professionField]: participantProfession
+                    [startDateField]: fechaFormato
                 };
+                if (pretestDoneField) commonFields[pretestDoneField] = true;
+                if (codeField) commonFields[codeField] = currentAccessCode || '';
+                if (currentSession?.id && sessionField) commonFields[sessionField] = [currentSession.id];
+                if (currentTrainingRecord?.id && trainingField) commonFields[trainingField] = [currentTrainingRecord.id];
 
-                if (codeField) {
-                    baseFields[codeField] = currentAccessCode || '';
-                }
-                if (currentSession?.id && sessionField) {
-                    baseFields[sessionField] = [currentSession.id];
-                }
-                if (currentTrainingRecord?.id && trainingField) {
-                    baseFields[trainingField] = [currentTrainingRecord.id];
-                }
-
-                participationPayloads.push({ fields: baseFields });
-
-                // Intentos alternos solamente si los campos exactos no fueron detectados
-                const seenPayloads = new Set([JSON.stringify(baseFields)]);
-                const fallbackProfessionFields = ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'];
-                for (const pf of fallbackProfessionFields) {
-                    const fields = {
-                        [nameField]: currentParticipantData.name,
-                        [departmentField]: currentParticipantData.department,
-                        [pretestScoreField]: pretestScore,
-                        [startDateField]: fechaFormato,
-                        [pretestDoneField]: true,
-                        [statusField]: 'Pretest Completado',
-                        [pf]: participantProfession
-                    };
+                const seenPayloads = new Set();
+                function addParticipationAttempt(extraFields = {}) {
+                    const fields = { ...commonFields, ...extraFields };
+                    Object.keys(fields).forEach(k => {
+                        if (!k || typeof k !== 'string') delete fields[k];
+                    });
                     const key = JSON.stringify(fields);
                     if (!seenPayloads.has(key)) {
                         seenPayloads.add(key);
                         participationPayloads.push({ fields });
                     }
                 }
+
+                const professionCandidates = Array.from(new Set([
+                    professionField,
+                    'Profesión',
+                    'Profesion',
+                    'Cargo',
+                    'Profesión / Cargo',
+                    'Profesion / Cargo'
+                ].filter(Boolean)));
+
+                const pretestDoneCandidates = Array.from(new Set([
+                    pretestDoneField,
+                    'Completado Pretest',
+                    'Pretest Completado',
+                    'Pre-Test Completado'
+                ].filter(Boolean)));
+
+                const statusCandidates = statusField ? [statusField] : [];
+
+                for (const pf of professionCandidates.length ? professionCandidates : ['']) {
+                    const extra = {};
+                    if (pf) extra[pf] = participantProfession;
+                    if (pretestDoneCandidates[0]) extra[pretestDoneCandidates[0]] = true;
+                    if (statusCandidates[0]) extra[statusCandidates[0]] = 'Pretest Completado';
+                    addParticipationAttempt(extra);
+                }
+
+                for (const pf of professionCandidates.length ? professionCandidates : ['']) {
+                    for (const doneField of pretestDoneCandidates) {
+                        const extra = {};
+                        if (pf) extra[pf] = participantProfession;
+                        extra[doneField] = true;
+                        addParticipationAttempt(extra);
+                    }
+                }
+
+                addParticipationAttempt();
 
                 let participationResult = null;
                 let lastParticipationError = null;
@@ -3557,38 +3576,81 @@ overflow: hidden;
                 const participationFields = participationFieldMeta.names || [];
                 const posttestScoreField = resolveExistingField(participationFields, ['Post-test Score', 'Posttest Score', 'Puntuación Posttest', 'Post-Test Score'], 'Post-test Score');
                 const endDateField = resolveExistingField(participationFields, ['Fecha Fin', 'Fecha de Fin', 'Fin'], 'Fecha Fin');
-                const posttestDoneField = resolveExistingField(participationFields, ['Completado Posttest', 'Completado Post-Test', 'Posttest Completado'], 'Completado Posttest');
-                const statusField = resolveExistingField(participationFields, ['Estado', 'Status'], 'Estado');
-                const professionField = resolveExistingField(participationFields, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], 'Profesión');
+                const posttestDoneField = resolveExistingField(participationFields, ['Completado Posttest', 'Completado Post-Test', 'Posttest Completado'], '');
+                const statusField = resolveExistingField(participationFields, ['Estado', 'Status'], '');
+                const professionField = resolveExistingField(participationFields, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], '');
 
-                const updateFields = {
-                    [posttestScoreField]: postestScore,
-                    [endDateField]: fechaFormato,
-                    [posttestDoneField]: true,
-                    [statusField]: 'Posttest Completado'
-                };
+                const posttestDoneCandidates = Array.from(new Set([
+                    posttestDoneField,
+                    'Completado Posttest',
+                    'Completado Post-Test',
+                    'Posttest Completado'
+                ].filter(Boolean)));
+                const professionCandidates = Array.from(new Set([
+                    professionField,
+                    'Profesión',
+                    'Profesion',
+                    'Cargo',
+                    'Profesión / Cargo',
+                    'Profesion / Cargo'
+                ].filter(Boolean)));
 
-                if (currentParticipantData && currentParticipantData.profession) {
-                    updateFields[professionField] = currentParticipantData.profession;
+                const updateAttempts = [];
+                const seenUpdateAttempts = new Set();
+                function addUpdateAttempt(extraFields = {}) {
+                    const fields = {
+                        [posttestScoreField]: postestScore,
+                        [endDateField]: fechaFormato,
+                        ...extraFields
+                    };
+                    Object.keys(fields).forEach(k => {
+                        if (!k || typeof k !== 'string') delete fields[k];
+                    });
+                    const key = JSON.stringify(fields);
+                    if (!seenUpdateAttempts.has(key)) {
+                        seenUpdateAttempts.add(key);
+                        updateAttempts.push(fields);
+                    }
                 }
 
-                const updateParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'PATCH',
-                        path: `/Participaciones/${currentParticipationId}`,
-                        body: {
-                            fields: updateFields
+                for (const doneField of posttestDoneCandidates.length ? posttestDoneCandidates : ['']) {
+                    for (const pf of professionCandidates.length ? professionCandidates : ['']) {
+                        const extra = {};
+                        if (doneField) extra[doneField] = true;
+                        if (pf && currentParticipantData && currentParticipantData.profession) {
+                            extra[pf] = currentParticipantData.profession;
                         }
-                    })
-                });
+                        if (statusField) extra[statusField] = 'Posttest Completado';
+                        addUpdateAttempt(extra);
+                    }
+                }
+                for (const doneField of posttestDoneCandidates) {
+                    const extra = { [doneField]: true };
+                    addUpdateAttempt(extra);
+                }
+                addUpdateAttempt();
+
+                let updateParticipationData = null;
+                let lastUpdateError = null;
+                for (const fields of updateAttempts) {
+                    const updateParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            method: 'PATCH',
+                            path: `/Participaciones/${currentParticipationId}`,
+                            body: { fields }
+                        })
+                    });
+                    updateParticipationData = await updateParticipationResponse.json();
+                    if (updateParticipationData.success) break;
+                    lastUpdateError = updateParticipationData.error || 'No se pudo actualizar el registro';
+                    console.warn('⚠️ Intento de actualización de posttest falló:', fields, updateParticipationData);
+                }
                 
-                const updateParticipationData = await updateParticipationResponse.json();
-                
-                if (!updateParticipationData.success) {
+                if (!updateParticipationData || !updateParticipationData.success) {
                     console.error('❌ Error actualizando participación:', updateParticipationData);
-                    throw new Error(updateParticipationData.error || 'No se pudo actualizar el registro');
+                    throw new Error(lastUpdateError || 'No se pudo actualizar el registro');
                 }
                 
                 console.log('✅ Participación actualizada:', currentParticipationId);
