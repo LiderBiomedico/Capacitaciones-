@@ -7482,6 +7482,12 @@ function makeCronogramaFilterFormula(year, tipo) {
                 // Guardar datos globalmente
                 currentReportData = data;
                 allParticipantsData = data.participants || [];
+
+                // Reiniciar filtros para evitar que quede una selección anterior ocultando resultados
+                const searchInput = document.getElementById('participantSearchInput');
+                const statusFilterSelect = document.getElementById('participantStatusFilter');
+                if (searchInput) searchInput.value = '';
+                if (statusFilterSelect) statusFilterSelect.value = '';
                 
                 // Llenar información de la capacitación
                 document.getElementById('reportTrainingTitle').textContent = data.training.titulo;
@@ -7552,11 +7558,19 @@ function makeCronogramaFilterFormula(year, tipo) {
             if (!participants || participants.length === 0) {
                 table.style.display = 'none';
                 noParticipantsMessage.style.display = 'block';
+                const messageTitle = noParticipantsMessage.querySelector('p');
+                const messageDetail = noParticipantsMessage.querySelector('small');
+                if (messageTitle) messageTitle.textContent = 'No hay participantes registrados con los filtros actuales';
+                if (messageDetail) messageDetail.textContent = 'Verifica el estado seleccionado o vuelve a “Todos los estados”.';
                 return;
             }
             
             table.style.display = 'table';
             noParticipantsMessage.style.display = 'none';
+            const messageTitle = noParticipantsMessage.querySelector('p');
+            const messageDetail = noParticipantsMessage.querySelector('small');
+            if (messageTitle) messageTitle.textContent = 'No hay participantes registrados en esta capacitación';
+            if (messageDetail) messageDetail.textContent = '';
             
             participants.forEach((participant, index) => {
                 const row = document.createElement('tr');

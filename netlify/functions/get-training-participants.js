@@ -169,17 +169,39 @@ exports.handler = async (event) => {
       const departamento = f['Departamento'] || f['Servicio'] || '';
       const cargo       = f['Cargo'] || f['Profesión'] || f['Profesion'] || '';
 
-      const pretestScore  = safeNum(f['Pretest Score'] || f['Puntuación Pretest']);
-      const postestScore  = safeNum(f['Puntuación Posttest'] || f['Puntuación Postest'] || f['Posttest Score']);
+      const pretestScore  = safeNum(
+        f['Pretest Score'] ?? f['Puntuación Pretest'] ?? f['Puntaje Pretest'] ?? f['Score Pretest']
+      );
+      const postestScore  = safeNum(
+        f['Puntuación Posttest'] ??
+        f['Puntuación Postest'] ??
+        f['Posttest Score'] ??
+        f['Post-test Score'] ??
+        f['Puntaje Posttest'] ??
+        f['Puntaje Postest']
+      );
 
       let status = 'Pendiente';
-      if (postestScore > 0)       status = 'Completado';
-      else if (pretestScore > 0)  status = 'Pretest Completado';
-      else if (f['Completado Pretest']) status = 'Pretest Completado';
+      if (postestScore > 0) {
+        status = 'Completado';
+      } else if (pretestScore > 0 || f['Completado Pretest']) {
+        status = 'Pretest Completado';
+      }
 
-      const rawStatus = (f['Estado'] || '').toLowerCase();
-      if (rawStatus.includes('posttest') || rawStatus.includes('postest') || rawStatus.includes('completado')) {
-        status = postestScore > 0 ? 'Completado' : 'Pretest Completado';
+      const rawStatus = (f['Estado'] || '').toString().toLowerCase();
+      if (
+        rawStatus.includes('posttest') ||
+        rawStatus.includes('postest') ||
+        rawStatus.includes('finalizado') ||
+        rawStatus.includes('completado')
+      ) {
+        status = 'Completado';
+      } else if (rawStatus.includes('pretest') || rawStatus.includes('iniciado')) {
+        status = 'Pretest Completado';
+      }
+
+      if (!postestScore && (f['Fecha Fin'] || f['Fecha Finalización'] || f['Fecha Finalizacion'])) {
+        status = 'Completado';
       }
 
       return {
