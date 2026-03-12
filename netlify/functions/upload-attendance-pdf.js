@@ -1,8 +1,29 @@
 // netlify/functions/upload-attendance-pdf.js
-// Sube el PDF de lista de asistencia al campo "Lista asistencia" de la capacitación en Airtable
-// Airtable requiere una URL pública para adjuntos; usamos su API de upload de attachments
+// Sube un PDF al campo "Lista asistencia" de una capacitación en Airtable
+// Usa https nativo de Node.js - sin dependencias externas
+//
+// ESTRATEGIA DUAL:
+//   1. Content API de Airtable: POST uploadAttachment (método oficial)
+//   2. Fallback: PATCH con data URL base64
 
-const AIRTABLE_API = 'https://api.airtable.com/v0';
+const https = require('https');
+
+function httpsRequest(options, bodyBuffer) {
+  return new Promise((resolve, reject) => {
+    const req = https.request(options, (res) => {
+      const chunks = [];
+      res.on('data', c => chunks.push(c));
+      res.on('end', () => {
+        const body = Buffer.concat(chunks).toString('utf8');
+        try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+        catch { resolve({ status: res.statusCode, data: { raw: body.slice(0, 500) } }); }
+      });
+    });
+    req.on('error', reject);
+    if (bodyBuffer) req.write(bodyBuffer);
+    req.end();
+  });
+}
 
 exports.handler = async (event) => {
   const headers = {
@@ -11,93 +32,87 @@ exports.handler = async (event) => {
     'Content-Type': 'application/json'
   };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
-  }
-
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, headers, body: JSON.stringify({ success: false, error: 'Método no permitido' }) };
   }
 
   const apiKey = process.env.AIRTABLE_API_KEY;
   const baseId = process.env.AIRTABLE_BASE_ID;
-
   if (!apiKey || !baseId) {
-    return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: 'Variables de entorno no configuradas' }) };
+    return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: 'Variables AIRTABLE_API_KEY / AIRTABLE_BASE_ID no configuradas' }) };
   }
 
   let trainingId, fileName, fileBase64, mimeType;
   try {
     const body = JSON.parse(event.body || '{}');
     trainingId = body.trainingId;
-    fileName   = body.fileName || 'lista_asistencia.pdf';
-    fileBase64 = body.fileBase64; // base64 del PDF sin prefijo data:...
-    mimeType   = body.mimeType || 'application/pdf';
+    fileName   = body.fileName   || 'lista_asistencia.pdf';
+    fileBase64 = body.fileBase64;
+    mimeType   = body.mimeType   || 'application/pdf';
   } catch {
     return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Body inválido' }) };
   }
 
   if (!trainingId || !fileBase64) {
-    return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Faltan parámetros: trainingId y fileBase64 son requeridos' }) };
+    return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Faltan trainingId o fileBase64' }) };
   }
 
+  const fileBuffer = Buffer.from(fileBase64, 'base64');
+  console.log(`📎 Subiendo "${fileName}" (${Math.round(fileBuffer.length/1024)}KB) → capacitación ${trainingId}`);
+
   try {
-    // Airtable Content API: subir attachment directamente
-    // POST https://content.airtableusercontent.com/v2/s3Upload
-    // Primero obtenemos una URL firmada de Airtable, luego subimos el archivo
-
-    // Paso 1: Solicitar URL de upload a Airtable
-    const uploadRequestUrl = `https://content.airtableusercontent.com/v2/${baseId}/Capacitaciones/${trainingId}/uploadAttachment/Lista%20asistencia`;
-
-    const fileBuffer = Buffer.from(fileBase64, 'base64');
-
-    const uploadRes = await fetch(uploadRequestUrl, {
+    // ── Método 1: Content API ─────────────────────────────────────────────
+    const uploadPath = `/v0/${baseId}/Capacitaciones/${trainingId}/uploadAttachment/Lista%20asistencia`;
+    const { status: s1, data: d1 } = await httpsRequest({
+      hostname: 'content.airtableusercontent.com',
+      port: 443,
+      path: uploadPath,
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': mimeType,
         'Content-Disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
-        'Content-Length': fileBuffer.length.toString()
-      },
-      body: fileBuffer
-    });
+        'Content-Length': fileBuffer.length
+      }
+    }, fileBuffer);
 
-    if (!uploadRes.ok) {
-      const errData = await uploadRes.json().catch(() => ({}));
-      console.error('❌ Error subiendo adjunto a Airtable:', uploadRes.status, errData);
+    console.log(`Content API → ${s1}:`, JSON.stringify(d1).slice(0, 200));
 
-      // Fallback: intentar actualizar el campo como URL (si el archivo está en algún CDN)
-      // En este caso informamos al usuario que Airtable requiere URL pública
-      return {
-        statusCode: uploadRes.status,
-        headers,
-        body: JSON.stringify({
-          success: false,
-          error: errData?.error?.message || 'Error al subir el archivo a Airtable. Airtable requiere que los adjuntos se suban desde una URL pública o mediante su Content API.',
-          hint: 'Verifica que tu token de Airtable tenga el scope "data.records:write" y "webhook:manage".'
-        })
-      };
+    if (s1 === 200 || s1 === 201) {
+      return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: `PDF guardado en Airtable`, attachment: d1 }) };
     }
 
-    const uploadData = await uploadRes.json();
-    console.log('✅ Adjunto subido exitosamente:', uploadData);
+    // ── Método 2: PATCH con data URL ──────────────────────────────────────
+    console.warn(`Content API falló (${s1}), intentando PATCH...`);
+    const patchBodyStr = JSON.stringify({
+      fields: { 'Lista asistencia': [{ url: `data:${mimeType};base64,${fileBase64}`, filename: fileName }] }
+    });
+    const patchBuf = Buffer.from(patchBodyStr, 'utf8');
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        success: true,
-        message: 'PDF subido correctamente a Airtable',
-        attachment: uploadData
-      })
-    };
+    const { status: s2, data: d2 } = await httpsRequest({
+      hostname: 'api.airtable.com',
+      port: 443,
+      path: `/v0/${baseId}/Capacitaciones/${trainingId}`,
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'Content-Length': patchBuf.length
+      }
+    }, patchBuf);
+
+    console.log(`PATCH → ${s2}:`, JSON.stringify(d2).slice(0, 200));
+
+    if (s2 === 200) {
+      const att = (d2.fields?.['Lista asistencia'] || [])[0];
+      return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: `PDF guardado en Airtable`, attachment: att }) };
+    }
+
+    throw new Error(`Error ${s2}: ${d2?.error?.message || JSON.stringify(d2).slice(0, 200)}`);
 
   } catch (err) {
-    console.error('❌ Error en upload-attendance-pdf:', err.message);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ success: false, error: err.message })
-    };
+    console.error('❌ upload-attendance-pdf:', err.message);
+    return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: err.message }) };
   }
 };

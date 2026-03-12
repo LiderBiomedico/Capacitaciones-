@@ -752,16 +752,15 @@
 
         .loader-credit {
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 24px;
+    left: 18px;
+    bottom: 14px;
     margin: 0;
     font-weight: 500;
     letter-spacing: 0.3px;
-    font-size: clamp(0.9rem, 1.9vw, 1.3rem); /* doble del original */
+    font-size: clamp(0.45rem, 0.95vw, 0.65rem); /* ~mitad del título */
     opacity: 0.85;
     text-shadow: 0 0 12px rgba(0,0,0,0.30);
-    text-align: center;
+    text-align: left;
     z-index: 2;
 }
 
@@ -2132,6 +2131,9 @@ overflow: hidden;
                                     </button>
                                     <button id="btnDownloadParticipantsPdf" class="btn btn-success" onclick="downloadParticipantsPdf()" disabled style="margin:0;">
                                         <i class="fas fa-download"></i> Descargar
+                                    </button>
+                                    <button id="btnSaveToAirtable" class="btn btn-primary" onclick="saveAttendancePdfToAirtable()" disabled style="margin:0;">
+                                        <i class="fas fa-cloud-upload-alt"></i> Guardar en Airtable
                                     </button>
                                     <button id="btnClearParticipantsPdf" class="btn btn-secondary" onclick="clearParticipantsPdf()" disabled style="margin:0;">
                                         <i class="fas fa-times"></i> Quitar
@@ -7641,9 +7643,11 @@ function makeCronogramaFilterFormula(year, tipo) {
             const btnOpen = document.getElementById('btnOpenParticipantsPdf');
             const btnDownload = document.getElementById('btnDownloadParticipantsPdf');
             const btnClear = document.getElementById('btnClearParticipantsPdf');
+            const btnSave = document.getElementById('btnSaveToAirtable');
             if (btnOpen) btnOpen.disabled = false;
             if (btnDownload) btnDownload.disabled = false;
             if (btnClear) btnClear.disabled = false;
+            if (btnSave) btnSave.disabled = false;
 
             // Mostrar preview
             const wrapper = document.getElementById('participantsPdfPreviewWrapper');
@@ -7654,8 +7658,77 @@ function makeCronogramaFilterFormula(year, tipo) {
             Swal.fire({
                 icon: 'success',
                 title: 'PDF cargado',
-                text: 'El listado PDF quedó disponible en el reporte.'
+                text: 'El listado PDF quedó disponible. Haz clic en "Guardar en Airtable" para subirlo.'
             });
+        }
+
+        // ═════════════════════════════════════════════════════════════════
+        // GUARDAR PDF EN AIRTABLE
+        // ═════════════════════════════════════════════════════════════════
+
+        async function saveAttendancePdfToAirtable() {
+            if (!participantsPdfFile) {
+                Swal.fire({ icon: 'warning', title: 'Sin archivo', text: 'Primero selecciona un PDF.' });
+                return;
+            }
+
+            const trainingId = document.getElementById('reportTrainingSelect')?.value;
+            if (!trainingId) {
+                Swal.fire({ icon: 'warning', title: 'Sin capacitación', text: 'Selecciona una capacitación antes de guardar el PDF.' });
+                return;
+            }
+
+            const btnSave = document.getElementById('btnSaveToAirtable');
+            if (btnSave) {
+                btnSave.disabled = true;
+                btnSave.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+            }
+
+            try {
+                // Convertir PDF a base64
+                const fileBase64 = await new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+                    reader.readAsDataURL(participantsPdfFile);
+                });
+
+                const response = await fetch('/.netlify/functions/upload-attendance-pdf', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        trainingId,
+                        fileName: participantsPdfFile.name || 'lista_asistencia.pdf',
+                        fileBase64,
+                        mimeType: 'application/pdf'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.success) {
+                    throw new Error(data.error || 'Error al subir el PDF');
+                }
+
+                Swal.fire({
+                    icon: 'success',
+                    title: '¡PDF guardado!',
+                    text: 'El listado de asistencia se guardó correctamente en Airtable.'
+                });
+
+                if (btnSave) {
+                    btnSave.innerHTML = '<i class="fas fa-check"></i> Guardado en Airtable';
+                    // Mantener deshabilitado para evitar duplicados
+                }
+
+            } catch (err) {
+                console.error('❌ Error guardando PDF en Airtable:', err);
+                Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo guardar el PDF en Airtable.' });
+                if (btnSave) {
+                    btnSave.disabled = false;
+                    btnSave.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Guardar en Airtable';
+                }
+            }
         }
 
         function openParticipantsPdf() {
@@ -7686,9 +7759,11 @@ function makeCronogramaFilterFormula(year, tipo) {
             const btnOpen = document.getElementById('btnOpenParticipantsPdf');
             const btnDownload = document.getElementById('btnDownloadParticipantsPdf');
             const btnClear = document.getElementById('btnClearParticipantsPdf');
+            const btnSave = document.getElementById('btnSaveToAirtable');
             if (btnOpen) btnOpen.disabled = true;
             if (btnDownload) btnDownload.disabled = true;
             if (btnClear) btnClear.disabled = true;
+            if (btnSave) { btnSave.disabled = true; btnSave.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Guardar en Airtable'; }
 
             const wrapper = document.getElementById('participantsPdfPreviewWrapper');
             const iframe = document.getElementById('participantsPdfPreview');
