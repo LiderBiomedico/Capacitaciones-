@@ -2957,75 +2957,85 @@ overflow: hidden;
                 
                 const participationPayloads = [];
 
+                const participantProfession = (currentParticipantData.profession || '').trim();
+
                 const baseFields = {
                     'Nombre': currentParticipantData.name,
                     'Departamento': currentParticipantData.department,
-                    'Profesión': currentParticipantData.profession || '',
                     'Pretest Score': pretestScore,
                     'Fecha de Inicio': fechaFormato,
                     'Completado Pretest': true,
                     'Estado': 'Pretest Completado'
                 };
 
-                // Intento 1: vincular por sesión + código
+                const professionFieldVariants = [
+                    'Profesión',
+                    'Profesion',
+                    'Cargo',
+                    'Profesión / Cargo',
+                    'Profesion / Cargo'
+                ];
+
+                const codeFieldVariants = [
+                    'Código de Acceso',
+                    'Código Acceso'
+                ];
+
+                const linkVariants = [];
                 if (currentSession?.id) {
-                    participationPayloads.push({
-                        fields: {
-                            ...baseFields,
-                            'Sesión': [currentSession.id],
-                            'Código de Acceso': currentAccessCode || ''
-                        }
-                    });
-                    participationPayloads.push({
-                        fields: {
-                            ...baseFields,
-                            'Sesion': [currentSession.id],
-                            'Código Acceso': currentAccessCode || ''
-                        }
-                    });
+                    linkVariants.push({ field: 'Sesión', value: [currentSession.id] });
+                    linkVariants.push({ field: 'Sesion', value: [currentSession.id] });
                 }
-
-                // Intento 2: vincular por capacitación + código
                 if (currentTrainingRecord?.id) {
-                    participationPayloads.push({
-                        fields: {
-                            ...baseFields,
-                            'Capacitación': [currentTrainingRecord.id],
-                            'Código de Acceso': currentAccessCode || ''
+                    linkVariants.push({ field: 'Capacitación', value: [currentTrainingRecord.id] });
+                    linkVariants.push({ field: 'Capacitaciones', value: [currentTrainingRecord.id] });
+                }
+                linkVariants.push(null);
+
+                const seenPayloads = new Set();
+
+                function pushPayload(fields) {
+                    const key = JSON.stringify(fields);
+                    if (!seenPayloads.has(key)) {
+                        seenPayloads.add(key);
+                        participationPayloads.push({ fields });
+                    }
+                }
+
+                // Intentos robustos priorizando que sí se guarde la profesión/cargo
+                for (const professionField of professionFieldVariants) {
+                    for (const codeField of codeFieldVariants) {
+                        for (const linkVariant of linkVariants) {
+                            const fields = {
+                                ...baseFields,
+                                [professionField]: participantProfession,
+                                [codeField]: currentAccessCode || ''
+                            };
+
+                            if (linkVariant && linkVariant.field && linkVariant.value) {
+                                fields[linkVariant.field] = linkVariant.value;
+                            }
+
+                            pushPayload(fields);
                         }
-                    });
-                    participationPayloads.push({
-                        fields: {
-                            ...baseFields,
-                            'Capacitaciones': [currentTrainingRecord.id],
-                            'Código Acceso': currentAccessCode || ''
-                        }
+                    }
+                }
+
+                // Intentos mínimos pero conservando profesión
+                for (const professionField of professionFieldVariants) {
+                    pushPayload({
+                        ...baseFields,
+                        [professionField]: participantProfession
                     });
                 }
 
-                // Intento 3: solo por código
-                participationPayloads.push({
-                    fields: {
-                        ...baseFields,
-                        'Código de Acceso': currentAccessCode || ''
-                    }
-                });
-                participationPayloads.push({
-                    fields: {
-                        ...baseFields,
-                        'Código Acceso': currentAccessCode || ''
-                    }
-                });
-
-                // Intento 4: mínimo viable
-                participationPayloads.push({
-                    fields: {
-                        'Nombre': currentParticipantData.name,
-                        'Departamento': currentParticipantData.department,
-                        'Pretest Score': pretestScore,
-                        'Fecha de Inicio': fechaFormato,
-                        'Completado Pretest': true
-                    }
+                // Último intento de emergencia sin profesión
+                pushPayload({
+                    'Nombre': currentParticipantData.name,
+                    'Departamento': currentParticipantData.department,
+                    'Pretest Score': pretestScore,
+                    'Fecha de Inicio': fechaFormato,
+                    'Completado Pretest': true
                 });
 
                 let participationResult = null;
