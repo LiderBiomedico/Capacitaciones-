@@ -2596,6 +2596,59 @@ overflow: hidden;
             document.getElementById('participantRegistrationModal').style.display = 'none';
         }
         
+        async function getParticipationFieldMap() {
+            try {
+                const response = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Participaciones`
+                    })
+                });
+
+                const data = await response.json();
+                const discovered = new Set();
+                (data.records || []).forEach(record => {
+                    Object.keys(record.fields || {}).forEach(key => discovered.add(key));
+                });
+
+                return {
+                    success: !!data.success,
+                    names: Array.from(discovered)
+                };
+            } catch (error) {
+                console.warn('⚠️ No se pudieron inferir campos de Participaciones:', error);
+                return { success: false, names: [] };
+            }
+        }
+
+        function resolveExistingField(fieldNames, candidates, fallback = '') {
+            const normalizedMap = new Map();
+            (fieldNames || []).forEach(name => {
+                const normalized = String(name)
+                    .normalize('NFD')
+                    .replace(/[̀-ͯ]/g, '')
+                    .replace(/[^a-zA-Z0-9]/g, '')
+                    .toLowerCase();
+                if (!normalizedMap.has(normalized)) normalizedMap.set(normalized, name);
+            });
+
+            for (const candidate of candidates) {
+                if ((fieldNames || []).includes(candidate)) return candidate;
+                const normalizedCandidate = String(candidate)
+                    .normalize('NFD')
+                    .replace(/[̀-ͯ]/g, '')
+                    .replace(/[^a-zA-Z0-9]/g, '')
+                    .toLowerCase();
+                if (normalizedMap.has(normalizedCandidate)) {
+                    return normalizedMap.get(normalizedCandidate);
+                }
+            }
+
+            return fallback || candidates[0] || '';
+        }
+        
         async function proceedToPretest() {
             const name = document.getElementById('participantName').value.trim();
             const department = document.getElementById('participantDepartment').value;
@@ -2956,85 +3009,62 @@ overflow: hidden;
                 const participationPayloads = [];
 
                 const participantProfession = (currentParticipantData.profession || '').trim();
+                const participationFieldMeta = await getParticipationFieldMap();
+                console.log('🧭 Campos detectados en Participaciones:', participationFieldMeta.names);
+
+                const participationFields = participationFieldMeta.names || [];
+                const nameField = resolveExistingField(participationFields, ['Nombre', 'name', 'Participante'], 'Nombre');
+                const departmentField = resolveExistingField(participationFields, ['Departamento', 'Servicio', 'Area', 'Área'], 'Departamento');
+                const pretestScoreField = resolveExistingField(participationFields, ['Pretest Score', 'Pre-Test Score', 'Puntuación Pretest'], 'Pretest Score');
+                const startDateField = resolveExistingField(participationFields, ['Fecha de Inicio', 'Fecha Inicio', 'Inicio'], 'Fecha de Inicio');
+                const pretestDoneField = resolveExistingField(participationFields, ['Completado Pretest', 'Pretest Completado', 'Pre-Test Completado'], 'Completado Pretest');
+                const statusField = resolveExistingField(participationFields, ['Estado', 'Status'], 'Estado');
+                const professionField = resolveExistingField(participationFields, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], 'Profesión');
+                const codeField = resolveExistingField(participationFields, ['Código de Acceso', 'Codigo de Acceso', 'Código Acceso', 'Codigo Acceso'], '');
+                const sessionField = resolveExistingField(participationFields, ['Sesión', 'Sesion'], '');
+                const trainingField = resolveExistingField(participationFields, ['Capacitación', 'Capacitaciones', 'Capacitacion'], '');
 
                 const baseFields = {
-                    'Nombre': currentParticipantData.name,
-                    'Departamento': currentParticipantData.department,
-                    'Pretest Score': pretestScore,
-                    'Fecha de Inicio': fechaFormato,
-                    'Completado Pretest': true,
-                    'Estado': 'Pretest Completado'
+                    [nameField]: currentParticipantData.name,
+                    [departmentField]: currentParticipantData.department,
+                    [pretestScoreField]: pretestScore,
+                    [startDateField]: fechaFormato,
+                    [pretestDoneField]: true,
+                    [statusField]: 'Pretest Completado',
+                    [professionField]: participantProfession
                 };
 
-                const professionFieldVariants = [
-                    'Profesión',
-                    'Profesion',
-                    'Cargo',
-                    'Profesión / Cargo',
-                    'Profesion / Cargo'
-                ];
-
-                const codeFieldVariants = [
-                    'Código de Acceso',
-                    'Código Acceso'
-                ];
-
-                const linkVariants = [];
-                if (currentSession?.id) {
-                    linkVariants.push({ field: 'Sesión', value: [currentSession.id] });
-                    linkVariants.push({ field: 'Sesion', value: [currentSession.id] });
+                if (codeField) {
+                    baseFields[codeField] = currentAccessCode || '';
                 }
-                if (currentTrainingRecord?.id) {
-                    linkVariants.push({ field: 'Capacitación', value: [currentTrainingRecord.id] });
-                    linkVariants.push({ field: 'Capacitaciones', value: [currentTrainingRecord.id] });
+                if (currentSession?.id && sessionField) {
+                    baseFields[sessionField] = [currentSession.id];
                 }
-                linkVariants.push(null);
+                if (currentTrainingRecord?.id && trainingField) {
+                    baseFields[trainingField] = [currentTrainingRecord.id];
+                }
 
-                const seenPayloads = new Set();
+                participationPayloads.push({ fields: baseFields });
 
-                function pushPayload(fields) {
+                // Intentos alternos solamente si los campos exactos no fueron detectados
+                const seenPayloads = new Set([JSON.stringify(baseFields)]);
+                const fallbackProfessionFields = ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'];
+                for (const pf of fallbackProfessionFields) {
+                    const fields = {
+                        [nameField]: currentParticipantData.name,
+                        [departmentField]: currentParticipantData.department,
+                        [pretestScoreField]: pretestScore,
+                        [startDateField]: fechaFormato,
+                        [pretestDoneField]: true,
+                        [statusField]: 'Pretest Completado',
+                        [pf]: participantProfession
+                    };
                     const key = JSON.stringify(fields);
                     if (!seenPayloads.has(key)) {
                         seenPayloads.add(key);
                         participationPayloads.push({ fields });
                     }
                 }
-
-                // Intentos robustos priorizando que sí se guarde la profesión/cargo
-                for (const professionField of professionFieldVariants) {
-                    for (const codeField of codeFieldVariants) {
-                        for (const linkVariant of linkVariants) {
-                            const fields = {
-                                ...baseFields,
-                                [professionField]: participantProfession,
-                                [codeField]: currentAccessCode || ''
-                            };
-
-                            if (linkVariant && linkVariant.field && linkVariant.value) {
-                                fields[linkVariant.field] = linkVariant.value;
-                            }
-
-                            pushPayload(fields);
-                        }
-                    }
-                }
-
-                // Intentos mínimos pero conservando profesión
-                for (const professionField of professionFieldVariants) {
-                    pushPayload({
-                        ...baseFields,
-                        [professionField]: participantProfession
-                    });
-                }
-
-                // Último intento de emergencia sin profesión
-                pushPayload({
-                    'Nombre': currentParticipantData.name,
-                    'Departamento': currentParticipantData.department,
-                    'Pretest Score': pretestScore,
-                    'Fecha de Inicio': fechaFormato,
-                    'Completado Pretest': true
-                });
 
                 let participationResult = null;
                 let lastParticipationError = null;
@@ -3522,6 +3552,26 @@ overflow: hidden;
                 const horaFormato = `${hours}:${minutes}:${seconds}`;
                 const fechaHoraCompleta = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
                 
+                const participationFieldMeta = await getParticipationFieldMap();
+                console.log('🧭 Campos detectados para actualizar posttest:', participationFieldMeta.names);
+                const participationFields = participationFieldMeta.names || [];
+                const posttestScoreField = resolveExistingField(participationFields, ['Post-test Score', 'Posttest Score', 'Puntuación Posttest', 'Post-Test Score'], 'Post-test Score');
+                const endDateField = resolveExistingField(participationFields, ['Fecha Fin', 'Fecha de Fin', 'Fin'], 'Fecha Fin');
+                const posttestDoneField = resolveExistingField(participationFields, ['Completado Posttest', 'Completado Post-Test', 'Posttest Completado'], 'Completado Posttest');
+                const statusField = resolveExistingField(participationFields, ['Estado', 'Status'], 'Estado');
+                const professionField = resolveExistingField(participationFields, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], 'Profesión');
+
+                const updateFields = {
+                    [posttestScoreField]: postestScore,
+                    [endDateField]: fechaFormato,
+                    [posttestDoneField]: true,
+                    [statusField]: 'Posttest Completado'
+                };
+
+                if (currentParticipantData && currentParticipantData.profession) {
+                    updateFields[professionField] = currentParticipantData.profession;
+                }
+
                 const updateParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -3529,10 +3579,7 @@ overflow: hidden;
                         method: 'PATCH',
                         path: `/Participaciones/${currentParticipationId}`,
                         body: {
-                            fields: {
-                                'Post-test Score': postestScore,
-                                'Fecha Fin': fechaFormato
-                            }
+                            fields: updateFields
                         }
                     })
                 });
