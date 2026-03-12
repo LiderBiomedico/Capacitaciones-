@@ -2646,7 +2646,20 @@ overflow: hidden;
                 }
             }
 
-            return fallback || candidates[0] || '';
+            return fallback ? fallback : '';
+        }
+
+        function getUnknownFieldName(errorMessage) {
+            if (!errorMessage) return '';
+            const match = String(errorMessage).match(/Unknown field name:\s*"([^"]+)"/i);
+            return match ? match[1] : '';
+        }
+
+        function withoutUnknownField(fields, fieldName) {
+            if (!fieldName || !fields || typeof fields !== 'object') return fields;
+            const clone = { ...fields };
+            delete clone[fieldName];
+            return clone;
         }
         
         async function proceedToPretest() {
@@ -3089,29 +3102,44 @@ overflow: hidden;
                 let lastParticipationError = null;
 
                 for (let i = 0; i < participationPayloads.length; i++) {
-                    const participationData = participationPayloads[i];
+                    let participationData = participationPayloads[i];
                     console.log(`📤 Intento ${i + 1} creando participación:`, participationData);
 
-                    const createParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
+                    for (let retry = 0; retry < 8; retry++) {
+                        const createParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
                             method: 'POST',
-                            path: `/Participaciones`,
-                            body: participationData
-                        })
-                    });
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                method: 'POST',
+                                path: `/Participaciones`,
+                                body: participationData
+                            })
+                        });
 
-                    const attemptResult = await createParticipationResponse.json();
+                        const attemptResult = await createParticipationResponse.json();
 
-                    if (attemptResult.success) {
-                        participationResult = attemptResult;
-                        console.log(`✅ Participación creada en intento ${i + 1}:`, attemptResult.id);
+                        if (attemptResult.success) {
+                            participationResult = attemptResult;
+                            console.log(`✅ Participación creada en intento ${i + 1}:`, attemptResult.id);
+                            break;
+                        }
+
+                        lastParticipationError = attemptResult.error || 'No se pudo crear el registro de participación';
+                        const unknownField = getUnknownFieldName(lastParticipationError);
+                        if (unknownField) {
+                            const cleanedFields = withoutUnknownField(participationData.fields, unknownField);
+                            if (JSON.stringify(cleanedFields) !== JSON.stringify(participationData.fields)) {
+                                console.warn(`⚠️ Eliminando campo no válido del pretest: ${unknownField}`);
+                                participationData = { fields: cleanedFields };
+                                continue;
+                            }
+                        }
+
+                        console.warn(`⚠️ Intento ${i + 1} falló:`, attemptResult);
                         break;
                     }
 
-                    lastParticipationError = attemptResult.error || 'No se pudo crear el registro de participación';
-                    console.warn(`⚠️ Intento ${i + 1} falló:`, attemptResult);
+                    if (participationResult && participationResult.success) break;
                 }
 
                 if (!participationResult || !participationResult.success) {
@@ -3632,20 +3660,34 @@ overflow: hidden;
 
                 let updateParticipationData = null;
                 let lastUpdateError = null;
-                for (const fields of updateAttempts) {
-                    const updateParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            method: 'PATCH',
-                            path: `/Participaciones/${currentParticipationId}`,
-                            body: { fields }
-                        })
-                    });
-                    updateParticipationData = await updateParticipationResponse.json();
-                    if (updateParticipationData.success) break;
-                    lastUpdateError = updateParticipationData.error || 'No se pudo actualizar el registro';
-                    console.warn('⚠️ Intento de actualización de posttest falló:', fields, updateParticipationData);
+                for (let idx = 0; idx < updateAttempts.length; idx++) {
+                    let fields = updateAttempts[idx];
+                    for (let retry = 0; retry < 8; retry++) {
+                        const updateParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                method: 'PATCH',
+                                path: `/Participaciones/${currentParticipationId}`,
+                                body: { fields }
+                            })
+                        });
+                        updateParticipationData = await updateParticipationResponse.json();
+                        if (updateParticipationData.success) break;
+                        lastUpdateError = updateParticipationData.error || 'No se pudo actualizar el registro';
+                        const unknownField = getUnknownFieldName(lastUpdateError);
+                        if (unknownField) {
+                            const cleanedFields = withoutUnknownField(fields, unknownField);
+                            if (JSON.stringify(cleanedFields) !== JSON.stringify(fields)) {
+                                console.warn(`⚠️ Eliminando campo no válido del posttest: ${unknownField}`);
+                                fields = cleanedFields;
+                                continue;
+                            }
+                        }
+                        console.warn('⚠️ Intento de actualización de posttest falló:', fields, updateParticipationData);
+                        break;
+                    }
+                    if (updateParticipationData && updateParticipationData.success) break;
                 }
                 
                 if (!updateParticipationData || !updateParticipationData.success) {
