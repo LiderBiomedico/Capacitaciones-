@@ -2830,7 +2830,7 @@ overflow: hidden;
                 
                 // Encontrar la sesión por código de acceso
                 const currentSession = sessionData.records.find(s => {
-                    const codigo = s.fields['Código Acceso'] || '';
+                    const codigo = s.fields['Código Acceso'] || s.fields['Código de Acceso'] || s.fields['Codigo Acceso'] || '';
                     return codigo.toUpperCase() === currentAccessCode.toUpperCase();
                 });
                 
@@ -2924,35 +2924,121 @@ overflow: hidden;
                 const horaFormato = `${hours}:${minutes}:${seconds}`;
                 const fechaHoraCompleta = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
                 
-                const participationData = {
-                    fields: {
-                        'Nombre': currentParticipantData.name,
-                        'Departamento': currentParticipantData.department,
-                        'Profesión': currentParticipantData.profession || '',
-                        'Pretest Score': pretestScore,
-                        'Fecha de Inicio': fechaFormato,
-                        'Completado Pretest': true,
-                        'Código de Acceso': currentAccessCode || ''
+                const participationCandidates = [
+                    {
+                        label: 'sesion_estandar',
+                        fields: {
+                            'Nombre': currentParticipantData.name,
+                            'Departamento': currentParticipantData.department,
+                            'Profesión': currentParticipantData.profession || '',
+                            'Email': currentParticipantData.email || '',
+                            'Pretest Score': pretestScore,
+                            'Fecha de Inicio': fechaFormato,
+                            'Completado Pretest': true,
+                            'Estado': 'Pretest Completado',
+                            'Sesión': [currentSession.id]
+                        }
+                    },
+                    {
+                        label: 'sesion_sin_tilde',
+                        fields: {
+                            'Nombre': currentParticipantData.name,
+                            'Departamento': currentParticipantData.department,
+                            'Profesión': currentParticipantData.profession || '',
+                            'Email': currentParticipantData.email || '',
+                            'Pretest Score': pretestScore,
+                            'Fecha de Inicio': fechaFormato,
+                            'Completado Pretest': true,
+                            'Estado': 'Pretest Completado',
+                            'Sesion': [currentSession.id]
+                        }
+                    },
+                    {
+                        label: 'codigo_acceso',
+                        fields: {
+                            'Nombre': currentParticipantData.name,
+                            'Departamento': currentParticipantData.department,
+                            'Profesión': currentParticipantData.profession || '',
+                            'Email': currentParticipantData.email || '',
+                            'Pretest Score': pretestScore,
+                            'Fecha de Inicio': fechaFormato,
+                            'Completado Pretest': true,
+                            'Estado': 'Pretest Completado',
+                            'Código Acceso': currentAccessCode || ''
+                        }
+                    },
+                    {
+                        label: 'codigo_de_acceso',
+                        fields: {
+                            'Nombre': currentParticipantData.name,
+                            'Departamento': currentParticipantData.department,
+                            'Profesión': currentParticipantData.profession || '',
+                            'Email': currentParticipantData.email || '',
+                            'Pretest Score': pretestScore,
+                            'Fecha de Inicio': fechaFormato,
+                            'Completado Pretest': true,
+                            'Estado': 'Pretest Completado',
+                            'Código de Acceso': currentAccessCode || ''
+                        }
+                    },
+                    {
+                        label: 'minimo',
+                        fields: {
+                            'Nombre': currentParticipantData.name,
+                            'Departamento': currentParticipantData.department,
+                            'Pretest Score': pretestScore,
+                            'Estado': 'Pretest Completado',
+                            'Sesión': [currentSession.id]
+                        }
+                    },
+                    {
+                        label: 'minimo_puntuacion',
+                        fields: {
+                            'Nombre': currentParticipantData.name,
+                            'Departamento': currentParticipantData.department,
+                            'Puntuación Pretest': pretestScore,
+                            'Estado': 'Pretest Completado',
+                            'Sesión': [currentSession.id]
+                        }
                     }
-                };
-                
-                console.log('📤 Creando participación:', participationData);
-                
-                const createParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'POST',
-                        path: `/Participaciones`,
-                        body: participationData
-                    })
-                });
-                
-                const participationResult = await createParticipationResponse.json();
-                
-                if (!participationResult.success) {
-                    console.error('❌ Error creando participación:', participationResult);
-                    throw new Error(participationResult.error || 'No se pudo crear el registro de participación');
+                ];
+
+                let participationResult = null;
+                let lastParticipationError = null;
+
+                for (const participationData of participationCandidates) {
+                    try {
+                        console.log(`📤 Creando participación [${participationData.label}]:`, participationData);
+
+                        const createParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                method: 'POST',
+                                path: `/Participaciones`,
+                                body: { fields: participationData.fields }
+                            })
+                        });
+
+                        const candidateResult = await createParticipationResponse.json();
+
+                        if (candidateResult.success) {
+                            participationResult = candidateResult;
+                            console.log(`✅ Participación creada con estrategia: ${participationData.label}`);
+                            break;
+                        }
+
+                        lastParticipationError = candidateResult;
+                        console.warn(`⚠️ Estrategia falló [${participationData.label}]:`, candidateResult);
+                    } catch (candidateError) {
+                        lastParticipationError = candidateError;
+                        console.warn(`⚠️ Error en estrategia [${participationData.label}]:`, candidateError);
+                    }
+                }
+
+                if (!participationResult || !participationResult.success) {
+                    console.error('❌ Error creando participación:', lastParticipationError);
+                    throw new Error((lastParticipationError && (lastParticipationError.error || lastParticipationError.message)) || 'No se pudo crear el registro de participación');
                 }
                 
                 console.log('✅ Participación creada:', participationResult.id);
@@ -7483,12 +7569,6 @@ function makeCronogramaFilterFormula(year, tipo) {
                 // Guardar datos globalmente
                 currentReportData = data;
                 allParticipantsData = data.participants || [];
-
-                // Reiniciar filtros de la tabla al cambiar de capacitación
-                const participantSearchInput = document.getElementById('participantSearchInput');
-                const participantStatusFilter = document.getElementById('participantStatusFilter');
-                if (participantSearchInput) participantSearchInput.value = '';
-                if (participantStatusFilter) participantStatusFilter.value = '';
                 
                 // Llenar información de la capacitación
                 document.getElementById('reportTrainingTitle').textContent = data.training.titulo;
@@ -7558,13 +7638,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             
             if (!participants || participants.length === 0) {
                 table.style.display = 'none';
-                if (noParticipantsMessage) {
-                    const hasBaseData = Array.isArray(allParticipantsData) && allParticipantsData.length > 0;
-                    noParticipantsMessage.style.display = 'block';
-                    noParticipantsMessage.innerHTML = hasBaseData
-                        ? '<div style="padding:1rem; text-align:center; color:#6b7280;">No hay participantes que coincidan con el filtro aplicado.</div>'
-                        : '<div style="padding:1rem; text-align:center; color:#6b7280;">No se encontraron participantes registrados para esta capacitación.</div>';
-                }
+                noParticipantsMessage.style.display = 'block';
                 return;
             }
             
