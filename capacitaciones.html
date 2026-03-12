@@ -7604,10 +7604,10 @@ function makeCronogramaFilterFormula(year, tipo) {
                 return;
             }
 
-            // Permitir hasta 10MB (ajustable)
-            const maxSize = 10 * 1024 * 1024;
+            // Límite 4MB para que el base64 (~5.3MB) no supere el límite de Netlify Functions (6MB)
+            const maxSize = 4 * 1024 * 1024;
             if (file.size > maxSize) {
-                Swal.fire({ icon: 'warning', title: 'Archivo muy grande', text: 'El PDF supera 10 MB. Por favor comprímelo e intenta de nuevo.' });
+                Swal.fire({ icon: 'warning', title: 'Archivo muy grande', text: 'El PDF supera 4 MB. Por favor comprímelo e intenta de nuevo.' });
                 event.target.value = '';
                 return;
             }
@@ -7685,10 +7685,10 @@ function makeCronogramaFilterFormula(year, tipo) {
                     })
                 });
 
-                const data = await response.json();
+                const data = await response.json().catch(() => ({}));
 
                 if (!response.ok || !data.success) {
-                    throw new Error(data.error || 'Error al subir el PDF');
+                    throw new Error(data.error || `Error del servidor (${response.status})`);
                 }
 
                 Swal.fire({
@@ -7698,13 +7698,18 @@ function makeCronogramaFilterFormula(year, tipo) {
                 });
 
                 if (btnSave) {
-                    btnSave.innerHTML = '<i class="fas fa-check"></i> Guardado en Airtable';
+                    btnSave.innerHTML = '<i class="fas fa-check"></i> Guardado ✓';
                     // Mantener deshabilitado para evitar duplicados
                 }
 
             } catch (err) {
                 console.error('❌ Error guardando PDF en Airtable:', err);
-                Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo guardar el PDF en Airtable.' });
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error al guardar',
+                    text: err.message || 'No se pudo guardar el PDF. Intenta de nuevo.',
+                    footer: '<small>Verifica que las variables de Netlify estén configuradas y que el PDF sea menor a 4MB</small>'
+                });
                 if (btnSave) {
                     btnSave.disabled = false;
                     btnSave.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Guardar en Airtable';

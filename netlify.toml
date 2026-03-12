@@ -5,6 +5,14 @@
 [build.environment]
   NODE_VERSION = "18"
 
+[functions]
+  included_files = []
+
+# Aumentar límite de body para upload de archivos (default 6MB, máximo en Netlify = 6MB base64)
+# El PDF se limita a 4MB en el cliente para que el base64 (~5.3MB) no supere el límite
+[functions."upload-attendance-pdf"]
+  node_bundler = "esbuild"
+
 # CORS básico
 [[headers]]
   for = "/*"
