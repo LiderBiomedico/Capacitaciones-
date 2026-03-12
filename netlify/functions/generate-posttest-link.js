@@ -71,9 +71,7 @@ export async function handler(event) {
         fields: {
           'Código Posttest': postestCode,
           'Link Posttest': postestUrl,
-          'Estado': 'Pretest Completado',
-          // ✅ asegurar vínculo para reportes y listados
-          'Sesión': [sessionId]
+          'Estado': 'Pretest Completado'
         }
       })
     });

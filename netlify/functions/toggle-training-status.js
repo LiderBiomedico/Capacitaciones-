@@ -1,230 +1,111 @@
 // netlify/functions/toggle-training-status.js
-// ═════════════════════════════════════════════════════════════════
-// Permite finalizar o reactivar una capacitación
-// Cuando se finaliza, las sesiones se desactivan para poder reutilizar
-// ═════════════════════════════════════════════════════════════════
+// Finaliza o reactiva una capacitación y sus sesiones
 
-export async function handler(event) {
+const AIRTABLE_API = 'https://api.airtable.com/v0';
+
+async function airtablePatch(baseId, apiKey, table, recordId, fields) {
+  const url = `${AIRTABLE_API}/${baseId}/${encodeURIComponent(table)}/${recordId}`;
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ fields })
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `Error ${res.status}`);
+  }
+  return res.json();
+}
+
+async function fetchAllRecords(baseId, apiKey, table, filterFormula = '') {
+  const records = [];
+  let offset = null;
+  do {
+    let params = '?pageSize=100';
+    if (filterFormula) params += `&filterByFormula=${encodeURIComponent(filterFormula)}`;
+    if (offset) params += `&offset=${offset}`;
+    const url = `${AIRTABLE_API}/${baseId}/${encodeURIComponent(table)}${params}`;
+    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } });
+    const data = await res.json();
+    if (data.records) records.push(...data.records);
+    offset = data.offset || null;
+  } while (offset);
+  return records;
+}
+
+exports.handler = async (event) => {
   const headers = {
-    'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS'
+    'Content-Type': 'application/json'
   };
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers, body: '' };
   }
 
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ success: false, error: 'Solo POST' })
-    };
+  const apiKey = process.env.AIRTABLE_API_KEY;
+  const baseId = process.env.AIRTABLE_BASE_ID;
+
+  if (!apiKey || !baseId) {
+    return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: 'Variables de entorno no configuradas' }) };
+  }
+
+  let trainingId, action;
+  try {
+    const body = JSON.parse(event.body || '{}');
+    trainingId = body.trainingId;
+    action = body.action; // 'finalize' | 'reactivate'
+  } catch {
+    return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Body inválido' }) };
+  }
+
+  if (!trainingId || !['finalize', 'reactivate'].includes(action)) {
+    return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Parámetros inválidos' }) };
   }
 
   try {
-    let payload = JSON.parse(event.body || '{}');
-    const { trainingId, action } = payload; // action: 'finalize' o 'reactivate'
+    const finalizar = action === 'finalize';
 
-    if (!trainingId || !action) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ 
-          success: false, 
-          error: 'Faltan parámetros: trainingId y action (finalize/reactivate)' 
-        })
-      };
-    }
-
-    if (!['finalize', 'reactivate'].includes(action)) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ 
-          success: false, 
-          error: 'Action debe ser "finalize" o "reactivate"' 
-        })
-      };
-    }
-
-    const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-    const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-
-    if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ success: false, error: 'Variables de entorno no configuradas' })
-      };
-    }
-
-    const isFinalize = action === 'finalize';
-    console.log(`📋 ${isFinalize ? 'Finalizando' : 'Reactivando'} capacitación:`, trainingId);
-
-    // ═════════════════════════════════════════════════════════════
-    // PASO 1: Actualizar la capacitación
-    // ═════════════════════════════════════════════════════════════
-
-    const updateTrainingUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Capacitaciones/${trainingId}`;
-    
-    const trainingFields = {
-      'Finalizada': isFinalize,
-      'Fecha Finalización': isFinalize ? new Date().toISOString().split('T')[0] : null
-    };
-
-    const trainingResponse = await fetch(updateTrainingUrl, {
-      method: 'PATCH',
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ fields: trainingFields })
+    // 1. Actualizar la capacitación
+    await airtablePatch(baseId, apiKey, 'Capacitaciones', trainingId, {
+      'Finalizada': finalizar,
+      'Activa': !finalizar
     });
 
-    if (!trainingResponse.ok) {
-      const errorData = await trainingResponse.json();
-      console.error('❌ Error actualizando capacitación:', errorData);
-      
-      // Si el campo no existe, continuamos de todas formas
-      if (errorData.error?.type !== 'INVALID_REQUEST_UNKNOWN_FIELD_NAME') {
-        return {
-          statusCode: trainingResponse.status,
-          headers,
-          body: JSON.stringify({
-            success: false,
-            error: 'No se pudo actualizar la capacitación',
-            details: errorData
-          })
-        };
-      }
+    // 2. Actualizar sesiones vinculadas
+    const formula = `FIND("${trainingId}", ARRAYJOIN({Capacitación}))`;
+    let sessions = [];
+    try {
+      sessions = await fetchAllRecords(baseId, apiKey, 'Sesiones', formula);
+    } catch {
+      const formula2 = `FIND("${trainingId}", ARRAYJOIN({Capacitacion}))`;
+      sessions = await fetchAllRecords(baseId, apiKey, 'Sesiones', formula2).catch(() => []);
     }
 
-    const trainingData = await trainingResponse.json();
-    console.log('✅ Capacitación actualizada');
-
-    // ═════════════════════════════════════════════════════════════
-    // PASO 2: Actualizar todas las sesiones relacionadas
-    // ═════════════════════════════════════════════════════════════
-
-    // Obtener sesiones de esta capacitación
-    const sessionsUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sesiones?filterByFormula=FIND('${trainingId}',ARRAYJOIN({Capacitaciones}))`;
-    
-    const sessionsResponse = await fetch(sessionsUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-        'Content-Type': 'application/json'
-      }
-    });
-
-    let updatedSessions = 0;
-    if (sessionsResponse.ok) {
-      const sessionsData = await sessionsResponse.json();
-      const sessions = sessionsData.records || [];
-      
-      console.log(`📋 Sesiones encontradas: ${sessions.length}`);
-
-      // Actualizar cada sesión
-      for (const session of sessions) {
-        const updateSessionUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/Sesiones/${session.id}`;
-        
-        const sessionUpdateResponse = await fetch(updateSessionUrl, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            fields: {
-              'Activa': !isFinalize,
-              'Estado': isFinalize ? 'Finalizada' : 'Activa'
-            }
-          })
+    let sessionsUpdated = 0;
+    for (const session of sessions) {
+      try {
+        await airtablePatch(baseId, apiKey, 'Sesiones', session.id, {
+          'Activa': !finalizar
         });
-
-        if (sessionUpdateResponse.ok) {
-          updatedSessions++;
-        }
+        sessionsUpdated++;
+      } catch (e) {
+        console.warn(`⚠️ No se pudo actualizar sesión ${session.id}:`, e.message);
       }
-      
-      console.log(`✅ Sesiones actualizadas: ${updatedSessions}`);
     }
-
-    // ═════════════════════════════════════════════════════════════
-    // RESPUESTA EXITOSA
-    // ═════════════════════════════════════════════════════════════
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({
-        success: true,
-        message: isFinalize 
-          ? 'Capacitación finalizada exitosamente' 
-          : 'Capacitación reactivada exitosamente',
-        training: {
-          id: trainingId,
-          finalizada: isFinalize,
-          fechaFinalizacion: isFinalize ? new Date().toISOString().split('T')[0] : null
-        },
-        sessionsUpdated: updatedSessions
-      })
+      body: JSON.stringify({ success: true, sessionsUpdated })
     };
 
-  } catch (error) {
-    console.error('❌ Error en toggle-training-status:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ 
-        success: false, 
-        error: error.message,
-        type: error.name
-      })
-    };
+  } catch (err) {
+    console.error('❌ Error en toggle-training-status:', err.message);
+    return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: err.message }) };
   }
-}
-
-/*
-═════════════════════════════════════════════════════════════════
-CÓMO USAR ESTA FUNCIÓN
-═════════════════════════════════════════════════════════════════
-
-1. Para FINALIZAR una capacitación:
-
-   const result = await fetch('/.netlify/functions/toggle-training-status', {
-     method: 'POST',
-     headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({
-       trainingId: 'recXXXXXXXXXXXXXX',
-       action: 'finalize'
-     })
-   }).then(r => r.json());
-
-2. Para REACTIVAR una capacitación:
-
-   const result = await fetch('/.netlify/functions/toggle-training-status', {
-     method: 'POST',
-     headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({
-       trainingId: 'recXXXXXXXXXXXXXX',
-       action: 'reactivate'
-     })
-   }).then(r => r.json());
-
-═════════════════════════════════════════════════════════════════
-CAMPOS NECESARIOS EN AIRTABLE (TABLA CAPACITACIONES)
-═════════════════════════════════════════════════════════════════
-
-Para que funcione correctamente, agregar estos campos a la tabla Capacitaciones:
-- Finalizada (Checkbox)
-- Fecha Finalización (Date)
-
-Y en la tabla Sesiones:
-- Estado (Single line text o Single select con opciones: Activa, Finalizada)
-
-═════════════════════════════════════════════════════════════════
-*/
+};
