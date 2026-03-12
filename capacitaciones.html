@@ -6572,8 +6572,7 @@ async function airtableProxyRequest(payload) {
         const matchInvalid = String(msg).match(/Field .([^.]+). cannot accept the provided value/i);
         let unknown = '';
         if (matchUnknown) {
-            const m = String(msg).match(/Unknown field name[^"]*"([^"]+)"/i) || String(msg).match(/Unknown field name\s*:?\s*([^
-"]+)/i);
+            const m = String(msg).match(/Unknown field name[^"]*"([^"]+)"/i) || String(msg).match(/Unknown field name\s*:?\s*([^\n"]+)/i);
             unknown = m && m[1] ? m[1].trim() : '';
         } else if (matchInvalid) {
             unknown = matchInvalid[1] ? matchInvalid[1].trim() : '';
