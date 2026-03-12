@@ -1540,7 +1540,7 @@ overflow: hidden;
                             <input type="text" id="trainingReferente" placeholder="Ej: Coordinador de Capacitaciones" style="color:#1a1a1a;">
                         </div>
                         <div class="form-group">
-                            <label style="color:#1a1a1a;"><i class="fas fa-list-ul"></i> Objetivo *</label>
+                            <label style="color:#1a1a1a;"><i class="fas fa-list-ul"></i> Objetivo</label>
                             <textarea id="trainingDescription" rows="3" placeholder="Describe los objetivos de la capacitación..." style="color:#1a1a1a;"></textarea>
                         </div>
                         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem;">
@@ -2588,106 +2588,31 @@ overflow: hidden;
                     didOpen: () => Swal.showLoading()
                 });
                 
-                // Buscar todas las sesiones para debugging
+                // Buscar directamente en Capacitaciones por "Código de Acceso"
                 const allResponse = await fetch('/.netlify/functions/airtable-proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: `/Sesiones`
-                    })
+                    body: JSON.stringify({ method: 'GET', path: '/Capacitaciones' })
                 });
-                
                 const allData = await allResponse.json();
-                console.log('📋 Todas las sesiones:', allData.records);
-                
-                // Buscar la sesión específica
-                let session = null;
-                
-                if (allData.success && allData.records) {
-                    session = allData.records.find(s => {
-                        const codigoAcceso = s.fields['Código Acceso'] || '';
-                        const activa = s.fields['Activa'] !== false;
-                        return codigoAcceso.toUpperCase() === code && activa;
-                    });
-                }
-                
-                if (!session) {
-                    Swal.close();
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Código Inválido',
-                        text: 'El código "' + code + '" no existe o la sesión no está activa.\n\nVerifica en Airtable que:\n1. El código exista en la tabla Sesiones\n2. El campo "Activa" esté marcado ✅\n3. El código sea exactamente: ' + code
-                    });
-                    return;
-                }
-                
-                console.log('✅ Sesión encontrada:', session);
-                
-                // Obtener ID de capacitación - probar múltiples nombres de campos
-                let trainingId = null;
-                
-                // Intentar diferentes nombres de campo
-                if (session.fields['Capacitaciones'] && Array.isArray(session.fields['Capacitaciones']) && session.fields['Capacitaciones'].length > 0) {
-                    trainingId = session.fields['Capacitaciones'][0];
-                    console.log('✅ Campo "Capacitaciones" encontrado');
-                } else if (session.fields['Capacitación'] && Array.isArray(session.fields['Capacitación']) && session.fields['Capacitación'].length > 0) {
-                    trainingId = session.fields['Capacitación'][0];
-                    console.log('✅ Campo "Capacitación" encontrado');
-                } else if (session.fields['capacitacion'] && Array.isArray(session.fields['capacitacion']) && session.fields['capacitacion'].length > 0) {
-                    trainingId = session.fields['capacitacion'][0];
-                    console.log('✅ Campo "capacitacion" encontrado');
-                }
-                
-                if (!trainingId) {
-                    Swal.close();
-                    console.error('❌ Campo de capacitación vacío:', session.fields);
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Error de Configuración',
-                        html: `<p>La sesión con código <strong>${code}</strong> no tiene capacitación enlazada.</p>
-                               <p><strong>En Airtable:</strong></p>
-                               <p>1. Abre tabla "Sesiones"</p>
-                               <p>2. Busca el registro con código "${code}"</p>
-                               <p>3. En el campo "Capacitaciones" (o "Capacitación"), haz click y selecciona una capacitación</p>
-                               <p>4. Guarda y vuelve a intentar</p>`
-                    });
-                    return;
-                }
-                
-                console.log('🎓 ID de Capacitación:', trainingId);
-                
-                // Obtener datos de la capacitación
-                const trainingResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: `/Capacitaciones/${trainingId}`
-                    })
+                console.log('📋 Capacitaciones:', allData.records?.length || 0);
+                if (!allData.success || !allData.records) throw new Error('No se pudo conectar con Airtable');
+
+                const training = allData.records.find(r => {
+                    const c = (r.fields['Código de Acceso'] || r.fields['Código Acceso'] || '').toUpperCase().trim();
+                    return c === code && r.fields['Estado'] !== 'inactive';
                 });
-                
-                const trainingData = await trainingResponse.json();
-                
-                console.log('📚 Datos de Capacitación:', trainingData);
-                
-                if (!trainingData.success || !trainingData.fields) {
-                    throw new Error('No se pudieron obtener los datos de la capacitación');
+
+                if (!training) {
+                    Swal.close();
+                    Swal.fire({ icon: 'error', title: 'Código Inválido', text: 'El código "' + code + '" no existe o la capacitación no está activa.' });
+                    return;
                 }
-                
-                // Guardar datos actuales
+
+                console.log('✅ Capacitación encontrada:', training.id, training.fields['Título']);
                 currentAccessCode = code;
-                currentTrainingRecord = {
-                    id: trainingId,
-                    fields: trainingData.fields
-                };
-                
-                console.log('✅ Datos guardados - ID de capacitación:', trainingId);
-                console.log('✅ currentTrainingRecord:', currentTrainingRecord);
-                
+                currentTrainingRecord = { id: training.id, fields: training.fields };
                 Swal.close();
-                
-                // Mostrar modal de registro
                 showParticipantRegistrationModal();
                 
             } catch (error) {
@@ -4188,7 +4113,6 @@ function getSelectedStaff() {
     const methodInput    = document.getElementById('trainingMethodology');
     const placeInput     = document.getElementById('trainingPlace');
     const eventDateInput = document.getElementById('trainingEventDate');
-
     const title       = titleInput     ? titleInput.value.trim()    : '';
     const description = descInput      ? descInput.value.trim()     : '';
     const trainingDate= dateInput      ? dateInput.value            : '';
@@ -4199,12 +4123,10 @@ function getSelectedStaff() {
     const methodology = methodInput    ? methodInput.value          : '';
     const place       = placeInput     ? placeInput.value.trim()    : '';
     const eventDate   = eventDateInput ? eventDateInput.value       : '';
-
     const selectedStaff = getSelectedStaff();
-
     if (!title || !trainingDate || !department || selectedStaff.length === 0) {
-        let missingMsg = 'Por favor completa todos los campos requeridos (*)';
-        if (selectedStaff.length === 0) missingMsg += ' y marca al menos una casilla en "Dirigido a".';
+        let missingMsg = 'Por favor completa los campos requeridos (*)';
+        if (selectedStaff.length === 0) missingMsg += ' y selecciona al menos un cargo en "Dirigido a".';
         Swal.fire({ icon: 'warning', title: 'Campos Incompletos', text: missingMsg });
         if (titleInput) titleInput.scrollIntoView({ behavior: 'smooth' });
         return;
@@ -4332,7 +4254,7 @@ async function sendTrainingToAirtable(trainingData) {
         console.log('📤 Enviando capacitación a Airtable...');
         console.log('Datos originales:', trainingData);
 
-        // Campos con nombres EXACTOS de Airtable (verificados en la tabla)
+        // Campos con nombres EXACTOS de Airtable
         const _f = {
             "Título":           trainingData.title      || '',
             "Código de Acceso": trainingData.accessCode || '',
@@ -4347,8 +4269,9 @@ async function sendTrainingToAirtable(trainingData) {
         if (trainingData.methodology)  _f["Metodología"]                 = trainingData.methodology;
         if (trainingData.place)        _f["Lugar"]                       = trainingData.place;
         if (trainingData.eventDate)    _f["Fecha de la capacitación"]    = trainingData.eventDate;
+        // "Dirigido a" es Selección múltiple en Airtable → debe ser array de strings
         if (trainingData.staffList && trainingData.staffList.length > 0)
-            _f["Dirigido a"] = trainingData.staffList.join(', ');
+            _f["Dirigido a"] = trainingData.staffList; // array, NO .join()
         const airtableRecord = { fields: _f };
 
         console.log('📋 Record a enviar:', JSON.stringify(airtableRecord, null, 2));
