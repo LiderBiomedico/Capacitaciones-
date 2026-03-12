@@ -1534,10 +1534,10 @@ overflow: hidden;
                         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:1rem;margin-bottom:1.5rem;">
                             <div class="form-group" style="margin-bottom:0;"><label style="color:#1a1a1a;"><i class="fas fa-calendar"></i> Fecha de Creación *</label><input type="date" id="trainingDate" required style="color:#1a1a1a;"></div>
                             <div class="form-group" style="margin-bottom:0;"><label style="color:#1a1a1a;"><i class="fas fa-hospital"></i> Proceso de Atención *</label>
-                                <select id="trainingDepartment" required style="color:#1a1a1a;"><option value="">Seleccione...</option><option value="General">General</option><option value="Enfermería">Enfermería</option><option value="Medicina">Medicina</option><option value="Administración">Administración</option><option value="Laboratorio">Laboratorio</option><option value="Radiología">Radiología</option><option value="Urgencias">Urgencias</option><option value="UCI">UCI</option><option value="Cirugía">Cirugía</option><option value="Pediatría">Pediatría</option></select></div>
+                                <select id="trainingDepartment" required style="color:#1a1a1a;"><option value="">Seleccione...</option><option>General</option><option>Enfermería</option><option>Medicina</option><option>Administración</option><option>Laboratorio</option><option>Radiología</option><option>Urgencias</option><option>UCI</option><option>Cirugía</option><option>Pediatría</option></select></div>
                             <div class="form-group" style="margin-bottom:0;"><label style="color:#1a1a1a;"><i class="fas fa-clock"></i> Duración</label><input type="text" id="trainingDuration" placeholder="Ej: 30 minutos" style="color:#1a1a1a;"></div>
                             <div class="form-group" style="margin-bottom:0;"><label style="color:#1a1a1a;"><i class="fas fa-chalkboard-teacher"></i> Metodología</label>
-                                <select id="trainingMethodology" style="color:#1a1a1a;"><option value="">Seleccione...</option><option value="Presencial">Presencial</option><option value="Virtual">Virtual</option><option value="Híbrida">Híbrida</option><option value="Simulación">Simulación</option><option value="Taller práctico">Taller práctico</option></select></div>
+                                <select id="trainingMethodology" style="color:#1a1a1a;"><option value="">Seleccione...</option><option>Presencial</option><option>Virtual</option><option>Híbrida</option><option>Simulación</option><option>Taller práctico</option></select></div>
                             <div class="form-group" style="margin-bottom:0;"><label style="color:#1a1a1a;"><i class="fas fa-map-marker-alt"></i> Lugar</label><input type="text" id="trainingPlace" placeholder="Ej: Sala de conferencias" style="color:#1a1a1a;"></div>
                             <div class="form-group" style="margin-bottom:0;"><label style="color:#1a1a1a;"><i class="fas fa-calendar-check"></i> Fecha de la capacitación</label><input type="date" id="trainingEventDate" style="color:#1a1a1a;"></div>
                         </div>
@@ -4263,19 +4263,26 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             return true;
         }
 
-        // Campos exactos de la tabla Preguntas (campo se llama "Tipo", no "Tipo Examen")
-        const records = questions.map((q, idx) => ({
-            fields: {
-                "Capacitación":       [trainingRecordId],
-                "Tipo":               type === 'pretest' ? 'Pretest' : 'Postest',
-                "Pregunta":           q.question,
-                "Opción A":           q.options.a,
-                "Opción B":           q.options.b,
-                "Opción C":           q.options.c,
-                "Opción D":           q.options.d,
-                "Respuesta Correcta": q.correctAnswer.toUpperCase()
-            }
-        }));
+        // Campos exactos de la tabla Preguntas
+        // "Respuesta Correcta" es select con permisos restringidos → enviar texto de la opción correcta
+        const records = questions.map(q => {
+            const letra = q.correctAnswer.toLowerCase();
+            const textoRespuesta = q.options[letra] || q.correctAnswer;
+            const f = {
+                "Capacitación": [trainingRecordId],
+                "Tipo":         type === 'pretest' ? 'Pretest' : 'Postest',
+                "Número":       String(q.number),
+                "Pregunta":     q.question,
+                "Opción A":     q.options.a,
+                "Opción B":     q.options.b,
+                "Opción C":     q.options.c,
+                "Opción D":     q.options.d
+            };
+            // Guardar la respuesta correcta: primero intenta como texto, si falla el campo es select
+            // IMPORTANTE: En Airtable, cambia "Respuesta Correcta" de tipo Select a tipo Texto
+            f["Respuesta Correcta"] = q.correctAnswer.toUpperCase();
+            return { fields: f };
+        });
 
         console.log(`📋 Preguntas a guardar:`, records);
 
