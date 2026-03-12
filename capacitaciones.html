@@ -2474,7 +2474,24 @@ overflow: hidden;
                     <option value="Otro">Otro</option>
                 </select>
             </div>
-            
+
+            <div class="form-group">
+                <label><i class="fas fa-user-md"></i> Profesión / Cargo *</label>
+                <select id="participantProfession" required>
+                    <option value="">Seleccione su profesión...</option>
+                    <option value="Jefe de enfermería">Jefe de enfermería</option>
+                    <option value="Médico general">Médico general</option>
+                    <option value="Médico especialista">Médico especialista</option>
+                    <option value="Ingeniero biomédico">Ingeniero biomédico</option>
+                    <option value="Estudiante">Estudiante</option>
+                    <option value="Auxiliar de enfermería">Auxiliar de enfermería</option>
+                    <option value="Terapeuta respiratorio">Terapeuta respiratorio</option>
+                    <option value="Fisioterapeuta">Fisioterapeuta</option>
+                    <option value="Conductor">Conductor</option>
+                    <option value="Técnico de rx">Técnico de rx</option>
+                </select>
+            </div>
+
             <div class="modal-actions" style="flex-direction: column; gap: 0.75rem;">
                 <button class="btn btn-success" onclick="proceedToPretest()" style="width: 100%;">
                     <i class="fas fa-check"></i> Continuar al Pre-Test
@@ -2584,9 +2601,11 @@ overflow: hidden;
         async function proceedToPretest() {
             const name = document.getElementById('participantName').value.trim();
             const department = document.getElementById('participantDepartment').value;
+            const profession = document.getElementById('participantProfession') ? document.getElementById('participantProfession').value : '';
             if (!name) { Swal.fire({ icon: 'warning', title: 'Nombre Requerido', text: 'Por favor ingresa tu nombre completo', confirmButtonText: 'Entendido' }); return; }
             if (!department) { Swal.fire({ icon: 'warning', title: 'Servicio Requerido', text: 'Por favor selecciona tu servicio', confirmButtonText: 'Entendido' }); return; }
-            currentParticipantData = { name, department, profession: '', accessCode: currentAccessCode };
+            if (!profession) { Swal.fire({ icon: 'warning', title: 'Profesión Requerida', text: 'Por favor selecciona tu profesión o cargo', confirmButtonText: 'Entendido' }); return; }
+            currentParticipantData = { name, department, profession, accessCode: currentAccessCode };
             closeParticipantModal();
             loadAndDisplayPretest();
         }
@@ -3529,6 +3548,7 @@ overflow: hidden;
             document.getElementById('accessCode').value = '';
             document.getElementById('participantName').value = '';
             document.getElementById('participantDepartment').value = '';
+            if (document.getElementById('participantProfession')) document.getElementById('participantProfession').value = '';
             
             // Mostrar/ocultar secciones
             document.getElementById('accessSection').style.display = 'block';
