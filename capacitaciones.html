@@ -1794,19 +1794,11 @@ overflow: hidden;
                     <h3><i class="fas fa-graduation-cap"></i> Seleccionar Capacitación</h3>
                     <p style="color: #1a1a1a; margin-bottom: 1rem;">Selecciona una capacitación para ver el listado de participantes y sus calificaciones</p>
                     
-                    <div style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap;">
-                        <div class="form-group" style="flex: 1; min-width: 220px; margin-bottom: 0;">
-                            <label><i class="fas fa-list"></i> Capacitación</label>
-                            <select id="reportTrainingSelect" onchange="loadTrainingReport()">
-                                <option value="">-- Selecciona una capacitación --</option>
-                            </select>
-                        </div>
-                        <div style="display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start;">
-                            <button id="btnRefreshReport" class="btn btn-primary" onclick="refreshTrainingReport()" style="margin: 0; white-space: nowrap;" disabled>
-                                <i class="fas fa-sync-alt" id="refreshIcon"></i> Actualizar Datos
-                            </button>
-                            <span id="reportLastUpdated" style="font-size: 0.78rem; color: #6b7280; padding-left: 2px;"></span>
-                        </div>
+                    <div class="form-group">
+                        <label><i class="fas fa-list"></i> Capacitación</label>
+                        <select id="reportTrainingSelect" onchange="loadTrainingReport()">
+                            <option value="">-- Selecciona una capacitación --</option>
+                        </select>
                     </div>
                 </div>
                 
@@ -2936,7 +2928,9 @@ overflow: hidden;
                         'Profesión': currentParticipantData.profession || '',
                         'Pretest Score': pretestScore,
                         'Fecha de Inicio': fechaFormato,
-                        'Completado Pretest': true
+                        'Completado Pretest': true,
+                        // ✅ CLAVE: vincular la participación con la sesión actual
+                        'Sesión': [currentSession.id]
                     }
                 };
                 
@@ -3420,7 +3414,9 @@ overflow: hidden;
                         body: {
                             fields: {
                                 'Post-test Score': postestScore,
-                                'Fecha Fin': fechaFormato
+                                'Fecha Fin': fechaFormato,
+                                // Mantener el vínculo por si el registro fue creado antes del ajuste
+                                'Sesión': currentSessionId ? [currentSessionId] : undefined
                             }
                         }
                     })
@@ -7444,35 +7440,13 @@ function makeCronogramaFilterFormula(year, tipo) {
         // CARGAR REPORTE DE UNA CAPACITACIÓN
         // ═════════════════════════════════════════════════════════════════
 
-        // ═════════════════════════════════════════════════════════════════
-        // ACTUALIZAR REPORTE (REFRESH)
-        // ═════════════════════════════════════════════════════════════════
-
-        async function refreshTrainingReport() {
-            const trainingId = document.getElementById('reportTrainingSelect').value;
-            if (!trainingId) return;
-
-            const icon = document.getElementById('refreshIcon');
-            const btn = document.getElementById('btnRefreshReport');
-            if (icon) icon.classList.add('fa-spin');
-            if (btn) btn.disabled = true;
-
-            try {
-                await loadTrainingReport(true);
-            } finally {
-                if (icon) icon.classList.remove('fa-spin');
-                if (btn) btn.disabled = false;
-            }
-        }
-
-        async function loadTrainingReport(isRefresh = false) {
+        async function loadTrainingReport() {
             const trainingId = document.getElementById('reportTrainingSelect').value;
             
             // Elementos del DOM
             const reportContainer = document.getElementById('reportContainer');
             const reportLoading = document.getElementById('reportLoading');
             const reportInitialMessage = document.getElementById('reportInitialMessage');
-            const btnRefresh = document.getElementById('btnRefreshReport');
             
             if (!trainingId) {
                 // Mostrar mensaje inicial
@@ -7480,19 +7454,14 @@ function makeCronogramaFilterFormula(year, tipo) {
                 reportLoading.style.display = 'none';
                 reportInitialMessage.style.display = 'block';
                 currentReportData = null;
-                if (btnRefresh) btnRefresh.disabled = true;
-                document.getElementById('reportLastUpdated').textContent = '';
                 return;
             }
-
-            // Habilitar botón refresh
-            if (btnRefresh) btnRefresh.disabled = false;
             
             try {
                 // Mostrar loading
-                if (!isRefresh) reportContainer.style.display = 'none';
+                reportContainer.style.display = 'none';
                 reportInitialMessage.style.display = 'none';
-                if (!isRefresh) reportLoading.style.display = 'block';
+                reportLoading.style.display = 'block';
                 
                 console.log('📊 Cargando reporte para capacitación:', trainingId);
                 
@@ -7552,12 +7521,6 @@ function makeCronogramaFilterFormula(year, tipo) {
                 // Actualizar acciones de la capacitación
                 updateTrainingActions(data.training);
                 
-                // Mostrar timestamp de última actualización
-                const now = new Date();
-                const timeStr = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-                const lastUpdatedEl = document.getElementById('reportLastUpdated');
-                if (lastUpdatedEl) lastUpdatedEl.textContent = `Actualizado: ${timeStr}`;
-
                 // Mostrar contenedor
                 reportLoading.style.display = 'none';
                 reportContainer.style.display = 'block';

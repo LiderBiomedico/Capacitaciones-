@@ -196,7 +196,7 @@ export async function handler(event) {
     const participationRecords = [];
     for (const p of participationsRaw) {
       const f = p.fields || {};
-      const sesion = pickField(f, ['Sesión', 'Sesion', 'Session']) || [];
+      const sesion = pickField(f, ['Sesión', 'Sesion', 'Sesiones', 'Sessions', 'Session']) || [];
       const sesArr = Array.isArray(sesion) ? sesion : [sesion];
       const belongs = sesArr.some((sid) => sessionIdSet.has(sid));
       if (!belongs) continue;

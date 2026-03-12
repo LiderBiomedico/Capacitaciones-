@@ -218,7 +218,7 @@ export async function handler(event) {
     const linkedParticipations = allParticipations.filter(participation => {
       const fields = participation.fields;
       // Buscar el campo de sesión con diferentes nombres posibles
-      const sesion = fields['Sesión'] || fields['Sesion'] || fields['Session'] || [];
+      const sesion = fields['Sesión'] || fields['Sesion'] || fields['Sesiones'] || fields['Sessions'] || fields['Session'] || [];
       
       if (Array.isArray(sesion)) {
         return sesion.some(sid => sessionIds.includes(sid));

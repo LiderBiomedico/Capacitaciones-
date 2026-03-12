@@ -96,7 +96,7 @@ export async function handler(event) {
       });
       const participationsData = await participationsResponse.json();
       allParticipations = (participationsData.records || []).filter(p => {
-        const sesion = p.fields['Sesión'] || [];
+        const sesion = p.fields['Sesión'] || p.fields['Sesion'] || p.fields['Sesiones'] || p.fields['Sessions'] || p.fields['Session'] || [];
         if (Array.isArray(sesion)) {
           return sesion.some(sid => sessionIds.includes(sid));
         }
