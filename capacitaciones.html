@@ -461,7 +461,6 @@
             font-size: 1rem;
             resize: vertical;
             transition: all 0.3s;
-            color: #1a1a1a;
         }
 
         .question-text:focus {
@@ -513,8 +512,6 @@
             border: 1px solid #e0e0e0;
             border-radius: 6px;
             font-size: 0.95rem;
-            color: #1a1a1a;
-            background: #fff;
         }
 
         .option-text:focus {
@@ -4138,71 +4135,36 @@ overflow: hidden;
             if (!container) return [];
             const questionCards = container.querySelectorAll('.question-card');
             if (questionCards.length === 0) return [];
-
             const typeName = type === 'pretest' ? 'Pretest' : 'Post-test';
             const questions = [];
-            
             for (let i = 0; i < questionCards.length; i++) {
                 const card = questionCards[i];
                 const questionId = card.id;
-                
-                // Texto de la pregunta
                 const textEl = document.getElementById(`${questionId}-text`);
                 const questionText = textEl ? textEl.value.trim() : '';
                 if (!questionText) {
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Pregunta Vacía',
-                        text: `Escribe el texto de la pregunta ${i + 1} del ${typeName}`,
-                        confirmButtonText: 'Entendido'
-                    });
+                    Swal.fire({ icon: 'error', title: 'Pregunta Vacía', text: `Escribe el texto de la pregunta ${i + 1} del ${typeName}`, confirmButtonText: 'Entendido' });
                     if (textEl) textEl.focus();
                     return null;
                 }
-                
-                // Opciones
-                const elA = document.getElementById(`${questionId}-text-a`);
-                const elB = document.getElementById(`${questionId}-text-b`);
-                const elC = document.getElementById(`${questionId}-text-c`);
-                const elD = document.getElementById(`${questionId}-text-d`);
                 const options = {
-                    a: elA ? elA.value.trim() : '',
-                    b: elB ? elB.value.trim() : '',
-                    c: elC ? elC.value.trim() : '',
-                    d: elD ? elD.value.trim() : ''
+                    a: (document.getElementById(`${questionId}-text-a`) || {value:''}).value.trim(),
+                    b: (document.getElementById(`${questionId}-text-b`) || {value:''}).value.trim(),
+                    c: (document.getElementById(`${questionId}-text-c`) || {value:''}).value.trim(),
+                    d: (document.getElementById(`${questionId}-text-d`) || {value:''}).value.trim()
                 };
-                
                 if (!options.a || !options.b || !options.c || !options.d) {
                     const missing = ['A','B','C','D'].filter((_,idx) => !Object.values(options)[idx]).join(', ');
-                    Swal.fire({
-                        icon: 'error',
-                        title: 'Opciones Incompletas',
-                        text: `Completa las opciones ${missing} de la pregunta ${i + 1} del ${typeName}`,
-                        confirmButtonText: 'Entendido'
-                    });
+                    Swal.fire({ icon: 'error', title: 'Opciones Incompletas', text: `Completa las opciones ${missing} de la pregunta ${i + 1} del ${typeName}`, confirmButtonText: 'Entendido' });
                     return null;
                 }
-                
-                // Respuesta correcta
                 const correctAnswer = card.querySelector(`input[name="${questionId}-correct"]:checked`);
                 if (!correctAnswer) {
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Falta la respuesta correcta',
-                        text: `Marca cuál opción es la correcta en la pregunta ${i + 1} del ${typeName}`,
-                        confirmButtonText: 'Entendido'
-                    });
+                    Swal.fire({ icon: 'warning', title: 'Falta respuesta correcta', text: `Marca la opción correcta en la pregunta ${i + 1} del ${typeName}`, confirmButtonText: 'Entendido' });
                     return null;
                 }
-                
-                questions.push({
-                    number: i + 1,
-                    question: questionText,
-                    options: options,
-                    correctAnswer: correctAnswer.value
-                });
+                questions.push({ number: i + 1, question: questionText, options, correctAnswer: correctAnswer.value });
             }
-            
             return questions;
         }
 // Lee SOLO el personal marcado en "Personal Capacitado"
@@ -4248,30 +4210,17 @@ function getSelectedStaff() {
         return;
     }
 
-    // Recopilar y validar preguntas del pretest
     const pretestQuestions = collectQuestions('pretest');
-    if (pretestQuestions === null) return; // error interno ya mostrado por collectQuestions
+    if (pretestQuestions === null) return;
     if (pretestQuestions.length === 0) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Sin Preguntas de Pretest',
-            text: 'Agrega al menos una pregunta al Pretest antes de guardar',
-            confirmButtonText: 'Entendido'
-        });
+        Swal.fire({ icon: 'warning', title: 'Sin Preguntas de Pretest', text: 'Agrega al menos una pregunta al Pretest', confirmButtonText: 'Entendido' });
         document.getElementById('pretestQuestions').scrollIntoView({ behavior: 'smooth' });
         return;
     }
-
-    // Recopilar y validar preguntas del postest
     const postestQuestions = collectQuestions('postest');
-    if (postestQuestions === null) return; // error interno ya mostrado por collectQuestions
+    if (postestQuestions === null) return;
     if (postestQuestions.length === 0) {
-        Swal.fire({
-            icon: 'warning',
-            title: 'Sin Preguntas de Post-test',
-            text: 'Agrega al menos una pregunta al Post-test antes de guardar',
-            confirmButtonText: 'Entendido'
-        });
+        Swal.fire({ icon: 'warning', title: 'Sin Preguntas de Post-test', text: 'Agrega al menos una pregunta al Post-test', confirmButtonText: 'Entendido' });
         document.getElementById('postestQuestions').scrollIntoView({ behavior: 'smooth' });
         return;
     }
@@ -4383,21 +4332,21 @@ async function sendTrainingToAirtable(trainingData) {
         console.log('📤 Enviando capacitación a Airtable...');
         console.log('Datos originales:', trainingData);
 
-        // Campos exactos de Airtable
+        // Campos con nombres EXACTOS de Airtable (verificados en la tabla)
         const _f = {
-            "Título":           trainingData.title        || '',
-            "Fecha":            trainingData.trainingDate || '',
-            "Departamento":     trainingData.department   || '',
-            "Código de Acceso": trainingData.accessCode   || '',
-            "Estado":           trainingData.status       || 'active'
+            "Título":           trainingData.title      || '',
+            "Código de Acceso": trainingData.accessCode || '',
+            "Estado":           trainingData.status     || 'active'
         };
-        if (trainingData.description) _f["Descripción"]                 = trainingData.description;
-        if (trainingData.duration)    _f["Duración"]                    = trainingData.duration;
-        if (trainingData.expositor)   _f["Expositor"]                   = trainingData.expositor;
-        if (trainingData.referente)   _f["Referente de Capacitaciones"] = trainingData.referente;
-        if (trainingData.methodology) _f["Metodología"]                 = trainingData.methodology;
-        if (trainingData.place)       _f["Lugar"]                       = trainingData.place;
-        if (trainingData.eventDate)   _f["Fecha de la capacitación"]    = trainingData.eventDate;
+        if (trainingData.trainingDate) _f["Fecha Creación"]              = trainingData.trainingDate;
+        if (trainingData.department)   _f["ProcesoAtencion"]             = trainingData.department;
+        if (trainingData.description)  _f["Descripción"]                 = trainingData.description;
+        if (trainingData.duration)     _f["Duración"]                    = trainingData.duration;
+        if (trainingData.expositor)    _f["Expositor"]                   = trainingData.expositor;
+        if (trainingData.referente)    _f["Referente de Capacitaciones"] = trainingData.referente;
+        if (trainingData.methodology)  _f["Metodología"]                 = trainingData.methodology;
+        if (trainingData.place)        _f["Lugar"]                       = trainingData.place;
+        if (trainingData.eventDate)    _f["Fecha de la capacitación"]    = trainingData.eventDate;
         if (trainingData.staffList && trainingData.staffList.length > 0)
             _f["Dirigido a"] = trainingData.staffList.join(', ');
         const airtableRecord = { fields: _f };
