@@ -2925,7 +2925,7 @@ overflow: hidden;
                 
                 // Encontrar la sesión por código de acceso
                 const currentSession = sessionData.records.find(s => {
-                    const codigo = s.fields['Código Acceso'] || s.fields['Código de Acceso'] || '';
+                    const codigo = s.fields['Código Acceso'] || '';
                     return codigo.toUpperCase() === currentAccessCode.toUpperCase();
                 });
                 
@@ -3022,11 +3022,17 @@ overflow: hidden;
                 const participationData = {
                     fields: {
                         'Nombre': currentParticipantData.name,
+                        'Nombre Completo': currentParticipantData.name,
                         'Departamento': currentParticipantData.department,
+                        'Servicio': currentParticipantData.department,
                         'Profesión': currentParticipantData.profession || '',
+                        'Profesion': currentParticipantData.profession || '',
+                        'Cargo': currentParticipantData.profession || '',
                         'Pretest Score': pretestScore,
+                        'Pre-test Score': pretestScore,
                         'Fecha de Inicio': fechaFormato,
                         'Completado Pretest': true,
+                        'Completado Pre-Test': true,
                         'Código de Acceso': currentAccessCode || '',
                         'Código Acceso': currentAccessCode || '',
                         'Sesion': [currentSession.id],
@@ -3074,10 +3080,14 @@ overflow: hidden;
                             }
                         };
                         
-                        await airtableProxyRequest({
+                        await fetch('/.netlify/functions/airtable-proxy', {
                             method: 'POST',
-                            path: `/Respuestas`,
-                            body: answerData
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                method: 'POST',
+                                path: `/Respuestas`,
+                                body: answerData
+                            })
                         });
                         
                         console.log(`✅ Respuesta guardada para pregunta: ${answer.questionId}`);
@@ -3501,26 +3511,25 @@ overflow: hidden;
                 const horaFormato = `${hours}:${minutes}:${seconds}`;
                 const fechaHoraCompleta = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
                 
-                const updateParticipationResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'PATCH',
-                        path: `/Participaciones/${currentParticipationId}`,
-                        body: {
-                            fields: {
-                                'Post-test Score': postestScore,
-                                'Fecha Fin': fechaFormato
-                            }
+                const updateParticipationData = await airtableProxyRequest({
+                    method: 'PATCH',
+                    path: `/Participaciones/${currentParticipationId}`,
+                    body: {
+                        fields: {
+                            'Post-test Score': postestScore,
+                            'Posttest Score': postestScore,
+                            'Fecha Fin': fechaFormato,
+                            'Completado Posttest': true,
+                            'Completado Post-Test': true,
+                            'Profesión': currentParticipantData.profession || '',
+                            'Profesion': currentParticipantData.profession || ''
                         }
-                    })
+                    }
                 });
                 
-                const updateParticipationData = await updateParticipationResponse.json();
-                
-                if (!updateParticipationData.success) {
+                if (!updateParticipationData || (!updateParticipationData.id && !updateParticipationData.success)) {
                     console.error('❌ Error actualizando participación:', updateParticipationData);
-                    throw new Error(updateParticipationData.error || 'No se pudo actualizar el registro');
+                    throw new Error((updateParticipationData && updateParticipationData.error) || 'No se pudo actualizar el registro');
                 }
                 
                 console.log('✅ Participación actualizada:', currentParticipationId);
@@ -3541,10 +3550,14 @@ overflow: hidden;
                             }
                         };
                         
-                        await airtableProxyRequest({
+                        await fetch('/.netlify/functions/airtable-proxy', {
                             method: 'POST',
-                            path: `/Respuestas`,
-                            body: answerData
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                method: 'POST',
+                                path: `/Respuestas`,
+                                body: answerData
+                            })
                         });
                         
                         console.log(`✅ Respuesta guardada para pregunta: ${answer.questionId}`);
@@ -6512,43 +6525,45 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         // ======================
         
 async function airtableProxyRequest(payload) {
-    // Request helper with automatic fallback when Airtable rejects an "Unknown field name"
-    // (commonly due to accents/tilde differences like Observación vs Observacion).
-    const stripDiacritics = (s) => (s || '')
+    const normalizeKey = (s) => (s || '')
         .toString()
         .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '');
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
 
-    // Deep-clone payload to avoid mutating caller objects
     let current = JSON.parse(JSON.stringify(payload || {}));
 
-    const tryFixUnknownField = (msg) => {
+    const removeUnknownFieldVariant = (msg) => {
         if (!msg) return false;
-
-        // Common Airtable message: Unknown field name: "Observación"
-        const m = String(msg).match(/Unknown field name\s*:?\s*"?([^"\n]+)"?/i);
-        const unknown = m && m[1] ? m[1].trim() : null;
-        if (!unknown) return false;
-
+        const match = String(msg).match(/Unknown field name\s*:?\s*\"?([^\"\n]+)\"?/i);
+        const unknown = match && match[1] ? match[1].trim() : '';
         const fields = current?.body?.fields;
-        if (!fields || typeof fields !== 'object') return false;
-        if (!(unknown in fields)) return false;
+        if (!unknown || !fields || typeof fields !== 'object') return false;
 
-        const alt = stripDiacritics(unknown);
+        const unknownNorm = normalizeKey(unknown);
+        const keys = Object.keys(fields);
+        const candidates = keys.filter((k) => {
+            const norm = normalizeKey(k);
+            return k === unknown || norm === unknownNorm || norm.replace(/\//g, ' ') === unknownNorm.replace(/\//g, ' ');
+        });
 
-        // 1) Prefer switching to the de-accented name (Observacion)
-        if (alt && alt !== unknown && !(alt in fields)) {
-            fields[alt] = fields[unknown];
-            delete fields[unknown];
-            return true;
+        if (!candidates.length) {
+            const compactUnknown = unknownNorm.replace(/\s+/g, '');
+            keys.forEach((k) => {
+                const compactKey = normalizeKey(k).replace(/\s+/g, '');
+                if (compactKey === compactUnknown) candidates.push(k);
+            });
         }
 
-        // 2) If de-accented already exists or no change, drop the unknown field to allow saving
-        delete fields[unknown];
+        if (!candidates.length) return false;
+        candidates.forEach((k) => delete fields[k]);
+        console.warn('⚠️ Campo no válido eliminado automáticamente:', unknown, '=>', candidates);
         return true;
     };
 
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 10; attempt++) {
         const res = await fetch('/.netlify/functions/airtable-proxy', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -6563,8 +6578,7 @@ async function airtableProxyRequest(payload) {
 
         const msg = (data && (data.error || data.message)) ? (data.error || data.message) : rawText;
 
-        // Auto-fix: retry if Airtable complains about an unknown field name
-        if (res.status === 422 && attempt < 2 && tryFixUnknownField(msg)) {
+        if (res.status === 422 && attempt < 9 && removeUnknownFieldVariant(msg)) {
             continue;
         }
 
