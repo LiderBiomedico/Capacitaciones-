@@ -1794,11 +1794,19 @@ overflow: hidden;
                     <h3><i class="fas fa-graduation-cap"></i> Seleccionar Capacitación</h3>
                     <p style="color: #1a1a1a; margin-bottom: 1rem;">Selecciona una capacitación para ver el listado de participantes y sus calificaciones</p>
                     
-                    <div class="form-group">
-                        <label><i class="fas fa-list"></i> Capacitación</label>
-                        <select id="reportTrainingSelect" onchange="loadTrainingReport()">
-                            <option value="">-- Selecciona una capacitación --</option>
-                        </select>
+                    <div style="display: flex; gap: 0.75rem; align-items: flex-end; flex-wrap: wrap;">
+                        <div class="form-group" style="flex: 1; min-width: 220px; margin-bottom: 0;">
+                            <label><i class="fas fa-list"></i> Capacitación</label>
+                            <select id="reportTrainingSelect" onchange="loadTrainingReport()">
+                                <option value="">-- Selecciona una capacitación --</option>
+                            </select>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-start;">
+                            <button id="btnRefreshReport" class="btn btn-primary" onclick="refreshTrainingReport()" style="margin: 0; white-space: nowrap;" disabled>
+                                <i class="fas fa-sync-alt" id="refreshIcon"></i> Actualizar Datos
+                            </button>
+                            <span id="reportLastUpdated" style="font-size: 0.78rem; color: #6b7280; padding-left: 2px;"></span>
+                        </div>
                     </div>
                 </div>
                 
@@ -2599,27 +2607,10 @@ overflow: hidden;
             const name = document.getElementById('participantName').value.trim();
             const department = document.getElementById('participantDepartment').value;
             const profession = document.getElementById('participantProfession') ? document.getElementById('participantProfession').value : '';
-            
-            if (!name) {
-                Swal.fire({ icon: 'warning', title: 'Nombre Requerido', text: 'Por favor ingresa tu nombre completo', confirmButtonText: 'Entendido' });
-                return;
-            }
-            if (!department) {
-                Swal.fire({ icon: 'warning', title: 'Departamento Requerido', text: 'Por favor selecciona tu departamento/servicio', confirmButtonText: 'Entendido' });
-                return;
-            }
-            if (!profession) {
-                Swal.fire({ icon: 'warning', title: 'Profesión Requerida', text: 'Por favor selecciona tu profesión o cargo', confirmButtonText: 'Entendido' });
-                return;
-            }
-            
-            currentParticipantData = {
-                name: name,
-                department: department,
-                profession: profession,
-                accessCode: currentAccessCode
-            };
-            
+            if (!name) { Swal.fire({ icon: 'warning', title: 'Nombre Requerido', text: 'Por favor ingresa tu nombre completo', confirmButtonText: 'Entendido' }); return; }
+            if (!department) { Swal.fire({ icon: 'warning', title: 'Departamento Requerido', text: 'Por favor selecciona tu departamento/servicio', confirmButtonText: 'Entendido' }); return; }
+            if (!profession) { Swal.fire({ icon: 'warning', title: 'Profesión Requerida', text: 'Por favor selecciona tu profesión o cargo', confirmButtonText: 'Entendido' }); return; }
+            currentParticipantData = { name, department, profession, accessCode: currentAccessCode };
             closeParticipantModal();
             loadAndDisplayPretest();
         }
@@ -4157,23 +4148,18 @@ async function sendTrainingToAirtable(trainingData) {
         console.log('📤 Enviando capacitación a Airtable...');
         console.log('Datos originales:', trainingData);
 
-        const _f = {
-            "Título":           trainingData.title      || '',
-            "Código de Acceso": trainingData.accessCode || '',
-            "Estado":           trainingData.status     || 'active'
-        };
-        if (trainingData.trainingDate) _f["Fecha Creación"]              = trainingData.trainingDate;
-        if (trainingData.department)   _f["ProcesoAtencion"]             = trainingData.department;
-        if (trainingData.description)  _f["Objetivo"]                    = trainingData.description;
-        if (trainingData.duration)     _f["Duración"]                    = trainingData.duration;
-        if (trainingData.expositor)    _f["Expositor"]                   = trainingData.expositor;
-        if (trainingData.referente)    _f["Referente de Capacitaciones"] = trainingData.referente;
-        if (trainingData.methodology)  _f["Metodología"]                 = trainingData.methodology;
-        if (trainingData.place)        _f["Lugar"]                       = trainingData.place;
-        if (trainingData.eventDate)    _f["Fecha de la capacitación"]    = trainingData.eventDate;
-        if (trainingData.staffList && trainingData.staffList.length > 0)
-            _f["Dirigido a"] = trainingData.staffList;
-        const airtableRecord = { fields: _f };
+        const _f={"Título":trainingData.title||'',"Código de Acceso":trainingData.accessCode||'',"Estado":trainingData.status||'active'};
+        if(trainingData.trainingDate)_f["Fecha Creación"]=trainingData.trainingDate;
+        if(trainingData.department)_f["ProcesoAtencion"]=trainingData.department;
+        if(trainingData.description)_f["Objetivo"]=trainingData.description;
+        if(trainingData.duration)_f["Duración"]=trainingData.duration;
+        if(trainingData.expositor)_f["Expositor"]=trainingData.expositor;
+        if(trainingData.referente)_f["Referente de Capacitaciones"]=trainingData.referente;
+        if(trainingData.methodology)_f["Metodología"]=trainingData.methodology;
+        if(trainingData.place)_f["Lugar"]=trainingData.place;
+        if(trainingData.eventDate)_f["Fecha de la capacitación"]=trainingData.eventDate;
+        if(trainingData.staffList&&trainingData.staffList.length>0)_f["Dirigido a"]=trainingData.staffList;
+        const airtableRecord={fields:_f};
 
         console.log('📋 Record a enviar:', JSON.stringify(airtableRecord, null, 2));
 
@@ -4281,15 +4267,10 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
         function showQRCode(accessCode, title) {
             const qrContainer = document.getElementById('qrCode');
-            if (!qrContainer) { console.error('No se encontró qrCode'); return; }
+            if (!qrContainer) return;
             qrContainer.innerHTML = '';
-            const baseUrl = window.location.origin + window.location.pathname;
-            const accessUrl = `${baseUrl}?code=${accessCode}`;
-            new QRCode(qrContainer, {
-                text: accessUrl, width: 300, height: 300,
-                colorDark: '#000000', colorLight: '#ffffff',
-                correctLevel: QRCode.CorrectLevel.H
-            });
+            const accessUrl = (window.location.origin + window.location.pathname) + '?code=' + accessCode;
+            new QRCode(qrContainer, { text: accessUrl, width: 300, height: 300, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
             const qrUrlInput = document.getElementById('qrUrl');
             if (qrUrlInput) qrUrlInput.value = accessUrl;
             window.currentQRData = { url: accessUrl, code: accessCode, title: title || '' };
@@ -4622,19 +4603,24 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 
                 const fields = training.fields;
                 
-                // Cargar preguntas de la capacitación
+                // Cargar preguntas filtrando por ID de la capacitación (campo link)
                 const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         method: 'GET',
-                        path: `/Preguntas?filterByFormula=SEARCH("${trainingId}",{Capacitacion (from Capacitación)})`,
+                        path: `/Preguntas?filterByFormula=SEARCH("${trainingId}",ARRAYJOIN({Capacitación}))`,
                         body: null
                     })
                 });
                 
                 const questionsData = await questionsResponse.json();
-                const questions = questionsData.success ? questionsData.records : [];
+                console.log('📋 Preguntas:', questionsData);
+                const allQuestions = questionsData.success ? (questionsData.records || []) : [];
+                const pretestQs = allQuestions.filter(q => (q.fields['Tipo']||'').toLowerCase().includes('pre'));
+                const posttestQs = allQuestions.filter(q => (q.fields['Tipo']||'').toLowerCase().includes('pos'));
+                const questions = allQuestions;
+                console.log(`✅ Pretest: ${pretestQs.length}, Postest: ${posttestQs.length}`);
                 
                 // Renderizar detalles
                 const detailsBody = document.getElementById('detailsBody');
@@ -4658,7 +4644,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     </div>
                     
                     <div class="details-section">
-                        <h3><i class="fas fa-question-circle"></i> Preguntas (${questions.length} total)</h3>
+                        <h3><i class="fas fa-question-circle"></i> Preguntas (${pretestQs.length} Pretest · ${posttestQs.length} Postest · ${questions.length} total)</h3>
                         ${questions.length > 0 ? `
                             <div class="questions-list">
                                 ${questions.map((q, index) => {
@@ -7458,13 +7444,35 @@ function makeCronogramaFilterFormula(year, tipo) {
         // CARGAR REPORTE DE UNA CAPACITACIÓN
         // ═════════════════════════════════════════════════════════════════
 
-        async function loadTrainingReport() {
+        // ═════════════════════════════════════════════════════════════════
+        // ACTUALIZAR REPORTE (REFRESH)
+        // ═════════════════════════════════════════════════════════════════
+
+        async function refreshTrainingReport() {
+            const trainingId = document.getElementById('reportTrainingSelect').value;
+            if (!trainingId) return;
+
+            const icon = document.getElementById('refreshIcon');
+            const btn = document.getElementById('btnRefreshReport');
+            if (icon) icon.classList.add('fa-spin');
+            if (btn) btn.disabled = true;
+
+            try {
+                await loadTrainingReport(true);
+            } finally {
+                if (icon) icon.classList.remove('fa-spin');
+                if (btn) btn.disabled = false;
+            }
+        }
+
+        async function loadTrainingReport(isRefresh = false) {
             const trainingId = document.getElementById('reportTrainingSelect').value;
             
             // Elementos del DOM
             const reportContainer = document.getElementById('reportContainer');
             const reportLoading = document.getElementById('reportLoading');
             const reportInitialMessage = document.getElementById('reportInitialMessage');
+            const btnRefresh = document.getElementById('btnRefreshReport');
             
             if (!trainingId) {
                 // Mostrar mensaje inicial
@@ -7472,14 +7480,19 @@ function makeCronogramaFilterFormula(year, tipo) {
                 reportLoading.style.display = 'none';
                 reportInitialMessage.style.display = 'block';
                 currentReportData = null;
+                if (btnRefresh) btnRefresh.disabled = true;
+                document.getElementById('reportLastUpdated').textContent = '';
                 return;
             }
+
+            // Habilitar botón refresh
+            if (btnRefresh) btnRefresh.disabled = false;
             
             try {
                 // Mostrar loading
-                reportContainer.style.display = 'none';
+                if (!isRefresh) reportContainer.style.display = 'none';
                 reportInitialMessage.style.display = 'none';
-                reportLoading.style.display = 'block';
+                if (!isRefresh) reportLoading.style.display = 'block';
                 
                 console.log('📊 Cargando reporte para capacitación:', trainingId);
                 
@@ -7539,6 +7552,12 @@ function makeCronogramaFilterFormula(year, tipo) {
                 // Actualizar acciones de la capacitación
                 updateTrainingActions(data.training);
                 
+                // Mostrar timestamp de última actualización
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const lastUpdatedEl = document.getElementById('reportLastUpdated');
+                if (lastUpdatedEl) lastUpdatedEl.textContent = `Actualizado: ${timeStr}`;
+
                 // Mostrar contenedor
                 reportLoading.style.display = 'none';
                 reportContainer.style.display = 'block';
