@@ -2588,14 +2588,11 @@ overflow: hidden;
                     didOpen: () => Swal.showLoading()
                 });
                 
-                // Buscar directamente en Capacitaciones por "Código de Acceso"
                 const allResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ method: 'GET', path: '/Capacitaciones' })
                 });
                 const allData = await allResponse.json();
-                console.log('📋 Capacitaciones:', allData.records?.length || 0);
                 if (!allData.success || !allData.records) throw new Error('No se pudo conectar con Airtable');
                 const training = allData.records.find(r => {
                     const c = (r.fields['Código de Acceso'] || r.fields['Código Acceso'] || '').toUpperCase().trim();
@@ -2606,7 +2603,6 @@ overflow: hidden;
                     Swal.fire({ icon: 'error', title: 'Código Inválido', text: 'El código "' + code + '" no existe o la capacitación no está activa.' });
                     return;
                 }
-                console.log('✅ Capacitación encontrada:', training.id, training.fields['Título']);
                 currentAccessCode = code;
                 currentTrainingRecord = { id: training.id, fields: training.fields };
                 Swal.close();
@@ -4251,7 +4247,6 @@ async function sendTrainingToAirtable(trainingData) {
         console.log('📤 Enviando capacitación a Airtable...');
         console.log('Datos originales:', trainingData);
 
-        // Campos con nombres EXACTOS de Airtable
         const _f = {
             "Título":           trainingData.title      || '',
             "Código de Acceso": trainingData.accessCode || '',
@@ -4318,11 +4313,11 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             return true;
         }
 
-        // Convertir las preguntas al formato de Airtable (campos exactos de la tabla Preguntas)
+        // Campos EXACTOS de la tabla Preguntas en Airtable
         const records = questions.map(q => ({
             fields: {
                 "Capacitación":      [trainingRecordId],
-                "Tipo":              type === 'pretest' ? 'Pretest' : 'Postest',
+                "Tipo Examen":       type === 'pretest' ? 'Pretest' : 'Posttest',
                 "Pregunta":          q.question,
                 "Opción A":          q.options.a,
                 "Opción B":          q.options.b,
