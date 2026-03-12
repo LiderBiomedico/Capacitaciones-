@@ -2904,6 +2904,9 @@ overflow: hidden;
                 console.log('👤 Participante:', currentParticipantData);
                 console.log('📋 Respuestas:', pretestAnswers);
                 
+                // Limpiar caché de campos para obtener info fresca de Airtable
+                delete airtableFieldCache['/Participaciones'];
+                
                 // ==========================================
                 // PASO 1: Usar la capacitación actual (ya validada al ingresar el código)
                 // ==========================================
@@ -3012,16 +3015,25 @@ overflow: hidden;
                 assignIfDetected(participationFields, participationFieldKeys, ['Nombre Completo', 'Nombre'], currentParticipantData.name);
                 assignIfDetected(participationFields, participationFieldKeys, ['Servicio', 'Departamento'], currentParticipantData.department);
                 assignIfDetected(participationFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.profession || '').trim());
-                assignIfDetected(participationFields, participationFieldKeys, ['Pretest Score', 'Pre-test Score'], pretestScore);
+                assignIfDetected(participationFields, participationFieldKeys, ['Pretest Score', 'Pre-test Score', 'Puntuación Pretest', 'Puntuacion Pretest'], pretestScore);
                 assignIfDetected(participationFields, participationFieldKeys, ['Fecha de Inicio', 'Fecha Inicio', 'Fecha'], fechaFormato);
-                assignIfDetected(participationFields, participationFieldKeys, ['Completado Pretest', 'Completado Pre-Test'], true);
+                assignIfDetected(participationFields, participationFieldKeys, ['Completado Pretest', 'Completado Pre-Test', 'Completado Pre Test'], true);
                 assignIfDetected(participationFields, participationFieldKeys, ['Código Acceso', 'Código de Acceso'], (currentAccessCode || '').trim());
                 // Vincular a la Capacitación (campo de linked records)
                 assignIfDetected(participationFields, participationFieldKeys, ['Capacitación', 'Capacitacion', 'Sesión', 'Sesion'], [currentSession.id]);
 
+                // Fallback: garantizar campos críticos aunque la detección falle
                 if (!Object.keys(participationFields).length) {
                     participationFields['Nombre Completo'] = currentParticipantData.name;
                 }
+                // Asegurar Pretest Score y Completado Pretest con nombres exactos
+                if (!('Pretest Score' in participationFields) && !('Pre-test Score' in participationFields)) {
+                    participationFields['Pretest Score'] = pretestScore;
+                }
+                if (!('Completado Pretest' in participationFields) && !('Completado Pre-Test' in participationFields)) {
+                    participationFields['Completado Pretest'] = true;
+                }
+                console.log('📤 Creando participación con campos:', JSON.stringify(participationFields));
 
                 const participationData = { fields: participationFields };
                 
@@ -3049,6 +3061,10 @@ overflow: hidden;
                 // ==========================================
                 // PASO 5: Guardar respuestas individuales (opcional)
                 // ==========================================
+                
+                // IMPORTANTE: Guardar el ID globalmente AHORA, antes del Swal
+                currentParticipationId = participationResult.id;
+                currentSessionId = currentSession.id;
                 
                 const participationId = participationResult.id;
                 
@@ -3496,13 +3512,33 @@ overflow: hidden;
                 const horaFormato = `${hours}:${minutes}:${seconds}`;
                 const fechaHoraCompleta = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
                 
+                // Limpiar caché para obtener campos frescos (incluidos Post-test Score, Completado Posttest)
+                delete airtableFieldCache['/Participaciones'];
                 const participationFieldKeys = await getTableFieldKeys('/Participaciones');
                 const updateFields = {};
 
-                assignIfDetected(updateFields, participationFieldKeys, ['Post-test Score', 'Posttest Score'], postestScore);
-                assignIfDetected(updateFields, participationFieldKeys, ['Fecha Fin', 'Fecha Final', 'Fecha de Finalización', 'Fecha Finalización'], fechaFormato);
-                assignIfDetected(updateFields, participationFieldKeys, ['Completado Posttest', 'Completado Post-Test'], true);
+                assignIfDetected(updateFields, participationFieldKeys, ['Post-test Score', 'Posttest Score', 'Puntuación Posttest', 'Puntuacion Posttest'], postestScore);
+                assignIfDetected(updateFields, participationFieldKeys, ['Fecha Fin', 'Fecha Final', 'Fecha de Finalización', 'Fecha Finalización', 'Fecha de Fin'], fechaFormato);
+                assignIfDetected(updateFields, participationFieldKeys, ['Completado Posttest', 'Completado Post-Test', 'Completado Post Test'], true);
                 assignIfDetected(updateFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.profession || '').trim());
+                // Vincular Capacitación si el campo existe
+                if (currentTrainingRecord && currentTrainingRecord.id) {
+                    assignIfDetected(updateFields, participationFieldKeys, ['Capacitación', 'Capacitacion'], [currentTrainingRecord.id]);
+                }
+
+                // Fallback: si assignIfDetected no encontró los campos, forzar con nombres exactos vistos en Airtable
+                if (!('Post-test Score' in updateFields) && !('Posttest Score' in updateFields)) {
+                    updateFields['Post-test Score'] = postestScore;
+                }
+                if (!('Completado Posttest' in updateFields) && !('Completado Post-Test' in updateFields)) {
+                    updateFields['Completado Posttest'] = true;
+                }
+
+                console.log('📤 Actualizando participación con campos:', JSON.stringify(updateFields));
+
+                if (!currentParticipationId) {
+                    throw new Error('No se encontró el ID de participación. Por favor vuelve a realizar el pretest.');
+                }
 
                 const updateParticipationData = await airtableProxyRequest({
                     method: 'PATCH',
