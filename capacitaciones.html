@@ -2458,9 +2458,9 @@ overflow: hidden;
             </div>
             
             <div class="form-group">
-                <label><i class="fas fa-hospital"></i> Servicio Médico (Departamento) *</label>
+                <label><i class="fas fa-hospital"></i> Servicio *</label>
                 <select id="participantDepartment" required>
-                    <option value="">Seleccione su departamento...</option>
+                    <option value="">Seleccione su servicio...</option>
                     <option value="General">General</option>
                     <option value="Enfermería">Enfermería</option>
                     <option value="Medicina">Medicina</option>
@@ -2472,23 +2472,6 @@ overflow: hidden;
                     <option value="Quirófano">Quirófano</option>
                     <option value="Pediatría">Pediatría</option>
                     <option value="Otro">Otro</option>
-                </select>
-            </div>
-
-            <div class="form-group">
-                <label><i class="fas fa-user-md"></i> Profesión / Cargo *</label>
-                <select id="participantProfession" required>
-                    <option value="">Seleccione su profesión...</option>
-                    <option value="Jefe de enfermería">Jefe de enfermería</option>
-                    <option value="medico general">Médico general</option>
-                    <option value="medico especialista">Médico especialista</option>
-                    <option value="Ingeniero biomédico">Ingeniero biomédico</option>
-                    <option value="Estudiante">Estudiante</option>
-                    <option value="Auxiliar de enfermería">Auxiliar de enfermería</option>
-                    <option value="Terapeuta respiratorio">Terapeuta respiratorio</option>
-                    <option value="Fisioterapeuta">Fisioterapeuta</option>
-                    <option value="Conductor">Conductor</option>
-                    <option value="Técnico de rx">Técnico de rx</option>
                 </select>
             </div>
             
@@ -2601,11 +2584,9 @@ overflow: hidden;
         async function proceedToPretest() {
             const name = document.getElementById('participantName').value.trim();
             const department = document.getElementById('participantDepartment').value;
-            const profession = document.getElementById('participantProfession') ? document.getElementById('participantProfession').value : '';
             if (!name) { Swal.fire({ icon: 'warning', title: 'Nombre Requerido', text: 'Por favor ingresa tu nombre completo', confirmButtonText: 'Entendido' }); return; }
-            if (!department) { Swal.fire({ icon: 'warning', title: 'Departamento Requerido', text: 'Por favor selecciona tu departamento/servicio', confirmButtonText: 'Entendido' }); return; }
-            if (!profession) { Swal.fire({ icon: 'warning', title: 'Profesión Requerida', text: 'Por favor selecciona tu profesión o cargo', confirmButtonText: 'Entendido' }); return; }
-            currentParticipantData = { name, department, profession, accessCode: currentAccessCode };
+            if (!department) { Swal.fire({ icon: 'warning', title: 'Servicio Requerido', text: 'Por favor selecciona tu servicio', confirmButtonText: 'Entendido' }); return; }
+            currentParticipantData = { name, department, profession: '', accessCode: currentAccessCode };
             closeParticipantModal();
             loadAndDisplayPretest();
         }
@@ -2931,7 +2912,8 @@ overflow: hidden;
                         'Profesión': currentParticipantData.profession || '',
                         'Pretest Score': pretestScore,
                         'Fecha de Inicio': fechaFormato,
-                        'Completado Pretest': true
+                        'Completado Pretest': true,
+                        'Código de Acceso': currentAccessCode || ''
                     }
                 };
                 
@@ -3547,7 +3529,6 @@ overflow: hidden;
             document.getElementById('accessCode').value = '';
             document.getElementById('participantName').value = '';
             document.getElementById('participantDepartment').value = '';
-            if (document.getElementById('participantProfession')) document.getElementById('participantProfession').value = '';
             
             // Mostrar/ocultar secciones
             document.getElementById('accessSection').style.display = 'block';

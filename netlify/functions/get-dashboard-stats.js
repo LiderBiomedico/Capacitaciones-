@@ -1,254 +1,170 @@
 // netlify/functions/get-dashboard-stats.js
-// ═════════════════════════════════════════════════════════════════
-// Obtiene estadísticas globales para el Dashboard
-// Cuenta TODAS las participaciones de la base de datos
-// ═════════════════════════════════════════════════════════════════
+// Estadísticas globales para el Panel de Control
+// Adherencia = participantes que completaron el POSTTEST / total participantes
+// Usa https nativo de Node.js
 
-export async function handler(event) {
+const https = require('https');
+
+function airtableGet(baseId, apiKey, table, params = '') {
+  return new Promise((resolve, reject) => {
+    const path = `/v0/${baseId}/${encodeURIComponent(table)}${params}`;
+    const options = {
+      hostname: 'api.airtable.com',
+      port: 443,
+      path,
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${apiKey}` }
+    };
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', c => body += c);
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+        catch (e) { reject(new Error('JSON inválido: ' + body.slice(0, 200))); }
+      });
+    });
+    req.on('error', reject);
+    req.end();
+  });
+}
+
+async function fetchAllRecords(baseId, apiKey, table) {
+  const records = [];
+  let offset = null;
+  do {
+    let params = '?pageSize=100';
+    if (offset) params += '&offset=' + offset;
+    const { status, data } = await airtableGet(baseId, apiKey, table, params);
+    if (status !== 200) throw new Error(`Error ${status} en ${table}: ` + JSON.stringify(data).slice(0,200));
+    if (data.records) records.push(...data.records);
+    offset = data.offset || null;
+  } while (offset);
+  return records;
+}
+
+exports.handler = async (event) => {
   const headers = {
-    'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
+    'Content-Type': 'application/json'
   };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
+
+  const apiKey = process.env.AIRTABLE_API_KEY;
+  const baseId = process.env.AIRTABLE_BASE_ID;
+  if (!apiKey || !baseId) {
+    return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: 'Variables de entorno no configuradas' }) };
   }
 
   try {
-    const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-    const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+    // Obtener capacitaciones y participaciones en paralelo
+    const [capacitaciones, participaciones] = await Promise.all([
+      fetchAllRecords(baseId, apiKey, 'Capacitaciones'),
+      fetchAllRecords(baseId, apiKey, 'Participaciones')
+    ]);
 
-    if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
-      return {
-        statusCode: 500,
-        headers,
-        body: JSON.stringify({ 
-          success: false, 
-          error: 'Variables de entorno no configuradas' 
-        })
-      };
-    }
+    // ── Estadísticas de capacitaciones ──────────────────────────────────
+    const totalTrainings = capacitaciones.filter(c => {
+      const f = c.fields || {};
+      return f['Estado'] !== 'inactive' && f['Finalizada'] !== true;
+    }).length;
 
-    const baseUrl = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}`;
-    const authHeaders = {
-      'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-      'Content-Type': 'application/json'
-    };
+    // ── Estadísticas de participaciones ─────────────────────────────────
+    const totalParticipants = participaciones.length;
 
-    console.log('📊 Obteniendo estadísticas del dashboard...');
+    // Adherencia: % que completó el POSTTEST
+    // Un participante completó si:
+    //   - campo 'Estado' = 'Posttest Completado'
+    //   - O 'Puntuación Posttest' > 0
+    const completedPosttest = participaciones.filter(p => {
+      const f = p.fields || {};
+      const estado = String(f['Estado'] || '').toLowerCase();
+      const postScore = Number(f['Puntuación Posttest'] || f['Posttest Score'] || 0);
+      return estado.includes('posttest') || estado.includes('postest') || postScore > 0;
+    }).length;
 
-    // ═══════════════════════════════════════════════════════════
-    // PASO 1: Obtener todas las capacitaciones activas
-    // ═══════════════════════════════════════════════════════════
+    const adherenceRate = totalParticipants > 0
+      ? Math.round((completedPosttest / totalParticipants) * 100)
+      : 0;
 
-    let allTrainings = [];
-    let offset = null;
-
-    do {
-      const url = offset 
-        ? `${baseUrl}/Capacitaciones?pageSize=100&offset=${offset}`
-        : `${baseUrl}/Capacitaciones?pageSize=100`;
-      
-      const response = await fetch(url, { headers: authHeaders });
-      
-      if (response.ok) {
-        const data = await response.json();
-        allTrainings = allTrainings.concat(data.records || []);
-        offset = data.offset;
-      } else {
-        offset = null;
+    // Mejora promedio (solo de quienes completaron posttest)
+    let totalImprovement = 0;
+    let improvementCount = 0;
+    participaciones.forEach(p => {
+      const f = p.fields || {};
+      const pre  = Number(f['Pretest Score'] || f['Puntuación Pretest'] || 0);
+      const post = Number(f['Puntuación Posttest'] || f['Posttest Score'] || 0);
+      if (post > 0) {
+        totalImprovement += (post - pre);
+        improvementCount++;
       }
-    } while (offset);
-
-    const activeTrainings = allTrainings.filter(t => t.fields['Activa'] !== false);
-    console.log(`✅ Capacitaciones activas: ${activeTrainings.length}`);
-
-    // ═══════════════════════════════════════════════════════════
-    // PASO 2: Obtener TODAS las participaciones
-    // ═══════════════════════════════════════════════════════════
-
-    let allParticipations = [];
-    offset = null;
-
-    do {
-      const url = offset 
-        ? `${baseUrl}/Participaciones?pageSize=100&offset=${offset}`
-        : `${baseUrl}/Participaciones?pageSize=100`;
-      
-      const response = await fetch(url, { headers: authHeaders });
-      
-      if (response.ok) {
-        const data = await response.json();
-        allParticipations = allParticipations.concat(data.records || []);
-        offset = data.offset;
-      } else {
-        offset = null;
-      }
-    } while (offset);
-
-    console.log(`✅ Total participaciones: ${allParticipations.length}`);
-
-    // ═══════════════════════════════════════════════════════════
-    // PASO 3: Calcular estadísticas
-    // ═══════════════════════════════════════════════════════════
-
-    const totalParticipants = allParticipations.length;
-
-    // Extraer scores
-    const participantsWithScores = allParticipations.map(p => {
-      const fields = p.fields;
-      const pretestScore = 
-        fields['Pretest Score'] || 
-        fields['Puntuación Pretest'] || 
-        fields['PretestScore'] || 
-        0;
-      const postestScore = 
-        fields['Post-test Score'] || 
-        fields['Posttest Score'] ||
-        fields['Puntuación Posttest'] || 
-        fields['Puntuación Postest'] ||
-        0;
-      
-      return {
-        pretest: Number(pretestScore) || 0,
-        posttest: Number(postestScore) || 0
-      };
     });
-
-    // Completados = tienen posttest
-    const completedPosttest = participantsWithScores.filter(p => p.posttest > 0).length;
-
-    // Tasa de adherencia
-    const adherenceRate = totalParticipants > 0 
-      ? Math.round((completedPosttest / totalParticipants) * 100) 
+    const avgImprovement = improvementCount > 0
+      ? Math.round(totalImprovement / improvementCount)
       : 0;
 
-    // Promedios
-    const pretestScores = participantsWithScores.filter(p => p.pretest > 0).map(p => p.pretest);
-    const postestScores = participantsWithScores.filter(p => p.posttest > 0).map(p => p.posttest);
-
-    const avgPretest = pretestScores.length > 0 
-      ? Math.round(pretestScores.reduce((a, b) => a + b, 0) / pretestScores.length)
-      : 0;
-
-    const avgPosttest = postestScores.length > 0 
-      ? Math.round(postestScores.reduce((a, b) => a + b, 0) / postestScores.length)
-      : 0;
-
-    // Mejora promedio
-    const avgImprovement = avgPretest > 0 && avgPosttest > 0
-      ? Math.round(((avgPosttest - avgPretest) / avgPretest) * 100)
-      : 0;
-
-    // ═══════════════════════════════════════════════════════════
-    // PASO 4: Estadísticas por día (últimos 7 días)
-    // ═══════════════════════════════════════════════════════════
-
-    const today = new Date();
-    const last7Days = [];
-    const participationsByDay = [];
+    // ── Gráfico: participaciones por día (últimos 7 días) ────────────────
+    const now = new Date();
+    const dayLabels = [];
+    const dayData = [];
+    const dayNames = ['dom','lun','mar','mié','jue','vie','sáb'];
 
     for (let i = 6; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
-      last7Days.push(dateStr);
-      
-      // Contar participaciones de ese día
-      const count = allParticipations.filter(p => {
-        const fechaRegistro = p.fields['Fecha de Inicio'] || p.fields['Fecha Registro'] || p.fields['Fecha Inicio'] || '';
-        return fechaRegistro.startsWith(dateStr);
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0]; // YYYY-MM-DD
+      dayLabels.push(dayNames[d.getDay()]);
+
+      const count = participaciones.filter(p => {
+        const f = p.fields || {};
+        const fecha = String(f['Fecha de Inicio'] || f['Fecha Inicio'] || p.createdTime || '');
+        return fecha.startsWith(dateStr);
       }).length;
-      
-      participationsByDay.push(count);
+      dayData.push(count);
     }
 
-    // Nombres de días
-    const dayNames = last7Days.map(dateStr => {
-      const date = new Date(dateStr + 'T12:00:00');
-      return date.toLocaleDateString('es-ES', { weekday: 'short' });
-    });
-
-    // ═══════════════════════════════════════════════════════════
-    // PASO 5: Estadísticas por departamento
-    // ═══════════════════════════════════════════════════════════
-
-    const departmentStats = {};
-    
-    allParticipations.forEach(p => {
-      const dept = p.fields['Departamento'] || 'General';
-      const posttest = Number(p.fields['Post-test Score'] || p.fields['Puntuación Posttest'] || 0);
-      
-      if (!departmentStats[dept]) {
-        departmentStats[dept] = { total: 0, scores: [] };
-      }
-      
-      departmentStats[dept].total++;
-      if (posttest > 0) {
-        departmentStats[dept].scores.push(posttest);
+    // ── Gráfico: rendimiento por departamento ────────────────────────────
+    const deptMap = {};
+    participaciones.forEach(p => {
+      const f = p.fields || {};
+      const dept = f['Departamento'] || 'General';
+      const post = Number(f['Puntuación Posttest'] || f['Posttest Score'] || 0);
+      const pre  = Number(f['Pretest Score'] || f['Puntuación Pretest'] || 0);
+      const score = post > 0 ? post : pre;
+      if (!deptMap[dept]) deptMap[dept] = { total: 0, count: 0 };
+      if (score > 0) {
+        deptMap[dept].total += score;
+        deptMap[dept].count++;
       }
     });
 
-    // Convertir a arrays para el gráfico
-    const departments = Object.keys(departmentStats).slice(0, 5); // Top 5
-    const departmentScores = departments.map(dept => {
-      const scores = departmentStats[dept].scores;
-      return scores.length > 0 
-        ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length)
-        : 0;
-    });
-
-    // ═══════════════════════════════════════════════════════════
-    // RESPUESTA
-    // ═══════════════════════════════════════════════════════════
-
-    const response = {
-      success: true,
-      statistics: {
-        totalTrainings: activeTrainings.length,
-        totalParticipants,
-        completedPosttest,
-        adherenceRate,
-        avgPretest,
-        avgPosttest,
-        avgImprovement
-      },
-      charts: {
-        participationsByDay: {
-          labels: dayNames,
-          data: participationsByDay
-        },
-        departmentPerformance: {
-          labels: departments,
-          data: departmentScores
-        }
-      },
-      debug: {
-        totalCapacitaciones: allTrainings.length,
-        capacitacionesActivas: activeTrainings.length,
-        totalParticipaciones: allParticipations.length
-      }
-    };
-
-    console.log('✅ Estadísticas calculadas:', response.statistics);
+    const deptLabels = Object.keys(deptMap);
+    const deptData = deptLabels.map(d =>
+      deptMap[d].count > 0 ? Math.round(deptMap[d].total / deptMap[d].count) : 0
+    );
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify(response)
-    };
-
-  } catch (error) {
-    console.error('❌ Error en get-dashboard-stats:', error);
-    return {
-      statusCode: 500,
-      headers,
       body: JSON.stringify({
-        success: false,
-        error: error.message
+        success: true,
+        statistics: {
+          totalTrainings,
+          totalParticipants,
+          completedPosttest,
+          adherenceRate,
+          avgImprovement
+        },
+        charts: {
+          participationsByDay: { labels: dayLabels, data: dayData },
+          departmentPerformance: { labels: deptLabels, data: deptData }
+        }
       })
     };
+
+  } catch (err) {
+    console.error('❌ get-dashboard-stats:', err.message);
+    return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: err.message }) };
   }
-}
+};
