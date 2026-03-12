@@ -182,20 +182,20 @@
 
         .connection-indicator.connected {
             background: linear-gradient(135deg, #e8f5e9 0%, #f1f8e9 100%);
-            border-color: #1a1a1a;
-            color: #374151;
+            border-color: #F2FFFA;
+            color: #F2FFFA;
         }
 
         .connection-indicator.disconnected {
             background: linear-gradient(135deg, #ffebee 0%, #fce4ec 100%);
-            border-color: #e5e7eb;
-            color: #374151;
+            border-color: #F2FFFA;
+            color: #F2FFFA;
         }
 
         .connection-indicator.checking {
             background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
-            border-color: #e5e7eb;
-            color: #374151;
+            border-color: #F2FFFA;
+            color: #F2FFFA;
         }
 
         .connection-dot {
@@ -440,7 +440,7 @@
 
         .btn-remove {
             background: var(--danger);
-            color: #1a1a1a;
+            color: #F2FFFA;
             border: none;
             padding: 0.5rem 1rem;
             border-radius: 6px;
@@ -462,7 +462,6 @@
             resize: vertical;
             transition: all 0.3s;
             color: #1a1a1a;
-            background: #fff;
         }
 
         .question-text:focus {
@@ -740,6 +739,7 @@
             font-weight: 500;
             letter-spacing: 0.6px;
             text-shadow: 0 2px 10px rgba(15, 23, 42, 0.10);
+            color: #F6F7F2;
             color: #334155;
         }
 
@@ -1653,7 +1653,7 @@ overflow: hidden;
                                     </label>
                                 </div>
                             </div>
-                            <small class="help-text">Selecciona el personal al que va dirigida esta capacitación</small>
+                            <small style="color:#555;font-size:0.85rem;font-style:italic;display:block;margin-top:0.5rem;">Selecciona el personal al que va dirigida esta capacitación</small>
                         </div>
                     </form>
                 </div>
@@ -1717,7 +1717,7 @@ overflow: hidden;
                         <i class="fas fa-qrcode"></i> Código QR Generado
                     </h3>
                     
-                    <p style="color: #374151; margin-bottom: 1.5rem;">
+                    <p style="color: #1a1a1a; margin-bottom: 1.5rem;">
                         Captura este código QR o comparte el enlace con tu personal
                     </p>
                     
@@ -1771,7 +1771,7 @@ overflow: hidden;
                 <!-- Acceso con código -->
                 <div class="card" id="accessSection">
                     <h3><i class="fas fa-key"></i> Acceso a Capacitación</h3>
-                    <p style="color: #374151; margin-bottom: 1.5rem;">Ingresa el código de acceso que recibiste para acceder a la capacitación</p>
+                    <p style="color: #1a1a1a; margin-bottom: 1.5rem;">Ingresa el código de acceso que recibiste para acceder a la capacitación</p>
                     
                     <div class="form-group">
                         <label><i class="fas fa-barcode"></i> Código de Acceso *</label>
@@ -1844,7 +1844,7 @@ overflow: hidden;
                 <!-- Selector de Capacitación -->
                 <div class="card">
                     <h3><i class="fas fa-graduation-cap"></i> Seleccionar Capacitación</h3>
-                    <p style="color: #374151; margin-bottom: 1rem;">Selecciona una capacitación para ver el listado de participantes y sus calificaciones</p>
+                    <p style="color: #1a1a1a; margin-bottom: 1rem;">Selecciona una capacitación para ver el listado de participantes y sus calificaciones</p>
                     
                     <div class="form-group">
                         <label><i class="fas fa-list"></i> Capacitación</label>
@@ -1858,7 +1858,7 @@ overflow: hidden;
                 <!-- Reportes Trimestrales -->
                 <div class="card" style="margin-top: 1.25rem;">
                     <h3><i class="fas fa-calendar-check"></i> Reporte Trimestral (Estadística Global)</h3>
-                    <p style="color: #374151; margin-bottom: 1rem;">
+                    <p style="color: #1a1a1a; margin-bottom: 1rem;">
                         Genera un consolidado trimestral con estadísticas de capacitaciones y participantes (adherencia, desempeño, distribución por servicio/cargo/profesión, rankings y exportables).
                     </p>
 
@@ -1885,7 +1885,7 @@ overflow: hidden;
                                 <option value="onlyActive">Solo capacitaciones activas</option>
                                 <option value="onlyFinalized">Solo capacitaciones finalizadas</option>
                             </select>
-                            <small style="color:#555;">Nota: el trimestre se calcula por fecha de la capacitación (campo “Fecha”; si no existe, usa “Fecha Creación/Creado En”).</small>
+                            <small style="color:#1a1a1a;">Nota: el trimestre se calcula por fecha de la capacitación (campo “Fecha”; si no existe, usa “Fecha Creación/Creado En”).</small>
                         </div>
                     </div>
 
@@ -2233,7 +2233,7 @@ overflow: hidden;
                         </div>
                         
                         <!-- Mensaje cuando no hay participantes -->
-                        <div id="noParticipantsMessage" style="display: none; text-align: center; padding: 2rem; color: #374151;">
+                        <div id="noParticipantsMessage" style="display: none; text-align: center; padding: 2rem; color: #1a1a1a;">
                             <i class="fas fa-users" style="font-size: 3rem; opacity: 0.3; margin-bottom: 1rem;"></i>
                             <p>No hay participantes registrados en esta capacitación</p>
                         </div>
@@ -2274,7 +2274,7 @@ overflow: hidden;
 
                 <div class="card">
                     <h3><i class="fas fa-sliders-h"></i> Configuración</h3>
-                    <p style="color: #374151; margin-bottom: 1rem;">
+                    <p style="color: #1a1a1a; margin-bottom: 1rem;">
                         Genera un cronograma para un <strong>año completo</strong> usando las capacitaciones <strong>activas</strong> (no finalizadas)
                         registradas en el sistema.
                     </p>
@@ -2346,14 +2346,14 @@ overflow: hidden;
                         </button>
                     </div>
 
-                    <div style="margin-top: 0.75rem; color: #374151; font-size: 0.9em;">
+                    <div style="margin-top: 0.75rem; color: #1a1a1a; font-size: 0.9em;">
                         Consejo: si tienes más de 12 capacitaciones activas, se distribuirán en el año con múltiples eventos por mes.
                     </div>
                 </div>
 
                                 <div class="card" style="margin-top: 1.25rem;">
                     <h3><i class="fas fa-calendar-plus"></i> Capacitaciones individuales (fecha específica)</h3>
-                    <p style="color: #374151; margin-bottom: 1rem;">
+                    <p style="color: #1a1a1a; margin-bottom: 1rem;">
                         Agrega eventos puntuales con fecha y hora exactas. Se incluyen en <strong>Excel</strong>, <strong>.ICS</strong> e <strong>Impresión</strong>.
                     </p>
 
@@ -2361,7 +2361,7 @@ overflow: hidden;
                         <div class="form-group" style="margin:0; min-width: 260px; flex:1;">
                             <label><i class="fas fa-chalkboard-teacher"></i> Capacitación</label>
                             <select id="manualTrainingSelect"></select>
-                            <small style="color: #555;">Si no aparece, selecciona “Otra…” y escribe el nombre.</small>
+                            <small style="color: #1a1a1a;">Si no aparece, selecciona “Otra…” y escribe el nombre.</small>
                         </div>
 
                         <div class="form-group" style="margin:0; min-width: 240px; flex:1; display:none;" id="manualTrainingOtherWrap">
@@ -2404,7 +2404,7 @@ overflow: hidden;
                         </button>
                     </div>
 
-                    <div id="manualScheduleEmpty" style="margin-top: 1rem; color: #374151;">
+                    <div id="manualScheduleEmpty" style="margin-top: 1rem; color: #1a1a1a;">
                         Aún no has agregado eventos individuales.
                     </div>
 
@@ -2541,7 +2541,7 @@ overflow: hidden;
             <div class="details-header">
                 <div style="display: flex; justify-content: space-between; align-items: center;">
                     <h2 style="margin: 0;"><i class="fas fa-info-circle"></i> Detalles de Capacitación</h2>
-                    <button class="close" onclick="closeDetailsModal()" style="background: rgba(255,255,255,0.2); color: #1a1a1a; border: none; font-size: 2rem; cursor: pointer; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">&times;</button>
+                    <button class="close" onclick="closeDetailsModal()" style="background: rgba(255,255,255,0.2); color: #F2FFFA; border: none; font-size: 2rem; cursor: pointer; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">&times;</button>
                 </div>
             </div>
             <div class="details-body" id="detailsBody">
@@ -2848,7 +2848,7 @@ overflow: hidden;
             if (!questions || questions.length === 0) {
                 container.innerHTML = `
                     <div style="text-align: center; padding: 2rem; background: #fff3cd; border-radius: 8px; border: 2px solid #ffc107;">
-                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: var(--primary); margin-bottom: 1rem; display: block;"></i>
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #1a1a1a; margin-bottom: 1rem; display: block;"></i>
                         <p style="color: #1f2937; margin: 0; font-size: 1.1rem;">
                             <strong>⚠️ No hay preguntas de pretest configuradas</strong>
                         </p>
@@ -2902,7 +2902,7 @@ overflow: hidden;
                                         <strong style="color: var(--primary);">${option.letter})</strong> <span style="color: #1a1a1a;">${option.text}</span>
                                     </span>
                                 </label>
-                            `).join('') : '<p style="color: #374151; font-weight: bold;">⚠️ Sin opciones de respuesta</p>'}
+                            `).join('') : '<p style="color: #1a1a1a; font-weight: bold;">⚠️ Sin opciones de respuesta</p>'}
                         </div>
                     </div>
                 `;
@@ -3368,11 +3368,11 @@ overflow: hidden;
             if (!questions || questions.length === 0) {
                 container.innerHTML = `
                     <div style="text-align: center; padding: 2rem; background: #fff3cd; border-radius: 8px; border: 2px solid #ffc107;">
-                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: var(--primary); margin-bottom: 1rem; display: block;"></i>
-                        <p style="color: #374151; margin: 0; font-size: 1.1rem;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #1a1a1a; margin-bottom: 1rem; display: block;"></i>
+                        <p style="color: #1a1a1a; margin: 0; font-size: 1.1rem;">
                             <strong>⚠️ No hay preguntas de postest configuradas</strong>
                         </p>
-                        <p style="color: #374151; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+                        <p style="color: #1a1a1a; margin: 0.5rem 0 0 0; font-size: 0.9rem;">
                             En Airtable, crea preguntas con Tipo = "Postest" enlazadas a esta capacitación
                         </p>
                     </div>
@@ -3422,7 +3422,7 @@ overflow: hidden;
                                         <strong style="color: var(--primary);">${option.letter})</strong> <span style="color: #1a1a1a;">${option.text}</span>
                                     </span>
                                 </label>
-                            `).join('') : '<p style="color: #374151; font-weight: bold;">⚠️ Sin opciones de respuesta</p>'}
+                            `).join('') : '<p style="color: #1a1a1a; font-weight: bold;">⚠️ Sin opciones de respuesta</p>'}
                         </div>
                     </div>
                 `;
@@ -4135,45 +4135,62 @@ overflow: hidden;
 
         function collectQuestions(type) {
             const container = document.getElementById(`${type}Questions`);
+            if (!container) return [];
             const questionCards = container.querySelectorAll('.question-card');
+            if (questionCards.length === 0) return [];
+
+            const typeName = type === 'pretest' ? 'Pretest' : 'Post-test';
             const questions = [];
             
             for (let i = 0; i < questionCards.length; i++) {
                 const card = questionCards[i];
                 const questionId = card.id;
                 
-                const questionText = document.getElementById(`${questionId}-text`).value.trim();
+                // Texto de la pregunta
+                const textEl = document.getElementById(`${questionId}-text`);
+                const questionText = textEl ? textEl.value.trim() : '';
                 if (!questionText) {
                     Swal.fire({
                         icon: 'error',
                         title: 'Pregunta Vacía',
-                        text: `Complete la pregunta ${i + 1} del ${type === 'pretest' ? 'Pretest' : 'Post-test'}`,
+                        text: `Escribe el texto de la pregunta ${i + 1} del ${typeName}`,
+                        confirmButtonText: 'Entendido'
                     });
+                    if (textEl) textEl.focus();
                     return null;
                 }
                 
+                // Opciones
+                const elA = document.getElementById(`${questionId}-text-a`);
+                const elB = document.getElementById(`${questionId}-text-b`);
+                const elC = document.getElementById(`${questionId}-text-c`);
+                const elD = document.getElementById(`${questionId}-text-d`);
                 const options = {
-                    a: document.getElementById(`${questionId}-text-a`).value.trim(),
-                    b: document.getElementById(`${questionId}-text-b`).value.trim(),
-                    c: document.getElementById(`${questionId}-text-c`).value.trim(),
-                    d: document.getElementById(`${questionId}-text-d`).value.trim()
+                    a: elA ? elA.value.trim() : '',
+                    b: elB ? elB.value.trim() : '',
+                    c: elC ? elC.value.trim() : '',
+                    d: elD ? elD.value.trim() : ''
                 };
                 
                 if (!options.a || !options.b || !options.c || !options.d) {
+                    const missing = ['A','B','C','D'].filter((_,idx) => !Object.values(options)[idx]).join(', ');
                     Swal.fire({
                         icon: 'error',
                         title: 'Opciones Incompletas',
-                        text: `Complete todas las opciones de la pregunta ${i + 1}`,
+                        text: `Completa las opciones ${missing} de la pregunta ${i + 1} del ${typeName}`,
+                        confirmButtonText: 'Entendido'
                     });
                     return null;
                 }
                 
-                const correctAnswer = document.querySelector(`input[name="${questionId}-correct"]:checked`);
+                // Respuesta correcta
+                const correctAnswer = card.querySelector(`input[name="${questionId}-correct"]:checked`);
                 if (!correctAnswer) {
                     Swal.fire({
-                        icon: 'error',
-                        title: 'Respuesta Correcta',
-                        text: `Seleccione la respuesta correcta para la pregunta ${i + 1}`,
+                        icon: 'warning',
+                        title: 'Falta la respuesta correcta',
+                        text: `Marca cuál opción es la correcta en la pregunta ${i + 1} del ${typeName}`,
+                        confirmButtonText: 'Entendido'
                     });
                     return null;
                 }
@@ -4231,27 +4248,28 @@ function getSelectedStaff() {
         return;
     }
 
-    // NUEVO: Recopilar preguntas del pretest y postest
+    // Recopilar y validar preguntas del pretest
     const pretestQuestions = collectQuestions('pretest');
-    const postestQuestions = collectQuestions('postest');
-    
-    // Validar que hay al menos algunas preguntas
-    if (!pretestQuestions || pretestQuestions.length === 0) {
+    if (pretestQuestions === null) return; // error interno ya mostrado por collectQuestions
+    if (pretestQuestions.length === 0) {
         Swal.fire({
             icon: 'warning',
             title: 'Sin Preguntas de Pretest',
-            text: 'Debes agregar al menos una pregunta al pretest',
+            text: 'Agrega al menos una pregunta al Pretest antes de guardar',
             confirmButtonText: 'Entendido'
         });
         document.getElementById('pretestQuestions').scrollIntoView({ behavior: 'smooth' });
         return;
     }
 
-    if (!postestQuestions || postestQuestions.length === 0) {
+    // Recopilar y validar preguntas del postest
+    const postestQuestions = collectQuestions('postest');
+    if (postestQuestions === null) return; // error interno ya mostrado por collectQuestions
+    if (postestQuestions.length === 0) {
         Swal.fire({
             icon: 'warning',
-            title: 'Sin Preguntas de Postest',
-            text: 'Debes agregar al menos una pregunta al post-test',
+            title: 'Sin Preguntas de Post-test',
+            text: 'Agrega al menos una pregunta al Post-test antes de guardar',
             confirmButtonText: 'Entendido'
         });
         document.getElementById('postestQuestions').scrollIntoView({ behavior: 'smooth' });
@@ -4365,7 +4383,7 @@ async function sendTrainingToAirtable(trainingData) {
         console.log('📤 Enviando capacitación a Airtable...');
         console.log('Datos originales:', trainingData);
 
-        // Campos exactos de Airtable — solo se incluyen si tienen valor
+        // Campos exactos de Airtable
         const _f = {
             "Título":           trainingData.title        || '',
             "Fecha":            trainingData.trainingDate || '',
@@ -8267,7 +8285,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                             <td rowspan="2" class="logo-cell" style="width: 15%; padding: 10px;">
                                 <div style="text-align: center;">
                                     <div style="width: 60px; height: 60px; margin: 0 auto; border: 2px solid #003087; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #003087 0%, #001a4d 100%);">
-                                        <span style="color: #1a1a1a; font-size: 24px;">⭐</span>
+                                        <span style="color: #F2FFFA; font-size: 24px;">⭐</span>
                                     </div>
                                     <div style="margin-top: 5px;">
                                         <strong style="font-size: 9pt; color: #1f2937;">REPÚBLICA DE COLOMBIA</strong><br>
