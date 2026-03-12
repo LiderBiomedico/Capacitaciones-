@@ -4204,7 +4204,7 @@ async function sendTrainingToAirtable(trainingData) {
         };
         if (trainingData.trainingDate) _f["Fecha Creación"]              = trainingData.trainingDate;
         if (trainingData.department)   _f["ProcesoAtencion"]             = trainingData.department;
-        if (trainingData.description)  _f["Objetivo"]                   = trainingData.description;  // campo se llama "Objetivo" en Airtable
+        if (trainingData.description)  _f["Objetivo"]                    = trainingData.description;
         if (trainingData.duration)     _f["Duración"]                    = trainingData.duration;
         if (trainingData.expositor)    _f["Expositor"]                   = trainingData.expositor;
         if (trainingData.referente)    _f["Referente de Capacitaciones"] = trainingData.referente;
@@ -4263,21 +4263,20 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             return true;
         }
 
-        // Campos exactos tabla Preguntas
-        const records = questions.map(q => {
-            const f = {
-                "Capacitación": [trainingRecordId],
-                "Tipo":         type === 'pretest' ? 'Pretest' : 'Postest',
-                "Número":       String(q.number),
-                "Pregunta":     q.question,
-                "Opción A":     q.options.a,
-                "Opción B":     q.options.b,
-                "Opción C":     q.options.c,
-                "Opción D":     q.options.d,
-                "Respuesta Correcta": q.correctAnswer.toUpperCase()
-            };
-            return { fields: f };
-        });
+        // Campos exactos de la tabla Preguntas en Airtable
+        // "Respuesta Correcta" es Select con opciones en minúscula: a, b, c, d
+        const records = questions.map(q => ({
+            fields: {
+                "Capacitación":       [trainingRecordId],
+                "Tipo":               type === 'pretest' ? 'Pretest' : 'Postest',
+                "Pregunta":           q.question,
+                "Opción A":           q.options.a,
+                "Opción B":           q.options.b,
+                "Opción C":           q.options.c,
+                "Opción D":           q.options.d,
+                "Respuesta Correcta": q.correctAnswer.toLowerCase()  // Select: opciones son a,b,c,d
+            }
+        }));
 
         console.log(`📋 Preguntas a guardar:`, records);
 
