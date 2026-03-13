@@ -1,5 +1,5 @@
 // /.netlify/functions/upload-attendance-pdf.js
-// Sube un PDF de lista de asistencia a Airtable como attachment
+// Sube PDF de lista de asistencia al campo 'Lista asistencia' de la tabla Sesiones
 // Variables de entorno: AIRTABLE_API_KEY, AIRTABLE_BASE_ID
 
 const https = require('https');
@@ -11,7 +11,6 @@ function airtableFetch(method, path, body) {
     const url = `https://api.airtable.com/v0/${BASE_ID}${path}`;
     const parsedUrl = new URL(url);
     const postData = body ? JSON.stringify(body) : null;
-
     const options = {
       hostname: parsedUrl.hostname,
       path: parsedUrl.pathname + parsedUrl.search,
@@ -19,13 +18,12 @@ function airtableFetch(method, path, body) {
       headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' }
     };
     if (postData) options.headers['Content-Length'] = Buffer.byteLength(postData);
-
     const req = https.request(options, (res) => {
       let data = '';
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
         try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
-        catch (e) { resolve({ status: res.statusCode, data: { error: data } }); }
+        catch (e) { resolve({ status: res.statusCode, data: { raw: data } }); }
       });
     });
     req.on('error', reject);
@@ -34,20 +32,15 @@ function airtableFetch(method, path, body) {
   });
 }
 
-// Sube el archivo a la Content API de Airtable y devuelve la URL
+// Sube el archivo binario a la Content API de Airtable
 function uploadToAirtableContent(fileBase64, fileName, mimeType) {
   return new Promise((resolve, reject) => {
     const API_KEY = process.env.AIRTABLE_API_KEY;
     const fileBuffer = Buffer.from(fileBase64, 'base64');
     const boundary = '----FormBoundary' + Date.now().toString(16);
-
-    const bodyParts = [
-      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`,
-      fileBuffer,
-      `\r\n--${boundary}--\r\n`
-    ];
-
-    const totalLength = bodyParts.reduce((sum, part) => sum + (typeof part === 'string' ? Buffer.byteLength(part) : part.length), 0);
+    const headerPart = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
+    const footerPart = `\r\n--${boundary}--\r\n`;
+    const totalLength = Buffer.byteLength(headerPart) + fileBuffer.length + Buffer.byteLength(footerPart);
 
     const options = {
       hostname: 'content.airtable.com',
@@ -69,11 +62,9 @@ function uploadToAirtableContent(fileBase64, fileName, mimeType) {
       });
     });
     req.on('error', reject);
-
-    bodyParts.forEach(part => {
-      if (typeof part === 'string') req.write(part);
-      else req.write(part);
-    });
+    req.write(headerPart);
+    req.write(fileBuffer);
+    req.write(footerPart);
     req.end();
   });
 }
@@ -98,7 +89,6 @@ exports.handler = async (event) => {
       return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'trainingId, fileName y fileBase64 son requeridos' }) };
     }
 
-    // Verificar tamaño (4MB en base64 ≈ 5.3MB)
     const fileSizeBytes = Buffer.byteLength(fileBase64, 'base64');
     if (fileSizeBytes > 5 * 1024 * 1024) {
       return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'El archivo supera el límite de 5MB' }) };
@@ -107,37 +97,72 @@ exports.handler = async (event) => {
     const safeFileName = fileName || 'lista_asistencia.pdf';
     const safeMimeType = mimeType || 'application/pdf';
 
-    // Intentar usar la Content API de Airtable para subir el archivo
-    // Si falla, usar URL de datos directamente en el campo attachment
-    let attachmentFields;
+    // ── Buscar la sesión vinculada a esta capacitación ──────────────────────
+    // Traer todas las sesiones y filtrar en JS (ARRAYJOIN devuelve nombres, no IDs)
+    const BASE_ID = process.env.AIRTABLE_BASE_ID;
+    const sesRes = await airtableFetch('GET', `/Sesiones?pageSize=100`);
+    const allSessions = sesRes.data?.records || [];
+
+    let targetId = null;  // ID del registro donde se guardará el PDF
+    let targetTable = 'Sesiones';
+
+    // Buscar sesión cuyo campo 'Capacitaciones' incluya el trainingId
+    const matchingSession = allSessions.find(s => {
+      const capLinked = s.fields?.['Capacitaciones'] || s.fields?.['Capacitación'] || s.fields?.['Capacitacion'] || [];
+      return Array.isArray(capLinked) && capLinked.includes(trainingId);
+    });
+
+    if (matchingSession) {
+      targetId = matchingSession.id;
+      console.log(`✅ Sesión encontrada: ${targetId}`);
+    } else {
+      // Fallback: guardar directamente en la Capacitación si no hay sesión
+      targetId = trainingId;
+      targetTable = 'Capacitaciones';
+      console.warn('⚠️ No se encontró sesión vinculada, guardando en Capacitaciones');
+    }
+
+    // ── Subir el archivo ─────────────────────────────────────────────────────
+    let attachmentValue;
 
     try {
       const uploadResult = await uploadToAirtableContent(fileBase64, safeFileName, safeMimeType);
       if (uploadResult.status === 200 && uploadResult.data?.uploadedFiles?.[0]?.url) {
         const fileUrl = uploadResult.data.uploadedFiles[0].url;
-        attachmentFields = { 'Lista de Asistencia': [{ url: fileUrl, filename: safeFileName }] };
+        attachmentValue = [{ url: fileUrl, filename: safeFileName }];
+        console.log('✅ Subido via Content API');
       } else {
-        throw new Error('Upload API no disponible');
+        throw new Error(`Content API status ${uploadResult.status}: ${JSON.stringify(uploadResult.data)}`);
       }
     } catch (uploadErr) {
-      // Fallback: guardar como data URL directamente
-      console.warn('⚠️ Content API no disponible, usando data URL:', uploadErr.message);
+      // Fallback: data URL (funciona para archivos pequeños en Airtable)
+      console.warn('⚠️ Content API falló, usando data URL:', uploadErr.message);
       const dataUrl = `data:${safeMimeType};base64,${fileBase64}`;
-      attachmentFields = { 'Lista de Asistencia': [{ url: dataUrl, filename: safeFileName }] };
+      attachmentValue = [{ url: dataUrl, filename: safeFileName }];
     }
 
-    // Actualizar el registro de la capacitación con el attachment
-    const updateResult = await airtableFetch('PATCH', `/Capacitaciones/${trainingId}`, { fields: attachmentFields });
+    // ── Guardar en Airtable ──────────────────────────────────────────────────
+    const fieldName = targetTable === 'Sesiones' ? 'Lista asistencia' : 'Lista de Asistencia';
+    const updateResult = await airtableFetch(
+      'PATCH',
+      `/${targetTable}/${targetId}`,
+      { fields: { [fieldName]: attachmentValue } }
+    );
 
     if (updateResult.status >= 400) {
       const errMsg = updateResult.data?.error?.message || updateResult.data?.error || `Error Airtable ${updateResult.status}`;
-      return { statusCode: updateResult.status, headers: corsHeaders, body: JSON.stringify({ success: false, error: errMsg }) };
+      return { statusCode: updateResult.status, headers: corsHeaders, body: JSON.stringify({ success: false, error: errMsg, detail: updateResult.data }) };
     }
 
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify({ success: true, message: 'PDF guardado correctamente', recordId: updateResult.data?.id })
+      body: JSON.stringify({
+        success: true,
+        message: `PDF guardado en ${targetTable}`,
+        recordId: updateResult.data?.id,
+        savedIn: targetTable
+      })
     };
 
   } catch (error) {
