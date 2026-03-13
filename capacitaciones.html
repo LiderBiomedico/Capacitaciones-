@@ -8016,7 +8016,6 @@ function makeCronogramaFilterFormula(year, tipo) {
                 const adherenceRate = total > 0 ? Math.round((completados / total) * 100) : 0;
                 const passRate = withPost.length > 0 ? Math.round(withPost.filter(p => p.postestScore >= 60).length / withPost.length * 100) : 0;
 
-                const tf = trainingRes?.fields || {};
                 const data = {
                     success: true,
                     training: {
