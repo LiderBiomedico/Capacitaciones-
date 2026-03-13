@@ -2019,6 +2019,7 @@ overflow: hidden;
 
 
                 <!-- Área del Reporte (oculta inicialmente) -->
+                <div id="reportFilterNote" style="display:none; background:#fff3cd; border:1px solid #ffc107; padding:10px 14px; border-radius:8px; margin-bottom:12px; font-size:13px; color:#856404;"></div>
                 <div id="reportDebugInfo" style="display:none; margin-bottom:12px;"></div>
                 <div id="reportContainer" style="display: none;">
                     
@@ -7951,32 +7952,40 @@ function makeCronogramaFilterFormula(year, tipo) {
                     return false;
                 });
 
-                console.log(`📊 Participaciones filtradas para la capacitación: ${partsFiltered.length}`);
+                // ── E4 FALLBACK: si no hay participaciones, filtrar por fecha de la capacitación ──
+                // Ocurre cuando las participaciones no tienen campo vinculado ni código de acceso
+                // (registros históricos sin metadatos de sesión)
                 if (partsFiltered.length === 0) {
-                    console.warn('⚠️ Sin participaciones. Debug info:');
-                    console.warn('   trainingId:', trainingId, '| código cap:', tf_codigo);
-                    console.warn('   sessionIds encontradas:', sessionIdsArr);
-                    console.warn('   sessionCodigos:', sessionCodigosArr);
-                    console.warn('   Total participaciones en BD:', allParts.length);
-                    // Mostrar info de diagnóstico visible en pantalla
-                    const dbgEl = document.getElementById('reportDebugInfo');
-                    if (dbgEl) {
-                        const sf0 = allParts.length > 0 ? allParts[0].fields || {} : {};
-                        dbgEl.innerHTML = `
-                            <div style="background:#fff3cd;border:1px solid #ffc107;padding:12px;border-radius:8px;margin-top:12px;font-size:13px;">
-                                <strong>⚠️ Debug: 0 participaciones encontradas</strong><br>
-                                <b>trainingId:</b> ${trainingId}<br>
-                                <b>Código capacitación:</b> ${tf_codigo || '(vacío)'}<br>
-                                <b>Sesiones encontradas:</b> ${sessionIdsArr.length} → IDs: [${sessionIdsArr.join(', ')}]<br>
-                                <b>Códigos sesiones:</b> [${sessionCodigosArr.join(', ')}]<br>
-                                <b>Total participaciones BD:</b> ${allParts.length}<br>
-                                ${allParts.length > 0 ? `<b>Campos participación muestra:</b> ${Object.keys(sf0).join(', ')}<br>
-                                <b>Código Acceso muestra:</b> ${sf0['Código Acceso'] || sf0['Código de Acceso'] || '(vacío)'}<br>
-                                <b>Linked muestra:</b> ${JSON.stringify(sf0['Capacitación'] || sf0['Sesión'] || '(vacío)')}` : ''}
-                            </div>`;
-                        dbgEl.style.display = 'block';
+                    const trainingDate = (tf['Fecha de la capacitación'] || tf['Fecha Creación'] || tf['Fecha'] || trainingRes?.createdTime || '').slice(0, 10);
+                    if (trainingDate) {
+                        const byDate = allParts.filter(p => {
+                            const pFecha = (p.fields?.['Fecha de Inicio'] || p.fields?.['Fecha Inicio'] || p.fields?.['Fecha'] || p.createdTime || '').slice(0, 10);
+                            return pFecha === trainingDate;
+                        });
+                        console.log(`📋 E4 fallback por fecha ${trainingDate}: ${byDate.length} participaciones`);
+                        if (byDate.length > 0) {
+                            partsFiltered.push(...byDate);
+                            window._reportFilterNote = `⚠️ Nota: este reporte incluye todas las participaciones del ${trainingDate} (sin vínculo directo a esta capacitación en Airtable).`;
+                        }
+                    }
+                } else {
+                    window._reportFilterNote = null;
+                }
+
+                console.log(`📊 Participaciones filtradas para la capacitación: ${partsFiltered.length}`);
+                // Mostrar nota de filtro si aplica E4
+                const noteEl = document.getElementById('reportFilterNote');
+                if (noteEl) {
+                    if (window._reportFilterNote) {
+                        noteEl.textContent = window._reportFilterNote;
+                        noteEl.style.display = 'block';
+                    } else {
+                        noteEl.style.display = 'none';
                     }
                 }
+                // El div de debug solo aparece si realmente no hay ninguna participación (ni por fecha)
+                const dbgEl = document.getElementById('reportDebugInfo');
+                if (dbgEl) dbgEl.style.display = 'none';
 
                 // ── Paso 5: Construir participantes ──────────────────────────────────────
                 const participants = partsFiltered.map(p => {
