@@ -2,8 +2,8 @@
  * upload-attendance-pdf.js
  * Sube PDF al campo "Lista de Asistencia" en la tabla Sesiones de Airtable.
  *
- * USA content.airtable.com con multipart/form-data — mismo método que
- * upload-pdf-attachment.js que ya funciona en el proyecto.
+ * Usa content.airtable.com con multipart/form-data — mismo método probado
+ * en upload-pdf-attachment.js. SIN encodeURIComponent en el nombre de tabla.
  */
 
 const https = require('https');
@@ -30,33 +30,43 @@ async function fetchAllRecords(baseId, table, token) {
   do {
     const params = new URLSearchParams({ pageSize: '100' });
     if (offset) params.set('offset', offset);
-    const data = await airtableFetch(`${AIRTABLE_API}/${baseId}/${encodeURIComponent(table)}?${params}`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const data = await airtableFetch(
+      `${AIRTABLE_API}/${baseId}/${encodeURIComponent(table)}?${params}`,
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
     records = records.concat(data.records || []);
     offset = data.offset || null;
   } while (offset);
   return records;
 }
 
-// Método probado: content.airtable.com + multipart/form-data
-function uploadToAirtableContent({ token, baseId, table, recordId, fieldName, fileName, fileBuffer, mimeType }) {
+// Igual que upload-pdf-attachment.js pero apuntando a Sesiones
+function subirMultipart({ token, baseId, recordId, fileName, fileBuffer, mimeType }) {
   return new Promise((resolve, reject) => {
     const boundary = '----FormBoundary' + Date.now().toString(16);
-    const before = Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`
+    // IMPORTANTE: nombre exacto del campo en Airtable, codificado para la URL
+    const fieldName        = 'Lista de Asistencia';
+    const encodedFieldName = encodeURIComponent(fieldName);
+
+    const beforeFile = Buffer.from(
+      `--${boundary}\r\n` +
+      `Content-Disposition: form-data; name="file"; filename="${fileName}"\r\n` +
+      `Content-Type: ${mimeType}\r\n\r\n`
     );
-    const after = Buffer.from(`\r\n--${boundary}--\r\n`);
-    const body = Buffer.concat([before, fileBuffer, after]);
+    const afterFile  = Buffer.from(`\r\n--${boundary}--\r\n`);
+    const bodyBuffer = Buffer.concat([beforeFile, fileBuffer, afterFile]);
+
+    // IMPORTANTE: tabla sin encodeURIComponent, igual que la función que funciona
+    const path = `/v0/${baseId}/Sesiones/${recordId}/uploadAttachment/${encodedFieldName}`;
 
     const req = https.request({
       hostname: 'content.airtable.com',
-      path: `/v0/${baseId}/${encodeURIComponent(table)}/${recordId}/uploadAttachment/${encodeURIComponent(fieldName)}`,
+      path,
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': `multipart/form-data; boundary=${boundary}`,
-        'Content-Length': body.length,
+        'Content-Length': bodyBuffer.length,
       },
     }, (res) => {
       let data = '';
@@ -67,21 +77,25 @@ function uploadToAirtableContent({ token, baseId, table, recordId, fieldName, fi
       });
     });
     req.on('error', reject);
-    req.write(body);
+    req.write(bodyBuffer);
     req.end();
   });
 }
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders(), body: '' };
-  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: corsHeaders(), body: JSON.stringify({ success: false, error: 'Método no permitido' }) };
+  if (event.httpMethod !== 'POST')    return { statusCode: 405, headers: corsHeaders(), body: JSON.stringify({ success: false, error: 'Método no permitido' }) };
 
   const token  = process.env.AIRTABLE_API_KEY || process.env.AIRTABLE_TOKEN;
   const baseId = process.env.AIRTABLE_BASE_ID;
-  if (!token || !baseId) return { statusCode: 500, headers: corsHeaders(), body: JSON.stringify({ success: false, error: 'Variables AIRTABLE_API_KEY y AIRTABLE_BASE_ID no configuradas.' }) };
+
+  if (!token || !baseId) return {
+    statusCode: 500, headers: corsHeaders(),
+    body: JSON.stringify({ success: false, error: 'Variables AIRTABLE_API_KEY y AIRTABLE_BASE_ID no configuradas.' }),
+  };
 
   let body;
-  try { body = JSON.parse(event.body || '{}'); }
+  try   { body = JSON.parse(event.body || '{}'); }
   catch { return { statusCode: 400, headers: corsHeaders(), body: JSON.stringify({ success: false, error: 'Body JSON inválido' }) }; }
 
   const { trainingId, trainingCode, sessionId, fileName, fileBase64, mimeType } = body;
@@ -91,7 +105,7 @@ exports.handler = async (event) => {
 
   // Paso 1: base64 → Buffer
   let fileBuffer;
-  try { fileBuffer = Buffer.from(fileBase64, 'base64'); }
+  try   { fileBuffer = Buffer.from(fileBase64, 'base64'); }
   catch { return { statusCode: 400, headers: corsHeaders(), body: JSON.stringify({ success: false, error: 'Base64 inválido.' }) }; }
 
   if (fileBuffer.length > 5 * 1024 * 1024) return {
@@ -104,12 +118,19 @@ exports.handler = async (event) => {
   // Paso 2: Encontrar sesión destino
   let sessionRecord = null, sessionFieldsList = [];
   try {
+    // Opción A: sessionId directo desde el selector (prioritario)
     if (sessionId) {
-      sessionRecord = await airtableFetch(`${AIRTABLE_API}/${baseId}/Sesiones/${sessionId}`, { headers: { Authorization: `Bearer ${token}` } });
+      sessionRecord = await airtableFetch(
+        `${AIRTABLE_API}/${baseId}/Sesiones/${sessionId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
     }
+
+    // Opción B: buscar por capacitación o código (fallback)
     if (!sessionRecord) {
       const all = await fetchAllRecords(baseId, 'Sesiones', token);
       sessionFieldsList = all.length > 0 ? Object.keys(all[0].fields || {}) : [];
+
       if (trainingId) {
         const linked = all.filter(s => {
           const cap = s.fields?.['Capacitaciones'] || s.fields?.['Capacitación'] || s.fields?.['Capacitacion'] || [];
@@ -120,9 +141,12 @@ exports.handler = async (event) => {
           sessionRecord = linked[0];
         }
       }
+
       if (!sessionRecord && trainingCode) {
         const code = trainingCode.toString().toUpperCase().trim();
-        sessionRecord = all.find(s => (s.fields?.['Código Acceso'] || s.fields?.['Código de Acceso'] || '').toString().toUpperCase().trim() === code) || null;
+        sessionRecord = all.find(s =>
+          (s.fields?.['Código Acceso'] || s.fields?.['Código de Acceso'] || '').toString().toUpperCase().trim() === code
+        ) || null;
       }
     }
   } catch (err) {
@@ -136,14 +160,19 @@ exports.handler = async (event) => {
 
   // Paso 3: Subir con content.airtable.com (multipart/form-data)
   try {
-    const result = await uploadToAirtableContent({
-      token, baseId, table: 'Sesiones', recordId: sessionRecord.id,
-      fieldName: 'Lista de Asistencia', fileName: safeFileName,
-      fileBuffer, mimeType: mimeType || 'application/pdf',
+    const result = await subirMultipart({
+      token, baseId,
+      recordId: sessionRecord.id,
+      fileName: safeFileName,
+      fileBuffer,
+      mimeType: mimeType || 'application/pdf',
     });
 
     if (result.status >= 200 && result.status < 300) {
-      return { statusCode: 200, headers: corsHeaders(), body: JSON.stringify({ success: true, sessionId: sessionRecord.id, fileName: safeFileName, message: 'PDF guardado correctamente.' }) };
+      return {
+        statusCode: 200, headers: corsHeaders(),
+        body: JSON.stringify({ success: true, sessionId: sessionRecord.id, fileName: safeFileName, message: 'PDF guardado correctamente en la sesión.' }),
+      };
     }
 
     const errMsg = typeof result.body === 'object'
