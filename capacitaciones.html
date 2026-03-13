@@ -5493,13 +5493,18 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const uniqueNames = new Set();
                 const byDeptMap = {};
 
+                const byCargoMap = {};
+                const byProfessionMap = {};
+
                 partsScoped.forEach(p => {
                     const f = p.fields || {};
                     const pre = parseFloat(f['Pretest Score'] || f['Pre-test Score'] || 0);
                     const post = parseFloat(f['Post-test Score'] || f['Posttest Score'] || 0);
                     const nombre = f['Nombre Completo'] || f['Nombre'] || '';
-                    const dept = f['Servicio'] || f['Departamento'] || 'Sin servicio';
+                    const dept = f['Departamento'] || f['Servicio'] || 'Sin servicio';
                     const completadoPost = !!(f['Completado Posttest'] || f['Completado Post-Test']);
+                    // Profesión viene del campo 'Profesión' (single select en Airtable)
+                    const profesion = f['Profesión'] || f['Profesion'] || f['Cargo'] || 'Sin especificar';
 
                     if (pre > 0) { sumPre += pre; countPre++; }
                     if (post > 0) { sumPost += post; countPost++; }
@@ -5510,7 +5515,20 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     byDeptMap[dept].count++;
                     if (pre > 0) { byDeptMap[dept].sumPre += pre; byDeptMap[dept].nPre++; }
                     if (post > 0) { byDeptMap[dept].sumPost += post; byDeptMap[dept].nPost++; }
+
+                    // Distribución por profesión
+                    byProfessionMap[profesion] = (byProfessionMap[profesion] || 0) + 1;
+                    // Cargo = misma profesión (en este sistema son el mismo campo)
+                    byCargoMap[profesion] = (byCargoMap[profesion] || 0) + 1;
                 });
+
+                // Convertir mapas a arrays ordenados [{name, count}]
+                const byProfessionArr = Object.entries(byProfessionMap)
+                    .map(([name, count]) => ({ name, count }))
+                    .sort((a, b) => b.count - a.count);
+                const byCargoArr = Object.entries(byCargoMap)
+                    .map(([name, count]) => ({ name, count }))
+                    .sort((a, b) => b.count - a.count);
 
                 const totalParts = partsScoped.length;
                 const avgPre = countPre > 0 ? Math.round(sumPre / countPre) : 0;
@@ -5572,7 +5590,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     },
                     trainings: trainingsWithStats,
                     topTrainingsByParticipants: topByParts,
-                    distributions: { byDept },
+                    distributions: { byDept, byCargo: byCargoArr, byProfession: byProfessionArr },
                     insights: []
                 };
 
@@ -5733,23 +5751,77 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 });
             }
 
-            // Cargo
+            // Paleta de colores para gráficas
+            const chartColors = ['rgba(102,126,234,0.85)', 'rgba(248,150,30,0.85)', 'rgba(217,65,244,0.85)', 'rgba(52,172,224,0.85)', 'rgba(46,125,50,0.85)', 'rgba(244,67,54,0.85)', 'rgba(76,175,80,0.85)', 'rgba(33,150,243,0.85)', 'rgba(255,193,7,0.85)', 'rgba(156,39,176,0.85)', 'rgba(96,125,139,0.85)'];
+            const getColors = (n) => Array.from({length: n}, (_, i) => chartColors[i % chartColors.length]);
+
+            // Cargo (doughnut con colores y porcentajes)
             const ctx2 = document.getElementById('qChartByCargo');
             if (ctx2) {
+                const totalCargo = byCargo.reduce((s, x) => s + safeNumber(x.count), 0);
                 quarterlyCharts.byCargo = new Chart(ctx2, {
                     type: 'doughnut',
-                    data: { labels: byCargo.map(x => x.name), datasets: [{ data: byCargo.map(x => safeNumber(x.count)) }] },
-                    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                    data: {
+                        labels: byCargo.map(x => x.name),
+                        datasets: [{
+                            data: byCargo.map(x => safeNumber(x.count)),
+                            backgroundColor: getColors(byCargo.length),
+                            borderWidth: 2,
+                            borderColor: '#fff'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 14 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => {
+                                        const pct = totalCargo > 0 ? Math.round(ctx.parsed / totalCargo * 100) : 0;
+                                        return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+                                    }
+                                }
+                            }
+                        }
+                    }
                 });
             }
 
-            // Profession
+            // Profesión (bar horizontal para mejor legibilidad con muchas profesiones)
             const ctx3 = document.getElementById('qChartByProfession');
             if (ctx3) {
+                const totalProf = byProfession.reduce((s, x) => s + safeNumber(x.count), 0);
                 quarterlyCharts.byProfession = new Chart(ctx3, {
-                    type: 'doughnut',
-                    data: { labels: byProfession.map(x => x.name), datasets: [{ data: byProfession.map(x => safeNumber(x.count)) }] },
-                    options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
+                    type: 'bar',
+                    data: {
+                        labels: byProfession.map(x => x.name),
+                        datasets: [{
+                            label: 'Participantes',
+                            data: byProfession.map(x => safeNumber(x.count)),
+                            backgroundColor: getColors(byProfession.length),
+                            borderWidth: 1,
+                            borderColor: 'rgba(0,0,0,0.1)'
+                        }]
+                    },
+                    options: {
+                        indexAxis: 'y',
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => {
+                                        const pct = totalProf > 0 ? Math.round(ctx.parsed.x / totalProf * 100) : 0;
+                                        return ` ${ctx.parsed.x} participantes (${pct}%)`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            x: { beginAtZero: true, ticks: { precision: 0 } },
+                            y: { ticks: { font: { size: 11 } } }
+                        }
+                    }
                 });
             }
 
