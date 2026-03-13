@@ -4288,29 +4288,14 @@ async function sendTrainingToAirtable(trainingData) {
 
         console.log('📋 Record a enviar:', JSON.stringify(airtableRecord, null, 2));
 
-        const response = await fetch('/.netlify/functions/airtable-proxy', {
+        const data = await airtableProxyRequest({
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                method: 'POST',
-                path: '/Capacitaciones',
-                body: airtableRecord
-            })
+            path: '/Capacitaciones',
+            body: airtableRecord
         });
 
-        const responseText = await response.text();
-        console.log(`📥 Respuesta HTTP ${response.status}:`, responseText);
-
-        if (!response.ok) {
-            console.error('❌ Error HTTP:', response.status);
-            console.error('Detalle:', responseText);
-            return false;
-        }
-
-        const data = JSON.parse(responseText);
         console.log('✅ Respuesta exitosa:', data);
 
-        // IMPORTANTE: Retornar el ID del registro creado
         if (data && data.id) {
             console.log('✅ Capacitación guardada con ID:', data.id);
             return { success: true, id: data.id };
@@ -4350,28 +4335,19 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         console.log(`📋 Preguntas a guardar:`, records);
 
         // Guardar todas las preguntas en un solo request
-        const response = await fetch('/.netlify/functions/airtable-proxy', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
+        // Airtable permite máximo 10 registros por batch
+        const batchSize = 10;
+        for (let i = 0; i < records.length; i += batchSize) {
+            const batch = records.slice(i, i + batchSize);
+            await airtableProxyRequest({
                 method: 'POST',
                 path: '/Preguntas',
-                body: { records: records }  // Airtable acepta múltiples records
-            })
-        });
-
-        const responseText = await response.text();
-        console.log(`📥 Respuesta guardado de preguntas HTTP ${response.status}:`, responseText);
-
-        if (!response.ok) {
-            console.error(`❌ Error guardando preguntas de ${type}:`, response.status);
-            console.error('Detalle:', responseText);
-            return false;
+                body: { records: batch }
+            });
+            console.log(`✅ Batch ${Math.floor(i/batchSize)+1} guardado (${batch.length} preguntas de ${type})`);
         }
-
-        const data = JSON.parse(responseText);
-        console.log(`✅ ${questions.length} preguntas de ${type} guardadas exitosamente`);
         
+        console.log(`✅ ${questions.length} preguntas de ${type} guardadas exitosamente`);
         return true;
 
     } catch (err) {
@@ -4903,47 +4879,75 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             loadDashboardStats();
         }
         
-        // Cargar estadísticas del dashboard desde Airtable
+        // Cargar estadísticas del dashboard directamente desde Airtable
         async function loadDashboardStats() {
             try {
                 console.log('📊 Cargando estadísticas del dashboard...');
-                
-                const response = await fetch('/.netlify/functions/get-dashboard-stats', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({})
+
+                // Obtener capacitaciones y participaciones en paralelo
+                const [trainingsRes, participationsRes] = await Promise.all([
+                    airtableFetchAll('/Capacitaciones'),
+                    airtableFetchAll('/Participaciones')
+                ]);
+
+                const trainings = trainingsRes || [];
+                const participations = participationsRes || [];
+
+                const totalTrainings = trainings.length;
+                const totalParticipants = participations.length;
+
+                // Calcular scores
+                let sumPre = 0, sumPost = 0, countPre = 0, countPost = 0, completados = 0;
+                const byDay = {};
+                const byDept = {};
+
+                participations.forEach(p => {
+                    const f = p.fields || {};
+                    const pre = parseFloat(f['Pretest Score'] || f['Pre-test Score'] || 0);
+                    const post = parseFloat(f['Post-test Score'] || f['Posttest Score'] || 0);
+                    const fecha = (f['Fecha de Inicio'] || f['Fecha Inicio'] || f['Fecha'] || '').slice(0, 10);
+                    const dept = f['Servicio'] || f['Departamento'] || 'Sin servicio';
+                    const completadoPost = f['Completado Posttest'] || f['Completado Post-Test'];
+
+                    if (pre > 0) { sumPre += pre; countPre++; }
+                    if (post > 0) { sumPost += post; countPost++; completados++; }
+
+                    if (fecha) byDay[fecha] = (byDay[fecha] || 0) + 1;
+                    byDept[dept] = (byDept[dept] || 0) + 1;
                 });
-                
-                const data = await response.json();
-                
-                if (data.success) {
-                    console.log('✅ Estadísticas recibidas:', data.statistics);
-                    
-                    // Actualizar cards del dashboard
-                    document.getElementById('totalTrainings').textContent = data.statistics.totalTrainings;
-                    document.getElementById('totalParticipants').textContent = data.statistics.totalParticipants;
-                    document.getElementById('adherenceRate').textContent = data.statistics.adherenceRate + '%';
-                    document.getElementById('avgImprovement').textContent = '+' + data.statistics.avgImprovement + '%';
-                    
-                    // Actualizar gráfico de participaciones por día
-                    if (participationsChart && data.charts && data.charts.participationsByDay) {
-                        participationsChart.data.labels = data.charts.participationsByDay.labels;
-                        participationsChart.data.datasets[0].data = data.charts.participationsByDay.data;
-                        participationsChart.update();
-                    }
-                    
-                    // Actualizar gráfico de departamentos
-                    if (departmentChart && data.charts && data.charts.departmentPerformance) {
-                        departmentChart.data.labels = data.charts.departmentPerformance.labels;
-                        departmentChart.data.datasets[0].data = data.charts.departmentPerformance.data;
-                        departmentChart.update();
-                    }
-                    
-                    console.log('✅ Dashboard actualizado correctamente');
-                } else {
-                    console.error('❌ Error en respuesta:', data.error);
+
+                const avgPre = countPre > 0 ? Math.round(sumPre / countPre) : 0;
+                const avgPost = countPost > 0 ? Math.round(sumPost / countPost) : 0;
+                const avgImprovement = avgPost - avgPre;
+                const adherenceRate = totalParticipants > 0 ? Math.round((completados / totalParticipants) * 100) : 0;
+
+                // Actualizar cards del dashboard
+                const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+                setEl('totalTrainings', totalTrainings);
+                setEl('totalParticipants', totalParticipants);
+                setEl('adherenceRate', adherenceRate + '%');
+                setEl('avgImprovement', '+' + avgImprovement + '%');
+
+                // Gráfico participaciones por día (últimos 7 días con datos)
+                const sortedDays = Object.keys(byDay).sort().slice(-7);
+                if (participationsChart) {
+                    participationsChart.data.labels = sortedDays.map(d => {
+                        const dt = new Date(d + 'T00:00:00');
+                        return dt.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' });
+                    });
+                    participationsChart.data.datasets[0].data = sortedDays.map(d => byDay[d]);
+                    participationsChart.update();
                 }
-                
+
+                // Gráfico por departamento (top 5)
+                const deptEntries = Object.entries(byDept).sort((a, b) => b[1] - a[1]).slice(0, 5);
+                if (departmentChart) {
+                    departmentChart.data.labels = deptEntries.map(e => e[0]);
+                    departmentChart.data.datasets[0].data = deptEntries.map(e => e[1]);
+                    departmentChart.update();
+                }
+
+                console.log('✅ Dashboard actualizado correctamente');
             } catch (error) {
                 console.error('❌ Error cargando estadísticas del dashboard:', error);
             }
@@ -5356,16 +5360,144 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             try {
                 destroyQuarterlyCharts();
 
-                const res = await fetch('/.netlify/functions/get-quarterly-report', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ year, quarter, scope })
+                // Consultar Airtable directamente para el reporte trimestral
+                console.log(`📊 Generando reporte trimestral T${quarter} ${year}...`);
+
+                // Calcular rango de fechas del trimestre
+                const qMonths = { 1: [1,3], 2: [4,6], 3: [7,9], 4: [10,12] };
+                const [mStart, mEnd] = qMonths[quarter];
+                const dateStart = `${year}-${String(mStart).padStart(2,'0')}-01`;
+                const mEndLastDay = new Date(year, mEnd, 0).getDate();
+                const dateEnd = `${year}-${String(mEnd).padStart(2,'0')}-${mEndLastDay}`;
+                const qLabels = { 1:'Ene-Mar', 2:'Abr-Jun', 3:'Jul-Sep', 4:'Oct-Dic' };
+
+                // Obtener capacitaciones y participaciones
+                const [trainingsRes, partsRes] = await Promise.all([
+                    airtableFetchAll('/Capacitaciones'),
+                    airtableFetchAll('/Participaciones')
+                ]);
+
+                const allTrainings = trainingsRes || [];
+                const allParts = partsRes || [];
+
+                // Filtrar capacitaciones del trimestre (por fecha)
+                const trimTrainings = allTrainings.filter(t => {
+                    const f = t.fields || {};
+                    const fechaRaw = f['Fecha'] || f['Fecha Creación'] || f['Fecha de la capacitación'] || '';
+                    if (!fechaRaw) return false;
+                    const fecha = fechaRaw.slice(0, 10);
+                    return fecha >= dateStart && fecha <= dateEnd;
                 });
 
-                const data = await res.json().catch(() => ({}));
-                if (!res.ok || !data.success) {
-                    throw new Error(data?.error || 'No se pudo generar el reporte trimestral');
-                }
+                // Filtrar participaciones del trimestre
+                const trimParts = allParts.filter(p => {
+                    const f = p.fields || {};
+                    const fechaRaw = f['Fecha de Inicio'] || f['Fecha Inicio'] || f['Fecha'] || '';
+                    if (!fechaRaw) return false;
+                    const fecha = fechaRaw.slice(0, 10);
+                    return fecha >= dateStart && fecha <= dateEnd;
+                });
+
+                // Scope filter (departamento)
+                const partsScoped = scope === 'all' ? trimParts : trimParts.filter(p => {
+                    const dept = (p.fields?.['Servicio'] || p.fields?.['Departamento'] || '').toLowerCase();
+                    return dept.includes(scope.toLowerCase());
+                });
+
+                // Calcular KPIs globales
+                let sumPre = 0, sumPost = 0, countPre = 0, countPost = 0, completados = 0;
+                const uniqueNames = new Set();
+                const byDeptMap = {};
+
+                partsScoped.forEach(p => {
+                    const f = p.fields || {};
+                    const pre = parseFloat(f['Pretest Score'] || f['Pre-test Score'] || 0);
+                    const post = parseFloat(f['Post-test Score'] || f['Posttest Score'] || 0);
+                    const nombre = f['Nombre Completo'] || f['Nombre'] || '';
+                    const dept = f['Servicio'] || f['Departamento'] || 'Sin servicio';
+                    const completadoPost = !!(f['Completado Posttest'] || f['Completado Post-Test']);
+
+                    if (pre > 0) { sumPre += pre; countPre++; }
+                    if (post > 0) { sumPost += post; countPost++; }
+                    if (completadoPost) completados++;
+                    if (nombre) uniqueNames.add(nombre.toLowerCase().trim());
+
+                    if (!byDeptMap[dept]) byDeptMap[dept] = { dept, count: 0, sumPre: 0, sumPost: 0, nPre: 0, nPost: 0 };
+                    byDeptMap[dept].count++;
+                    if (pre > 0) { byDeptMap[dept].sumPre += pre; byDeptMap[dept].nPre++; }
+                    if (post > 0) { byDeptMap[dept].sumPost += post; byDeptMap[dept].nPost++; }
+                });
+
+                const totalParts = partsScoped.length;
+                const avgPre = countPre > 0 ? Math.round(sumPre / countPre) : 0;
+                const avgPost = countPost > 0 ? Math.round(sumPost / countPost) : 0;
+                const avgImprovement = avgPost - avgPre;
+                const adherenceRate = totalParts > 0 ? Math.round((completados / totalParts) * 100) : 0;
+                const passRate = countPost > 0 ? Math.round(partsScoped.filter(p => parseFloat(p.fields?.['Post-test Score'] || p.fields?.['Posttest Score'] || 0) >= 60).length / countPost * 100) : 0;
+
+                // Construir lista de capacitaciones del trimestre con stats
+                const trainingIds = new Set(trimTrainings.map(t => t.id));
+                const trainingsWithStats = trimTrainings.map(t => {
+                    const tf = t.fields || {};
+                    const tParts = partsScoped.filter(p => {
+                        const f = p.fields || {};
+                        const linked = f['Capacitación'] || f['Capacitacion'] || f['Sesión'] || f['Sesion'] || [];
+                        const codigoAcceso = f['Código Acceso'] || f['Código de Acceso'] || '';
+                        const tCodigo = tf['Código de Acceso'] || tf['Código Acceso'] || '';
+                        return (Array.isArray(linked) && linked.includes(t.id)) ||
+                               (tCodigo && codigoAcceso === tCodigo);
+                    });
+                    const tPre = tParts.filter(p => parseFloat(p.fields?.['Pretest Score'] || p.fields?.['Pre-test Score'] || 0) > 0);
+                    const tPost = tParts.filter(p => parseFloat(p.fields?.['Post-test Score'] || p.fields?.['Posttest Score'] || 0) > 0);
+                    const tAvgPre = tPre.length > 0 ? Math.round(tPre.reduce((s, p) => s + parseFloat(p.fields?.['Pretest Score'] || p.fields?.['Pre-test Score'] || 0), 0) / tPre.length) : 0;
+                    const tAvgPost = tPost.length > 0 ? Math.round(tPost.reduce((s, p) => s + parseFloat(p.fields?.['Post-test Score'] || p.fields?.['Posttest Score'] || 0), 0) / tPost.length) : 0;
+                    const tCompletados = tParts.filter(p => !!(p.fields?.['Completado Posttest'] || p.fields?.['Completado Post-Test'])).length;
+                    return {
+                        id: t.id,
+                        title: tf['Título'] || tf['name'] || 'Sin título',
+                        department: tf['Departamento'] || 'General',
+                        date: tf['Fecha'] || tf['Fecha de la capacitación'] || tf['Fecha Creación'] || '',
+                        status: tf['Estado'] || 'active',
+                        participationsCount: tParts.length,
+                        completedCount: tCompletados,
+                        avgPretestScore: tAvgPre,
+                        avgPostestScore: tAvgPost,
+                        avgImprovement: tAvgPost - tAvgPre,
+                        adherenceRate: tParts.length > 0 ? Math.round((tCompletados / tParts.length) * 100) : 0,
+                        passRatePostest: tPost.length > 0 ? Math.round(tPost.filter(p => parseFloat(p.fields?.['Post-test Score'] || p.fields?.['Posttest Score'] || 0) >= 60).length / tPost.length * 100) : 0
+                    };
+                });
+
+                // Top capacitaciones por participaciones
+                const topByParts = [...trainingsWithStats].sort((a, b) => b.participationsCount - a.participationsCount).slice(0, 5)
+                    .map(t => ({ title: t.title, count: t.participationsCount }));
+
+                // Distribución por departamento
+                const byDept = Object.values(byDeptMap).sort((a, b) => b.count - a.count).slice(0, 10).map(d => ({
+                    dept: d.dept,
+                    count: d.count,
+                    avgPretestScore: d.nPre > 0 ? Math.round(d.sumPre / d.nPre) : 0,
+                    avgPostestScore: d.nPost > 0 ? Math.round(d.sumPost / d.nPost) : 0
+                }));
+
+                const data = {
+                    success: true,
+                    period: { year, quarter, label: `T${quarter} (${qLabels[quarter]}) ${year}` },
+                    kpis: {
+                        trainingsCount: trimTrainings.length,
+                        participationsCount: totalParts,
+                        uniqueParticipants: uniqueNames.size,
+                        adherenceRate,
+                        avgPretestScore: avgPre,
+                        avgPostestScore: avgPost,
+                        avgImprovement,
+                        passRatePostest: passRate
+                    },
+                    trainings: trainingsWithStats,
+                    topTrainingsByParticipants: topByParts,
+                    distributions: { byDept },
+                    insights: []
+                };
 
                 currentQuarterlyReportData = data;
                 renderQuarterlyReport(data);
@@ -6548,6 +6680,21 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
 const airtableFieldCache = {};
 
+// Helper: obtiene TODOS los registros paginando automáticamente
+async function airtableFetchAll(tablePath) {
+    let allRecords = [];
+    let offset = null;
+    const baseParams = tablePath.includes('?') ? '&' : '?';
+    do {
+        const path = offset ? `${tablePath}${baseParams}offset=${encodeURIComponent(offset)}` : tablePath;
+        const res = await airtableProxyRequest({ method: 'GET', path });
+        const records = res?.records || [];
+        allRecords = allRecords.concat(records);
+        offset = res?.offset || null;
+    } while (offset);
+    return allRecords;
+}
+
 async function getTableFieldKeys(tablePath) {
     if (airtableFieldCache[tablePath]) return airtableFieldCache[tablePath];
     try {
@@ -7648,20 +7795,86 @@ function makeCronogramaFilterFormula(year, tipo) {
                 
                 console.log('📊 Cargando reporte para capacitación:', trainingId);
                 
-                // Llamar a la función serverless
-                const response = await fetch('/.netlify/functions/get-training-participants', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ trainingId })
+                // Consultar Airtable directamente
+                console.log('📊 Consultando participaciones para capacitación:', trainingId);
+
+                // Obtener capacitación
+                const trainingRes = await airtableProxyRequest({ method: 'GET', path: `/Capacitaciones/${trainingId}` });
+
+                // Obtener TODAS las participaciones y filtrar por capacitación
+                const partRes = await airtableFetchAll('/Participaciones');
+                const allParts = Array.isArray(partRes) ? partRes : (partRes?.records || []);
+
+                // Filtrar participaciones que pertenecen a esta capacitación
+                const partsFiltered = allParts.filter(p => {
+                    const f = p.fields || {};
+                    const linked = f['Capacitación'] || f['Capacitacion'] || f['Sesión'] || f['Sesion'] || [];
+                    const codigoAcceso = f['Código Acceso'] || f['Código de Acceso'] || '';
+                    const trainingCodigo = trainingRes?.fields?.['Código de Acceso'] || trainingRes?.fields?.['Código Acceso'] || '';
+                    return (Array.isArray(linked) && linked.includes(trainingId)) ||
+                           (trainingCodigo && codigoAcceso === trainingCodigo);
                 });
-                
-                const data = await response.json();
-                
-                if (!data.success) {
-                    throw new Error(data.error || 'Error al obtener el reporte');
-                }
-                
-                console.log('✅ Datos del reporte recibidos:', data);
+
+                // Construir participantes
+                const participants = partsFiltered.map(p => {
+                    const f = p.fields || {};
+                    const pre = parseFloat(f['Pretest Score'] || f['Pre-test Score'] || 0);
+                    const post = parseFloat(f['Post-test Score'] || f['Posttest Score'] || 0);
+                    const completadoPost = !!(f['Completado Posttest'] || f['Completado Post-Test']);
+                    const completadoPre = !!(f['Completado Pretest'] || f['Completado Pre-Test']);
+                    let status = 'Registrado';
+                    if (completadoPost) status = 'Completado';
+                    else if (completadoPre) status = 'Pretest Completado';
+                    return {
+                        id: p.id,
+                        nombre: f['Nombre Completo'] || f['Nombre'] || 'Sin nombre',
+                        email: f['Email'] || f['Correo'] || '',
+                        departamento: f['Servicio'] || f['Departamento'] || '-',
+                        cargo: f['Profesión'] || f['Profesion'] || f['Cargo'] || '-',
+                        pretestScore: pre,
+                        postestScore: post,
+                        improvement: post > 0 ? Math.round(post - pre) : 0,
+                        status,
+                        fecha: f['Fecha de Inicio'] || f['Fecha Inicio'] || f['Fecha'] || ''
+                    };
+                });
+
+                // Calcular estadísticas
+                const total = participants.length;
+                const completados = participants.filter(p => p.status === 'Completado').length;
+                const withPre = participants.filter(p => p.pretestScore > 0);
+                const withPost = participants.filter(p => p.postestScore > 0);
+                const avgPre = withPre.length > 0 ? Math.round(withPre.reduce((s, p) => s + p.pretestScore, 0) / withPre.length) : 0;
+                const avgPost = withPost.length > 0 ? Math.round(withPost.reduce((s, p) => s + p.postestScore, 0) / withPost.length) : 0;
+                const avgImprovement = avgPost - avgPre;
+                const adherenceRate = total > 0 ? Math.round((completados / total) * 100) : 0;
+                const passRate = withPost.length > 0 ? Math.round(withPost.filter(p => p.postestScore >= 60).length / withPost.length * 100) : 0;
+
+                const tf = trainingRes?.fields || {};
+                const data = {
+                    success: true,
+                    training: {
+                        id: trainingId,
+                        titulo: tf['Título'] || tf['name'] || 'Sin título',
+                        descripcion: tf['Descripción'] || tf['Descripcion'] || '',
+                        departamento: tf['Departamento'] || 'General',
+                        fechaCreacion: tf['Fecha'] || tf['Fecha Creación'] || tf['Fecha de la capacitación'] || '',
+                        activa: (tf['Estado'] || 'active') !== 'inactive' && (tf['Estado'] || 'active') !== 'finalizada',
+                        finalizada: tf['Estado'] === 'finalizada'
+                    },
+                    participants,
+                    statistics: {
+                        totalParticipants: total,
+                        completedPostest: completados,
+                        avgPretestScore: avgPre,
+                        avgPostestScore: avgPost,
+                        avgImprovement,
+                        adherenceRate,
+                        passRate
+                    }
+                };
+
+                console.log('✅ Datos del reporte calculados localmente:', data);
                 
                 // Guardar datos globalmente
                 currentReportData = data;

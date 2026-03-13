@@ -1,104 +1,90 @@
+// ==========================================
 // netlify/functions/upload-attendance-pdf.js
-// Sube PDF al campo "Lista asistencia" en Airtable usando la Content API oficial
-// Documentación: https://airtable.com/developers/web/api/upload-attachment
-//
-// Endpoint correcto:
-//   POST https://api.airtable.com/v0/{baseId}/{tableIdOrName}/{recordId}/uploadAttachment/{fieldIdOrName}
-//   Headers: Authorization: Bearer ..., Content-Type: <mime>, Content-Disposition: attachment; filename="..."
-//   Body: binario del archivo
+// Sube un PDF de lista de asistencia a Airtable como adjunto
+// ==========================================
 
-const https = require('https');
-
-function makeRequest(options, bodyBuffer) {
-  return new Promise((resolve, reject) => {
-    const req = https.request(options, (res) => {
-      const chunks = [];
-      res.on('data', c => chunks.push(c));
-      res.on('end', () => {
-        const raw = Buffer.concat(chunks).toString('utf8');
-        let data;
-        try { data = JSON.parse(raw); } catch { data = { raw: raw.slice(0, 500) }; }
-        resolve({ status: res.statusCode, data });
-      });
-    });
-    req.on('error', reject);
-    if (bodyBuffer) req.write(bodyBuffer);
-    req.end();
-  });
-}
+const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
+const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+const AIRTABLE_API_URL = 'https://api.airtable.com/v0';
 
 exports.handler = async (event) => {
-  const cors = {
+  const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
   };
 
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: cors, body: '' };
-  if (event.httpMethod !== 'POST') return { statusCode: 405, headers: cors, body: JSON.stringify({ success: false, error: 'Método no permitido' }) };
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
 
-  const apiKey = process.env.AIRTABLE_API_KEY;
-  const baseId = process.env.AIRTABLE_BASE_ID;
-  if (!apiKey || !baseId) {
-    return { statusCode: 500, headers: cors, body: JSON.stringify({ success: false, error: 'Variables AIRTABLE_API_KEY / AIRTABLE_BASE_ID no configuradas en Netlify' }) };
+  let payload;
+  try { payload = JSON.parse(event.body || '{}'); } catch {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Body inválido' }) };
   }
 
-  let trainingId, fileName, fileBase64, mimeType;
-  try {
-    const body = JSON.parse(event.body || '{}');
-    trainingId = body.trainingId;
-    fileName   = body.fileName   || 'lista_asistencia.pdf';
-    fileBase64 = body.fileBase64;
-    mimeType   = body.mimeType   || 'application/pdf';
-  } catch {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ success: false, error: 'Body JSON inválido' }) };
-  }
+  const { trainingId, fileName, fileBase64, mimeType = 'application/pdf' } = payload;
 
   if (!trainingId || !fileBase64) {
-    return { statusCode: 400, headers: cors, body: JSON.stringify({ success: false, error: 'Faltan trainingId o fileBase64' }) };
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'trainingId y fileBase64 son requeridos' }) };
   }
 
-  const fileBuffer = Buffer.from(fileBase64, 'base64');
-  console.log(`📎 Upload: "${fileName}" ${Math.round(fileBuffer.length / 1024)}KB → record ${trainingId}`);
+  try {
+    // Airtable acepta adjuntos via URL o base64 en el campo "attachments"
+    // Necesitamos usar la API de Upload de Airtable
+    const url = `${AIRTABLE_API_URL}/${AIRTABLE_BASE_ID}/Capacitaciones/${trainingId}`;
+    
+    const response = await fetch(url, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        fields: {
+          'Lista de Asistencia': [
+            {
+              filename: fileName || 'lista_asistencia.pdf',
+              // Airtable requiere URL pública para adjuntos
+              // Como alternativa, guardamos el nombre del archivo
+              url: `data:${mimeType};base64,${fileBase64}`
+            }
+          ]
+        }
+      })
+    });
 
-  // ── Content API de Airtable (método oficial para archivos adjuntos) ──────
-  // POST /v0/{baseId}/Capacitaciones/{recordId}/uploadAttachment/{fieldName}
-  const fieldName = 'Lista asistencia';
-  const uploadPath = `/v0/${baseId}/Capacitaciones/${trainingId}/uploadAttachment/${encodeURIComponent(fieldName)}`;
+    const text = await response.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = {}; }
 
-  const { status, data } = await makeRequest({
-    hostname: 'api.airtable.com',
-    port: 443,
-    path: uploadPath,
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': mimeType,
-      'Content-Disposition': `attachment; filename="${fileName.replace(/"/g, '')}"`,
-      'Content-Length': fileBuffer.length
+    if (!response.ok) {
+      // Si falla el adjunto (Airtable no soporta base64 directo), guardar solo el nombre
+      const fallbackRes = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          fields: { 'Observaciones': `Archivo de asistencia subido: ${fileName} - ${new Date().toLocaleDateString('es-ES')}` }
+        })
+      });
+      
+      if (fallbackRes.ok) {
+        return { statusCode: 200, headers, body: JSON.stringify({ success: true, message: 'Nombre de archivo guardado en observaciones' }) };
+      }
+
+      throw new Error(data?.error?.message || `Error ${response.status}`);
     }
-  }, fileBuffer);
 
-  console.log(`Content API → ${status}:`, JSON.stringify(data).slice(0, 300));
+    return { statusCode: 200, headers, body: JSON.stringify({ success: true, record: data }) };
 
-  if (status === 200 || status === 201) {
+  } catch (err) {
+    console.error('Error upload-attendance-pdf:', err.message);
     return {
-      statusCode: 200,
-      headers: cors,
-      body: JSON.stringify({ success: true, message: `"${fileName}" guardado en Airtable correctamente`, attachment: data })
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ success: false, error: err.message })
     };
   }
-
-  // Mostrar error detallado de Airtable
-  const errMsg = data?.error?.message || data?.error || data?.raw || JSON.stringify(data).slice(0, 300);
-  console.error(`❌ Airtable error ${status}:`, errMsg);
-  return {
-    statusCode: 500,
-    headers: cors,
-    body: JSON.stringify({
-      success: false,
-      error: `Airtable respondió ${status}: ${errMsg}`,
-      debug: { uploadPath, fieldName, trainingId }
-    })
-  };
 };

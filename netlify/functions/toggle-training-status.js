@@ -1,111 +1,81 @@
+// ==========================================
 // netlify/functions/toggle-training-status.js
-// Finaliza o reactiva una capacitación y sus sesiones
+// Finaliza o reactiva una capacitación en Airtable
+// ==========================================
 
-const AIRTABLE_API = 'https://api.airtable.com/v0';
+const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
+const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+const AIRTABLE_API_URL = 'https://api.airtable.com/v0';
 
-async function airtablePatch(baseId, apiKey, table, recordId, fields) {
-  const url = `${AIRTABLE_API}/${baseId}/${encodeURIComponent(table)}/${recordId}`;
-  const res = await fetch(url, {
-    method: 'PATCH',
+async function airtableRequest(method, path, body) {
+  const url = `${AIRTABLE_API_URL}/${AIRTABLE_BASE_ID}${path}`;
+  const opts = {
+    method,
     headers: {
-      'Authorization': `Bearer ${apiKey}`,
+      'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
       'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({ fields })
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `Error ${res.status}`);
-  }
-  return res.json();
-}
-
-async function fetchAllRecords(baseId, apiKey, table, filterFormula = '') {
-  const records = [];
-  let offset = null;
-  do {
-    let params = '?pageSize=100';
-    if (filterFormula) params += `&filterByFormula=${encodeURIComponent(filterFormula)}`;
-    if (offset) params += `&offset=${offset}`;
-    const url = `${AIRTABLE_API}/${baseId}/${encodeURIComponent(table)}${params}`;
-    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${apiKey}` } });
-    const data = await res.json();
-    if (data.records) records.push(...data.records);
-    offset = data.offset || null;
-  } while (offset);
-  return records;
+    }
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(url, opts);
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { data = {}; }
+  if (!res.ok) throw new Error(data?.error?.message || `Error ${res.status}`);
+  return data;
 }
 
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
   };
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers, body: '' };
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
+
+  let payload;
+  try { payload = JSON.parse(event.body || '{}'); } catch {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Body inválido' }) };
   }
 
-  const apiKey = process.env.AIRTABLE_API_KEY;
-  const baseId = process.env.AIRTABLE_BASE_ID;
+  const { trainingId, action } = payload;
 
-  if (!apiKey || !baseId) {
-    return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: 'Variables de entorno no configuradas' }) };
-  }
-
-  let trainingId, action;
-  try {
-    const body = JSON.parse(event.body || '{}');
-    trainingId = body.trainingId;
-    action = body.action; // 'finalize' | 'reactivate'
-  } catch {
-    return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Body inválido' }) };
-  }
-
-  if (!trainingId || !['finalize', 'reactivate'].includes(action)) {
-    return { statusCode: 400, headers, body: JSON.stringify({ success: false, error: 'Parámetros inválidos' }) };
+  if (!trainingId || !action) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'trainingId y action son requeridos' }) };
   }
 
   try {
-    const finalizar = action === 'finalize';
+    const nuevoEstado = action === 'finalize' ? 'finalizada' : 'active';
+    const activa = action !== 'finalize';
 
-    // 1. Actualizar la capacitación
-    await airtablePatch(baseId, apiKey, 'Capacitaciones', trainingId, {
-      'Finalizada': finalizar,
-      'Activa': !finalizar
-    });
-
-    // 2. Actualizar sesiones vinculadas
-    const formula = `FIND("${trainingId}", ARRAYJOIN({Capacitación}))`;
-    let sessions = [];
-    try {
-      sessions = await fetchAllRecords(baseId, apiKey, 'Sesiones', formula);
-    } catch {
-      const formula2 = `FIND("${trainingId}", ARRAYJOIN({Capacitacion}))`;
-      sessions = await fetchAllRecords(baseId, apiKey, 'Sesiones', formula2).catch(() => []);
-    }
-
-    let sessionsUpdated = 0;
-    for (const session of sessions) {
-      try {
-        await airtablePatch(baseId, apiKey, 'Sesiones', session.id, {
-          'Activa': !finalizar
-        });
-        sessionsUpdated++;
-      } catch (e) {
-        console.warn(`⚠️ No se pudo actualizar sesión ${session.id}:`, e.message);
+    // Actualizar capacitación
+    await airtableRequest('PATCH', `/Capacitaciones/${trainingId}`, {
+      fields: {
+        'Estado': nuevoEstado,
+        'Activa': activa
       }
-    }
+    });
 
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ success: true, sessionsUpdated })
+      body: JSON.stringify({
+        success: true,
+        action,
+        trainingId,
+        sessionsUpdated: 0,
+        message: action === 'finalize' ? 'Capacitación finalizada' : 'Capacitación reactivada'
+      })
     };
 
   } catch (err) {
-    console.error('❌ Error en toggle-training-status:', err.message);
-    return { statusCode: 500, headers, body: JSON.stringify({ success: false, error: err.message }) };
+    console.error('Error toggle-training-status:', err.message);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ success: false, error: err.message })
+    };
   }
 };

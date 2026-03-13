@@ -1,95 +1,88 @@
+// ==========================================
 // netlify/functions/airtable-proxy.js
 // Proxy seguro para todas las peticiones a Airtable
-// Las credenciales viven SOLO en variables de entorno del servidor
+// ==========================================
+
+const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
+const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
+const AIRTABLE_API_URL = 'https://api.airtable.com/v0';
 
 exports.handler = async (event) => {
-  // Manejar CORS preflight
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: corsHeaders(),
-      body: ''
-    };
-  }
-
-  if (event.httpMethod !== 'POST') {
-    return respond(405, { error: 'Método no permitido' });
-  }
-
-  const apiKey  = process.env.AIRTABLE_API_KEY;
-  const baseId  = process.env.AIRTABLE_BASE_ID;
-
-  if (!apiKey || !baseId) {
-    console.error('❌ Variables de entorno AIRTABLE_API_KEY o AIRTABLE_BASE_ID no configuradas');
-    return respond(500, { error: 'Configuración del servidor incompleta. Verifica las variables de entorno en Netlify.' });
-  }
-
-  let body;
-  try {
-    body = JSON.parse(event.body || '{}');
-  } catch {
-    return respond(400, { error: 'Body inválido (no es JSON)' });
-  }
-
-  const { method = 'GET', path: endpointPath = '', body: requestBody } = body;
-
-  if (!endpointPath) {
-    return respond(400, { error: 'Falta el parámetro "path"' });
-  }
-
-  // Construir URL de Airtable
-  const baseUrl = `https://api.airtable.com/v0/${baseId}`;
-  const url = `${baseUrl}${endpointPath}`;
-
-  const fetchOptions = {
-    method: method.toUpperCase(),
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json'
-    }
-  };
-
-  if (requestBody && ['POST', 'PATCH', 'PUT'].includes(method.toUpperCase())) {
-    fetchOptions.body = JSON.stringify(requestBody);
-  }
-
-  try {
-    const airtableResponse = await fetch(url, fetchOptions);
-    const data = await airtableResponse.json();
-
-    if (!airtableResponse.ok) {
-      console.error('❌ Error Airtable:', airtableResponse.status, data);
-      return respond(airtableResponse.status, {
-        success: false,
-        error: data?.error?.message || `Error ${airtableResponse.status} de Airtable`
-      });
-    }
-
-    // Airtable devuelve los registros en data.records para listas
-    return respond(200, {
-      success: true,
-      ...data
-    });
-
-  } catch (err) {
-    console.error('❌ Error de red al contactar Airtable:', err.message);
-    return respond(502, { success: false, error: 'Error de red al contactar Airtable: ' + err.message });
-  }
-};
-
-function corsHeaders() {
-  return {
+  const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
   };
-}
 
-function respond(statusCode, body) {
-  return {
-    statusCode,
-    headers: corsHeaders(),
-    body: JSON.stringify(body)
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 200, headers, body: '' };
+  }
+
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, headers, body: JSON.stringify({ error: 'Método no permitido' }) };
+  }
+
+  if (!AIRTABLE_API_KEY || !AIRTABLE_BASE_ID) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Variables de entorno AIRTABLE_API_KEY y AIRTABLE_BASE_ID no configuradas' })
+    };
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(event.body || '{}');
+  } catch {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Body JSON inválido' }) };
+  }
+
+  const { method = 'GET', path: airtablePath = '', body: requestBody } = payload;
+
+  if (!airtablePath) {
+    return { statusCode: 400, headers, body: JSON.stringify({ error: 'path es requerido' }) };
+  }
+
+  const url = `${AIRTABLE_API_URL}/${AIRTABLE_BASE_ID}${airtablePath}`;
+
+  const fetchOptions = {
+    method,
+    headers: {
+      'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
+      'Content-Type': 'application/json'
+    }
   };
-}
+
+  if (requestBody && ['POST', 'PUT', 'PATCH'].includes(method.toUpperCase())) {
+    fetchOptions.body = JSON.stringify(requestBody);
+  }
+
+  try {
+    const response = await fetch(url, fetchOptions);
+    const text = await response.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = { raw: text }; }
+
+    if (!response.ok) {
+      return {
+        statusCode: response.status,
+        headers,
+        body: JSON.stringify({ error: data?.error?.message || data?.error || text || `Error ${response.status}` })
+      };
+    }
+
+    // Normalizar respuesta: agregar success:true y records array
+    const normalized = { success: true, ...data };
+    if (data.records === undefined && method === 'GET') normalized.records = [];
+
+    return { statusCode: 200, headers, body: JSON.stringify(normalized) };
+
+  } catch (err) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: err.message || 'Error interno del servidor' })
+    };
+  }
+};
