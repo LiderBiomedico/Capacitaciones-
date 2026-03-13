@@ -5387,7 +5387,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 // Mapa: sessionId → trainingId (para resolver vínculos indirectos)
                 const sessionToTraining = {};
                 allSessions.forEach(s => {
-                    const capLinked = s.fields?.['Capacitación'] || s.fields?.['Capacitacion'] || [];
+                    const capLinked = s.fields?.['Capacitaciones'] || s.fields?.['Capacitación'] || s.fields?.['Capacitacion'] || [];
                     if (Array.isArray(capLinked) && capLinked.length > 0) {
                         sessionToTraining[s.id] = capLinked[0];
                     }
@@ -5404,10 +5404,11 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 function resolvePartTrainingId(p, trainingsArr) {
                     const f = p.fields || {};
                     const linked = [
-                        ...(Array.isArray(f['Capacitación']) ? f['Capacitación'] : []),
-                        ...(Array.isArray(f['Capacitacion']) ? f['Capacitacion'] : []),
-                        ...(Array.isArray(f['Sesión'])        ? f['Sesión']        : []),
-                        ...(Array.isArray(f['Sesion'])        ? f['Sesion']        : [])
+                        ...(Array.isArray(f['Capacitación'])   ? f['Capacitación']   : []),
+                        ...(Array.isArray(f['Capacitaciones']) ? f['Capacitaciones'] : []),
+                        ...(Array.isArray(f['Capacitacion'])   ? f['Capacitacion']   : []),
+                        ...(Array.isArray(f['Sesión'])          ? f['Sesión']          : []),
+                        ...(Array.isArray(f['Sesion'])          ? f['Sesion']          : [])
                     ];
                     const trainingSet = new Set(trainingsArr.map(t => t.id));
                     for (const id of linked) {
@@ -7871,13 +7872,13 @@ function makeCronogramaFilterFormula(year, tipo) {
                 // Estrategia A: filtrar en tabla Sesiones por linked record Capacitación
                 let sessionIds = new Set();
                 try {
-                    const sesFilter = encodeURIComponent(`SEARCH("${trainingId}", ARRAYJOIN({Capacitación}))`);
+                    const sesFilter = encodeURIComponent(`SEARCH("${trainingId}", ARRAYJOIN({Capacitaciones}))`);
                     const sesRes = await airtableProxyRequest({ method: 'GET', path: `/Sesiones?filterByFormula=${sesFilter}` });
                     const sesRecords = sesRes?.records || [];
                     sesRecords.forEach(s => sessionIds.add(s.id));
                     // También sesiones con el mismo código de acceso
                     sesRecords.forEach(s => {
-                        const sCod = s.fields?.['Código de Acceso'] || s.fields?.['Código Acceso'] || '';
+                        const sCod = s.fields?.['Código Acceso'] || s.fields?.['Código de Acceso'] || '';
                         if (sCod) sessionIds.add(s.id);
                     });
                     console.log(`📋 Sesiones encontradas para esta capacitación: ${sesRecords.length}`);
@@ -7888,7 +7889,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                 // Estrategia B: buscar sesiones por código de acceso igual al de la capacitación
                 if (tf_codigo) {
                     try {
-                        const codFilter = encodeURIComponent(`OR({Código de Acceso}="${tf_codigo}", {Código Acceso}="${tf_codigo}")`);
+                        const codFilter = encodeURIComponent(`{Código Acceso}="${tf_codigo}"`);
                         const sesRes2 = await airtableProxyRequest({ method: 'GET', path: `/Sesiones?filterByFormula=${codFilter}` });
                         (sesRes2?.records || []).forEach(s => sessionIds.add(s.id));
                     } catch(e) { /* silencioso */ }
@@ -7920,16 +7921,34 @@ function makeCronogramaFilterFormula(year, tipo) {
                     // Estrategia 2: vinculado a alguna sesión de esta capacitación
                     if (sessionIdsArr.length > 0 && linked.some(id => sessionIds.has(id))) return true;
 
-                    // Estrategia 3: tiene el mismo código de acceso que la capacitación
-                    const pCodigo = f['Código Acceso'] || f['Código de Acceso'] || '';
-                    if (tf_codigo && pCodigo && pCodigo.toString().toUpperCase() === tf_codigo.toString().toUpperCase()) return true;
+                    // Estrategia 3: código de acceso de la participación = código de la capacitación
+                    const pCodigo = (f['Código Acceso'] || f['Código de Acceso'] || '').toString().toUpperCase().trim();
+                    if (tf_codigo && pCodigo && pCodigo === tf_codigo.toString().toUpperCase().trim()) return true;
+
+                    // Estrategia 4: el linked contiene un sessionId que tiene el mismo código
+                    const linkedRaw = [
+                        ...(Array.isArray(f['Capacitación']) ? f['Capacitación'] : []),
+                        ...(Array.isArray(f['Sesión'])        ? f['Sesión']        : [])
+                    ];
+                    if (linkedRaw.length > 0 && sessionIdsArr.length > 0) {
+                        if (linkedRaw.some(id => sessionIds.has(id))) return true;
+                    }
 
                     return false;
                 });
 
                 console.log(`📊 Participaciones filtradas para la capacitación: ${partsFiltered.length}`);
                 if (partsFiltered.length === 0) {
-                    console.warn('⚠️ Sin participaciones con vínculo. Revisa que el campo "Capacitación" o "Sesión" esté vinculado en Airtable, o que el Código de Acceso coincida.');
+                    console.warn('⚠️ Sin participaciones encontradas para esta capacitación.');
+                    console.warn('   trainingId:', trainingId);
+                    console.warn('   código capacitación:', tf_codigo);
+                    console.warn('   sesionIds encontradas:', sessionIdsArr);
+                    console.warn('   total participaciones en BD:', allParts.length);
+                    if (allParts.length > 0) {
+                        const sample = allParts[0].fields || {};
+                        console.warn('   campos muestra participación:', Object.keys(sample));
+                        console.warn('   linked muestra:', sample['Capacitación'] || sample['Sesión'] || 'ninguno');
+                    }
                 }
 
                 // ── Paso 5: Construir participantes ──────────────────────────────────────

@@ -60,9 +60,9 @@ exports.handler = async (event) => {
 
     const sessionBody = {
       fields: {
-        'Código de Acceso': codeUpper,
+        'Código Acceso': codeUpper,
         'Link Acceso': accessLink,
-        'Capacitación': [trainingId],
+        'Capacitaciones': [trainingId],
         'Activa': true,
         'Fecha Inicio': new Date().toISOString().split('T')[0]
       }
