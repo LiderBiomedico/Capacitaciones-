@@ -1,6 +1,7 @@
 // /.netlify/functions/upload-attendance-pdf.js
-// Sube PDF de lista de asistencia al campo 'Lista asistencia' de la tabla Sesiones
-// Variables de entorno: AIRTABLE_API_KEY, AIRTABLE_BASE_ID
+// Guarda PDF en campo 'Lista asistencia' de la tabla Sesiones
+// Si no hay sesión vinculada, la crea automáticamente
+// Variables de entorno: AIRTABLE_API_KEY, AIRTABLE_BASE_ID, SITE_URL
 
 const https = require('https');
 
@@ -20,7 +21,7 @@ function airtableFetch(method, path, body) {
     if (postData) options.headers['Content-Length'] = Buffer.byteLength(postData);
     const req = https.request(options, (res) => {
       let data = '';
-      res.on('data', (chunk) => { data += chunk; });
+      res.on('data', chunk => { data += chunk; });
       res.on('end', () => {
         try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
         catch (e) { resolve({ status: res.statusCode, data: { raw: data } }); }
@@ -32,7 +33,6 @@ function airtableFetch(method, path, body) {
   });
 }
 
-// Sube el archivo binario a la Content API de Airtable
 function uploadToAirtableContent(fileBase64, fileName, mimeType) {
   return new Promise((resolve, reject) => {
     const API_KEY = process.env.AIRTABLE_API_KEY;
@@ -41,7 +41,6 @@ function uploadToAirtableContent(fileBase64, fileName, mimeType) {
     const headerPart = `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
     const footerPart = `\r\n--${boundary}--\r\n`;
     const totalLength = Buffer.byteLength(headerPart) + fileBuffer.length + Buffer.byteLength(footerPart);
-
     const options = {
       hostname: 'content.airtable.com',
       path: '/v0/uploadFiles',
@@ -52,10 +51,9 @@ function uploadToAirtableContent(fileBase64, fileName, mimeType) {
         'Content-Length': totalLength
       }
     };
-
     const req = https.request(options, (res) => {
       let data = '';
-      res.on('data', (chunk) => { data += chunk; });
+      res.on('data', chunk => { data += chunk; });
       res.on('end', () => {
         try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
         catch (e) { resolve({ status: res.statusCode, data: { error: data } }); }
@@ -83,7 +81,7 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { trainingId, fileName, fileBase64, mimeType } = JSON.parse(event.body || '{}');
+    const { trainingId, trainingCode, fileName, fileBase64, mimeType } = JSON.parse(event.body || '{}');
 
     if (!trainingId || !fileBase64 || !fileName) {
       return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'trainingId, fileName y fileBase64 son requeridos' }) };
@@ -97,76 +95,122 @@ exports.handler = async (event) => {
     const safeFileName = fileName || 'lista_asistencia.pdf';
     const safeMimeType = mimeType || 'application/pdf';
 
-    // ── Buscar la sesión vinculada a esta capacitación ──────────────────────
-    // Traer todas las sesiones y filtrar en JS (ARRAYJOIN devuelve nombres, no IDs)
-    const BASE_ID = process.env.AIRTABLE_BASE_ID;
-    const sesRes = await airtableFetch('GET', `/Sesiones?pageSize=100`);
-    const allSessions = sesRes.data?.records || [];
+    // ── 1. Buscar sesión vinculada (filtro en JS) ───────────────────────────
+    let sessionId = null;
+    let allSessions = [];
 
-    let targetId = null;  // ID del registro donde se guardará el PDF
-    let targetTable = 'Sesiones';
+    try {
+      let offset = null;
+      do {
+        const path = `/Sesiones?pageSize=100${offset ? '&offset=' + encodeURIComponent(offset) : ''}`;
+        const res = await airtableFetch('GET', path);
+        allSessions.push(...(res.data?.records || []));
+        offset = res.data?.offset || null;
+      } while (offset);
 
-    // Buscar sesión cuyo campo 'Capacitaciones' incluya el trainingId
-    const matchingSession = allSessions.find(s => {
-      const capLinked = s.fields?.['Capacitaciones'] || s.fields?.['Capacitación'] || s.fields?.['Capacitacion'] || [];
-      return Array.isArray(capLinked) && capLinked.includes(trainingId);
-    });
-
-    if (matchingSession) {
-      targetId = matchingSession.id;
-      console.log(`✅ Sesión encontrada: ${targetId}`);
-    } else {
-      // Fallback: guardar directamente en la Capacitación si no hay sesión
-      targetId = trainingId;
-      targetTable = 'Capacitaciones';
-      console.warn('⚠️ No se encontró sesión vinculada, guardando en Capacitaciones');
+      const match = allSessions.find(s => {
+        const linked = s.fields?.['Capacitaciones'] || s.fields?.['Capacitación'] || s.fields?.['Capacitacion'] || [];
+        return Array.isArray(linked) && linked.includes(trainingId);
+      });
+      if (match) {
+        sessionId = match.id;
+        console.log('✅ Sesión vinculada encontrada:', sessionId);
+      }
+    } catch (e) {
+      console.warn('⚠️ Error buscando sesiones:', e.message);
     }
 
-    // ── Subir el archivo ─────────────────────────────────────────────────────
-    let attachmentValue;
+    // ── 2. Si no hay sesión, crear una nueva automáticamente ───────────────
+    if (!sessionId) {
+      console.log('⚠️ Sin sesión vinculada, creando una automáticamente...');
+      try {
+        // Obtener datos de la capacitación para el código
+        const capRes = await airtableFetch('GET', `/Capacitaciones/${trainingId}`);
+        const capFields = capRes.data?.fields || {};
+        const capCode = trainingCode || capFields['Código de Acceso'] || capFields['Código Acceso'] || 'ASIST';
+        const siteUrl = process.env.SITE_URL || 'https://capacitaciones-hslv.netlify.app';
 
+        const newSession = await airtableFetch('POST', '/Sesiones', {
+          fields: {
+            'Código Acceso': capCode,
+            'Capacitaciones': [trainingId],
+            'Activa': true,
+            'Fecha Inicio': new Date().toISOString().split('T')[0],
+            'Link Acceso': `${siteUrl}?code=${capCode}`
+          }
+        });
+
+        if (newSession.status < 400 && newSession.data?.id) {
+          sessionId = newSession.data.id;
+          console.log('✅ Sesión creada automáticamente:', sessionId);
+        } else {
+          console.warn('⚠️ No se pudo crear sesión:', JSON.stringify(newSession.data));
+        }
+      } catch (e) {
+        console.warn('⚠️ Error creando sesión:', e.message);
+      }
+    }
+
+    // ── 3. Subir archivo a Airtable Content API ────────────────────────────
+    let attachmentValue;
     try {
       const uploadResult = await uploadToAirtableContent(fileBase64, safeFileName, safeMimeType);
       if (uploadResult.status === 200 && uploadResult.data?.uploadedFiles?.[0]?.url) {
-        const fileUrl = uploadResult.data.uploadedFiles[0].url;
-        attachmentValue = [{ url: fileUrl, filename: safeFileName }];
-        console.log('✅ Subido via Content API');
+        attachmentValue = [{ url: uploadResult.data.uploadedFiles[0].url, filename: safeFileName }];
+        console.log('✅ Archivo subido via Content API');
       } else {
         throw new Error(`Content API status ${uploadResult.status}: ${JSON.stringify(uploadResult.data)}`);
       }
     } catch (uploadErr) {
-      // Fallback: data URL (funciona para archivos pequeños en Airtable)
       console.warn('⚠️ Content API falló, usando data URL:', uploadErr.message);
-      const dataUrl = `data:${safeMimeType};base64,${fileBase64}`;
-      attachmentValue = [{ url: dataUrl, filename: safeFileName }];
+      attachmentValue = [{ url: `data:${safeMimeType};base64,${fileBase64}`, filename: safeFileName }];
     }
 
-    // ── Guardar en Airtable ──────────────────────────────────────────────────
-    const fieldName = targetTable === 'Sesiones' ? 'Lista asistencia' : 'Lista de Asistencia';
-    const updateResult = await airtableFetch(
-      'PATCH',
-      `/${targetTable}/${targetId}`,
-      { fields: { [fieldName]: attachmentValue } }
-    );
+    // ── 4. Guardar en la sesión ────────────────────────────────────────────
+    if (sessionId) {
+      const updateRes = await airtableFetch('PATCH', `/Sesiones/${sessionId}`, {
+        fields: { 'Lista asistencia': attachmentValue }
+      });
 
-    if (updateResult.status >= 400) {
-      const errMsg = updateResult.data?.error?.message || updateResult.data?.error || `Error Airtable ${updateResult.status}`;
-      return { statusCode: updateResult.status, headers: corsHeaders, body: JSON.stringify({ success: false, error: errMsg, detail: updateResult.data }) };
+      if (updateRes.status < 400) {
+        return {
+          statusCode: 200,
+          headers: corsHeaders,
+          body: JSON.stringify({
+            success: true,
+            message: 'PDF guardado correctamente en Sesiones',
+            recordId: sessionId,
+            savedIn: 'Sesiones',
+            fieldUsed: 'Lista asistencia'
+          })
+        };
+      }
+
+      const err422 = updateRes.data?.error?.message || JSON.stringify(updateRes.data);
+      console.error('❌ Error guardando en Sesiones:', err422);
+      return {
+        statusCode: updateRes.status,
+        headers: corsHeaders,
+        body: JSON.stringify({ success: false, error: err422, hint: 'Verifica que el campo "Lista asistencia" existe en la tabla Sesiones de Airtable.' })
+      };
     }
 
+    // ── 5. Fallback total: error con instrucciones ────────────────────────
     return {
-      statusCode: 200,
+      statusCode: 422,
       headers: corsHeaders,
       body: JSON.stringify({
-        success: true,
-        message: `PDF guardado en ${targetTable}`,
-        recordId: updateResult.data?.id,
-        savedIn: targetTable
+        success: false,
+        error: 'No se pudo vincular o crear una sesión para esta capacitación. Ve a Airtable y crea manualmente una sesión vinculada a esta capacitación, luego intenta de nuevo.'
       })
     };
 
   } catch (error) {
     console.error('Error en upload-attendance-pdf:', error);
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ success: false, error: error.message }) };
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ success: false, error: error.message })
+    };
   }
 };

@@ -5262,6 +5262,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 sortedTrainings.forEach(training => {
                     const option = document.createElement('option');
                     option.value = training.id;
+                    option.dataset.code = training.fields['Código de Acceso'] || training.fields['Código Acceso'] || '';
                     
                     const titulo = training.fields['Título'] || 'Sin título';
                     const departamento = training.fields['ProcesoAtencion'] || training.fields['Departamento'] || '';
@@ -8347,11 +8348,16 @@ function makeCronogramaFilterFormula(year, tipo) {
                     reader.readAsDataURL(participantsPdfFile);
                 });
 
+                // Obtener el código de la capacitación para crear sesión si no existe
+                const trainingSelect = document.getElementById('reportTrainingSelect');
+                const trainingCode = trainingSelect?.options[trainingSelect.selectedIndex]?.dataset?.code || '';
+
                 const response = await fetch('/.netlify/functions/upload-attendance-pdf', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         trainingId,
+                        trainingCode,
                         fileName: participantsPdfFile.name || 'lista_asistencia.pdf',
                         fileBase64,
                         mimeType: 'application/pdf'
