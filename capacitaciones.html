@@ -4903,14 +4903,16 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 participations.forEach(p => {
                     const f = p.fields || {};
-                    const pre = parseFloat(f['Pretest Score'] || f['Pre-test Score'] || 0);
+                    const pre  = parseFloat(f['Pretest Score']  || f['Pre-test Score']  || 0);
                     const post = parseFloat(f['Post-test Score'] || f['Posttest Score'] || 0);
-                    const fecha = (f['Fecha de Inicio'] || f['Fecha Inicio'] || f['Fecha'] || '').slice(0, 10);
-                    const dept = f['Servicio'] || f['Departamento'] || 'Sin servicio';
-                    const completadoPost = f['Completado Posttest'] || f['Completado Post-Test'];
+                    // Fecha: propia o fecha de creación de Airtable
+                    const fecha = (f['Fecha de Inicio'] || f['Fecha Inicio'] || f['Fecha'] || p.createdTime || '').slice(0, 10);
+                    const dept = f['Departamento'] || f['Servicio'] || 'Sin servicio';
+                    const completadoPost = !!(f['Completado Posttest'] || f['Completado Post-Test']);
 
                     if (pre > 0) { sumPre += pre; countPre++; }
-                    if (post > 0) { sumPost += post; countPost++; completados++; }
+                    if (post > 0) { sumPost += post; countPost++; }
+                    if (completadoPost) completados++;
 
                     if (fecha) byDay[fecha] = (byDay[fecha] || 0) + 1;
                     byDept[dept] = (byDept[dept] || 0) + 1;
@@ -5372,13 +5374,69 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const qLabels = { 1:'Ene-Mar', 2:'Abr-Jun', 3:'Jul-Sep', 4:'Oct-Dic' };
 
                 // Obtener capacitaciones y participaciones
-                const [trainingsRes, partsRes] = await Promise.all([
+                const [trainingsRes, partsRes, sessionsRes] = await Promise.all([
                     airtableFetchAll('/Capacitaciones'),
-                    airtableFetchAll('/Participaciones')
+                    airtableFetchAll('/Participaciones'),
+                    airtableFetchAll('/Sesiones').catch(() => [])
                 ]);
 
                 const allTrainings = trainingsRes || [];
-                const allParts = partsRes || [];
+                const allSessions  = sessionsRes  || [];
+                const allParts     = partsRes     || [];
+
+                // Mapa: sessionId → trainingId (para resolver vínculos indirectos)
+                const sessionToTraining = {};
+                allSessions.forEach(s => {
+                    const capLinked = s.fields?.['Capacitación'] || s.fields?.['Capacitacion'] || [];
+                    if (Array.isArray(capLinked) && capLinked.length > 0) {
+                        sessionToTraining[s.id] = capLinked[0];
+                    }
+                });
+
+                // Mapa: trainingId → Set de sessionIds
+                const trainingToSessions = {};
+                Object.entries(sessionToTraining).forEach(([sid, tid]) => {
+                    if (!trainingToSessions[tid]) trainingToSessions[tid] = new Set();
+                    trainingToSessions[tid].add(sid);
+                });
+
+                // Helper: dada una participación, obtener el trainingId al que pertenece
+                function resolvePartTrainingId(p, trainingsArr) {
+                    const f = p.fields || {};
+                    const linked = [
+                        ...(Array.isArray(f['Capacitación']) ? f['Capacitación'] : []),
+                        ...(Array.isArray(f['Capacitacion']) ? f['Capacitacion'] : []),
+                        ...(Array.isArray(f['Sesión'])        ? f['Sesión']        : []),
+                        ...(Array.isArray(f['Sesion'])        ? f['Sesion']        : [])
+                    ];
+                    const trainingSet = new Set(trainingsArr.map(t => t.id));
+                    for (const id of linked) {
+                        if (trainingSet.has(id)) return id;
+                        if (sessionToTraining[id]) return sessionToTraining[id];
+                    }
+                    return null;
+                }
+
+                // Mapa trainingId → Código de Acceso
+                const trainingCodigos = {};
+                allTrainings.forEach(t => {
+                    const c = t.fields?.['Código de Acceso'] || t.fields?.['Código Acceso'] || '';
+                    if (c) trainingCodigos[t.id] = c.toString().toUpperCase().trim();
+                });
+
+                // Mapa código → trainingId (fallback para participaciones sin vínculo)
+                const codigoToTraining = {};
+                Object.entries(trainingCodigos).forEach(([tid, cod]) => { codigoToTraining[cod] = tid; });
+
+                // Pre-calcular _trainingId en cada participación
+                allParts.forEach(p => {
+                    p._trainingId = resolvePartTrainingId(p, allTrainings);
+                    if (!p._trainingId) {
+                        const f = p.fields || {};
+                        const pCod = (f['Código Acceso'] || f['Código de Acceso'] || '').toString().toUpperCase().trim();
+                        if (pCod && codigoToTraining[pCod]) p._trainingId = codigoToTraining[pCod];
+                    }
+                });
 
                 // Helper para extraer fecha de una capacitación (acepta todos los campos posibles)
                 function getTrainingDate(t) {
@@ -5401,11 +5459,18 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 });
 
                 // Filtrar participaciones del trimestre
+                // Estrategia: fecha propia O fecha de la capacitación a la que pertenecen
+                const trimTrainingIds = new Set(trimTrainings.map(t => t.id));
                 const trimParts = allParts.filter(p => {
+                    // Estrategia 1: la participación tiene su propia fecha en el rango
                     const fechaRaw = getPartDate(p);
-                    if (!fechaRaw) return false;
-                    const fecha = fechaRaw.slice(0, 10);
-                    return fecha >= dateStart && fecha <= dateEnd;
+                    if (fechaRaw) {
+                        const fecha = fechaRaw.slice(0, 10);
+                        if (fecha >= dateStart && fecha <= dateEnd) return true;
+                    }
+                    // Estrategia 2: pertenece a una capacitación del trimestre
+                    if (p._trainingId && trimTrainingIds.has(p._trainingId)) return true;
+                    return false;
                 });
 
                 // Scope filter (departamento)
@@ -5449,14 +5514,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const trainingIds = new Set(trimTrainings.map(t => t.id));
                 const trainingsWithStats = trimTrainings.map(t => {
                     const tf = t.fields || {};
-                    const tParts = partsScoped.filter(p => {
-                        const f = p.fields || {};
-                        const linked = f['Capacitación'] || f['Capacitacion'] || f['Sesión'] || f['Sesion'] || [];
-                        const codigoAcceso = f['Código Acceso'] || f['Código de Acceso'] || '';
-                        const tCodigo = tf['Código de Acceso'] || tf['Código Acceso'] || '';
-                        return (Array.isArray(linked) && linked.includes(t.id)) ||
-                               (tCodigo && codigoAcceso === tCodigo);
-                    });
+                    const tParts = partsScoped.filter(p => p._trainingId === t.id);
                     const tPre = tParts.filter(p => parseFloat(p.fields?.['Pretest Score'] || p.fields?.['Pre-test Score'] || 0) > 0);
                     const tPost = tParts.filter(p => parseFloat(p.fields?.['Post-test Score'] || p.fields?.['Posttest Score'] || 0) > 0);
                     const tAvgPre = tPre.length > 0 ? Math.round(tPre.reduce((s, p) => s + parseFloat(p.fields?.['Pretest Score'] || p.fields?.['Pre-test Score'] || 0), 0) / tPre.length) : 0;
@@ -7804,48 +7862,100 @@ function makeCronogramaFilterFormula(year, tipo) {
                 reportLoading.style.display = 'block';
                 
                 console.log('📊 Cargando reporte para capacitación:', trainingId);
-                
-                // Consultar Airtable directamente
-                console.log('📊 Consultando participaciones para capacitación:', trainingId);
 
-                // Obtener capacitación
+                // ── Paso 1: Obtener datos de la capacitación ──────────────────────────────
                 const trainingRes = await airtableProxyRequest({ method: 'GET', path: `/Capacitaciones/${trainingId}` });
+                const tf_codigo = trainingRes?.fields?.['Código de Acceso'] || trainingRes?.fields?.['Código Acceso'] || '';
 
-                // Obtener TODAS las participaciones y filtrar por capacitación
+                // ── Paso 2: Buscar Sesiones vinculadas a esta capacitación ────────────────
+                // Estrategia A: filtrar en tabla Sesiones por linked record Capacitación
+                let sessionIds = new Set();
+                try {
+                    const sesFilter = encodeURIComponent(`SEARCH("${trainingId}", ARRAYJOIN({Capacitación}))`);
+                    const sesRes = await airtableProxyRequest({ method: 'GET', path: `/Sesiones?filterByFormula=${sesFilter}` });
+                    const sesRecords = sesRes?.records || [];
+                    sesRecords.forEach(s => sessionIds.add(s.id));
+                    // También sesiones con el mismo código de acceso
+                    sesRecords.forEach(s => {
+                        const sCod = s.fields?.['Código de Acceso'] || s.fields?.['Código Acceso'] || '';
+                        if (sCod) sessionIds.add(s.id);
+                    });
+                    console.log(`📋 Sesiones encontradas para esta capacitación: ${sesRecords.length}`);
+                } catch(e) {
+                    console.warn('⚠️ No se pudo consultar tabla Sesiones:', e.message);
+                }
+
+                // Estrategia B: buscar sesiones por código de acceso igual al de la capacitación
+                if (tf_codigo) {
+                    try {
+                        const codFilter = encodeURIComponent(`OR({Código de Acceso}="${tf_codigo}", {Código Acceso}="${tf_codigo}")`);
+                        const sesRes2 = await airtableProxyRequest({ method: 'GET', path: `/Sesiones?filterByFormula=${codFilter}` });
+                        (sesRes2?.records || []).forEach(s => sessionIds.add(s.id));
+                    } catch(e) { /* silencioso */ }
+                }
+
+                const sessionIdsArr = Array.from(sessionIds);
+                console.log(`📋 IDs de sesiones a buscar:`, sessionIdsArr);
+
+                // ── Paso 3: Obtener TODAS las participaciones ────────────────────────────
                 const partRes = await airtableFetchAll('/Participaciones');
                 const allParts = Array.isArray(partRes) ? partRes : (partRes?.records || []);
+                console.log(`📋 Total participaciones en BD: ${allParts.length}`);
 
-                // Filtrar participaciones que pertenecen a esta capacitación
+                // ── Paso 4: Filtrar participaciones por múltiples estrategias ─────────────
                 const partsFiltered = allParts.filter(p => {
                     const f = p.fields || {};
-                    const linked = f['Capacitación'] || f['Capacitacion'] || f['Sesión'] || f['Sesion'] || [];
-                    const codigoAcceso = f['Código Acceso'] || f['Código de Acceso'] || '';
-                    const trainingCodigo = trainingRes?.fields?.['Código de Acceso'] || trainingRes?.fields?.['Código Acceso'] || '';
-                    return (Array.isArray(linked) && linked.includes(trainingId)) ||
-                           (trainingCodigo && codigoAcceso === trainingCodigo);
+
+                    // IDs vinculados (campo puede apuntar a Capacitación o Sesión)
+                    const linked = [
+                        ...(Array.isArray(f['Capacitación'])  ? f['Capacitación']  : []),
+                        ...(Array.isArray(f['Capacitacion'])  ? f['Capacitacion']  : []),
+                        ...(Array.isArray(f['Sesión'])         ? f['Sesión']         : []),
+                        ...(Array.isArray(f['Sesion'])         ? f['Sesion']         : [])
+                    ];
+
+                    // Estrategia 1: vinculado directamente al ID de la capacitación
+                    if (linked.includes(trainingId)) return true;
+
+                    // Estrategia 2: vinculado a alguna sesión de esta capacitación
+                    if (sessionIdsArr.length > 0 && linked.some(id => sessionIds.has(id))) return true;
+
+                    // Estrategia 3: tiene el mismo código de acceso que la capacitación
+                    const pCodigo = f['Código Acceso'] || f['Código de Acceso'] || '';
+                    if (tf_codigo && pCodigo && pCodigo.toString().toUpperCase() === tf_codigo.toString().toUpperCase()) return true;
+
+                    return false;
                 });
 
-                // Construir participantes
+                console.log(`📊 Participaciones filtradas para la capacitación: ${partsFiltered.length}`);
+                if (partsFiltered.length === 0) {
+                    console.warn('⚠️ Sin participaciones con vínculo. Revisa que el campo "Capacitación" o "Sesión" esté vinculado en Airtable, o que el Código de Acceso coincida.');
+                }
+
+                // ── Paso 5: Construir participantes ──────────────────────────────────────
                 const participants = partsFiltered.map(p => {
                     const f = p.fields || {};
-                    const pre = parseFloat(f['Pretest Score'] || f['Pre-test Score'] || 0);
+                    const pre  = parseFloat(f['Pretest Score']  || f['Pre-test Score']  || 0);
                     const post = parseFloat(f['Post-test Score'] || f['Posttest Score'] || 0);
                     const completadoPost = !!(f['Completado Posttest'] || f['Completado Post-Test']);
-                    const completadoPre = !!(f['Completado Pretest'] || f['Completado Pre-Test']);
+                    const completadoPre  = !!(f['Completado Pretest']  || f['Completado Pre-Test']);
+                    // Mejora % puede venir calculada desde Airtable
+                    const mejoraCampo = parseFloat(f['Mejora %'] || f['Mejora'] || 0);
+                    const improvement = post > 0 ? Math.round(post - pre) : (mejoraCampo || 0);
                     let status = 'Registrado';
                     if (completadoPost) status = 'Completado';
                     else if (completadoPre) status = 'Pretest Completado';
                     return {
                         id: p.id,
-                        nombre: f['Nombre Completo'] || f['Nombre'] || 'Sin nombre',
-                        email: f['Email'] || f['Correo'] || '',
-                        departamento: f['Servicio'] || f['Departamento'] || '-',
-                        cargo: f['Profesión'] || f['Profesion'] || f['Cargo'] || '-',
+                        nombre:      f['Nombre Completo'] || f['Nombre'] || 'Sin nombre',
+                        email:       f['Email'] || f['Correo'] || '',
+                        departamento:f['Departamento'] || f['Servicio'] || '-',
+                        cargo:       f['Profesión'] || f['Profesion'] || f['Cargo'] || '-',
                         pretestScore: pre,
                         postestScore: post,
-                        improvement: post > 0 ? Math.round(post - pre) : 0,
+                        improvement,
                         status,
-                        fecha: f['Fecha de Inicio'] || f['Fecha Inicio'] || f['Fecha'] || ''
+                        fecha: f['Fecha de Inicio'] || f['Fecha Inicio'] || f['Fecha'] || p.createdTime || ''
                     };
                 });
 
