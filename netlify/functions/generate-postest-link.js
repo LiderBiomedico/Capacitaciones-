@@ -1,8 +1,9 @@
-// /.netlify/functions/create-session.js
-// Crea una nueva sesión en Airtable vinculada a una capacitación
+// /.netlify/functions/generate-postest-link.js
+// Genera un código único de postest y actualiza la participación en Airtable
 // Variables de entorno: AIRTABLE_API_KEY, AIRTABLE_BASE_ID, SITE_URL (opcional)
 
 const https = require('https');
+const crypto = require('crypto');
 
 function airtableFetch(method, path, body) {
   return new Promise((resolve, reject) => {
@@ -48,40 +49,44 @@ exports.handler = async (event) => {
   }
 
   try {
-    const { code, trainingId } = JSON.parse(event.body || '{}');
+    const { sessionId, participationId, sessionCode, userName, userEmail, department } = JSON.parse(event.body || '{}');
 
-    if (!code || !trainingId) {
-      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'Parámetros code y trainingId son requeridos' }) };
+    if (!participationId) {
+      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'participationId es requerido' }) };
     }
 
+    // Generar código único para postest
+    const randomPart = crypto.randomBytes(4).toString('hex').toUpperCase();
+    const codePrefix = (sessionCode || 'SES').toString().substring(0, 8).toUpperCase();
+    const postestCode = `POSTTEST-${codePrefix}-${randomPart}`;
+
     const SITE_URL = process.env.SITE_URL || process.env.URL || 'https://capacitaciones-hslv.netlify.app';
-    const codeUpper = code.toUpperCase().trim();
-    const accessLink = `${SITE_URL}?code=${codeUpper}`;
+    const postestUrl = `${SITE_URL}?code=${postestCode}&type=postest&pid=${participationId}`;
 
-    const sessionBody = {
-      fields: {
-        'Código de Acceso': codeUpper,
-        'Link Acceso': accessLink,
-        'Capacitación': [trainingId],
-        'Activa': true,
-        'Fecha Inicio': new Date().toISOString().split('T')[0]
-      }
-    };
-
-    const result = await airtableFetch('POST', '/Sesiones', sessionBody);
-
-    if (result.status >= 400) {
-      const errMsg = result.data?.error?.message || result.data?.error || `Error Airtable ${result.status}`;
-      return { statusCode: result.status, headers: corsHeaders, body: JSON.stringify({ success: false, error: errMsg }) };
+    // Intentar guardar el código en la participación (falla silenciosamente si los campos no existen)
+    try {
+      await airtableFetch('PATCH', `/Participaciones/${participationId}`, {
+        fields: {
+          'Código Postest': postestCode,
+          'Link Postest': postestUrl
+        }
+      });
+    } catch (patchErr) {
+      console.warn('⚠️ No se pudo guardar código postest en participación (continuando):', patchErr.message);
     }
 
     return {
       statusCode: 200,
       headers: corsHeaders,
-      body: JSON.stringify({ success: true, session: result.data, id: result.data.id, code: codeUpper, accessLink })
+      body: JSON.stringify({
+        success: true,
+        postestCode,
+        postestUrl,
+        participationId
+      })
     };
   } catch (error) {
-    console.error('Error en create-session:', error);
+    console.error('Error en generate-postest-link:', error);
     return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ success: false, error: error.message }) };
   }
 };

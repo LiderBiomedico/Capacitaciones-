@@ -1,81 +1,114 @@
-// ==========================================
-// netlify/functions/toggle-training-status.js
-// Finaliza o reactiva una capacitación en Airtable
-// ==========================================
+// /.netlify/functions/toggle-training-status.js
+// Finaliza o reactiva una capacitación (activa/desactiva sus sesiones)
+// Variables de entorno: AIRTABLE_API_KEY, AIRTABLE_BASE_ID
 
-const AIRTABLE_API_KEY = process.env.AIRTABLE_API_KEY;
-const AIRTABLE_BASE_ID = process.env.AIRTABLE_BASE_ID;
-const AIRTABLE_API_URL = 'https://api.airtable.com/v0';
+const https = require('https');
 
-async function airtableRequest(method, path, body) {
-  const url = `${AIRTABLE_API_URL}/${AIRTABLE_BASE_ID}${path}`;
-  const opts = {
-    method,
-    headers: {
-      'Authorization': `Bearer ${AIRTABLE_API_KEY}`,
-      'Content-Type': 'application/json'
-    }
-  };
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(url, opts);
-  const text = await res.text();
-  let data;
-  try { data = JSON.parse(text); } catch { data = {}; }
-  if (!res.ok) throw new Error(data?.error?.message || `Error ${res.status}`);
-  return data;
+function airtableFetch(method, path, body) {
+  return new Promise((resolve, reject) => {
+    const API_KEY = process.env.AIRTABLE_API_KEY;
+    const BASE_ID = process.env.AIRTABLE_BASE_ID;
+    const url = `https://api.airtable.com/v0/${BASE_ID}${path}`;
+    const parsedUrl = new URL(url);
+    const postData = body ? JSON.stringify(body) : null;
+
+    const options = {
+      hostname: parsedUrl.hostname,
+      path: parsedUrl.pathname + parsedUrl.search,
+      method: method.toUpperCase(),
+      headers: { 'Authorization': `Bearer ${API_KEY}`, 'Content-Type': 'application/json' }
+    };
+    if (postData) options.headers['Content-Length'] = Buffer.byteLength(postData);
+
+    const req = https.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
+        catch (e) { resolve({ status: res.statusCode, data: { error: data } }); }
+      });
+    });
+    req.on('error', reject);
+    if (postData) req.write(postData);
+    req.end();
+  });
 }
 
 exports.handler = async (event) => {
-  const headers = {
+  const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Content-Type': 'application/json'
   };
 
-  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
-
-  let payload;
-  try { payload = JSON.parse(event.body || '{}'); } catch {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'Body inválido' }) };
-  }
-
-  const { trainingId, action } = payload;
-
-  if (!trainingId || !action) {
-    return { statusCode: 400, headers, body: JSON.stringify({ error: 'trainingId y action son requeridos' }) };
+  if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: corsHeaders, body: '' };
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'Método no permitido' }) };
   }
 
   try {
-    const nuevoEstado = action === 'finalize' ? 'finalizada' : 'active';
-    const activa = action !== 'finalize';
+    const { trainingId, action } = JSON.parse(event.body || '{}');
 
-    // Actualizar capacitación
-    await airtableRequest('PATCH', `/Capacitaciones/${trainingId}`, {
+    if (!trainingId || !action) {
+      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'trainingId y action son requeridos' }) };
+    }
+
+    const isActive = action === 'reactivate';
+
+    // 1. Actualizar estado de la capacitación
+    const trainingUpdate = {
       fields: {
-        'Estado': nuevoEstado,
-        'Activa': activa
+        'Activa': isActive,
+        'Estado': isActive ? 'Activa' : 'Finalizada'
       }
-    });
+    };
+
+    const trainingResult = await airtableFetch('PATCH', `/Capacitaciones/${trainingId}`, trainingUpdate);
+
+    if (trainingResult.status >= 400) {
+      const errMsg = trainingResult.data?.error?.message || `Error ${trainingResult.status}`;
+      return { statusCode: trainingResult.status, headers: corsHeaders, body: JSON.stringify({ success: false, error: errMsg }) };
+    }
+
+    // 2. Buscar todas las sesiones vinculadas a esta capacitación
+    const encoded = encodeURIComponent(`SEARCH("${trainingId}", ARRAYJOIN({Capacitación}))`);
+    const sessionsResult = await airtableFetch('GET', `/Sesiones?filterByFormula=${encoded}`, null);
+
+    let sessionsUpdated = 0;
+
+    if (sessionsResult.status === 200 && sessionsResult.data?.records?.length > 0) {
+      const sessions = sessionsResult.data.records;
+
+      // Actualizar cada sesión en lotes de 10 (límite de Airtable)
+      for (let i = 0; i < sessions.length; i += 10) {
+        const batch = sessions.slice(i, i + 10);
+        const batchBody = {
+          records: batch.map(s => ({
+            id: s.id,
+            fields: { 'Activa': isActive }
+          }))
+        };
+
+        await airtableFetch('PATCH', '/Sesiones', batchBody);
+        sessionsUpdated += batch.length;
+      }
+    }
 
     return {
       statusCode: 200,
-      headers,
+      headers: corsHeaders,
       body: JSON.stringify({
         success: true,
         action,
         trainingId,
-        sessionsUpdated: 0,
-        message: action === 'finalize' ? 'Capacitación finalizada' : 'Capacitación reactivada'
+        sessionsUpdated,
+        message: isActive ? 'Capacitación reactivada correctamente' : 'Capacitación finalizada correctamente'
       })
     };
 
-  } catch (err) {
-    console.error('Error toggle-training-status:', err.message);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ success: false, error: err.message })
-    };
+  } catch (error) {
+    console.error('Error en toggle-training-status:', error);
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ success: false, error: error.message }) };
   }
 };
