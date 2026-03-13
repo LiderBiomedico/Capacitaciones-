@@ -100,7 +100,7 @@ exports.handler = async (event) => {
     };
   }
 
-  const { trainingId, trainingCode, fileName, fileBase64, mimeType } = body;
+  const { trainingId, trainingCode, sessionId, fileName, fileBase64, mimeType } = body;
 
   if (!fileBase64) {
     return {
@@ -109,18 +109,36 @@ exports.handler = async (event) => {
       body: JSON.stringify({ success: false, error: 'No se recibió el archivo base64.' }),
     };
   }
-  if (!trainingId && !trainingCode) {
+  if (!trainingId && !trainingCode && !sessionId) {
     return {
       statusCode: 400,
       headers: corsHeaders(),
-      body: JSON.stringify({ success: false, error: 'Se requiere trainingId o trainingCode.' }),
+      body: JSON.stringify({ success: false, error: 'Se requiere trainingId, sessionId o trainingCode.' }),
     };
   }
 
-  // ── Paso 1: Buscar sesión vinculada a la capacitación ─────────────────────────
+  // ── Paso 1: Buscar sesión ──────────────────────────────────────────────────────
   let sessionRecord = null;
   let sessionFieldsList = [];
 
+  // Atajo: si el frontend envió el sessionId directamente, usarlo sin buscar
+  if (sessionId) {
+    try {
+      const direct = await airtableFetch(
+        `${AIRTABLE_API}/${baseId}/Sesiones/${sessionId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (direct && direct.id) {
+        sessionRecord = direct;
+      }
+    } catch (err) {
+      // Si falla la búsqueda directa, continuar con el flujo normal
+      console.warn('No se pudo obtener sesión por ID directo, buscando por capacitación:', err.message);
+    }
+  }
+
+  // Si no se resolvió por sessionId, buscar por trainingId / trainingCode
+  if (!sessionRecord) {
   try {
     const allSessions = await fetchAllRecords(baseId, 'Sesiones', token);
     sessionFieldsList = allSessions.length > 0 ? Object.keys(allSessions[0].fields || {}) : [];
@@ -164,6 +182,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ success: false, error: `Error consultando Sesiones: ${err.message}` }),
     };
   }
+  } // fin if (!sessionRecord) búsqueda por capacitación
 
   if (!sessionRecord) {
     return {
@@ -188,7 +207,7 @@ exports.handler = async (event) => {
   //
   // Usamos el endpoint de uploadAttachment (Content API) que acepta binario directamente.
 
-  const sessionId = sessionRecord.id;
+  const sessionRecordId = sessionRecord.id;
   const safeFileName = (fileName || 'lista_asistencia.pdf').replace(/[^a-zA-Z0-9._\-]/g, '_');
 
   // Convertir base64 a Buffer
@@ -218,7 +237,7 @@ exports.handler = async (event) => {
 
   try {
     // Airtable Content API: subir attachment directamente con binario
-    const uploadUrl = `${AIRTABLE_API}/${baseId}/Sesiones/${sessionId}/uploadAttachment`;
+    const uploadUrl = `${AIRTABLE_API}/${baseId}/Sesiones/${sessionRecordId}/uploadAttachment`;
 
     const uploadRes = await fetch(uploadUrl, {
       method: 'POST',
@@ -241,7 +260,7 @@ exports.handler = async (event) => {
       // Si Content API no está disponible, fallback al método PATCH con data-URI
       if (uploadRes.status === 404 || uploadRes.status === 405) {
         return await patchWithDataUri({
-          token, baseId, sessionId, safeFileName, mimeType, fileBase64,
+          token, baseId, sessionId: sessionRecordId, safeFileName, mimeType, fileBase64,
         });
       }
 
@@ -253,8 +272,8 @@ exports.handler = async (event) => {
       headers: corsHeaders(),
       body: JSON.stringify({
         success: true,
-        sessionId,
-        sessionName: sessionRecord.fields?.['Capacitaciones']?.[0] || sessionId,
+        sessionId: sessionRecordId,
+        sessionName: sessionRecord.fields?.['Capacitaciones']?.[0] || sessionRecordId,
         fileName: safeFileName,
         message: 'PDF subido correctamente a la sesión.',
       }),

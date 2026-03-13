@@ -2121,6 +2121,17 @@ overflow: hidden;
                                 Puedes adjuntar un PDF con el listado de participantes (por ejemplo, listado firmado). Se mostrará aquí para consulta y descarga.
                             </p>
 
+                            <!-- Selector de sesión para el PDF -->
+                            <div id="pdfSessionSelectorWrapper" style="display:none; margin-bottom: 1rem;">
+                                <div class="form-group" style="margin:0;">
+                                    <label><i class="fas fa-calendar-alt"></i> Sesión destino</label>
+                                    <select id="pdfSessionSelect" style="width:100%;">
+                                        <option value="">-- Selecciona la sesión --</option>
+                                    </select>
+                                    <small style="color:#6b7280; font-weight: 500;">El PDF se guardará en el campo "Lista de Asistencia" de la sesión seleccionada.</small>
+                                </div>
+                            </div>
+
                             <div class="form-row" style="display:flex; flex-wrap:wrap; gap: 1rem; align-items:end;">
                                 <div class="form-group" style="margin:0; flex: 1; min-width: 260px;">
                                     <label><i class="fas fa-paperclip"></i> Archivo PDF</label>
@@ -7989,6 +8000,37 @@ function makeCronogramaFilterFormula(year, tipo) {
                         }
                     });
                     console.log(`📋 Sesiones encontradas para ${trainingId}: ${sessionIds.size}, códigos:`, Array.from(sessionCodigos));
+
+                    // ── Llenar selector de sesiones para el PDF ──────────────────────────────
+                    const pdfWrapper = document.getElementById('pdfSessionSelectorWrapper');
+                    const pdfSelect  = document.getElementById('pdfSessionSelect');
+                    if (pdfSelect) {
+                        pdfSelect.innerHTML = '<option value="">-- Selecciona la sesión --</option>';
+                        const sesionesVinculadas = allSesiones.filter(s => {
+                            const cap = s.fields?.['Capacitaciones'] || s.fields?.['Capacitación'] || s.fields?.['Capacitacion'] || [];
+                            return (Array.isArray(cap) ? cap : []).includes(trainingId);
+                        });
+                        // Ordenar por fecha descendente (más reciente primero)
+                        sesionesVinculadas.sort((a, b) =>
+                            (b.fields?.['Fecha Inicio'] || '').localeCompare(a.fields?.['Fecha Inicio'] || '')
+                        );
+                        sesionesVinculadas.forEach(s => {
+                            const opt = document.createElement('option');
+                            opt.value = s.id;
+                            const fecha = s.fields?.['Fecha Inicio'] || '';
+                            const cod   = s.fields?.['Código Acceso'] || s.fields?.['Código de Acceso'] || s.id;
+                            const hora  = s.fields?.['Hora Inicio'] || '';
+                            opt.textContent = `${fecha ? fecha + (hora ? ' ' + hora : '') + ' — ' : ''}Código: ${cod}`;
+                            pdfSelect.appendChild(opt);
+                        });
+                        // Preseleccionar automáticamente si solo hay una sesión
+                        if (sesionesVinculadas.length === 1) {
+                            pdfSelect.value = sesionesVinculadas[0].id;
+                        }
+                        if (pdfWrapper) {
+                            pdfWrapper.style.display = sesionesVinculadas.length > 0 ? 'block' : 'none';
+                        }
+                    }
                 } catch(e) {
                     console.warn('⚠️ No se pudo consultar Sesiones:', e.message);
                 }
@@ -8333,6 +8375,15 @@ function makeCronogramaFilterFormula(year, tipo) {
                 return;
             }
 
+            // Validar que se haya seleccionado una sesión específica
+            const pdfSessionSelect = document.getElementById('pdfSessionSelect');
+            const selectedSessionId = pdfSessionSelect?.value || '';
+            const sessionSelectorVisible = document.getElementById('pdfSessionSelectorWrapper')?.style.display !== 'none';
+            if (sessionSelectorVisible && !selectedSessionId) {
+                Swal.fire({ icon: 'warning', title: 'Sin sesión', text: 'Selecciona la sesión en la que deseas guardar el PDF.' });
+                return;
+            }
+
             const btnSave = document.getElementById('btnSaveToAirtable');
             if (btnSave) {
                 btnSave.disabled = true;
@@ -8357,6 +8408,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         trainingId,
+                        sessionId: selectedSessionId || null,
                         trainingCode,
                         fileName: participantsPdfFile.name || 'lista_asistencia.pdf',
                         fileBase64,
