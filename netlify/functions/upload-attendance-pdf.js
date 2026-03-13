@@ -1,7 +1,6 @@
 // /.netlify/functions/upload-attendance-pdf.js
-// Guarda PDF en campo 'Lista asistencia' de la tabla Sesiones
-// Si no hay sesión vinculada, la crea automáticamente
-// Variables de entorno: AIRTABLE_API_KEY, AIRTABLE_BASE_ID, SITE_URL
+// Guarda PDF de asistencia en la sesión vinculada a la capacitación
+// Estrategia: GET la sesión → detectar campo attachment → guardar
 
 const https = require('https');
 
@@ -82,25 +81,23 @@ exports.handler = async (event) => {
 
   try {
     const { trainingId, trainingCode, fileName, fileBase64, mimeType } = JSON.parse(event.body || '{}');
-
     if (!trainingId || !fileBase64 || !fileName) {
       return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'trainingId, fileName y fileBase64 son requeridos' }) };
     }
-
     const fileSizeBytes = Buffer.byteLength(fileBase64, 'base64');
     if (fileSizeBytes > 5 * 1024 * 1024) {
-      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'El archivo supera el límite de 5MB' }) };
+      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ success: false, error: 'El archivo supera 5MB' }) };
     }
-
     const safeFileName = fileName || 'lista_asistencia.pdf';
     const safeMimeType = mimeType || 'application/pdf';
 
-    // ── 1. Buscar sesión vinculada (filtro en JS) ───────────────────────────
+    // ── PASO 1: Buscar sesión vinculada (filtro JS, no API) ─────────────────
     let sessionId = null;
-    let allSessions = [];
+    let sessionFields = {};
 
     try {
       let offset = null;
+      const allSessions = [];
       do {
         const path = `/Sesiones?pageSize=100${offset ? '&offset=' + encodeURIComponent(offset) : ''}`;
         const res = await airtableFetch('GET', path);
@@ -108,29 +105,33 @@ exports.handler = async (event) => {
         offset = res.data?.offset || null;
       } while (offset);
 
+      console.log(`Sesiones totales encontradas: ${allSessions.length}`);
+
       const match = allSessions.find(s => {
         const linked = s.fields?.['Capacitaciones'] || s.fields?.['Capacitación'] || s.fields?.['Capacitacion'] || [];
         return Array.isArray(linked) && linked.includes(trainingId);
       });
+
       if (match) {
         sessionId = match.id;
-        console.log('✅ Sesión vinculada encontrada:', sessionId);
+        sessionFields = match.fields || {};
+        console.log(`Sesión encontrada: ${sessionId}`);
+        console.log(`Campos de la sesión: ${Object.keys(sessionFields).join(', ')}`);
       }
     } catch (e) {
-      console.warn('⚠️ Error buscando sesiones:', e.message);
+      console.warn('Error buscando sesiones:', e.message);
     }
 
-    // ── 2. Si no hay sesión, crear una nueva automáticamente ───────────────
+    // ── PASO 2: Si no hay sesión, crearla ───────────────────────────────────
     if (!sessionId) {
-      console.log('⚠️ Sin sesión vinculada, creando una automáticamente...');
+      console.log('Sin sesión vinculada, creando una nueva...');
       try {
-        // Obtener datos de la capacitación para el código
         const capRes = await airtableFetch('GET', `/Capacitaciones/${trainingId}`);
         const capFields = capRes.data?.fields || {};
         const capCode = trainingCode || capFields['Código de Acceso'] || capFields['Código Acceso'] || 'ASIST';
         const siteUrl = process.env.SITE_URL || 'https://capacitaciones-hslv.netlify.app';
 
-        const newSession = await airtableFetch('POST', '/Sesiones', {
+        const newSes = await airtableFetch('POST', '/Sesiones', {
           fields: {
             'Código Acceso': capCode,
             'Capacitaciones': [trainingId],
@@ -140,68 +141,112 @@ exports.handler = async (event) => {
           }
         });
 
-        if (newSession.status < 400 && newSession.data?.id) {
-          sessionId = newSession.data.id;
-          console.log('✅ Sesión creada automáticamente:', sessionId);
+        if (newSes.status < 400 && newSes.data?.id) {
+          sessionId = newSes.data.id;
+          sessionFields = newSes.data.fields || {};
+          console.log('Sesión creada:', sessionId);
+          console.log('Campos sesión nueva:', Object.keys(sessionFields).join(', '));
         } else {
-          console.warn('⚠️ No se pudo crear sesión:', JSON.stringify(newSession.data));
+          console.warn('No se pudo crear sesión:', JSON.stringify(newSes.data));
         }
       } catch (e) {
-        console.warn('⚠️ Error creando sesión:', e.message);
+        console.warn('Error creando sesión:', e.message);
       }
     }
 
-    // ── 3. Subir archivo a Airtable Content API ────────────────────────────
+    if (!sessionId) {
+      return {
+        statusCode: 422,
+        headers: corsHeaders,
+        body: JSON.stringify({ success: false, error: 'No se encontró ni se pudo crear una sesión vinculada a esta capacitación.' })
+      };
+    }
+
+    // ── PASO 3: GET detallado de la sesión para ver campos reales ───────────
+    // Esto nos da el schema real incluyendo campos vacíos que no aparecen en GET lista
+    try {
+      const detailRes = await airtableFetch('GET', `/Sesiones/${sessionId}`);
+      if (detailRes.status < 400) {
+        sessionFields = detailRes.data?.fields || sessionFields;
+        console.log('Campos detallados sesión:', Object.keys(sessionFields).join(', '));
+      }
+    } catch (e) { /* ignorar */ }
+
+    // ── PASO 4: Subir archivo ────────────────────────────────────────────────
     let attachmentValue;
     try {
       const uploadResult = await uploadToAirtableContent(fileBase64, safeFileName, safeMimeType);
       if (uploadResult.status === 200 && uploadResult.data?.uploadedFiles?.[0]?.url) {
         attachmentValue = [{ url: uploadResult.data.uploadedFiles[0].url, filename: safeFileName }];
-        console.log('✅ Archivo subido via Content API');
+        console.log('Archivo subido via Content API');
       } else {
-        throw new Error(`Content API status ${uploadResult.status}: ${JSON.stringify(uploadResult.data)}`);
+        throw new Error(`Content API ${uploadResult.status}: ${JSON.stringify(uploadResult.data).slice(0, 200)}`);
       }
     } catch (uploadErr) {
-      console.warn('⚠️ Content API falló, usando data URL:', uploadErr.message);
+      console.warn('Content API falló, usando data URL:', uploadErr.message);
       attachmentValue = [{ url: `data:${safeMimeType};base64,${fileBase64}`, filename: safeFileName }];
     }
 
-    // ── 4. Guardar en la sesión ────────────────────────────────────────────
-    if (sessionId) {
-      const updateRes = await airtableFetch('PATCH', `/Sesiones/${sessionId}`, {
-        fields: { 'Lista asistencia': attachmentValue }
+    // ── PASO 5: Intentar guardar con múltiples nombres de campo ─────────────
+    // Candidatos en orden de probabilidad (basado en lo visto en Airtable)
+    const fieldCandidates = [
+      'Lista asistencia',       // nombre exacto visto en la imagen
+      'Lista de asistencia',    // variante con 'de'
+      'Lista de Asistencia',    // variante capitalizada
+      'Lista Asistencia',       // variante sin preposición
+      'Attachment',             // campo genérico
+      'Adjunto',                // en español
+      'Archivo',                // otra variante
+    ];
+
+    let savedField = null;
+    let lastError = '';
+
+    for (const fieldName of fieldCandidates) {
+      console.log(`Intentando campo: "${fieldName}"`);
+      const res = await airtableFetch('PATCH', `/Sesiones/${sessionId}`, {
+        fields: { [fieldName]: attachmentValue }
       });
 
-      if (updateRes.status < 400) {
-        return {
-          statusCode: 200,
-          headers: corsHeaders,
-          body: JSON.stringify({
-            success: true,
-            message: 'PDF guardado correctamente en Sesiones',
-            recordId: sessionId,
-            savedIn: 'Sesiones',
-            fieldUsed: 'Lista asistencia'
-          })
-        };
+      if (res.status < 400) {
+        savedField = fieldName;
+        console.log(`✅ Guardado con campo: "${fieldName}"`);
+        break;
       }
 
-      const err422 = updateRes.data?.error?.message || JSON.stringify(updateRes.data);
-      console.error('❌ Error guardando en Sesiones:', err422);
+      const errMsg = (res.data?.error?.message || res.data?.error || JSON.stringify(res.data) || '').toLowerCase();
+      lastError = res.data?.error?.message || errMsg;
+      console.warn(`Campo "${fieldName}" falló (${res.status}): ${lastError.slice(0, 100)}`);
+
+      // Si el error no es de campo desconocido, parar — es otro tipo de error
+      if (!errMsg.includes('unknown field') && !errMsg.includes('campo desconocido')) {
+        break;
+      }
+    }
+
+    if (savedField) {
       return {
-        statusCode: updateRes.status,
+        statusCode: 200,
         headers: corsHeaders,
-        body: JSON.stringify({ success: false, error: err422, hint: 'Verifica que el campo "Lista asistencia" existe en la tabla Sesiones de Airtable.' })
+        body: JSON.stringify({
+          success: true,
+          message: `PDF guardado correctamente (campo: "${savedField}")`,
+          recordId: sessionId,
+          savedIn: 'Sesiones',
+          fieldUsed: savedField
+        })
       };
     }
 
-    // ── 5. Fallback total: error con instrucciones ────────────────────────
+    // ── PASO 6: Diagnóstico — devolver los campos reales de la sesión ────────
     return {
       statusCode: 422,
       headers: corsHeaders,
       body: JSON.stringify({
         success: false,
-        error: 'No se pudo vincular o crear una sesión para esta capacitación. Ve a Airtable y crea manualmente una sesión vinculada a esta capacitación, luego intenta de nuevo.'
+        error: `No se pudo guardar el PDF. Último error: "${lastError}". Campos disponibles en la sesión: [${Object.keys(sessionFields).join(', ')}]. Por favor verifica el nombre exacto del campo de attachment en Airtable.`,
+        sessionId,
+        sessionFields: Object.keys(sessionFields)
       })
     };
 

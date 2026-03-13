@@ -8367,7 +8367,12 @@ function makeCronogramaFilterFormula(year, tipo) {
                 const data = await response.json().catch(() => ({}));
 
                 if (!response.ok || !data.success) {
-                    throw new Error(data.error || `Error del servidor (${response.status})`);
+                    // Mostrar campos disponibles en el error para diagnóstico
+                    let errMsg = data.error || `Error del servidor (${response.status})`;
+                    if (data.sessionFields && data.sessionFields.length > 0) {
+                        errMsg += `\n\nCampos disponibles en la sesión:\n• ${data.sessionFields.join('\n• ')}`;
+                    }
+                    throw new Error(errMsg);
                 }
 
                 // Limpiar archivo local tras guardar
