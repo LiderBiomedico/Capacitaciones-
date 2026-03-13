@@ -4634,11 +4634,11 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         // Crear tarjeta de capacitación
         function createTrainingCard(id, fields) {
             const title = fields['Título'] || 'Sin título';
-            const description = fields['Descripción'] || 'Sin descripción';
-            const date = fields['Fecha'] || '';
-            const department = fields['Departamento'] || '';
-            const duration = fields['Duración'] || '';
-            const accessCode = fields['Código de Acceso'] || '';
+            const description = fields['Descripción'] || fields['Objetivo'] || 'Sin descripción';
+            const date = fields['Fecha de la capacitación'] || fields['Fecha Creación'] || fields['Fecha'] || '';
+            const department = fields['ProcesoAtencion'] || fields['Departamento'] || '';
+            const duration = fields['Duración'] || fields['Duracion'] || '';
+            const accessCode = fields['Código de Acceso'] || fields['Código Acceso'] || '';
             const status = fields['Estado'] || 'active';
             
             const formattedDate = date ? new Date(date).toLocaleDateString('es-ES', { 
@@ -5244,7 +5244,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     option.value = training.id;
                     
                     const titulo = training.fields['Título'] || 'Sin título';
-                    const departamento = training.fields['Departamento'] || '';
+                    const departamento = training.fields['ProcesoAtencion'] || training.fields['Departamento'] || '';
                     const activa = training.fields['Activa'] !== false;
                     const finalizada = training.fields['Finalizada'] === true;
                     
@@ -5380,10 +5380,21 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const allTrainings = trainingsRes || [];
                 const allParts = partsRes || [];
 
+                // Helper para extraer fecha de una capacitación (acepta todos los campos posibles)
+                function getTrainingDate(t) {
+                    const f = t.fields || {};
+                    return f['Fecha de la capacitación'] || f['Fecha Creación'] || f['Fecha'] || t.createdTime || '';
+                }
+
+                // Helper para extraer fecha de una participación
+                function getPartDate(p) {
+                    const f = p.fields || {};
+                    return f['Fecha de Inicio'] || f['Fecha Inicio'] || f['Fecha'] || p.createdTime || '';
+                }
+
                 // Filtrar capacitaciones del trimestre (por fecha)
                 const trimTrainings = allTrainings.filter(t => {
-                    const f = t.fields || {};
-                    const fechaRaw = f['Fecha'] || f['Fecha Creación'] || f['Fecha de la capacitación'] || '';
+                    const fechaRaw = getTrainingDate(t);
                     if (!fechaRaw) return false;
                     const fecha = fechaRaw.slice(0, 10);
                     return fecha >= dateStart && fecha <= dateEnd;
@@ -5391,8 +5402,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 // Filtrar participaciones del trimestre
                 const trimParts = allParts.filter(p => {
-                    const f = p.fields || {};
-                    const fechaRaw = f['Fecha de Inicio'] || f['Fecha Inicio'] || f['Fecha'] || '';
+                    const fechaRaw = getPartDate(p);
                     if (!fechaRaw) return false;
                     const fecha = fechaRaw.slice(0, 10);
                     return fecha >= dateStart && fecha <= dateEnd;
@@ -5455,8 +5465,8 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     return {
                         id: t.id,
                         title: tf['Título'] || tf['name'] || 'Sin título',
-                        department: tf['Departamento'] || 'General',
-                        date: tf['Fecha'] || tf['Fecha de la capacitación'] || tf['Fecha Creación'] || '',
+                        department: tf['ProcesoAtencion'] || tf['Departamento'] || 'General',
+                        date: tf['Fecha de la capacitación'] || tf['Fecha Creación'] || tf['Fecha'] || t.createdTime || '',
                         status: tf['Estado'] || 'active',
                         participationsCount: tParts.length,
                         completedCount: tCompletados,
@@ -7325,7 +7335,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                 .map(r => ({
                     id: r.id,
                     title: (r.fields && (r.fields['Título'] || r.fields['Titulo'])) || 'Sin título',
-                    department: (r.fields && r.fields['Departamento']) || 'General',
+                    department: (r.fields && (r.fields['ProcesoAtencion'] || r.fields['Departamento'])) || 'General',
                     duration: (r.fields && r.fields['Duración']) || (r.fields && r.fields['Duracion']) || ''
                 }));
 
@@ -7856,9 +7866,9 @@ function makeCronogramaFilterFormula(year, tipo) {
                     training: {
                         id: trainingId,
                         titulo: tf['Título'] || tf['name'] || 'Sin título',
-                        descripcion: tf['Descripción'] || tf['Descripcion'] || '',
-                        departamento: tf['Departamento'] || 'General',
-                        fechaCreacion: tf['Fecha'] || tf['Fecha Creación'] || tf['Fecha de la capacitación'] || '',
+                        descripcion: tf['Descripción'] || tf['Descripcion'] || tf['Objetivo'] || '',
+                        departamento: tf['ProcesoAtencion'] || tf['Departamento'] || 'General',
+                        fechaCreacion: tf['Fecha de la capacitación'] || tf['Fecha Creación'] || tf['Fecha'] || trainingRes?.createdTime || '',
                         activa: (tf['Estado'] || 'active') !== 'inactive' && (tf['Estado'] || 'active') !== 'finalizada',
                         finalizada: tf['Estado'] === 'finalizada'
                     },
