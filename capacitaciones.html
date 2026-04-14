@@ -6422,30 +6422,34 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 // ENCABEZADO CON LOGO
                 // ═══════════════════════════════════════════════════════════
                 
-                // Logo del hospital
+                // Logo del hospital (tamaño grande)
+                const logoSize = 50;
+                const logoX = (pageWidth - logoSize) / 2;
                 try {
-                    doc.addImage(HOSPITAL_LOGO_BASE64, 'PNG', margin, yPos, 25, 25);
+                    doc.addImage(HOSPITAL_LOGO_BASE64, 'PNG', logoX, yPos, logoSize, logoSize);
                 } catch(e) {
                     console.warn('No se pudo agregar el logo:', e);
                 }
 
+                yPos += logoSize + 5;
+
                 // Título principal
                 doc.setFontSize(14);
                 doc.setFont('helvetica', 'bold');
-                doc.setTextColor(46, 125, 50); // Verde hospital
-                doc.text('HOSPITAL SUSANA LÓPEZ DE VALENCIA E.S.E.', pageWidth / 2, yPos + 8, { align: 'center' });
+                doc.setTextColor(46, 125, 50);
+                doc.text('HOSPITAL SUSANA LÓPEZ DE VALENCIA E.S.E.', pageWidth / 2, yPos, { align: 'center' });
+                yPos += 6;
                 
                 doc.setFontSize(10);
                 doc.setFont('helvetica', 'normal');
                 doc.setTextColor(100);
-                doc.text('Gestión de la Tecnología e Innovación Biomédica', pageWidth / 2, yPos + 14, { align: 'center' });
+                doc.text('Gestión de la Tecnología e Innovación Biomédica', pageWidth / 2, yPos, { align: 'center' });
+                yPos += 5;
 
                 // Código del documento
                 doc.setFontSize(8);
                 doc.setTextColor(50);
-                doc.text('SLV-SR-03-F06', pageWidth - margin, yPos + 5, { align: 'right' });
-
-                yPos += 30;
+                doc.text('SLV-SR-03-F06', pageWidth - margin, margin + 5, { align: 'right' });
 
                 // Línea separadora
                 doc.setDrawColor(46, 125, 50);
@@ -6724,66 +6728,88 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 // Helper: detectar tipo de insight y retornar color + etiqueta
                 function getInsightType(text) {
-                    if (text.includes('\u{1F534}'))   return { color: [220, 38, 38],  label: 'CRITICO',  bgColor: [254, 242, 242] }; // 🔴
-                    if (text.includes('\u{26A0}\u{FE0F}'))  return { color: [217, 119, 6],  label: 'ALERTA',   bgColor: [255, 251, 235] }; // ⚠️
-                    if (text.includes('\u{2705}'))    return { color: [22, 163, 74],   label: 'POSITIVO', bgColor: [240, 253, 244] }; // ✅
-                    if (text.includes('\u{1F4CB}'))   return { color: [37, 99, 235],   label: 'PLAN',     bgColor: [239, 246, 255] }; // 📋
-                    if (text.includes('\u{1F4CA}'))   return { color: [79, 70, 229],   label: 'DATO',     bgColor: [238, 242, 255] }; // 📊
-                    if (text.includes('\u{2139}\u{FE0F}'))  return { color: [100, 116, 139], label: 'INFO',     bgColor: [248, 250, 252] }; // ℹ️
-                    return                                   { color: [100, 116, 139], label: 'INFO',     bgColor: [248, 250, 252] };
+                    if (text.includes('\u{1F534}'))              return { color: [220, 38, 38],  label: 'CRITICO',  bgColor: [254, 242, 242] };
+                    if (text.includes('\u{26A0}'))               return { color: [217, 119, 6],  label: 'ALERTA',   bgColor: [255, 251, 235] };
+                    if (text.includes('\u{2705}'))               return { color: [22, 163, 74],  label: 'POSITIVO', bgColor: [240, 253, 244] };
+                    if (text.includes('\u{1F4CB}'))              return { color: [37, 99, 235],  label: 'PLAN',     bgColor: [239, 246, 255] };
+                    if (text.includes('\u{1F4CA}'))              return { color: [79, 70, 229],  label: 'DATO',     bgColor: [238, 242, 255] };
+                    if (text.includes('\u{2139}'))               return { color: [100, 116, 139], label: 'INFO',    bgColor: [248, 250, 252] };
+                    return                                        { color: [100, 116, 139], label: 'INFO',    bgColor: [248, 250, 252] };
                 }
 
-                // Helper: limpiar emojis del texto para PDF
+                // Helper: limpiar TODOS los emojis y caracteres especiales Unicode
                 function cleanEmojis(text) {
-                    return text.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, '').trim();
+                    return text
+                        .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+                        .replace(/[\u{2600}-\u{27BF}]/gu, '')
+                        .replace(/[\u{FE00}-\u{FE0F}]/gu, '')
+                        .replace(/[\u{200D}]/gu, '')
+                        .replace(/[\u{20E3}]/gu, '')
+                        .replace(/[\u{E0020}-\u{E007F}]/gu, '')
+                        .replace(/[\u{2139}\u{2705}\u{26A0}]/gu, '')
+                        .replace(/^\s+/, '')
+                        .trim();
                 }
 
-                const insightBoxMargin = margin + 2;
-                const insightContentWidth = pageWidth - 2 * margin - 4;
-                const tagWidth = 18;
-                const textStartX = insightBoxMargin + tagWidth + 3;
-                const textMaxWidth = insightContentWidth - tagWidth - 5;
+                const boxLeft = margin;
+                const boxWidth = pageWidth - 2 * margin;
+                const barWidth = 1.5;
+                const tagW = 19;
+                const tagH = 5.5;
+                const padLeft = 4;
+                const padTop = 3;
+                const padBottom = 3;
+                const textX = boxLeft + barWidth + padLeft + tagW + 3;
+                const textW = boxWidth - barWidth - padLeft - tagW - 3 - 4;
+                const lineH = 4;
+                const fontSize = 8;
+
+                doc.setFontSize(fontSize);
 
                 insights.forEach((insight, index) => {
                     const type = getInsightType(insight);
                     const cleanText = cleanEmojis(insight);
-                    const lines = doc.splitTextToSize(cleanText, textMaxWidth);
-                    const blockHeight = Math.max(lines.length * 4.5 + 4, 10);
 
-                    // Salto de página si no cabe
-                    if (yPos + blockHeight + 4 > pageHeight - 25) {
+                    // Pre-calculate text lines with correct font
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(fontSize);
+                    const lines = doc.splitTextToSize(cleanText, textW);
+                    const textBlockH = lines.length * lineH;
+                    const blockH = Math.max(textBlockH + padTop + padBottom, tagH + padTop + padBottom + 1);
+
+                    // Page break check
+                    if (yPos + blockH + 3 > pageHeight - 20) {
                         doc.addPage();
                         yPos = margin;
                     }
 
-                    // Fondo del bloque
+                    // 1) Background rounded rect
                     doc.setFillColor(...type.bgColor);
-                    doc.roundedRect(insightBoxMargin, yPos - 1, insightContentWidth, blockHeight, 1.5, 1.5, 'F');
+                    doc.roundedRect(boxLeft, yPos, boxWidth, blockH, 2, 2, 'F');
 
-                    // Barra lateral de color
+                    // 2) Left color bar
                     doc.setFillColor(...type.color);
-                    doc.rect(insightBoxMargin, yPos - 1, 1.2, blockHeight, 'F');
+                    doc.rect(boxLeft, yPos, barWidth, blockH, 'F');
 
-                    // Etiqueta de tipo (tag)
+                    // 3) Tag badge
+                    const tagX = boxLeft + barWidth + padLeft;
+                    const tagY = yPos + padTop;
                     doc.setFillColor(...type.color);
-                    const tagX = insightBoxMargin + 3;
-                    const tagY = yPos + 1;
-                    doc.roundedRect(tagX, tagY - 0.5, tagWidth, 5, 1, 1, 'F');
-                    doc.setFontSize(6);
+                    doc.roundedRect(tagX, tagY, tagW, tagH, 1.2, 1.2, 'F');
+                    doc.setFontSize(6.5);
                     doc.setFont('helvetica', 'bold');
                     doc.setTextColor(255, 255, 255);
-                    doc.text(type.label, tagX + tagWidth / 2, tagY + 3.2, { align: 'center' });
+                    doc.text(type.label, tagX + tagW / 2, tagY + 3.8, { align: 'center' });
 
-                    // Texto del hallazgo
-                    doc.setFontSize(8);
+                    // 4) Text content - aligned to top of box
+                    doc.setFontSize(fontSize);
                     doc.setFont('helvetica', 'normal');
                     doc.setTextColor(30, 30, 30);
-                    let textY = yPos + 2;
                     lines.forEach((line, li) => {
-                        doc.text(line, textStartX, textY + (li * 4.5));
+                        doc.text(line, textX, yPos + padTop + 3 + (li * lineH));
                     });
 
-                    yPos += blockHeight + 3;
+                    yPos += blockH + 2.5;
                 });
 
                 // ═══════════════════════════════════════════════════════════
