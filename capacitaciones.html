@@ -5658,6 +5658,9 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     insights: []
                 };
 
+                // Generar hallazgos automáticos basados en los datos
+                data.insights = generateQuarterlyInsights(data);
+
                 currentQuarterlyReportData = data;
                 renderQuarterlyReport(data);
 
@@ -5670,6 +5673,199 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 if (loading) loading.style.display = 'none';
                 Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Error al generar el reporte' });
             }
+        }
+
+        // ==========================================
+        // GENERADOR DE HALLAZGOS AUTOMÁTICOS
+        // ==========================================
+
+        function generateQuarterlyInsights(data) {
+            const insights = [];
+            const k = data.kpis || {};
+            const trainings = data.trainings || [];
+            const byDept = data.distributions?.byDept || [];
+            const byCargo = data.distributions?.byCargo || [];
+            const byProfession = data.distributions?.byProfession || [];
+            const trainingsByMonth = data.distributions?.trainingsByMonth || [];
+            const p = data.period || {};
+
+            // Si no hay datos mínimos, salir
+            if (k.participationsCount === 0 && trainings.length === 0) return insights;
+
+            // ── 1. RESUMEN GENERAL ──
+            if (trainings.length > 0) {
+                insights.push(
+                    `En el trimestre ${p.label || ''} se realizaron ${trainings.length} capacitación(es) con un total de ${k.participationsCount} participaciones y ${k.uniqueParticipants} participantes únicos.`
+                );
+            }
+
+            // ── 2. ADHERENCIA ──
+            if (k.adherenceRate >= 95) {
+                insights.push(
+                    `✅ La tasa de adherencia al post-test fue del ${k.adherenceRate}%, lo cual supera la meta institucional (≥80%). Esto refleja un alto compromiso del personal con los procesos de evaluación.`
+                );
+            } else if (k.adherenceRate >= 80) {
+                insights.push(
+                    `✅ La tasa de adherencia al post-test fue del ${k.adherenceRate}%, cumpliendo con la meta institucional (≥80%).`
+                );
+            } else if (k.adherenceRate >= 50) {
+                insights.push(
+                    `⚠️ La tasa de adherencia al post-test fue del ${k.adherenceRate}%, por debajo de la meta institucional (≥80%). Se recomienda implementar estrategias de seguimiento para asegurar que más participantes completen el post-test.`
+                );
+            } else if (k.participationsCount > 0) {
+                insights.push(
+                    `🔴 La tasa de adherencia al post-test fue del ${k.adherenceRate}%, significativamente por debajo de la meta (≥80%). Se requiere un plan de acción urgente para mejorar la completitud de evaluaciones.`
+                );
+            }
+
+            // ── 3. MEJORA PRE VS POST ──
+            if (k.avgPretestScore > 0 && k.avgPostestScore > 0) {
+                const mejora = k.avgImprovement;
+                if (mejora > 15) {
+                    insights.push(
+                        `✅ Se evidencia una mejora significativa del +${mejora}% entre pre-test (${k.avgPretestScore}%) y post-test (${k.avgPostestScore}%), demostrando efectividad de las capacitaciones en la transferencia de conocimiento.`
+                    );
+                } else if (mejora > 5) {
+                    insights.push(
+                        `✅ Se registra una mejora del +${mejora}% entre pre-test (${k.avgPretestScore}%) y post-test (${k.avgPostestScore}%), indicando un impacto positivo de las capacitaciones.`
+                    );
+                } else if (mejora >= 0) {
+                    insights.push(
+                        `⚠️ La mejora entre pre-test (${k.avgPretestScore}%) y post-test (${k.avgPostestScore}%) fue de apenas +${mejora}%. Se sugiere revisar la metodología de enseñanza o la complejidad del contenido evaluado.`
+                    );
+                } else {
+                    insights.push(
+                        `🔴 Se registra un retroceso de ${mejora}% entre pre-test (${k.avgPretestScore}%) y post-test (${k.avgPostestScore}%). Se recomienda investigar posibles causas (fatiga evaluativa, dificultad del instrumento, etc.) y ajustar la estrategia pedagógica.`
+                    );
+                }
+            }
+
+            // ── 4. TASA DE APROBACIÓN ──
+            if (k.passRatePostest > 0) {
+                if (k.passRatePostest >= 90) {
+                    insights.push(
+                        `✅ El ${k.passRatePostest}% de los participantes aprobaron el post-test (≥60%), lo que indica una alta asimilación del contenido.`
+                    );
+                } else if (k.passRatePostest >= 70) {
+                    insights.push(
+                        `La tasa de aprobación del post-test fue del ${k.passRatePostest}%. Aunque es aceptable, se recomienda reforzar los temas con menor desempeño.`
+                    );
+                } else {
+                    insights.push(
+                        `⚠️ Solo el ${k.passRatePostest}% de los participantes aprobaron el post-test. Se recomienda un plan de refuerzo y re-evaluación para los participantes que no alcanzaron la competencia mínima.`
+                    );
+                }
+            }
+
+            // ── 5. CAPACITACIÓN CON MEJOR DESEMPEÑO ──
+            const sortedByPost = [...trainings].filter(t => t.avgPostestScore > 0).sort((a, b) => b.avgPostestScore - a.avgPostestScore);
+            if (sortedByPost.length > 0) {
+                const best = sortedByPost[0];
+                insights.push(
+                    `📊 La capacitación con mejor desempeño en post-test fue "${best.title}" con un promedio de ${best.avgPostestScore}%${best.participations > 0 ? ` (${best.participations} participantes)` : ''}.`
+                );
+            }
+
+            // ── 6. CAPACITACIÓN CON MENOR DESEMPEÑO ──
+            if (sortedByPost.length > 1) {
+                const worst = sortedByPost[sortedByPost.length - 1];
+                if (worst.avgPostestScore < 80) {
+                    insights.push(
+                        `⚠️ La capacitación con menor desempeño en post-test fue "${worst.title}" con un promedio de ${worst.avgPostestScore}%. Se recomienda revisar el contenido y la metodología de esta capacitación.`
+                    );
+                }
+            }
+
+            // ── 7. CAPACITACIÓN CON MÁS PARTICIPANTES ──
+            const sortedByParts = [...trainings].filter(t => t.participations > 0).sort((a, b) => b.participations - a.participations);
+            if (sortedByParts.length > 0) {
+                const most = sortedByParts[0];
+                insights.push(
+                    `📊 La capacitación con mayor asistencia fue "${most.title}" con ${most.participations} participaciones.`
+                );
+            }
+
+            // ── 8. CAPACITACIÓN CON BAJA ADHERENCIA ──
+            const lowAdherence = trainings.filter(t => t.participations > 0 && t.adherenceRate < 80);
+            if (lowAdherence.length > 0) {
+                const names = lowAdherence.map(t => `"${t.title}" (${t.adherenceRate}%)`).join(', ');
+                insights.push(
+                    `⚠️ Las siguientes capacitaciones presentaron adherencia por debajo del 80%: ${names}. Se recomienda implementar estrategias de seguimiento para asegurar la completitud de evaluaciones.`
+                );
+            }
+
+            // ── 9. DISTRIBUCIÓN POR DEPARTAMENTO ──
+            if (byDept.length > 0) {
+                const topDept = byDept[0];
+                const bottomDepts = byDept.filter(d => d.count > 0).slice(-2);
+                insights.push(
+                    `📊 El servicio con mayor participación fue "${topDept.name}" con ${topDept.count} participaciones (${topDept.unique || 0} únicos).`
+                );
+                if (bottomDepts.length > 0 && byDept.length > 3) {
+                    const lowNames = bottomDepts.map(d => `"${d.name}" (${d.count})`).join(' y ');
+                    insights.push(
+                        `⚠️ Los servicios con menor participación fueron ${lowNames}. Se recomienda fortalecer la convocatoria en estas áreas para el próximo trimestre.`
+                    );
+                }
+            }
+
+            // ── 10. CONCENTRACIÓN POR MES ──
+            if (trainingsByMonth.length > 0) {
+                const monthsWithTrainings = trainingsByMonth.filter(m => m.count > 0);
+                const monthsWithout = trainingsByMonth.filter(m => m.count === 0);
+                if (monthsWithout.length > 0 && monthsWithTrainings.length > 0) {
+                    const emptyMonths = monthsWithout.map(m => m.label).join(', ');
+                    insights.push(
+                        `ℹ️ No se registraron capacitaciones en: ${emptyMonths}. Se sugiere distribuir las capacitaciones de manera más uniforme durante el trimestre para facilitar la asistencia del personal.`
+                    );
+                }
+                if (monthsWithTrainings.length === 1) {
+                    const m = monthsWithTrainings[0];
+                    insights.push(
+                        `ℹ️ Todas las capacitaciones del trimestre (${m.count}) se concentraron en ${m.label}. Se recomienda planificar una distribución más equilibrada.`
+                    );
+                }
+            }
+
+            // ── 11. DIVERSIDAD DE CARGOS/PROFESIONES ──
+            if (byProfession.length > 0) {
+                const topProf = byProfession[0];
+                const totalProf = byProfession.reduce((s, x) => s + x.count, 0);
+                const pctTop = totalProf > 0 ? Math.round((topProf.count / totalProf) * 100) : 0;
+                if (pctTop > 50) {
+                    insights.push(
+                        `ℹ️ La profesión "${topProf.name}" representa el ${pctTop}% de las participaciones. Se recomienda diversificar la convocatoria para incluir otros perfiles profesionales.`
+                    );
+                } else if (byProfession.length >= 5) {
+                    insights.push(
+                        `✅ Se evidencia una buena diversidad de perfiles profesionales en las capacitaciones, con ${byProfession.length} cargos/profesiones representados.`
+                    );
+                }
+            }
+
+            // ── 12. RECOMENDACIONES GENERALES ──
+            const recomendaciones = [];
+            if (k.adherenceRate < 80) {
+                recomendaciones.push('Implementar recordatorios automáticos para completar el post-test');
+            }
+            if (k.avgImprovement < 5 && k.avgPretestScore > 0) {
+                recomendaciones.push('Revisar la metodología de enseñanza y evaluar la pertinencia del contenido');
+            }
+            if (byDept.length > 0 && byDept[byDept.length - 1].count < 10) {
+                recomendaciones.push('Fortalecer la convocatoria en los servicios con menor participación');
+            }
+            if (trainings.some(t => t.participations > 0 && t.adherenceRate < 70)) {
+                recomendaciones.push('Establecer planes de acción para capacitaciones con adherencia inferior al 70%');
+            }
+            if (trainingsByMonth.some(m => m.count === 0)) {
+                recomendaciones.push('Distribuir las capacitaciones de manera más uniforme en los meses del trimestre');
+            }
+
+            if (recomendaciones.length > 0) {
+                insights.push(`📋 Recomendaciones para el próximo trimestre: ${recomendaciones.join('; ')}.`);
+            }
+
+            return insights;
         }
 
         function renderQuarterlyReport(data) {
@@ -5785,6 +5981,24 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const list = (items && items.length) ? items : ['Sin hallazgos automáticos (no hay datos suficientes).'];
             list.forEach(t => {
                 const li = document.createElement('li');
+                li.style.cssText = 'margin-bottom:8px; line-height:1.5; padding:6px 8px; border-radius:6px;';
+                // Colorear según tipo de hallazgo
+                if (t.includes('🔴')) {
+                    li.style.background = '#fef2f2';
+                    li.style.borderLeft = '3px solid #dc2626';
+                } else if (t.includes('⚠️')) {
+                    li.style.background = '#fffbeb';
+                    li.style.borderLeft = '3px solid #f59e0b';
+                } else if (t.includes('✅')) {
+                    li.style.background = '#f0fdf4';
+                    li.style.borderLeft = '3px solid #16a34a';
+                } else if (t.includes('📋')) {
+                    li.style.background = '#eff6ff';
+                    li.style.borderLeft = '3px solid #2563eb';
+                } else {
+                    li.style.background = '#f8fafc';
+                    li.style.borderLeft = '3px solid #94a3b8';
+                }
                 li.textContent = t;
                 ul.appendChild(li);
             });
