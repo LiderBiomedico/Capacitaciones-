@@ -6389,14 +6389,121 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 }
 
                 // ═══════════════════════════════════════════════════════════
-                // SECCIÓN 4: HALLAZGOS Y RECOMENDACIONES
+                // SECCIÓN 4: ANÁLISIS GRÁFICO
+                // ═══════════════════════════════════════════════════════════
+
+                // Helper para capturar canvas como imagen base64
+                const getChartImage = (canvasId) => {
+                    try {
+                        const canvas = document.getElementById(canvasId);
+                        if (!canvas || typeof canvas.toDataURL !== 'function') return null;
+                        return canvas.toDataURL('image/png', 1.0);
+                    } catch (e) {
+                        console.warn('No se pudo capturar gráfica:', canvasId, e);
+                        return null;
+                    }
+                };
+
+                const imgDept = getChartImage('qChartParticipantsByDept');
+                const imgCargo = getChartImage('qChartByCargo');
+                const imgProf = getChartImage('qChartByProfession');
+                const imgMonth = getChartImage('qChartTrainingsByMonth');
+
+                const hasAnyChart = imgDept || imgCargo || imgProf || imgMonth;
+
+                if (hasAnyChart) {
+                    doc.setFillColor(46, 125, 50);
+                    doc.rect(margin, yPos, pageWidth - 2 * margin, 7, 'F');
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(255);
+                    doc.text('4. ANÁLISIS GRÁFICO', margin + 3, yPos + 5);
+                    yPos += 12;
+
+                    const contentWidth = pageWidth - 2 * margin;
+                    const halfWidth = (contentWidth - 5) / 2; // 5mm gap between charts
+                    const chartHeight = 65; // Height for each chart image
+
+                    // Row 1: Departamento (left) + Cargo (right)
+                    if (imgDept || imgCargo) {
+                        if (yPos + chartHeight + 10 > pageHeight - 25) {
+                            doc.addPage();
+                            yPos = margin;
+                        }
+
+                        if (imgDept) {
+                            doc.setFontSize(8);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setTextColor(30);
+                            doc.text('Participaciones por Departamento/Servicio (Top 10)', margin, yPos);
+                            yPos += 3;
+                            try {
+                                doc.addImage(imgDept, 'PNG', margin, yPos, halfWidth, chartHeight);
+                            } catch(e) { console.warn('Error img dept:', e); }
+                        }
+
+                        if (imgCargo) {
+                            const xRight = margin + halfWidth + 5;
+                            doc.setFontSize(8);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setTextColor(30);
+                            doc.text('Distribución por Cargo (Top 10 + Otros)', xRight, yPos - 3);
+                            try {
+                                doc.addImage(imgCargo, 'PNG', xRight, yPos, halfWidth, chartHeight);
+                            } catch(e) { console.warn('Error img cargo:', e); }
+                        }
+
+                        yPos += chartHeight + 8;
+                    }
+
+                    // Row 2: Profesión (left) + Capacitaciones por Mes (right)
+                    if (imgProf || imgMonth) {
+                        if (yPos + chartHeight + 10 > pageHeight - 25) {
+                            doc.addPage();
+                            yPos = margin;
+                        }
+
+                        if (imgProf) {
+                            doc.setFontSize(8);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setTextColor(30);
+                            doc.text('Distribución por Profesión (Top 10 + Otros)', margin, yPos);
+                            yPos += 3;
+                            try {
+                                doc.addImage(imgProf, 'PNG', margin, yPos, halfWidth, chartHeight);
+                            } catch(e) { console.warn('Error img prof:', e); }
+                        }
+
+                        if (imgMonth) {
+                            const xRight = margin + halfWidth + 5;
+                            doc.setFontSize(8);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setTextColor(30);
+                            doc.text('Capacitaciones por Mes (Trimestre)', xRight, yPos - 3);
+                            try {
+                                doc.addImage(imgMonth, 'PNG', xRight, yPos, halfWidth, chartHeight);
+                            } catch(e) { console.warn('Error img month:', e); }
+                        }
+
+                        yPos += chartHeight + 8;
+                    }
+                }
+
+                // Verificar si necesitamos nueva página para hallazgos
+                if (yPos > pageHeight - 50) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // SECCIÓN 5: HALLAZGOS Y RECOMENDACIONES
                 // ═══════════════════════════════════════════════════════════
                 doc.setFillColor(46, 125, 50);
                 doc.rect(margin, yPos, pageWidth - 2 * margin, 7, 'F');
                 doc.setFontSize(10);
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(255);
-                doc.text('4. HALLAZGOS Y RECOMENDACIONES', margin + 3, yPos + 5);
+                doc.text('5. HALLAZGOS Y RECOMENDACIONES', margin + 3, yPos + 5);
                 yPos += 12;
 
                 doc.setFontSize(9);
