@@ -5577,37 +5577,71 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     const tAvgPre = tPre.length > 0 ? Math.round(tPre.reduce((s, p) => s + parseFloat(p.fields?.['Pretest Score'] || p.fields?.['Pre-test Score'] || 0), 0) / tPre.length) : 0;
                     const tAvgPost = tPost.length > 0 ? Math.round(tPost.reduce((s, p) => s + parseFloat(p.fields?.['Post-test Score'] || p.fields?.['Posttest Score'] || 0), 0) / tPost.length) : 0;
                     const tCompletados = tParts.filter(p => !!(p.fields?.['Completado Posttest'] || p.fields?.['Completado Post-Test'])).length;
+                    const isActiva = !!(tf['Activa'] || tf['Estado'] === 'Activa' || tf['Estado'] === 'active');
+                    const isFinalizada = !!(tf['Finalizada'] || tf['Estado'] === 'Finalizada' || tf['Estado'] === 'Inactiva');
+                    const rawDate = tf['Fecha de la capacitación'] || tf['Fecha Creación'] || tf['Fecha'] || t.createdTime || '';
+                    const dateObj = rawDate ? new Date(rawDate) : null;
+                    const dateLabel = dateObj && !isNaN(dateObj) ? dateObj.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
                     return {
                         id: t.id,
                         title: tf['Título'] || tf['name'] || 'Sin título',
                         department: tf['ProcesoAtencion'] || tf['Departamento'] || 'General',
-                        date: tf['Fecha de la capacitación'] || tf['Fecha Creación'] || tf['Fecha'] || t.createdTime || '',
+                        date: rawDate,
+                        dateLabel: dateLabel,
                         status: tf['Estado'] || 'active',
+                        activa: isActiva,
+                        finalizada: isFinalizada,
                         participationsCount: tParts.length,
+                        participations: tParts.length,
                         completedCount: tCompletados,
                         avgPretestScore: tAvgPre,
                         avgPostestScore: tAvgPost,
                         avgImprovement: tAvgPost - tAvgPre,
-                        adherenceRate: tParts.length > 0 ? Math.round((tCompletados / tParts.length) * 100) : 0,
+                        adherenceRate: tf['Adherencia'] != null ? Math.round(parseFloat(tf['Adherencia'])) : (tParts.length > 0 ? Math.round((tCompletados / tParts.length) * 100) : 0),
                         passRatePostest: tPost.length > 0 ? Math.round(tPost.filter(p => parseFloat(p.fields?.['Post-test Score'] || p.fields?.['Posttest Score'] || 0) >= 60).length / tPost.length * 100) : 0
                     };
                 });
 
                 // Top capacitaciones por participaciones
                 const topByParts = [...trainingsWithStats].sort((a, b) => b.participationsCount - a.participationsCount).slice(0, 5)
-                    .map(t => ({ title: t.title, count: t.participationsCount }));
+                    .map(t => ({ title: t.title, count: t.participationsCount, participations: t.participationsCount, department: t.department, adherenceRate: t.adherenceRate }));
 
                 // Distribución por departamento
+                // Calcular únicos por departamento
+                const uniqueByDeptMap = {};
+                partsScoped.forEach(p => {
+                    const f = p.fields || {};
+                    const dept = f['Departamento'] || f['Servicio'] || 'Sin servicio';
+                    const nombre = (f['Nombre Completo'] || f['Nombre'] || '').toLowerCase().trim();
+                    if (!uniqueByDeptMap[dept]) uniqueByDeptMap[dept] = new Set();
+                    if (nombre) uniqueByDeptMap[dept].add(nombre);
+                });
+
                 const byDept = Object.values(byDeptMap).sort((a, b) => b.count - a.count).slice(0, 10).map(d => ({
+                    name: d.dept,
                     dept: d.dept,
                     count: d.count,
+                    unique: uniqueByDeptMap[d.dept] ? uniqueByDeptMap[d.dept].size : 0,
                     avgPretestScore: d.nPre > 0 ? Math.round(d.sumPre / d.nPre) : 0,
                     avgPostestScore: d.nPost > 0 ? Math.round(d.sumPost / d.nPost) : 0
                 }));
 
+                // Distribución de capacitaciones por mes del trimestre
+                const qMonthsRange = { 1: [1,2,3], 2: [4,5,6], 3: [7,8,9], 4: [10,11,12] };
+                const monthNames = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+                const trainingsByMonth = qMonthsRange[quarter].map(m => {
+                    const count = trimTrainings.filter(t => {
+                        const d = getTrainingDate(t);
+                        if (!d) return false;
+                        const month = parseInt(d.slice(5,7), 10);
+                        return month === m;
+                    }).length;
+                    return { month: m, label: monthNames[m], count };
+                });
+
                 const data = {
                     success: true,
-                    period: { year, quarter, label: `T${quarter} (${qLabels[quarter]}) ${year}` },
+                    period: { year, quarter, label: `T${quarter} (${qLabels[quarter]}) ${year}`, startDate: dateStart, endDate: dateEnd },
                     kpis: {
                         trainingsCount: trimTrainings.length,
                         participationsCount: totalParts,
@@ -5620,7 +5654,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     },
                     trainings: trainingsWithStats,
                     topTrainingsByParticipants: topByParts,
-                    distributions: { byDept, byCargo: byCargoArr, byProfession: byProfessionArr },
+                    distributions: { byDept, byCargo: byCargoArr, byProfession: byProfessionArr, trainingsByMonth },
                     insights: []
                 };
 
