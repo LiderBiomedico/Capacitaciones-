@@ -6720,22 +6720,70 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 doc.text('5. HALLAZGOS Y RECOMENDACIONES', margin + 3, yPos + 5);
                 yPos += 12;
 
-                doc.setFontSize(9);
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(50);
+                const insights = data.insights && data.insights.length ? data.insights : ['Sin hallazgos automaticos (no hay datos suficientes).'];
 
-                const insights = data.insights && data.insights.length ? data.insights : ['Sin hallazgos automáticos (no hay datos suficientes).'];
+                // Helper: detectar tipo de insight y retornar color + etiqueta
+                function getInsightType(text) {
+                    if (text.includes('\u{1F534}'))   return { color: [220, 38, 38],  label: 'CRITICO',  bgColor: [254, 242, 242] }; // 🔴
+                    if (text.includes('\u{26A0}\u{FE0F}'))  return { color: [217, 119, 6],  label: 'ALERTA',   bgColor: [255, 251, 235] }; // ⚠️
+                    if (text.includes('\u{2705}'))    return { color: [22, 163, 74],   label: 'POSITIVO', bgColor: [240, 253, 244] }; // ✅
+                    if (text.includes('\u{1F4CB}'))   return { color: [37, 99, 235],   label: 'PLAN',     bgColor: [239, 246, 255] }; // 📋
+                    if (text.includes('\u{1F4CA}'))   return { color: [79, 70, 229],   label: 'DATO',     bgColor: [238, 242, 255] }; // 📊
+                    if (text.includes('\u{2139}\u{FE0F}'))  return { color: [100, 116, 139], label: 'INFO',     bgColor: [248, 250, 252] }; // ℹ️
+                    return                                   { color: [100, 116, 139], label: 'INFO',     bgColor: [248, 250, 252] };
+                }
+
+                // Helper: limpiar emojis del texto para PDF
+                function cleanEmojis(text) {
+                    return text.replace(/[\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE0F}\u{200D}\u{20E3}\u{E0020}-\u{E007F}]/gu, '').trim();
+                }
+
+                const insightBoxMargin = margin + 2;
+                const insightContentWidth = pageWidth - 2 * margin - 4;
+                const tagWidth = 18;
+                const textStartX = insightBoxMargin + tagWidth + 3;
+                const textMaxWidth = insightContentWidth - tagWidth - 5;
+
                 insights.forEach((insight, index) => {
-                    const lines = doc.splitTextToSize(`• ${insight}`, pageWidth - 2 * margin - 10);
-                    lines.forEach(line => {
-                        if (yPos > pageHeight - 30) {
-                            doc.addPage();
-                            yPos = margin;
-                        }
-                        doc.text(line, margin + 5, yPos);
-                        yPos += 5;
+                    const type = getInsightType(insight);
+                    const cleanText = cleanEmojis(insight);
+                    const lines = doc.splitTextToSize(cleanText, textMaxWidth);
+                    const blockHeight = Math.max(lines.length * 4.5 + 4, 10);
+
+                    // Salto de página si no cabe
+                    if (yPos + blockHeight + 4 > pageHeight - 25) {
+                        doc.addPage();
+                        yPos = margin;
+                    }
+
+                    // Fondo del bloque
+                    doc.setFillColor(...type.bgColor);
+                    doc.roundedRect(insightBoxMargin, yPos - 1, insightContentWidth, blockHeight, 1.5, 1.5, 'F');
+
+                    // Barra lateral de color
+                    doc.setFillColor(...type.color);
+                    doc.rect(insightBoxMargin, yPos - 1, 1.2, blockHeight, 'F');
+
+                    // Etiqueta de tipo (tag)
+                    doc.setFillColor(...type.color);
+                    const tagX = insightBoxMargin + 3;
+                    const tagY = yPos + 1;
+                    doc.roundedRect(tagX, tagY - 0.5, tagWidth, 5, 1, 1, 'F');
+                    doc.setFontSize(6);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(255, 255, 255);
+                    doc.text(type.label, tagX + tagWidth / 2, tagY + 3.2, { align: 'center' });
+
+                    // Texto del hallazgo
+                    doc.setFontSize(8);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(30, 30, 30);
+                    let textY = yPos + 2;
+                    lines.forEach((line, li) => {
+                        doc.text(line, textStartX, textY + (li * 4.5));
                     });
-                    yPos += 2;
+
+                    yPos += blockHeight + 3;
                 });
 
                 // ═══════════════════════════════════════════════════════════
