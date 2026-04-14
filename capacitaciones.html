@@ -6747,6 +6747,14 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         .replace(/[\u{20E3}]/gu, '')
                         .replace(/[\u{E0020}-\u{E007F}]/gu, '')
                         .replace(/[\u{2139}\u{2705}\u{26A0}]/gu, '')
+                        .replace(/\u{2265}/gu, '>=')   // ≥ → >=
+                        .replace(/\u{2264}/gu, '<=')   // ≤ → <=
+                        .replace(/\u{2013}/gu, '-')    // – → -
+                        .replace(/\u{2014}/gu, '-')    // — → -
+                        .replace(/\u{201C}/gu, '"')    // " → "
+                        .replace(/\u{201D}/gu, '"')    // " → "
+                        .replace(/\u{2018}/gu, "'")    // ' → '
+                        .replace(/\u{2019}/gu, "'")    // ' → '
                         .replace(/^\s+/, '')
                         .trim();
                 }
@@ -6760,7 +6768,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const padTop = 3;
                 const padBottom = 3;
                 const textX = boxLeft + barWidth + padLeft + tagW + 3;
-                const textW = boxWidth - barWidth - padLeft - tagW - 3 - 4;
+                const textW = boxWidth - barWidth - padLeft - tagW - 3 - 8;
                 const lineH = 4;
                 const fontSize = 8;
 
