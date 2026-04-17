@@ -670,137 +670,143 @@
             inset: 0;
             width: 100%;
             height: 100%;
-            background-color: #f0f4f8;
-            background:
-                radial-gradient(circle at 18% 18%, rgba(30,64,175,0.07) 0%, rgba(241,245,249,1) 55%),
-                radial-gradient(circle at 82% 30%, rgba(30,64,175,0.06) 0%, rgba(241,245,249,1) 60%),
-                linear-gradient(135deg,
-                    rgba(241,245,249,1) 0%,
-                    rgba(226,232,240,1) 55%,
-                    rgba(241,245,249,1) 100%);
-            background-size: 200% 200%;
-            animation: greenFlow 10s ease-in-out infinite;
+            background: linear-gradient(160deg, #0a1628 0%, #132847 40%, #1a3660 70%, #0d2240 100%);
             display: flex;
             justify-content: center;
             align-items: center;
             z-index: 9999;
-            transition: opacity 0.25s;
+            transition: opacity 0.4s;
             overflow: hidden;
         }
 
-        /* Grid futurista */
         .loading-screen::before {
             content: '';
             position: absolute;
             inset: -40%;
             background:
-                repeating-linear-gradient(90deg, rgba(30,64,175,0.04) 0 1px, transparent 1px 88px),
-                repeating-linear-gradient(0deg,  rgba(30,64,175,0.04) 0 1px, transparent 1px 88px);
+                repeating-linear-gradient(90deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 80px),
+                repeating-linear-gradient(0deg, rgba(255,255,255,0.015) 0 1px, transparent 1px 80px);
             transform: rotate(12deg);
-            animation: gridDrift 12s linear infinite;
+            animation: gridDrift 20s linear infinite;
             pointer-events: none;
         }
 
-        /* Ondas / glow en movimiento */
         .loading-screen::after {
             content: '';
             position: absolute;
-            inset: -50%;
-            background:
-                radial-gradient(circle at 50% 50%, rgba(30,64,175,0.08) 0%, rgba(59,130,246,0.05) 40%, rgba(241,245,249,1) 100%),
-                conic-gradient(from 180deg at 50% 50%,
-                    rgba(30,64,175,0.06),
-                    rgba(59,130,246,0.06),
-                    rgba(30,64,175,0.06));
-            filter: blur(30px);
-            animation: waveGlow 8s ease-in-out infinite;
+            width: 700px;
+            height: 700px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(30,80,180,0.15) 0%, transparent 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            animation: pulseGlow 4s ease-in-out infinite;
             pointer-events: none;
+        }
+
+        @keyframes pulseGlow {
+            0%, 100% { opacity: 0.5; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.15); }
         }
 
         .loader {
             position: relative;
             z-index: 1;
             text-align: center;
-            color: #1e3a5f;
+            color: #e2e8f0;
+            max-width: 600px;
+            padding: 0 20px;
         }
 
         .loader i {
             font-size: 4rem;
             animation: pulse 1.5s infinite;
-            filter: drop-shadow(0 0 18px rgba(30, 64, 175, 0.40));
+            filter: drop-shadow(0 0 18px rgba(30, 80, 200, 0.5));
         }
 
         .loader p {
             margin-top: 1rem;
             font-weight: 500;
             letter-spacing: 0.6px;
-            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
-            color: #334155;
+            color: #94a3b8;
         }
-
-
-        .loader-title {
-            margin-top: 1.1rem;
-            font-weight: 700;
-            letter-spacing: 0.8px;
-            font-size: clamp(1.8rem, 3.4vw, 2.4rem);
-            text-shadow: 0 2px 8px rgba(30,64,175,0.12);
-            text-align: center;
-            color: #1e2a4a;
-        }
-
-        .loader-credit {
-    position: static;
-    margin: 0.9rem 0 0 0;
-    font-weight: 600;
-    letter-spacing: 0.4px;
-    font-size: clamp(1.4rem, 3vw, 2rem);
-    opacity: 0.90;
-    text-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    text-align: center;
-    z-index: 2;
-    color: #475569;
-}
 
         .splash-logo {
-            width: 420px;
+            width: 380px;
             max-width: 85vw;
             height: auto;
             border-radius: 20px;
             background: #ffffff;
-            padding: 20px 28px;
+            padding: 22px 28px;
             box-shadow:
-                0 12px 40px rgba(30,64,175,0.12),
-                0 0 0 1px rgba(30,64,175,0.06);
-            animation: logoFloat 2.4s ease-in-out infinite;
+                0 20px 60px rgba(0,0,0,0.4),
+                0 0 80px rgba(30,80,200,0.12);
+            animation: logoFloat 3s ease-in-out infinite;
             display: inline-block;
         }
 
         @keyframes logoFloat {
             0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-8px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .loader-title {
+            margin-top: 1.5rem;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            font-size: clamp(1.6rem, 3.2vw, 2.4rem);
+            text-align: center;
+            color: #ffffff;
+            text-shadow: 0 2px 20px rgba(30,80,200,0.3);
+        }
+
+        .loader-subtitle {
+            margin-top: 0.4rem;
+            font-weight: 400;
+            letter-spacing: 3px;
+            font-size: clamp(0.6rem, 1.2vw, 0.8rem);
+            text-align: center;
+            color: rgba(148,163,184,0.8);
+            text-transform: uppercase;
+        }
+
+        .loader-credit {
+            position: static;
+            margin: 1.2rem 0 0 0;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+            font-size: clamp(0.85rem, 1.8vw, 1.05rem);
+            text-align: center;
+            z-index: 2;
+            color: #64748b;
+        }
+
+        .loader-divider {
+            width: 60px;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, rgba(59,130,246,0.6), transparent);
+            margin: 1rem auto;
+            border-radius: 2px;
         }
 
         .progress-track {
-            width: min(420px, 78vw);
-            height: 12px;
+            width: min(340px, 70vw);
+            height: 4px;
             border-radius: 999px;
-            background: rgba(30, 64, 175, 0.08);
-            border: 1px solid rgba(30, 64, 175, 0.12);
-overflow: hidden;
-            margin: 18px auto 0;
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            box-shadow: 0 4px 12px rgba(30,64,175,0.10);
+            background: rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+            margin: 1.5rem auto 0;
         }
 
         .progress-fill {
             height: 100%;
             width: 0%;
+            border-radius: 999px;
             background: linear-gradient(90deg,
-                rgba(14,165,164,0.95),
-                rgba(22,163,74,0.95));
-            box-shadow: 0 0 18px rgba(14, 165, 164, 0.20);
+                rgba(59,130,246,0.9),
+                rgba(99,170,255,0.9));
+            box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
             animation: progressFill 5s linear forwards;
         }
 
@@ -1400,8 +1406,11 @@ overflow: hidden;
             <div class="progress-track" aria-label="Cargando">
                 <div class="progress-fill"></div>
             </div>
-<p class="loader-title">Campus Susana López <span class="heartbeat-heart" aria-hidden="true">💙</span></p>
-            <p class="loader-credit">Plataforma de Capacitación Hospital Susana López de Valencia</p>
+<p class="loader-title">Campus Susana López</p>
+            <p class="loader-subtitle">Gestión de la Tecnología e Innovación Biomédica</p>
+            <div class="loader-divider"></div>
+            <p class="loader-credit">Plataforma de Capacitación — Hospital Susana López de Valencia E.S.E.</p>
+            <p class="loader-credit" style="margin-top:0.5rem;">Desarrollado por: Ing. Paul Eduardo Muñoz Rodriguez</p>
         </div>
     </div>
 
