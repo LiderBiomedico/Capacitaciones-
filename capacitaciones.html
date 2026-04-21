@@ -1461,6 +1461,12 @@
                 <span>Reportes</span>
             </button>
 
+            <!-- Personal HSLV -->
+            <button class="nav-tab" onclick="switchTab('personal')">
+                <i class="fas fa-id-card"></i>
+                <span>Personal HSLV</span>
+            </button>
+
             <!-- Nuevo: Cronograma anual -->
             <button class="nav-tab" onclick="switchTab('schedule')">
                 <i class="fas fa-calendar-alt"></i>
@@ -2421,6 +2427,84 @@
                     </div>
                 </div>
             </section>
+
+            <!-- =============================================
+                 PERSONAL HSLV TAB
+                 ============================================= -->
+            <section id="personal" class="tab-content">
+                <h2 class="section-title">
+                    <i class="fas fa-id-card"></i> Personal HSLV
+                </h2>
+
+                <!-- Selector de base de datos -->
+                <div class="card" style="margin-bottom: 1.25rem;">
+                    <h3 style="margin-bottom: 0.75rem;"><i class="fas fa-database"></i> Base de Datos</h3>
+                    <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
+                        <div class="form-group" style="margin:0; min-width:260px; flex:1;">
+                            <label style="font-weight:600; color:#374151; display:block; margin-bottom:0.4rem;">
+                                <i class="fas fa-file-excel" style="color:#16a34a;"></i> Seleccionar archivo de personal
+                            </label>
+                            <select id="personalDbSelect" style="width:100%; padding:0.6rem 0.9rem; border:1.5px solid #d1d5db; border-radius:8px; font-size:1rem;" onchange="cargarBasePersonal()">
+                                <option value="">-- Selecciona una base de datos --</option>
+                            </select>
+                        </div>
+                        <div style="display:flex; gap:0.5rem; align-items:flex-end; padding-top:1.4rem;">
+                            <button class="btn btn-light" onclick="recargarListaBD()" title="Recargar lista">
+                                <i class="fas fa-sync-alt"></i> Recargar
+                            </button>
+                        </div>
+                    </div>
+                    <div id="personalDbStatus" style="margin-top:0.6rem; font-size:0.9rem; color:#6b7280; font-weight:500;"></div>
+                </div>
+
+                <!-- Buscador por cédula -->
+                <div class="card" style="max-width:680px; margin:0 auto 1.5rem auto;">
+                    <h3 style="margin-bottom:1rem;"><i class="fas fa-search"></i> Buscar por Número de Cédula</h3>
+                    <div style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
+                        <div class="form-group" style="flex:1; margin:0; min-width:200px;">
+                            <label style="font-weight:600; color:#374151; display:block; margin-bottom:0.4rem;">Número de Cédula</label>
+                            <input
+                                type="text"
+                                id="personalCedulaInput"
+                                placeholder="Ej: 12345678"
+                                style="width:100%; padding:0.6rem 0.9rem; border:1.5px solid #d1d5db; border-radius:8px; font-size:1rem; outline:none; transition:border-color 0.2s;"
+                                onkeydown="if(event.key==='Enter') buscarPersonalHSLV()"
+                                onfocus="this.style.borderColor='var(--primary)'"
+                                onblur="this.style.borderColor='#d1d5db'"
+                            />
+                        </div>
+                        <button class="btn btn-primary" onclick="buscarPersonalHSLV()" style="height:42px; padding:0 1.4rem; white-space:nowrap;">
+                            <i class="fas fa-search"></i> Buscar
+                        </button>
+                        <button class="btn btn-secondary" onclick="limpiarBusquedaPersonal()" style="height:42px; padding:0 1rem; white-space:nowrap;">
+                            <i class="fas fa-times"></i> Limpiar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Estado de carga -->
+                <div id="personalLoading" style="display:none; text-align:center; padding:2rem;">
+                    <i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i>
+                    <p style="color:#1f2937; margin-top:0.75rem; font-weight:600;">Buscando en base de datos de personal...</p>
+                </div>
+
+                <!-- Resultado -->
+                <div id="personalResultado" style="display:none; max-width:680px; margin:0 auto;"></div>
+
+                <!-- Sin resultado -->
+                <div id="personalNoEncontrado" style="display:none; text-align:center; padding:2.5rem;">
+                    <i class="fas fa-user-slash" style="font-size:3rem; color:#9ca3af; margin-bottom:1rem; display:block;"></i>
+                    <h3 style="color:#1f2937;">No se encontró el registro</h3>
+                    <p style="color:#6b7280;">Verifica que el número de cédula sea correcto e intenta de nuevo.</p>
+                </div>
+
+                <!-- Estado inicial -->
+                <div id="personalInicial" style="text-align:center; padding:3rem; color:#9ca3af;">
+                    <i class="fas fa-users" style="font-size:3.5rem; margin-bottom:1rem; display:block;"></i>
+                    <p style="font-size:1.1rem;">Selecciona una base de datos y luego ingresa un número de cédula para buscar.</p>
+                </div>
+            </section>
+
         </main>
 
         <!-- Footer -->
@@ -3982,6 +4066,11 @@
             if (tabName === 'reports') {
                 if (typeof loadReportOptions === 'function') loadReportOptions();
                 if (typeof initQuarterlyReportDefaults === 'function') initQuarterlyReportDefaults();
+            }
+
+            // Al entrar a Personal HSLV, cargar lista de BDs
+            if (tabName === 'personal' && typeof initPersonalTab === 'function') {
+                initPersonalTab();
             }
 
             // Al entrar a Cronograma, inicializar valores por defecto
@@ -5583,37 +5672,71 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     const tAvgPre = tPre.length > 0 ? Math.round(tPre.reduce((s, p) => s + parseFloat(p.fields?.['Pretest Score'] || p.fields?.['Pre-test Score'] || 0), 0) / tPre.length) : 0;
                     const tAvgPost = tPost.length > 0 ? Math.round(tPost.reduce((s, p) => s + parseFloat(p.fields?.['Post-test Score'] || p.fields?.['Posttest Score'] || 0), 0) / tPost.length) : 0;
                     const tCompletados = tParts.filter(p => !!(p.fields?.['Completado Posttest'] || p.fields?.['Completado Post-Test'])).length;
+                    const isActiva = !!(tf['Activa'] || tf['Estado'] === 'Activa' || tf['Estado'] === 'active');
+                    const isFinalizada = !!(tf['Finalizada'] || tf['Estado'] === 'Finalizada' || tf['Estado'] === 'Inactiva');
+                    const rawDate = tf['Fecha de la capacitación'] || tf['Fecha Creación'] || tf['Fecha'] || t.createdTime || '';
+                    const dateObj = rawDate ? new Date(rawDate) : null;
+                    const dateLabel = dateObj && !isNaN(dateObj) ? dateObj.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
                     return {
                         id: t.id,
                         title: tf['Título'] || tf['name'] || 'Sin título',
                         department: tf['ProcesoAtencion'] || tf['Departamento'] || 'General',
-                        date: tf['Fecha de la capacitación'] || tf['Fecha Creación'] || tf['Fecha'] || t.createdTime || '',
+                        date: rawDate,
+                        dateLabel: dateLabel,
                         status: tf['Estado'] || 'active',
+                        activa: isActiva,
+                        finalizada: isFinalizada,
                         participationsCount: tParts.length,
+                        participations: tParts.length,
                         completedCount: tCompletados,
                         avgPretestScore: tAvgPre,
                         avgPostestScore: tAvgPost,
                         avgImprovement: tAvgPost - tAvgPre,
-                        adherenceRate: tParts.length > 0 ? Math.round((tCompletados / tParts.length) * 100) : 0,
+                        adherenceRate: tf['Adherencia'] != null ? Math.round(parseFloat(tf['Adherencia'])) : (tParts.length > 0 ? Math.round((tCompletados / tParts.length) * 100) : 0),
                         passRatePostest: tPost.length > 0 ? Math.round(tPost.filter(p => parseFloat(p.fields?.['Post-test Score'] || p.fields?.['Posttest Score'] || 0) >= 60).length / tPost.length * 100) : 0
                     };
                 });
 
                 // Top capacitaciones por participaciones
                 const topByParts = [...trainingsWithStats].sort((a, b) => b.participationsCount - a.participationsCount).slice(0, 5)
-                    .map(t => ({ title: t.title, count: t.participationsCount }));
+                    .map(t => ({ title: t.title, count: t.participationsCount, participations: t.participationsCount, department: t.department, adherenceRate: t.adherenceRate }));
 
                 // Distribución por departamento
+                // Calcular únicos por departamento
+                const uniqueByDeptMap = {};
+                partsScoped.forEach(p => {
+                    const f = p.fields || {};
+                    const dept = f['Departamento'] || f['Servicio'] || 'Sin servicio';
+                    const nombre = (f['Nombre Completo'] || f['Nombre'] || '').toLowerCase().trim();
+                    if (!uniqueByDeptMap[dept]) uniqueByDeptMap[dept] = new Set();
+                    if (nombre) uniqueByDeptMap[dept].add(nombre);
+                });
+
                 const byDept = Object.values(byDeptMap).sort((a, b) => b.count - a.count).slice(0, 10).map(d => ({
+                    name: d.dept,
                     dept: d.dept,
                     count: d.count,
+                    unique: uniqueByDeptMap[d.dept] ? uniqueByDeptMap[d.dept].size : 0,
                     avgPretestScore: d.nPre > 0 ? Math.round(d.sumPre / d.nPre) : 0,
                     avgPostestScore: d.nPost > 0 ? Math.round(d.sumPost / d.nPost) : 0
                 }));
 
+                // Distribución de capacitaciones por mes del trimestre
+                const qMonthsRange = { 1: [1,2,3], 2: [4,5,6], 3: [7,8,9], 4: [10,11,12] };
+                const monthNames = ['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+                const trainingsByMonth = qMonthsRange[quarter].map(m => {
+                    const count = trimTrainings.filter(t => {
+                        const d = getTrainingDate(t);
+                        if (!d) return false;
+                        const month = parseInt(d.slice(5,7), 10);
+                        return month === m;
+                    }).length;
+                    return { month: m, label: monthNames[m], count };
+                });
+
                 const data = {
                     success: true,
-                    period: { year, quarter, label: `T${quarter} (${qLabels[quarter]}) ${year}` },
+                    period: { year, quarter, label: `T${quarter} (${qLabels[quarter]}) ${year}`, startDate: dateStart, endDate: dateEnd },
                     kpis: {
                         trainingsCount: trimTrainings.length,
                         participationsCount: totalParts,
@@ -5626,9 +5749,12 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     },
                     trainings: trainingsWithStats,
                     topTrainingsByParticipants: topByParts,
-                    distributions: { byDept, byCargo: byCargoArr, byProfession: byProfessionArr },
+                    distributions: { byDept, byCargo: byCargoArr, byProfession: byProfessionArr, trainingsByMonth },
                     insights: []
                 };
+
+                // Generar hallazgos automáticos basados en los datos
+                data.insights = generateQuarterlyInsights(data);
 
                 currentQuarterlyReportData = data;
                 renderQuarterlyReport(data);
@@ -5642,6 +5768,199 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 if (loading) loading.style.display = 'none';
                 Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Error al generar el reporte' });
             }
+        }
+
+        // ==========================================
+        // GENERADOR DE HALLAZGOS AUTOMÁTICOS
+        // ==========================================
+
+        function generateQuarterlyInsights(data) {
+            const insights = [];
+            const k = data.kpis || {};
+            const trainings = data.trainings || [];
+            const byDept = data.distributions?.byDept || [];
+            const byCargo = data.distributions?.byCargo || [];
+            const byProfession = data.distributions?.byProfession || [];
+            const trainingsByMonth = data.distributions?.trainingsByMonth || [];
+            const p = data.period || {};
+
+            // Si no hay datos mínimos, salir
+            if (k.participationsCount === 0 && trainings.length === 0) return insights;
+
+            // ── 1. RESUMEN GENERAL ──
+            if (trainings.length > 0) {
+                insights.push(
+                    `En el trimestre ${p.label || ''} se realizaron ${trainings.length} capacitación(es) con un total de ${k.participationsCount} participaciones y ${k.uniqueParticipants} participantes únicos.`
+                );
+            }
+
+            // ── 2. ADHERENCIA ──
+            if (k.adherenceRate >= 95) {
+                insights.push(
+                    `✅ La tasa de adherencia al post-test fue del ${k.adherenceRate}%, lo cual supera la meta institucional (≥80%). Esto refleja un alto compromiso del personal con los procesos de evaluación.`
+                );
+            } else if (k.adherenceRate >= 80) {
+                insights.push(
+                    `✅ La tasa de adherencia al post-test fue del ${k.adherenceRate}%, cumpliendo con la meta institucional (≥80%).`
+                );
+            } else if (k.adherenceRate >= 50) {
+                insights.push(
+                    `⚠️ La tasa de adherencia al post-test fue del ${k.adherenceRate}%, por debajo de la meta institucional (≥80%). Se recomienda implementar estrategias de seguimiento para asegurar que más participantes completen el post-test.`
+                );
+            } else if (k.participationsCount > 0) {
+                insights.push(
+                    `🔴 La tasa de adherencia al post-test fue del ${k.adherenceRate}%, significativamente por debajo de la meta (≥80%). Se requiere un plan de acción urgente para mejorar la completitud de evaluaciones.`
+                );
+            }
+
+            // ── 3. MEJORA PRE VS POST ──
+            if (k.avgPretestScore > 0 && k.avgPostestScore > 0) {
+                const mejora = k.avgImprovement;
+                if (mejora > 15) {
+                    insights.push(
+                        `✅ Se evidencia una mejora significativa del +${mejora}% entre pre-test (${k.avgPretestScore}%) y post-test (${k.avgPostestScore}%), demostrando efectividad de las capacitaciones en la transferencia de conocimiento.`
+                    );
+                } else if (mejora > 5) {
+                    insights.push(
+                        `✅ Se registra una mejora del +${mejora}% entre pre-test (${k.avgPretestScore}%) y post-test (${k.avgPostestScore}%), indicando un impacto positivo de las capacitaciones.`
+                    );
+                } else if (mejora >= 0) {
+                    insights.push(
+                        `⚠️ La mejora entre pre-test (${k.avgPretestScore}%) y post-test (${k.avgPostestScore}%) fue de apenas +${mejora}%. Se sugiere revisar la metodología de enseñanza o la complejidad del contenido evaluado.`
+                    );
+                } else {
+                    insights.push(
+                        `🔴 Se registra un retroceso de ${mejora}% entre pre-test (${k.avgPretestScore}%) y post-test (${k.avgPostestScore}%). Se recomienda investigar posibles causas (fatiga evaluativa, dificultad del instrumento, etc.) y ajustar la estrategia pedagógica.`
+                    );
+                }
+            }
+
+            // ── 4. TASA DE APROBACIÓN ──
+            if (k.passRatePostest > 0) {
+                if (k.passRatePostest >= 90) {
+                    insights.push(
+                        `✅ El ${k.passRatePostest}% de los participantes aprobaron el post-test (≥60%), lo que indica una alta asimilación del contenido.`
+                    );
+                } else if (k.passRatePostest >= 70) {
+                    insights.push(
+                        `La tasa de aprobación del post-test fue del ${k.passRatePostest}%. Aunque es aceptable, se recomienda reforzar los temas con menor desempeño.`
+                    );
+                } else {
+                    insights.push(
+                        `⚠️ Solo el ${k.passRatePostest}% de los participantes aprobaron el post-test. Se recomienda un plan de refuerzo y re-evaluación para los participantes que no alcanzaron la competencia mínima.`
+                    );
+                }
+            }
+
+            // ── 5. CAPACITACIÓN CON MEJOR DESEMPEÑO ──
+            const sortedByPost = [...trainings].filter(t => t.avgPostestScore > 0).sort((a, b) => b.avgPostestScore - a.avgPostestScore);
+            if (sortedByPost.length > 0) {
+                const best = sortedByPost[0];
+                insights.push(
+                    `📊 La capacitación con mejor desempeño en post-test fue "${best.title}" con un promedio de ${best.avgPostestScore}%${best.participations > 0 ? ` (${best.participations} participantes)` : ''}.`
+                );
+            }
+
+            // ── 6. CAPACITACIÓN CON MENOR DESEMPEÑO ──
+            if (sortedByPost.length > 1) {
+                const worst = sortedByPost[sortedByPost.length - 1];
+                if (worst.avgPostestScore < 80) {
+                    insights.push(
+                        `⚠️ La capacitación con menor desempeño en post-test fue "${worst.title}" con un promedio de ${worst.avgPostestScore}%. Se recomienda revisar el contenido y la metodología de esta capacitación.`
+                    );
+                }
+            }
+
+            // ── 7. CAPACITACIÓN CON MÁS PARTICIPANTES ──
+            const sortedByParts = [...trainings].filter(t => t.participations > 0).sort((a, b) => b.participations - a.participations);
+            if (sortedByParts.length > 0) {
+                const most = sortedByParts[0];
+                insights.push(
+                    `📊 La capacitación con mayor asistencia fue "${most.title}" con ${most.participations} participaciones.`
+                );
+            }
+
+            // ── 8. CAPACITACIÓN CON BAJA ADHERENCIA ──
+            const lowAdherence = trainings.filter(t => t.participations > 0 && t.adherenceRate < 80);
+            if (lowAdherence.length > 0) {
+                const names = lowAdherence.map(t => `"${t.title}" (${t.adherenceRate}%)`).join(', ');
+                insights.push(
+                    `⚠️ Las siguientes capacitaciones presentaron adherencia por debajo del 80%: ${names}. Se recomienda implementar estrategias de seguimiento para asegurar la completitud de evaluaciones.`
+                );
+            }
+
+            // ── 9. DISTRIBUCIÓN POR DEPARTAMENTO ──
+            if (byDept.length > 0) {
+                const topDept = byDept[0];
+                const bottomDepts = byDept.filter(d => d.count > 0).slice(-2);
+                insights.push(
+                    `📊 El servicio con mayor participación fue "${topDept.name}" con ${topDept.count} participaciones (${topDept.unique || 0} únicos).`
+                );
+                if (bottomDepts.length > 0 && byDept.length > 3) {
+                    const lowNames = bottomDepts.map(d => `"${d.name}" (${d.count})`).join(' y ');
+                    insights.push(
+                        `⚠️ Los servicios con menor participación fueron ${lowNames}. Se recomienda fortalecer la convocatoria en estas áreas para el próximo trimestre.`
+                    );
+                }
+            }
+
+            // ── 10. CONCENTRACIÓN POR MES ──
+            if (trainingsByMonth.length > 0) {
+                const monthsWithTrainings = trainingsByMonth.filter(m => m.count > 0);
+                const monthsWithout = trainingsByMonth.filter(m => m.count === 0);
+                if (monthsWithout.length > 0 && monthsWithTrainings.length > 0) {
+                    const emptyMonths = monthsWithout.map(m => m.label).join(', ');
+                    insights.push(
+                        `ℹ️ No se registraron capacitaciones en: ${emptyMonths}. Se sugiere distribuir las capacitaciones de manera más uniforme durante el trimestre para facilitar la asistencia del personal.`
+                    );
+                }
+                if (monthsWithTrainings.length === 1) {
+                    const m = monthsWithTrainings[0];
+                    insights.push(
+                        `ℹ️ Todas las capacitaciones del trimestre (${m.count}) se concentraron en ${m.label}. Se recomienda planificar una distribución más equilibrada.`
+                    );
+                }
+            }
+
+            // ── 11. DIVERSIDAD DE CARGOS/PROFESIONES ──
+            if (byProfession.length > 0) {
+                const topProf = byProfession[0];
+                const totalProf = byProfession.reduce((s, x) => s + x.count, 0);
+                const pctTop = totalProf > 0 ? Math.round((topProf.count / totalProf) * 100) : 0;
+                if (pctTop > 50) {
+                    insights.push(
+                        `ℹ️ La profesión "${topProf.name}" representa el ${pctTop}% de las participaciones. Se recomienda diversificar la convocatoria para incluir otros perfiles profesionales.`
+                    );
+                } else if (byProfession.length >= 5) {
+                    insights.push(
+                        `✅ Se evidencia una buena diversidad de perfiles profesionales en las capacitaciones, con ${byProfession.length} cargos/profesiones representados.`
+                    );
+                }
+            }
+
+            // ── 12. RECOMENDACIONES GENERALES ──
+            const recomendaciones = [];
+            if (k.adherenceRate < 80) {
+                recomendaciones.push('Implementar recordatorios automáticos para completar el post-test');
+            }
+            if (k.avgImprovement < 5 && k.avgPretestScore > 0) {
+                recomendaciones.push('Revisar la metodología de enseñanza y evaluar la pertinencia del contenido');
+            }
+            if (byDept.length > 0 && byDept[byDept.length - 1].count < 10) {
+                recomendaciones.push('Fortalecer la convocatoria en los servicios con menor participación');
+            }
+            if (trainings.some(t => t.participations > 0 && t.adherenceRate < 70)) {
+                recomendaciones.push('Establecer planes de acción para capacitaciones con adherencia inferior al 70%');
+            }
+            if (trainingsByMonth.some(m => m.count === 0)) {
+                recomendaciones.push('Distribuir las capacitaciones de manera más uniforme en los meses del trimestre');
+            }
+
+            if (recomendaciones.length > 0) {
+                insights.push(`📋 Recomendaciones para el próximo trimestre: ${recomendaciones.join('; ')}.`);
+            }
+
+            return insights;
         }
 
         function renderQuarterlyReport(data) {
@@ -5757,6 +6076,24 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const list = (items && items.length) ? items : ['Sin hallazgos automáticos (no hay datos suficientes).'];
             list.forEach(t => {
                 const li = document.createElement('li');
+                li.style.cssText = 'margin-bottom:8px; line-height:1.5; padding:6px 8px; border-radius:6px;';
+                // Colorear según tipo de hallazgo
+                if (t.includes('🔴')) {
+                    li.style.background = '#fef2f2';
+                    li.style.borderLeft = '3px solid #dc2626';
+                } else if (t.includes('⚠️')) {
+                    li.style.background = '#fffbeb';
+                    li.style.borderLeft = '3px solid #f59e0b';
+                } else if (t.includes('✅')) {
+                    li.style.background = '#f0fdf4';
+                    li.style.borderLeft = '3px solid #16a34a';
+                } else if (t.includes('📋')) {
+                    li.style.background = '#eff6ff';
+                    li.style.borderLeft = '3px solid #2563eb';
+                } else {
+                    li.style.background = '#f8fafc';
+                    li.style.borderLeft = '3px solid #94a3b8';
+                }
                 li.textContent = t;
                 ul.appendChild(li);
             });
@@ -6180,30 +6517,34 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 // ENCABEZADO CON LOGO
                 // ═══════════════════════════════════════════════════════════
                 
-                // Logo del hospital
+                // Logo del hospital (tamaño grande)
+                const logoSize = 50;
+                const logoX = (pageWidth - logoSize) / 2;
                 try {
-                    doc.addImage(HOSPITAL_LOGO_BASE64, 'PNG', margin, yPos, 25, 25);
+                    doc.addImage(HOSPITAL_LOGO_BASE64, 'PNG', logoX, yPos, logoSize, logoSize);
                 } catch(e) {
                     console.warn('No se pudo agregar el logo:', e);
                 }
 
+                yPos += logoSize + 5;
+
                 // Título principal
                 doc.setFontSize(14);
                 doc.setFont('helvetica', 'bold');
-                doc.setTextColor(46, 125, 50); // Verde hospital
-                doc.text('HOSPITAL SUSANA LÓPEZ DE VALENCIA E.S.E.', pageWidth / 2, yPos + 8, { align: 'center' });
+                doc.setTextColor(46, 125, 50);
+                doc.text('HOSPITAL SUSANA LÓPEZ DE VALENCIA E.S.E.', pageWidth / 2, yPos, { align: 'center' });
+                yPos += 6;
                 
                 doc.setFontSize(10);
                 doc.setFont('helvetica', 'normal');
                 doc.setTextColor(100);
-                doc.text('Gestión de la Tecnología e Innovación Biomédica', pageWidth / 2, yPos + 14, { align: 'center' });
+                doc.text('Gestión de la Tecnología e Innovación Biomédica', pageWidth / 2, yPos, { align: 'center' });
+                yPos += 5;
 
                 // Código del documento
                 doc.setFontSize(8);
                 doc.setTextColor(50);
-                doc.text('SLV-SR-03-F06', pageWidth - margin, yPos + 5, { align: 'right' });
-
-                yPos += 30;
+                doc.text('SLV-SR-03-F06', pageWidth - margin, margin + 5, { align: 'right' });
 
                 // Línea separadora
                 doc.setDrawColor(46, 125, 50);
@@ -6361,32 +6702,217 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 }
 
                 // ═══════════════════════════════════════════════════════════
-                // SECCIÓN 4: HALLAZGOS Y RECOMENDACIONES
+                // SECCIÓN 4: ANÁLISIS GRÁFICO
+                // ═══════════════════════════════════════════════════════════
+
+                // Helper para capturar canvas como imagen base64
+                const getChartImage = (canvasId) => {
+                    try {
+                        const canvas = document.getElementById(canvasId);
+                        if (!canvas || typeof canvas.toDataURL !== 'function') return null;
+                        return canvas.toDataURL('image/png', 1.0);
+                    } catch (e) {
+                        console.warn('No se pudo capturar gráfica:', canvasId, e);
+                        return null;
+                    }
+                };
+
+                const imgDept = getChartImage('qChartParticipantsByDept');
+                const imgCargo = getChartImage('qChartByCargo');
+                const imgProf = getChartImage('qChartByProfession');
+                const imgMonth = getChartImage('qChartTrainingsByMonth');
+
+                const hasAnyChart = imgDept || imgCargo || imgProf || imgMonth;
+
+                if (hasAnyChart) {
+                    doc.setFillColor(46, 125, 50);
+                    doc.rect(margin, yPos, pageWidth - 2 * margin, 7, 'F');
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(255);
+                    doc.text('4. ANÁLISIS GRÁFICO', margin + 3, yPos + 5);
+                    yPos += 12;
+
+                    const contentWidth = pageWidth - 2 * margin;
+                    const halfWidth = (contentWidth - 5) / 2; // 5mm gap between charts
+                    const chartHeight = 65; // Height for each chart image
+
+                    // Row 1: Departamento (left) + Cargo (right)
+                    if (imgDept || imgCargo) {
+                        if (yPos + chartHeight + 10 > pageHeight - 25) {
+                            doc.addPage();
+                            yPos = margin;
+                        }
+
+                        if (imgDept) {
+                            doc.setFontSize(8);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setTextColor(30);
+                            doc.text('Participaciones por Departamento/Servicio (Top 10)', margin, yPos);
+                            yPos += 3;
+                            try {
+                                doc.addImage(imgDept, 'PNG', margin, yPos, halfWidth, chartHeight);
+                            } catch(e) { console.warn('Error img dept:', e); }
+                        }
+
+                        if (imgCargo) {
+                            const xRight = margin + halfWidth + 5;
+                            doc.setFontSize(8);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setTextColor(30);
+                            doc.text('Distribución por Cargo (Top 10 + Otros)', xRight, yPos - 3);
+                            try {
+                                doc.addImage(imgCargo, 'PNG', xRight, yPos, halfWidth, chartHeight);
+                            } catch(e) { console.warn('Error img cargo:', e); }
+                        }
+
+                        yPos += chartHeight + 8;
+                    }
+
+                    // Row 2: Profesión (left) + Capacitaciones por Mes (right)
+                    if (imgProf || imgMonth) {
+                        if (yPos + chartHeight + 10 > pageHeight - 25) {
+                            doc.addPage();
+                            yPos = margin;
+                        }
+
+                        if (imgProf) {
+                            doc.setFontSize(8);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setTextColor(30);
+                            doc.text('Distribución por Profesión (Top 10 + Otros)', margin, yPos);
+                            yPos += 3;
+                            try {
+                                doc.addImage(imgProf, 'PNG', margin, yPos, halfWidth, chartHeight);
+                            } catch(e) { console.warn('Error img prof:', e); }
+                        }
+
+                        if (imgMonth) {
+                            const xRight = margin + halfWidth + 5;
+                            doc.setFontSize(8);
+                            doc.setFont('helvetica', 'bold');
+                            doc.setTextColor(30);
+                            doc.text('Capacitaciones por Mes (Trimestre)', xRight, yPos - 3);
+                            try {
+                                doc.addImage(imgMonth, 'PNG', xRight, yPos, halfWidth, chartHeight);
+                            } catch(e) { console.warn('Error img month:', e); }
+                        }
+
+                        yPos += chartHeight + 8;
+                    }
+                }
+
+                // Verificar si necesitamos nueva página para hallazgos
+                if (yPos > pageHeight - 50) {
+                    doc.addPage();
+                    yPos = margin;
+                }
+
+                // ═══════════════════════════════════════════════════════════
+                // SECCIÓN 5: HALLAZGOS Y RECOMENDACIONES
                 // ═══════════════════════════════════════════════════════════
                 doc.setFillColor(46, 125, 50);
                 doc.rect(margin, yPos, pageWidth - 2 * margin, 7, 'F');
                 doc.setFontSize(10);
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(255);
-                doc.text('4. HALLAZGOS Y RECOMENDACIONES', margin + 3, yPos + 5);
+                doc.text('5. HALLAZGOS Y RECOMENDACIONES', margin + 3, yPos + 5);
                 yPos += 12;
 
-                doc.setFontSize(9);
-                doc.setFont('helvetica', 'normal');
-                doc.setTextColor(50);
+                const insights = data.insights && data.insights.length ? data.insights : ['Sin hallazgos automaticos (no hay datos suficientes).'];
 
-                const insights = data.insights && data.insights.length ? data.insights : ['Sin hallazgos automáticos (no hay datos suficientes).'];
+                // Helper: detectar tipo de insight y retornar color + etiqueta
+                function getInsightType(text) {
+                    if (text.includes('\u{1F534}'))              return { color: [220, 38, 38],  label: 'CRITICO',  bgColor: [254, 242, 242] };
+                    if (text.includes('\u{26A0}'))               return { color: [217, 119, 6],  label: 'ALERTA',   bgColor: [255, 251, 235] };
+                    if (text.includes('\u{2705}'))               return { color: [22, 163, 74],  label: 'POSITIVO', bgColor: [240, 253, 244] };
+                    if (text.includes('\u{1F4CB}'))              return { color: [37, 99, 235],  label: 'PLAN',     bgColor: [239, 246, 255] };
+                    if (text.includes('\u{1F4CA}'))              return { color: [79, 70, 229],  label: 'DATO',     bgColor: [238, 242, 255] };
+                    if (text.includes('\u{2139}'))               return { color: [100, 116, 139], label: 'INFO',    bgColor: [248, 250, 252] };
+                    return                                        { color: [100, 116, 139], label: 'INFO',    bgColor: [248, 250, 252] };
+                }
+
+                // Helper: limpiar TODOS los emojis y caracteres especiales Unicode
+                function cleanEmojis(text) {
+                    return text
+                        .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+                        .replace(/[\u{2600}-\u{27BF}]/gu, '')
+                        .replace(/[\u{FE00}-\u{FE0F}]/gu, '')
+                        .replace(/[\u{200D}]/gu, '')
+                        .replace(/[\u{20E3}]/gu, '')
+                        .replace(/[\u{E0020}-\u{E007F}]/gu, '')
+                        .replace(/[\u{2139}\u{2705}\u{26A0}]/gu, '')
+                        .replace(/\u{2265}/gu, '>=')   // ≥ → >=
+                        .replace(/\u{2264}/gu, '<=')   // ≤ → <=
+                        .replace(/\u{2013}/gu, '-')    // – → -
+                        .replace(/\u{2014}/gu, '-')    // — → -
+                        .replace(/\u{201C}/gu, '"')    // " → "
+                        .replace(/\u{201D}/gu, '"')    // " → "
+                        .replace(/\u{2018}/gu, "'")    // ' → '
+                        .replace(/\u{2019}/gu, "'")    // ' → '
+                        .replace(/^\s+/, '')
+                        .trim();
+                }
+
+                const boxLeft = margin;
+                const boxWidth = pageWidth - 2 * margin;
+                const barWidth = 1.5;
+                const tagW = 19;
+                const tagH = 5.5;
+                const padLeft = 4;
+                const padTop = 3;
+                const padBottom = 3;
+                const textX = boxLeft + barWidth + padLeft + tagW + 3;
+                const textW = boxWidth - barWidth - padLeft - tagW - 3 - 8;
+                const lineH = 4;
+                const fontSize = 8;
+
+                doc.setFontSize(fontSize);
+
                 insights.forEach((insight, index) => {
-                    const lines = doc.splitTextToSize(`• ${insight}`, pageWidth - 2 * margin - 10);
-                    lines.forEach(line => {
-                        if (yPos > pageHeight - 30) {
-                            doc.addPage();
-                            yPos = margin;
-                        }
-                        doc.text(line, margin + 5, yPos);
-                        yPos += 5;
+                    const type = getInsightType(insight);
+                    const cleanText = cleanEmojis(insight);
+
+                    // Pre-calculate text lines with correct font
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(fontSize);
+                    const lines = doc.splitTextToSize(cleanText, textW);
+                    const textBlockH = lines.length * lineH;
+                    const blockH = Math.max(textBlockH + padTop + padBottom, tagH + padTop + padBottom + 1);
+
+                    // Page break check
+                    if (yPos + blockH + 3 > pageHeight - 20) {
+                        doc.addPage();
+                        yPos = margin;
+                    }
+
+                    // 1) Background rounded rect
+                    doc.setFillColor(...type.bgColor);
+                    doc.roundedRect(boxLeft, yPos, boxWidth, blockH, 2, 2, 'F');
+
+                    // 2) Left color bar
+                    doc.setFillColor(...type.color);
+                    doc.rect(boxLeft, yPos, barWidth, blockH, 'F');
+
+                    // 3) Tag badge
+                    const tagX = boxLeft + barWidth + padLeft;
+                    const tagY = yPos + padTop;
+                    doc.setFillColor(...type.color);
+                    doc.roundedRect(tagX, tagY, tagW, tagH, 1.2, 1.2, 'F');
+                    doc.setFontSize(6.5);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(255, 255, 255);
+                    doc.text(type.label, tagX + tagW / 2, tagY + 3.8, { align: 'center' });
+
+                    // 4) Text content - aligned to top of box
+                    doc.setFontSize(fontSize);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(30, 30, 30);
+                    lines.forEach((line, li) => {
+                        doc.text(line, textX, yPos + padTop + 3 + (li * lineH));
                     });
-                    yPos += 2;
+
+                    yPos += blockH + 2.5;
                 });
 
                 // ═══════════════════════════════════════════════════════════
@@ -6817,16 +7343,175 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         let annualScheduleData = [];
         let manualScheduleData = [];
         const CRONOGRAMA_TABLE = 'Cronograma';
+        // ══════════════════════════════════════════════════════════════════════
+        // PERSONAL HSLV — Carga Excel desde Airtable y búsqueda por cédula
+        // ══════════════════════════════════════════════════════════════════════
+
         const BD_PERSONAL_TABLE = 'BD PERSONAL HSLV';
+        let personalData = [];          // Filas del Excel cargado
+        let personalDbLoaded = false;   // Si ya se cargó algún Excel
+        let personalDbName = '';        // Nombre del archivo cargado
 
-        // ══════════════════════════════════════════════════════════════════
-        // PERSONAL HSLV — Búsqueda por cédula
-        // ══════════════════════════════════════════════════════════════════
+        // ─── Al entrar al tab Personal, cargar lista de archivos ────────────
+        async function initPersonalTab() {
+            await recargarListaBD();
+        }
 
+        // ─── Obtiene los registros de la tabla BD PERSONAL HSLV ─────────────
+        async function recargarListaBD() {
+            const sel = document.getElementById('personalDbSelect');
+            const status = document.getElementById('personalDbStatus');
+            if (!sel || !status) return;
+
+            sel.innerHTML = '<option value="">Cargando archivos...</option>';
+            sel.disabled = true;
+            status.textContent = '';
+
+            try {
+                const res = await airtableProxyRequest({
+                    method: 'GET',
+                    path: `/${encodeURIComponent(BD_PERSONAL_TABLE)}?pageSize=50`
+                });
+
+                const records = res?.records || [];
+                sel.innerHTML = '<option value="">-- Selecciona una base de datos --</option>';
+
+                if (records.length === 0) {
+                    sel.innerHTML += '<option disabled>No se encontraron archivos</option>';
+                    status.textContent = '⚠️ No hay archivos en la tabla BD PERSONAL HSLV.';
+                    sel.disabled = false;
+                    return;
+                }
+
+                records.forEach(rec => {
+                    const f = rec.fields || {};
+                    // El campo de adjunto en Airtable puede llamarse "File Content",
+                    // "Attachments", "Archivo" u otros nombres; buscamos el primero con array
+                    const attachKey = Object.keys(f).find(k => Array.isArray(f[k]) && f[k][0]?.url);
+                    const name = f['Name'] || f['File Path'] || rec.id;
+                    const url  = attachKey ? f[attachKey][0]?.url : null;
+
+                    const opt = document.createElement('option');
+                    opt.value = url || '';
+                    opt.textContent = name;
+                    opt.dataset.recordId = rec.id;
+                    opt.dataset.attachKey = attachKey || '';
+                    // Si no hay URL de adjunto, deshabilitar opción
+                    if (!url) {
+                        opt.disabled = true;
+                        opt.textContent += ' (sin adjunto)';
+                    }
+                    sel.appendChild(opt);
+                });
+
+                sel.disabled = false;
+                status.textContent = `${records.length} archivo(s) encontrado(s). Selecciona uno para cargarlo.`;
+
+            } catch (err) {
+                console.error('Error cargando lista BD Personal:', err);
+                sel.innerHTML = '<option value="">Error al cargar archivos</option>';
+                sel.disabled = false;
+                status.textContent = '❌ No se pudo conectar con la tabla BD PERSONAL HSLV.';
+            }
+        }
+
+        // ─── Descarga y parsea el Excel seleccionado ────────────────────────
+        async function cargarBasePersonal() {
+            const sel = document.getElementById('personalDbSelect');
+            const status = document.getElementById('personalDbStatus');
+            const url = sel?.value;
+            if (!url) {
+                personalData = [];
+                personalDbLoaded = false;
+                if (status) status.textContent = '';
+                return;
+            }
+
+            if (status) status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Descargando y procesando Excel...';
+
+            try {
+                // Descargar el archivo como ArrayBuffer vía proxy (CORS)
+                const proxyUrl = `/api/proxy-file?url=${encodeURIComponent(url)}`;
+                let arrayBuf;
+
+                try {
+                    // Intentar directo (Airtable permite CORS en sus adjuntos)
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error('Fetch directo falló');
+                    arrayBuf = await resp.arrayBuffer();
+                } catch {
+                    // Fallback: proxy Netlify
+                    const resp2 = await fetch(proxyUrl);
+                    if (!resp2.ok) throw new Error('Fetch por proxy también falló');
+                    arrayBuf = await resp2.arrayBuffer();
+                }
+
+                // Parsear con SheetJS (xlsx-js-style ya cargado en la página)
+                const workbook = XLSX.read(arrayBuf, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+                if (rows.length === 0) {
+                    throw new Error('El archivo Excel está vacío o no tiene datos.');
+                }
+
+                // Detectar nombres de columnas clave (cédula, nombre, correo)
+                const cols = Object.keys(rows[0]);
+                console.log('📊 Columnas detectadas:', cols);
+
+                personalData = rows;
+                personalDbLoaded = true;
+                personalDbName = sel.options[sel.selectedIndex]?.textContent || '';
+
+                if (status) status.innerHTML = `✅ <strong>${personalDbName}</strong> cargado — ${rows.length} registros. Columnas: <em>${cols.join(', ')}</em>`;
+
+            } catch (err) {
+                console.error('Error cargando Excel:', err);
+                personalData = [];
+                personalDbLoaded = false;
+                if (status) status.innerHTML = `❌ Error al cargar el archivo: ${err.message}`;
+                Swal.fire({
+                    icon: 'error',
+                    title: 'No se pudo cargar el Excel',
+                    text: err.message || 'Verifica que el archivo tenga adjunto válido en Airtable.',
+                    confirmButtonColor: 'var(--primary)'
+                });
+            }
+        }
+
+        // ─── Normaliza texto para comparación (sin tildes, minúsculas) ───────
+        function normStr(s) {
+            return String(s || '')
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/\s+/g, ' ').trim().toLowerCase();
+        }
+
+        // ─── Detecta qué columna del Excel corresponde a cada campo ──────────
+        function detectarCampo(cols, candidatos) {
+            for (const cand of candidatos) {
+                const match = cols.find(c => normStr(c) === normStr(cand));
+                if (match) return match;
+            }
+            // Búsqueda parcial
+            for (const cand of candidatos) {
+                const match = cols.find(c => normStr(c).includes(normStr(cand)));
+                if (match) return match;
+            }
+            return null;
+        }
+
+        // ─── Busca en los datos del Excel por cédula ─────────────────────────
         async function buscarPersonalHSLV() {
             const cedula = (document.getElementById('personalCedulaInput')?.value || '').trim();
+
             if (!cedula) {
-                Swal.fire({ icon: 'warning', title: 'Campo vacío', text: 'Ingresa un número de cédula para buscar.' });
+                Swal.fire({ icon: 'warning', title: 'Campo vacío', text: 'Ingresa un número de cédula para buscar.', confirmButtonColor: 'var(--primary)' });
+                return;
+            }
+
+            if (!personalDbLoaded || personalData.length === 0) {
+                Swal.fire({ icon: 'warning', title: 'Sin base de datos', text: 'Primero selecciona y carga una base de datos de personal.', confirmButtonColor: 'var(--primary)' });
                 return;
             }
 
@@ -6835,74 +7520,110 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             document.getElementById('personalNoEncontrado').style.display = 'none';
             document.getElementById('personalInicial').style.display = 'none';
 
-            const candidatos = [
-                'Cédula', 'Cedula', 'No. Cédula', 'Número de Cédula',
-                'Numero de Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion'
-            ];
+            // Pequeño delay para mostrar el spinner
+            await new Promise(r => setTimeout(r, 100));
 
-            let record = null;
+            try {
+                const cols = Object.keys(personalData[0] || {});
 
-            for (const campo of candidatos) {
-                try {
-                    const params = new URLSearchParams();
-                    params.set('filterByFormula', `{${campo}}='${cedula}'`);
-                    params.set('maxRecords', '1');
-                    const res = await airtableProxyRequest({
-                        method: 'GET',
-                        path: `/${encodeURIComponent(BD_PERSONAL_TABLE)}?${params.toString()}`
+                // Detectar columnas
+                const colCedula  = detectarCampo(cols, ['Cedula', 'Cédula', 'CC', 'Documento', 'No. Cédula', 'Numero de Cedula', 'Número de Cédula', 'Identificacion', 'Identificación', 'NIT', 'DNI']);
+                const colNombre  = detectarCampo(cols, ['Nombre Completo', 'Nombre', 'NOMBRE COMPLETO', 'Nombres', 'Nombre y Apellido', 'Empleado', 'Funcionario', 'NOMBRE']);
+                const colCorreo  = detectarCampo(cols, ['Correo Electrónico', 'Correo electronico', 'Correo', 'Email', 'E-mail', 'Mail', 'EMAIL', 'CORREO']);
+                const colCargo   = detectarCampo(cols, ['Cargo', 'Profesión', 'Profesion', 'Puesto', 'CARGO']);
+                const colServicio= detectarCampo(cols, ['Servicio', 'Departamento', 'Area', 'Área', 'Dependencia', 'Unidad']);
+
+                if (!colCedula) {
+                    document.getElementById('personalLoading').style.display = 'none';
+                    document.getElementById('personalInicial').style.display = 'block';
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Columna de cédula no encontrada',
+                        html: `No se encontró una columna de cédula/documento en el Excel.<br><br>Columnas disponibles: <strong>${cols.join(', ')}</strong>`,
+                        confirmButtonColor: 'var(--primary)'
                     });
-                    if (res?.records?.length > 0) {
-                        record = res.records[0];
-                        break;
-                    }
-                } catch (e) {
-                    continue;
+                    return;
                 }
-            }
 
-            document.getElementById('personalLoading').style.display = 'none';
+                // Buscar coincidencia exacta (comparando como string)
+                const cedStr = String(cedula).trim();
+                const row = personalData.find(r => {
+                    const val = String(r[colCedula] || '').trim();
+                    // Quitar decimales (ej: 12345678.0 → 12345678)
+                    const valClean = val.replace(/\.0+$/, '');
+                    return val === cedStr || valClean === cedStr;
+                });
 
-            if (!record) {
-                document.getElementById('personalNoEncontrado').style.display = 'block';
-                return;
-            }
+                document.getElementById('personalLoading').style.display = 'none';
 
-            const f = record.fields;
-            const nombre  = f['Nombre Completo'] || f['Nombre'] || f['NOMBRE COMPLETO'] || f['nombre completo'] || '—';
-            const ced     = f['Cédula'] || f['Cedula'] || f['No. Cédula'] || f['CC'] || f['Documento'] || f['Identificación'] || cedula;
-            const correo  = f['Correo Electrónico'] || f['Correo electronico'] || f['Correo'] || f['Email'] || f['E-mail'] || f['EMAIL'] || '—';
-            const cargo   = f['Cargo'] || f['Profesión'] || f['Profesion'] || '';
-            const servicio = f['Servicio'] || f['Departamento'] || f['Área'] || f['Area'] || '';
+                if (!row) {
+                    document.getElementById('personalNoEncontrado').style.display = 'block';
+                    return;
+                }
 
-            document.getElementById('personalResultado').innerHTML = `
-                <div class="card" style="border-left:5px solid var(--primary);">
-                    <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
-                        <div style="width:56px; height:56px; background:linear-gradient(135deg,var(--primary),var(--secondary)); border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">
-                            <i class="fas fa-user" style="color:white; font-size:1.5rem;"></i>
-                        </div>
-                        <div>
-                            <h3 style="margin:0; color:#111827; font-size:1.2rem;">${nombre}</h3>
-                            ${cargo ? `<p style="margin:0.2rem 0 0 0; color:#6b7280; font-size:0.9rem;">${cargo}${servicio ? ' · ' + servicio : ''}</p>` : ''}
-                        </div>
-                    </div>
-                    <div style="display:grid; gap:0.85rem;">
-                        <div style="display:flex; align-items:center; gap:0.75rem; padding:0.85rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
-                            <i class="fas fa-id-card" style="color:var(--primary); width:22px; text-align:center; font-size:1.1rem;"></i>
+                const nombre  = colNombre  ? (row[colNombre]  || '—') : '—';
+                const cedVal  = colCedula  ? (row[colCedula]  || cedula) : cedula;
+                const correo  = colCorreo  ? (row[colCorreo]  || '—') : '—';
+                const cargo   = colCargo   ? (row[colCargo]   || '') : '';
+                const servicio= colServicio? (row[colServicio]|| '') : '';
+
+                // Renderizar tarjeta resultado
+                const resultDiv = document.getElementById('personalResultado');
+                resultDiv.innerHTML = `
+                    <div class="card" style="border-left:5px solid var(--primary); background:#fff;">
+                        <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
+                            <div style="width:60px; height:60px; background:linear-gradient(135deg,var(--primary),var(--secondary)); border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 4px 12px rgba(46,125,50,0.3);">
+                                <i class="fas fa-user" style="color:white; font-size:1.6rem;"></i>
+                            </div>
                             <div>
-                                <span style="font-size:0.72rem; color:#9ca3af; text-transform:uppercase; font-weight:700; letter-spacing:0.05em;">Cédula</span>
-                                <p style="margin:0.1rem 0 0 0; font-weight:700; color:#111827; font-size:1.1rem;">${ced}</p>
+                                <h3 style="margin:0; color:#111827; font-size:1.25rem; font-weight:700;">${String(nombre)}</h3>
+                                ${cargo || servicio ? `<p style="margin:0.2rem 0 0 0; color:#6b7280; font-size:0.9rem; font-weight:500;">${cargo}${cargo && servicio ? ' · ' : ''}${servicio}</p>` : ''}
                             </div>
                         </div>
-                        <div style="display:flex; align-items:center; gap:0.75rem; padding:0.85rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
-                            <i class="fas fa-envelope" style="color:var(--primary); width:22px; text-align:center; font-size:1.1rem;"></i>
-                            <div>
-                                <span style="font-size:0.72rem; color:#9ca3af; text-transform:uppercase; font-weight:700; letter-spacing:0.05em;">Correo Electrónico</span>
-                                <p style="margin:0.1rem 0 0 0; font-weight:600; color:#111827; word-break:break-all;">${correo}</p>
+                        <div style="display:grid; gap:0.85rem;">
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.85rem 1rem; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
+                                <i class="fas fa-id-card" style="color:var(--primary); width:22px; text-align:center; font-size:1.1rem;"></i>
+                                <div>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Cédula / Documento</span>
+                                    <p style="margin:0.1rem 0 0 0; font-weight:700; color:#111827; font-size:1.1rem;">${String(cedVal).replace(/\.0+$/, '')}</p>
+                                </div>
                             </div>
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.85rem 1rem; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
+                                <i class="fas fa-envelope" style="color:var(--primary); width:22px; text-align:center; font-size:1.1rem;"></i>
+                                <div>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Correo Electrónico</span>
+                                    <p style="margin:0.1rem 0 0 0; font-weight:600; color:#111827; word-break:break-all; font-size:1rem;">${String(correo)}</p>
+                                </div>
+                            </div>
+                            ${cargo ? `
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
+                                <i class="fas fa-briefcase" style="color:#6b7280; width:22px; text-align:center;"></i>
+                                <div>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Cargo / Profesión</span>
+                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(cargo)}</p>
+                                </div>
+                            </div>` : ''}
+                            ${servicio ? `
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
+                                <i class="fas fa-building" style="color:#6b7280; width:22px; text-align:center;"></i>
+                                <div>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Servicio / Departamento</span>
+                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(servicio)}</p>
+                                </div>
+                            </div>` : ''}
                         </div>
-                    </div>
-                </div>`;
-            document.getElementById('personalResultado').style.display = 'block';
+                        <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid #e5e7eb; font-size:0.8rem; color:#9ca3af;">
+                            Fuente: <strong>${personalDbName}</strong>
+                        </div>
+                    </div>`;
+                resultDiv.style.display = 'block';
+
+            } catch (err) {
+                console.error('Error en búsqueda:', err);
+                document.getElementById('personalLoading').style.display = 'none';
+                document.getElementById('personalInicial').style.display = 'block';
+                Swal.fire({ icon: 'error', title: 'Error al buscar', text: err.message, confirmButtonColor: 'var(--primary)' });
+            }
         }
 
         function limpiarBusquedaPersonal() {
@@ -8103,6 +8824,37 @@ function makeCronogramaFilterFormula(year, tipo) {
                         }
                     });
                     console.log(`📋 Sesiones encontradas para ${trainingId}: ${sessionIds.size}, códigos:`, Array.from(sessionCodigos));
+
+                    // ── Llenar selector de sesiones para el PDF ──────────────────────────────
+                    const pdfWrapper = document.getElementById('pdfSessionSelectorWrapper');
+                    const pdfSelect  = document.getElementById('pdfSessionSelect');
+                    if (pdfSelect) {
+                        pdfSelect.innerHTML = '<option value="">-- Selecciona la sesión --</option>';
+                        const sesionesVinculadas = allSesiones.filter(s => {
+                            const cap = s.fields?.['Capacitaciones'] || s.fields?.['Capacitación'] || s.fields?.['Capacitacion'] || [];
+                            return (Array.isArray(cap) ? cap : []).includes(trainingId);
+                        });
+                        // Ordenar por fecha descendente (más reciente primero)
+                        sesionesVinculadas.sort((a, b) =>
+                            (b.fields?.['Fecha Inicio'] || '').localeCompare(a.fields?.['Fecha Inicio'] || '')
+                        );
+                        sesionesVinculadas.forEach(s => {
+                            const opt = document.createElement('option');
+                            opt.value = s.id;
+                            const fecha = s.fields?.['Fecha Inicio'] || '';
+                            const cod   = s.fields?.['Código Acceso'] || s.fields?.['Código de Acceso'] || s.id;
+                            const hora  = s.fields?.['Hora Inicio'] || '';
+                            opt.textContent = `${fecha ? fecha + (hora ? ' ' + hora : '') + ' — ' : ''}Código: ${cod}`;
+                            pdfSelect.appendChild(opt);
+                        });
+                        // Preseleccionar automáticamente si solo hay una sesión
+                        if (sesionesVinculadas.length === 1) {
+                            pdfSelect.value = sesionesVinculadas[0].id;
+                        }
+                        if (pdfWrapper) {
+                            pdfWrapper.style.display = sesionesVinculadas.length > 0 ? 'block' : 'none';
+                        }
+                    }
                 } catch(e) {
                     console.warn('⚠️ No se pudo consultar Sesiones:', e.message);
                 }
@@ -8447,6 +9199,15 @@ function makeCronogramaFilterFormula(year, tipo) {
                 return;
             }
 
+            // Validar que se haya seleccionado una sesión específica
+            const pdfSessionSelect = document.getElementById('pdfSessionSelect');
+            const selectedSessionId = pdfSessionSelect?.value || '';
+            const sessionSelectorVisible = document.getElementById('pdfSessionSelectorWrapper')?.style.display !== 'none';
+            if (sessionSelectorVisible && !selectedSessionId) {
+                Swal.fire({ icon: 'warning', title: 'Sin sesión', text: 'Selecciona la sesión en la que deseas guardar el PDF.' });
+                return;
+            }
+
             const btnSave = document.getElementById('btnSaveToAirtable');
             if (btnSave) {
                 btnSave.disabled = true;
@@ -8471,6 +9232,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         trainingId,
+                        sessionId: selectedSessionId || null,
                         trainingCode,
                         fileName: participantsPdfFile.name || 'lista_asistencia.pdf',
                         fileBase64,
