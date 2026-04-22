@@ -2489,7 +2489,7 @@
                 </div>
 
                 <!-- Resultado -->
-                <div id="personalResultado" style="display:none; max-width:680px; margin:0 auto;"></div>
+                <div id="personalResultado" style="display:none; max-width:1200px; margin:0 auto;"></div>
 
                 <!-- Sin resultado -->
                 <div id="personalNoEncontrado" style="display:none; text-align:center; padding:2.5rem;">
@@ -7441,6 +7441,156 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             return null;
         }
 
+        async function obtenerHistorialCapacitacionesPersonal(row, cols, colCedula, colNombre) {
+            try {
+                const [partsRes, trainingsRes, sessionsRes] = await Promise.all([
+                    airtableFetchAll('/Participaciones').catch(() => []),
+                    airtableFetchAll('/Capacitaciones').catch(() => []),
+                    airtableFetchAll('/Sesiones').catch(() => [])
+                ]);
+
+                const participations = Array.isArray(partsRes) ? partsRes : [];
+                const trainings = Array.isArray(trainingsRes) ? trainingsRes : [];
+                const sessions = Array.isArray(sessionsRes) ? sessionsRes : [];
+
+                const cedulaBuscada = colCedula ? normDoc(row[colCedula]) : '';
+                const nombreBuscado = colNombre ? normStr(row[colNombre]) : '';
+
+                const partSample = participations.find(r => Object.keys(r?.fields || {}).length) || { fields: {} };
+                const partCols = Object.keys(partSample.fields || {});
+
+                const partCedula = detectarCampo(partCols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
+                const partNombre = detectarCampo(partCols, ['Nombre Completo', 'NOMBRE', 'Nombre', 'Participante']);
+                const partPre = detectarCampo(partCols, ['Pretest Score', 'Pre-test Score', 'Puntuación Pretest', 'Puntuacion Pretest']);
+                const partPost = detectarCampo(partCols, ['Post-test Score', 'Posttest Score', 'Puntuación Posttest', 'Puntuacion Posttest']);
+                const partFecha = detectarCampo(partCols, ['Fecha de Inicio', 'Fecha Inicio', 'Fecha']);
+                const partCap = detectarCampo(partCols, ['Capacitación', 'Capacitaciones', 'Capacitacion']);
+                const partSesion = detectarCampo(partCols, ['Sesión', 'Sesion']);
+
+                const sessionToTraining = {};
+                sessions.forEach(s => {
+                    const f = s.fields || {};
+                    const linked = f['Capacitaciones'] || f['Capacitación'] || f['Capacitacion'] || [];
+                    if (Array.isArray(linked) && linked.length > 0) sessionToTraining[s.id] = linked[0];
+                });
+
+                const trainingMap = {};
+                trainings.forEach(t => { trainingMap[t.id] = t; });
+
+                function partMatches(p) {
+                    const f = p.fields || {};
+                    const byCedula = partCedula && cedulaBuscada && normDoc(f[partCedula]) === cedulaBuscada;
+                    const byNombre = partNombre && nombreBuscado && normStr(f[partNombre]) === nombreBuscado;
+                    return !!(byCedula || byNombre);
+                }
+
+                function resolveTrainingId(p) {
+                    const f = p.fields || {};
+                    const direct = partCap ? f[partCap] : (f['Capacitación'] || f['Capacitaciones'] || f['Capacitacion']);
+                    if (Array.isArray(direct) && direct.length > 0) return direct[0];
+                    const ses = partSesion ? f[partSesion] : (f['Sesión'] || f['Sesion']);
+                    if (Array.isArray(ses) && ses.length > 0) {
+                        for (const sid of ses) {
+                            if (sessionToTraining[sid]) return sessionToTraining[sid];
+                        }
+                    }
+                    return null;
+                }
+
+                function getTrainingTitle(t) {
+                    const f = t?.fields || {};
+                    return f['Título'] || f['Titulo'] || f['Capacitación'] || f['Nombre'] || f['Tema'] || 'Capacitación';
+                }
+
+                function getTrainingDate(t, p) {
+                    const tf = t?.fields || {};
+                    const pf = p?.fields || {};
+                    return tf['Fecha de la capacitación'] || tf['Fecha'] || tf['Fecha Creación'] || (partFecha ? pf[partFecha] : null) || pf['Fecha de Inicio'] || pf['Fecha Inicio'] || pf['Fecha'] || p?.createdTime || '';
+                }
+
+                function fmtDate(v) {
+                    if (!v) return '—';
+                    const s = String(v);
+                    const date = new Date(s);
+                    if (!isNaN(date.getTime())) {
+                        return date.toLocaleDateString('es-CO');
+                    }
+                    return s.length >= 10 ? s.slice(0, 10) : s;
+                }
+
+                return participations
+                    .filter(partMatches)
+                    .map(p => {
+                        const trainingId = resolveTrainingId(p);
+                        const training = trainingId ? trainingMap[trainingId] : null;
+                        const f = p.fields || {};
+                        return {
+                            titulo: getTrainingTitle(training),
+                            fecha: fmtDate(getTrainingDate(training, p)),
+                            pretest: partPre && f[partPre] !== undefined && f[partPre] !== null && f[partPre] !== '' ? `${f[partPre]}%` : '—',
+                            posttest: partPost && f[partPost] !== undefined && f[partPost] !== null && f[partPost] !== '' ? `${f[partPost]}%` : '—',
+                            rawFecha: getTrainingDate(training, p) || '',
+                            trainingId: trainingId || '',
+                            participationId: p.id
+                        };
+                    })
+                    .sort((a, b) => String(b.rawFecha).localeCompare(String(a.rawFecha)));
+            } catch (err) {
+                console.warn('No se pudo cargar historial de capacitaciones del personal:', err);
+                return [];
+            }
+        }
+
+        function renderHistorialCapacitaciones(historial) {
+            if (!historial || !historial.length) {
+                return `
+                    <div class="card" style="height:100%; background:#fff; border-left:5px solid #94a3b8;">
+                        <h3 style="margin:0 0 1rem 0; color:#111827; display:flex; align-items:center; gap:0.6rem;">
+                            <i class="fas fa-graduation-cap" style="color:var(--primary);"></i>
+                            Capacitaciones realizadas
+                        </h3>
+                        <div style="text-align:center; padding:2rem 1rem; color:#6b7280;">
+                            <i class="fas fa-folder-open" style="font-size:2.2rem; color:#cbd5e1; margin-bottom:0.75rem;"></i>
+                            <p style="margin:0; font-weight:600;">No se encontraron capacitaciones asociadas a este colaborador.</p>
+                        </div>
+                    </div>`;
+            }
+
+            const rows = historial.map((item, idx) => `
+                <tr style="border-bottom:1px solid #e5e7eb;">
+                    <td style="padding:0.75rem; color:#6b7280; font-weight:700; text-align:center;">${idx + 1}</td>
+                    <td style="padding:0.75rem; font-weight:600; color:#111827;">${item.titulo}</td>
+                    <td style="padding:0.75rem; text-align:center; color:#374151;">${item.fecha}</td>
+                    <td style="padding:0.75rem; text-align:center; font-weight:700; color:#1f2937;">${item.pretest}</td>
+                    <td style="padding:0.75rem; text-align:center; font-weight:700; color:#1f2937;">${item.posttest}</td>
+                </tr>`).join('');
+
+            return `
+                <div class="card" style="height:100%; background:#fff; border-left:5px solid var(--primary);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+                        <h3 style="margin:0; color:#111827; display:flex; align-items:center; gap:0.6rem;">
+                            <i class="fas fa-graduation-cap" style="color:var(--primary);"></i>
+                            Capacitaciones realizadas
+                        </h3>
+                        <span style="background:#ecfdf5; color:#166534; border:1px solid #bbf7d0; padding:0.35rem 0.7rem; border-radius:999px; font-size:0.82rem; font-weight:700;">${historial.length} registro(s)</span>
+                    </div>
+                    <div style="overflow:auto; border:1px solid #e5e7eb; border-radius:10px;">
+                        <table style="width:100%; border-collapse:collapse; min-width:520px; background:#fff;">
+                            <thead>
+                                <tr style="background:#f8fafc;">
+                                    <th style="padding:0.8rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase;">#</th>
+                                    <th style="padding:0.8rem; text-align:left; color:#475569; font-size:0.78rem; text-transform:uppercase;">Capacitación</th>
+                                    <th style="padding:0.8rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase;">Fecha</th>
+                                    <th style="padding:0.8rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase;">Pretest</th>
+                                    <th style="padding:0.8rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase;">Postest</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+        }
+
         async function buscarPersonalHSLV() {
             const cedulaInput = document.getElementById('personalCedulaInput');
             const cedula = (cedulaInput?.value || '').trim();
@@ -7534,32 +7684,36 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     ['fas fa-map-marker-alt', 'Ubicación', ubicacion, '#f9fafb', '#e5e7eb']
                 ];
 
+                const historialCapacitaciones = await obtenerHistorialCapacitacionesPersonal(row, cols, colCedula, colNombre);
                 const resultDiv = document.getElementById('personalResultado');
                 resultDiv.innerHTML = `
-                    <div class="card" style="border-left:5px solid var(--primary); background:#fff;">
-                        <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
-                            <div style="width:60px; height:60px; background:linear-gradient(135deg,var(--primary),var(--secondary)); border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 4px 12px rgba(46,125,50,0.3);">
-                                <i class="fas fa-user" style="color:white; font-size:1.6rem;"></i>
-                            </div>
-                            <div>
-                                <h3 style="margin:0; color:#111827; font-size:1.25rem; font-weight:700;">${nombre}</h3>
-                                <p style="margin:0.2rem 0 0 0; color:#6b7280; font-size:0.92rem; font-weight:500;">${cargo !== '—' ? cargo : ''}${cargo !== '—' && area !== '—' ? ' · ' : ''}${area !== '—' ? area : ''}</p>
-                            </div>
-                        </div>
-                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:0.85rem;">
-                            ${infoItems.map(([icon, label, value, bg, border]) => `
-                                <div style="display:flex; align-items:flex-start; gap:0.75rem; padding:0.85rem 1rem; background:${bg}; border-radius:8px; border:1px solid ${border};">
-                                    <i class="${icon}" style="color:var(--primary); width:22px; text-align:center; font-size:1rem; margin-top:2px;"></i>
-                                    <div>
-                                        <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">${label}</span>
-                                        <p style="margin:0.15rem 0 0 0; font-weight:600; color:#111827; word-break:break-word;">${value}</p>
-                                    </div>
+                    <div style="display:grid; grid-template-columns:minmax(320px, 1.05fr) minmax(320px, 1fr); gap:1rem; align-items:start;">
+                        <div class="card" style="border-left:5px solid var(--primary); background:#fff; margin:0;">
+                            <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
+                                <div style="width:60px; height:60px; background:linear-gradient(135deg,var(--primary),var(--secondary)); border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 4px 12px rgba(46,125,50,0.3);">
+                                    <i class="fas fa-user" style="color:white; font-size:1.6rem;"></i>
                                 </div>
-                            `).join('')}
+                                <div>
+                                    <h3 style="margin:0; color:#111827; font-size:1.25rem; font-weight:700;">${nombre}</h3>
+                                    <p style="margin:0.2rem 0 0 0; color:#6b7280; font-size:0.92rem; font-weight:500;">${cargo !== '—' ? cargo : ''}${cargo !== '—' && area !== '—' ? ' · ' : ''}${area !== '—' ? area : ''}</p>
+                                </div>
+                            </div>
+                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:0.85rem;">
+                                ${infoItems.map(([icon, label, value, bg, border]) => `
+                                    <div style="display:flex; align-items:flex-start; gap:0.75rem; padding:0.85rem 1rem; background:${bg}; border-radius:8px; border:1px solid ${border};">
+                                        <i class="${icon}" style="color:var(--primary); width:22px; text-align:center; font-size:1rem; margin-top:2px;"></i>
+                                        <div>
+                                            <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">${label}</span>
+                                            <p style="margin:0.15rem 0 0 0; font-weight:600; color:#111827; word-break:break-word;">${value}</p>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid #e5e7eb; font-size:0.8rem; color:#6b7280;">
+                                Fuente: <strong>${personalDbName}</strong>
+                            </div>
                         </div>
-                        <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid #e5e7eb; font-size:0.8rem; color:#6b7280;">
-                            Fuente: <strong>${personalDbName}</strong>
-                        </div>
+                        ${renderHistorialCapacitaciones(historialCapacitaciones)}
                     </div>`;
                 resultDiv.style.display = 'block';
             } catch (err) {
