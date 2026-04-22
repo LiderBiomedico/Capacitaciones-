@@ -2545,48 +2545,44 @@
             <h2 style="text-align: center; margin-bottom: 0.5rem; color: var(--primary);">
                 <i class="fas fa-user-plus"></i> Registro de Participante
             </h2>
-            <p style="text-align: center; color: #4b5563; margin-bottom: 1.5rem; font-weight: 500;">
-                Por favor completa tu información para acceder a la capacitación
-            </p>
+            Ingresa el número de cédula para cargar automáticamente la información del colaborador
+
+            <div class="form-group">
+                <label><i class="fas fa-id-card"></i> Número de Cédula *</label>
+                <div style="display:flex; gap:0.6rem; align-items:center;">
+                    <input type="text" id="participantCedula" placeholder="Ej: 76328229" required onkeydown="if(event.key==='Enter'){event.preventDefault(); cargarDatosParticipantePorCedula();}">
+                    <button type="button" class="btn btn-secondary" onclick="cargarDatosParticipantePorCedula()" style="white-space:nowrap; min-width:150px;">
+                        <i class="fas fa-search"></i> Cargar datos
+                    </button>
+                </div>
+                <small style="display:block; margin-top:0.45rem; color:#6b7280; font-weight:500;">Los datos se consultan desde la tabla <strong>Personal HSLV</strong>.</small>
+            </div>
+
+            <div id="participantLookupStatus" style="display:none; margin:-0.35rem 0 1rem 0; padding:0.75rem 0.9rem; border-radius:8px; font-weight:600;"></div>
             
             <div class="form-group">
-                <label><i class="fas fa-user"></i> Nombre Completo *</label>
-                <input type="text" id="participantName" placeholder="Ej: Juan García López" required>
+                <label><i class="fas fa-user"></i> Nombre Completo</label>
+                <input type="text" id="participantName" placeholder="Se cargará automáticamente" readonly style="background:#f8fafc;">
             </div>
             
             <div class="form-group">
-                <label><i class="fas fa-hospital"></i> Servicio *</label>
-                <select id="participantDepartment" required>
-                    <option value="">Seleccione su servicio...</option>
-                    <option value="General">General</option>
-                    <option value="Enfermería">Enfermería</option>
-                    <option value="Medicina">Medicina</option>
-                    <option value="Administración">Administración</option>
-                    <option value="Laboratorio">Laboratorio</option>
-                    <option value="Radiología">Radiología</option>
-                    <option value="Urgencias">Urgencias</option>
-                    <option value="UCI">UCI</option>
-                    <option value="Quirófano">Quirófano</option>
-                    <option value="Pediatría">Pediatría</option>
-                    <option value="Otro">Otro</option>
-                </select>
+                <label><i class="fas fa-building"></i> Entidad</label>
+                <input type="text" id="participantEntity" placeholder="Se cargará automáticamente" readonly style="background:#f8fafc;">
             </div>
 
             <div class="form-group">
-                <label><i class="fas fa-user-md"></i> Profesión / Cargo *</label>
-                <select id="participantProfession" required>
-                    <option value="">Seleccione su profesión...</option>
-                    <option value="Jefe de enfermería">Jefe de enfermería</option>
-                    <option value="Médico general">Médico general</option>
-                    <option value="Médico especialista">Médico especialista</option>
-                    <option value="Ingeniero biomédico">Ingeniero biomédico</option>
-                    <option value="Estudiante">Estudiante</option>
-                    <option value="Auxiliar de enfermería">Auxiliar de enfermería</option>
-                    <option value="Terapeuta respiratorio">Terapeuta respiratorio</option>
-                    <option value="Fisioterapeuta">Fisioterapeuta</option>
-                    <option value="Conductor">Conductor</option>
-                    <option value="Técnico de rx">Técnico de rx</option>
-                </select>
+                <label><i class="fas fa-project-diagram"></i> Proceso</label>
+                <input type="text" id="participantProcess" placeholder="Se cargará automáticamente" readonly style="background:#f8fafc;">
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-user-tag"></i> Perfil</label>
+                <input type="text" id="participantProfile" placeholder="Se cargará automáticamente" readonly style="background:#f8fafc;">
+            </div>
+
+            <div class="form-group">
+                <label><i class="fas fa-briefcase"></i> Cargo</label>
+                <input type="text" id="participantProfession" placeholder="Se cargará automáticamente" readonly style="background:#f8fafc;">
             </div>
 
             <div class="modal-actions" style="flex-direction: column; gap: 0.75rem;">
@@ -2770,8 +2766,145 @@
             }
         }
         
+        function setParticipantLookupStatus(message = '', type = 'info') {
+            const box = document.getElementById('participantLookupStatus');
+            if (!box) return;
+            if (!message) {
+                box.style.display = 'none';
+                box.innerHTML = '';
+                return;
+            }
+            const palette = {
+                success: { bg: '#f0fdf4', border: '#bbf7d0', color: '#166534' },
+                error: { bg: '#fef2f2', border: '#fecaca', color: '#991b1b' },
+                warning: { bg: '#fffbeb', border: '#fde68a', color: '#92400e' },
+                info: { bg: '#eff6ff', border: '#bfdbfe', color: '#1d4ed8' }
+            };
+            const style = palette[type] || palette.info;
+            box.style.display = 'block';
+            box.style.background = style.bg;
+            box.style.border = `1px solid ${style.border}`;
+            box.style.color = style.color;
+            box.innerHTML = message;
+        }
+
+        function clearParticipantFields() {
+            ['participantName', 'participantEntity', 'participantProcess', 'participantProfile', 'participantProfession'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+        }
+
+        async function cargarDatosParticipantePorCedula() {
+            const cedulaInput = document.getElementById('participantCedula');
+            const cedula = (cedulaInput?.value || '').trim();
+
+            if (!cedula) {
+                setParticipantLookupStatus('Ingresa un número de cédula para consultar el colaborador.', 'warning');
+                clearParticipantFields();
+                currentParticipantData = {};
+                return;
+            }
+
+            try {
+                setParticipantLookupStatus('<i class="fas fa-spinner fa-spin"></i> Consultando datos del colaborador...', 'info');
+                if (!personalDbLoaded || personalData.length === 0) {
+                    await recargarListaBD();
+                }
+                if (!personalDbLoaded || personalData.length === 0) {
+                    throw new Error('No fue posible cargar la tabla Personal HSLV.');
+                }
+
+                const sample = personalData.find(r => Object.keys(r || {}).length > 1) || personalData[0] || {};
+                const cols = Object.keys(sample).filter(c => c !== 'id');
+                const colCedula    = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
+                const colNombre    = detectarCampo(cols, ['NOMBRE', 'Nombre Completo', 'Nombre', 'Nombres']);
+                const colEntidad   = detectarCampo(cols, ['ENTIDAD', 'Empresa']);
+                const colPerfil    = detectarCampo(cols, ['PERFIL', 'Perfil']);
+                const colCargo     = detectarCampo(cols, ['CARGO', 'Cargo', 'Profesión', 'Profesion']);
+                const colProceso   = detectarCampo(cols, ['PROCESO', 'Proceso']);
+                const colArea      = detectarCampo(cols, ['AREA', 'Área', 'Area', 'Servicio', 'Departamento']);
+                const colGenero    = detectarCampo(cols, ['GENERO', 'Género', 'Genero', 'Sexo']);
+                const colNacimiento= detectarCampo(cols, ['F.NACIMIENTO', 'Fecha Nacimiento', 'Nacimiento']);
+                const colEmail     = detectarCampo(cols, ['EMAIL', 'Correo', 'Correo Electrónico', 'Correo electronico', 'E-mail']);
+                const colContacto  = detectarCampo(cols, ['CONTACTO', 'Telefono', 'Teléfono', 'Celular']);
+                const colContrato  = detectarCampo(cols, ['CONTRATO', 'Contrato']);
+                const colUbicacion = detectarCampo(cols, ['UBICACIÓN', 'Ubicacion', 'Ubicación', 'SEDE', 'Sede']);
+
+                if (!colCedula) throw new Error('La tabla Personal HSLV no tiene un campo de cédula identificable.');
+
+                const cedulaBuscada = normDoc(cedula);
+                const row = personalData.find(r => normDoc(r[colCedula]) === cedulaBuscada);
+                if (!row) {
+                    clearParticipantFields();
+                    currentParticipantData = {};
+                    setParticipantLookupStatus(`No se encontró ningún colaborador con la cédula <strong>${cedulaBuscada}</strong>.`, 'error');
+                    return;
+                }
+
+                const valor = (col, fallback = '') => {
+                    if (!col) return fallback;
+                    const v = row[col];
+                    if (v === undefined || v === null || v === '') return fallback;
+                    return Array.isArray(v) ? v.join(', ') : String(v);
+                };
+
+                const name = valor(colNombre);
+                const entity = valor(colEntidad);
+                const process = valor(colProceso);
+                const profile = valor(colPerfil);
+                const cargo = valor(colCargo);
+                const area = valor(colArea);
+                const genero = valor(colGenero);
+                const nacimiento = valor(colNacimiento);
+                const email = valor(colEmail);
+                const contacto = valor(colContacto);
+                const contrato = valor(colContrato);
+                const ubicacion = valor(colUbicacion);
+
+                document.getElementById('participantName').value = name;
+                document.getElementById('participantEntity').value = entity;
+                document.getElementById('participantProcess').value = process;
+                document.getElementById('participantProfile').value = profile;
+                document.getElementById('participantProfession').value = cargo;
+
+                currentParticipantData = {
+                    cedula: cedulaBuscada,
+                    name,
+                    entity,
+                    process,
+                    profile,
+                    cargo,
+                    profession: cargo,
+                    department: area || process || entity || 'General',
+                    area,
+                    genero,
+                    nacimiento,
+                    email,
+                    contacto,
+                    contrato,
+                    ubicacion,
+                    personalRowId: row.id,
+                    accessCode: currentAccessCode
+                };
+
+                setParticipantLookupStatus(`<i class="fas fa-check-circle"></i> Datos cargados correctamente para <strong>${name || 'colaborador'}</strong>.`, 'success');
+            } catch (error) {
+                console.error('❌ Error cargando datos del participante:', error);
+                clearParticipantFields();
+                currentParticipantData = {};
+                setParticipantLookupStatus(error.message || 'No se pudieron cargar los datos del colaborador.', 'error');
+            }
+        }
+
         function showParticipantRegistrationModal() {
-            document.getElementById('participantRegistrationModal').style.display = 'flex';
+            currentParticipantData = {};
+            const modal = document.getElementById('participantRegistrationModal');
+            if (modal) modal.style.display = 'flex';
+            const cedula = document.getElementById('participantCedula');
+            if (cedula) cedula.value = '';
+            clearParticipantFields();
+            setParticipantLookupStatus('', 'info');
         }
         
         function closeParticipantModal() {
@@ -2779,12 +2912,16 @@
         }
         
         async function proceedToPretest() {
+            const cedula = (document.getElementById('participantCedula')?.value || '').trim();
             const name = document.getElementById('participantName').value.trim();
-            const department = document.getElementById('participantDepartment').value;
-            const profession = document.getElementById('participantProfession') ? document.getElementById('participantProfession').value : '';
-            if (!name) { Swal.fire({ icon: 'warning', title: 'Nombre Requerido', text: 'Por favor ingresa tu nombre completo', confirmButtonText: 'Entendido' }); return; }
-            if (!department) { Swal.fire({ icon: 'warning', title: 'Servicio Requerido', text: 'Por favor selecciona tu servicio', confirmButtonText: 'Entendido' }); return; }
-            if (!profession) { Swal.fire({ icon: 'warning', title: 'Profesión Requerida', text: 'Por favor selecciona tu profesión o cargo', confirmButtonText: 'Entendido' }); return; }
+            const entity = document.getElementById('participantEntity')?.value.trim() || '';
+            const process = document.getElementById('participantProcess')?.value.trim() || '';
+            const profile = document.getElementById('participantProfile')?.value.trim() || '';
+            const profession = document.getElementById('participantProfession') ? document.getElementById('participantProfession').value.trim() : '';
+
+            if (!cedula) { Swal.fire({ icon: 'warning', title: 'Cédula requerida', text: 'Por favor ingresa el número de cédula y carga los datos.', confirmButtonText: 'Entendido' }); return; }
+            if (!name) { Swal.fire({ icon: 'warning', title: 'Datos no cargados', text: 'Primero consulta la cédula para cargar la información del colaborador.', confirmButtonText: 'Entendido' }); return; }
+            if (!entity && !process && !profile && !profession) { Swal.fire({ icon: 'warning', title: 'Información incompleta', text: 'No fue posible cargar todos los datos del colaborador. Verifica la cédula e inténtalo de nuevo.', confirmButtonText: 'Entendido' }); return; }
             if (isTrainingCompletedLocally(currentAccessCode, name)) {
                 closeParticipantModal();
                 Swal.fire({
@@ -2797,7 +2934,18 @@
                 });
                 return;
             }
-            currentParticipantData = { name, department, profession, accessCode: currentAccessCode };
+            currentParticipantData = {
+                ...currentParticipantData,
+                cedula: normDoc(cedula),
+                name,
+                entity,
+                process,
+                profile,
+                cargo: profession,
+                profession,
+                department: currentParticipantData.department || currentParticipantData.area || process || entity || 'General',
+                accessCode: currentAccessCode
+            };
             closeParticipantModal();
             loadAndDisplayPretest();
         }
@@ -3110,8 +3258,14 @@
                 const participationFields = {};
                 
                 assignIfDetected(participationFields, participationFieldKeys, ['Nombre Completo', 'Nombre'], currentParticipantData.name);
-                assignIfDetected(participationFields, participationFieldKeys, ['Servicio', 'Departamento'], currentParticipantData.department);
-                assignIfDetected(participationFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.profession || '').trim());
+                assignIfDetected(participationFields, participationFieldKeys, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula'], currentParticipantData.cedula);
+                assignIfDetected(participationFields, participationFieldKeys, ['Servicio', 'Departamento', 'Área', 'Area'], currentParticipantData.department || currentParticipantData.area);
+                assignIfDetected(participationFields, participationFieldKeys, ['Entidad', 'ENTIDAD', 'Empresa'], currentParticipantData.entity);
+                assignIfDetected(participationFields, participationFieldKeys, ['Proceso', 'PROCESO'], currentParticipantData.process);
+                assignIfDetected(participationFields, participationFieldKeys, ['Perfil', 'PERFIL'], currentParticipantData.profile);
+                assignIfDetected(participationFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'CARGO', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.cargo || currentParticipantData.profession || '').trim());
+                assignIfDetected(participationFields, participationFieldKeys, ['Correo', 'EMAIL', 'Email', 'Correo Electrónico', 'Correo electronico'], currentParticipantData.email);
+                assignIfDetected(participationFields, participationFieldKeys, ['Contacto', 'CONTACTO', 'Telefono', 'Teléfono', 'Celular'], currentParticipantData.contacto);
                 assignIfDetected(participationFields, participationFieldKeys, ['Pretest Score', 'Pre-test Score', 'Puntuación Pretest', 'Puntuacion Pretest'], pretestScore);
                 assignIfDetected(participationFields, participationFieldKeys, ['Fecha de Inicio', 'Fecha Inicio', 'Fecha'], fechaFormato);
                 assignIfDetected(participationFields, participationFieldKeys, ['Completado Pretest', 'Completado Pre-Test', 'Completado Pre Test'], true);
@@ -3122,6 +3276,9 @@
                 // Fallback: garantizar campos críticos aunque la detección falle
                 if (!Object.keys(participationFields).length) {
                     participationFields['Nombre Completo'] = currentParticipantData.name;
+                }
+                if (!('CEDULA' in participationFields) && currentParticipantData.cedula) {
+                    participationFields['CEDULA'] = currentParticipantData.cedula;
                 }
                 // Asegurar Pretest Score y Completado Pretest con nombres exactos
                 if (!('Pretest Score' in participationFields) && !('Pre-test Score' in participationFields)) {
@@ -3233,7 +3390,7 @@
                             </div>
                             
                             <p style="margin: 0.5rem 0;"><strong>${currentParticipantData.name}</strong></p>
-                            <p style="margin: 0; color: #4b5563; font-size: 1rem; font-weight: 500;">${currentParticipantData.department}</p>
+                            <p style="margin: 0; color: #4b5563; font-size: 1rem; font-weight: 500;">${currentParticipantData.cargo || currentParticipantData.department || '—'}</p>
                             <p style="margin: 1rem 0 0 0; color: #1f2937; font-size: 1rem; font-weight: 600;">${scoreMessage}</p>
                             <p style="margin: 0.5rem 0 0 0; color: #1f2937; font-size: 0.95rem; font-weight: 600;">
                                 Tu asistencia y calificación han sido registradas
@@ -3617,7 +3774,12 @@
                 assignIfDetected(updateFields, participationFieldKeys, ['Post-test Score', 'Posttest Score', 'Puntuación Posttest', 'Puntuacion Posttest'], postestScore);
                 assignIfDetected(updateFields, participationFieldKeys, ['Fecha Fin', 'Fecha Final', 'Fecha de Finalización', 'Fecha Finalización', 'Fecha de Fin'], fechaFormato);
                 assignIfDetected(updateFields, participationFieldKeys, ['Completado Posttest', 'Completado Post-Test', 'Completado Post Test'], true);
-                assignIfDetected(updateFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.profession || '').trim());
+                assignIfDetected(updateFields, participationFieldKeys, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula'], currentParticipantData.cedula);
+                assignIfDetected(updateFields, participationFieldKeys, ['Entidad', 'ENTIDAD', 'Empresa'], currentParticipantData.entity);
+                assignIfDetected(updateFields, participationFieldKeys, ['Proceso', 'PROCESO'], currentParticipantData.process);
+                assignIfDetected(updateFields, participationFieldKeys, ['Perfil', 'PERFIL'], currentParticipantData.profile);
+                assignIfDetected(updateFields, participationFieldKeys, ['Servicio', 'Departamento', 'Área', 'Area'], currentParticipantData.department || currentParticipantData.area);
+                assignIfDetected(updateFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'CARGO', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.cargo || currentParticipantData.profession || '').trim());
                 // Vincular Capacitación si el campo existe
                 if (currentTrainingRecord && currentTrainingRecord.id) {
                     assignIfDetected(updateFields, participationFieldKeys, ['Capacitación', 'Capacitacion'], [currentTrainingRecord.id]);
@@ -3726,7 +3888,7 @@
                             </div>
                             
                             <p style="margin: 0.5rem 0;"><strong>${currentParticipantData.name}</strong></p>
-                            <p style="margin: 0; color: #4b5563; font-size: 1rem; font-weight: 500;">${currentParticipantData.department}</p>
+                            <p style="margin: 0; color: #4b5563; font-size: 1rem; font-weight: 500;">${currentParticipantData.cargo || currentParticipantData.department || '—'}</p>
                             <p style="margin: 1rem 0 0 0; color: #1f2937; font-size: 1rem; font-weight: 600;">${scoreMessage}</p>
                             <p style="margin: 0.5rem 0 0 0; color: #1f2937; font-size: 0.95rem; font-weight: 600;">
                                 Tu evaluación ha sido completada y registrada
@@ -3772,9 +3934,9 @@
             
             // Limpiar formulario
             document.getElementById('accessCode').value = '';
-            document.getElementById('participantName').value = '';
-            document.getElementById('participantDepartment').value = '';
-            if (document.getElementById('participantProfession')) document.getElementById('participantProfession').value = '';
+            if (document.getElementById('participantCedula')) document.getElementById('participantCedula').value = '';
+            clearParticipantFields();
+            setParticipantLookupStatus('', 'info');
             
             // Mostrar/ocultar secciones
             document.getElementById('accessSection').style.display = 'block';
