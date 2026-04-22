@@ -2442,10 +2442,10 @@
                     <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
                         <div class="form-group" style="margin:0; min-width:260px; flex:1;">
                             <label style="font-weight:600; color:#374151; display:block; margin-bottom:0.4rem;">
-                                <i class="fas fa-file-excel" style="color:#16a34a;"></i> Seleccionar archivo de personal
+                                <i class="fas fa-database" style="color:#16a34a;"></i> Tabla de personal conectada
                             </label>
-                            <select id="personalDbSelect" style="width:100%; padding:0.6rem 0.9rem; border:1.5px solid #d1d5db; border-radius:8px; font-size:1rem;" onchange="cargarBasePersonal()">
-                                <option value="">-- Selecciona una base de datos --</option>
+                            <select id="personalDbSelect" style="width:100%; padding:0.6rem 0.9rem; border:1.5px solid #d1d5db; border-radius:8px; font-size:1rem;" disabled>
+                                <option value="">Conectando con Airtable...</option>
                             </select>
                         </div>
                         <div style="display:flex; gap:0.5rem; align-items:flex-end; padding-top:1.4rem;">
@@ -2485,7 +2485,7 @@
                 <!-- Estado de carga -->
                 <div id="personalLoading" style="display:none; text-align:center; padding:2rem;">
                     <i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i>
-                    <p style="color:#1f2937; margin-top:0.75rem; font-weight:600;">Buscando en base de datos de personal...</p>
+                    <p style="color:#1f2937; margin-top:0.75rem; font-weight:600;">Buscando en la tabla de personal...</p>
                 </div>
 
                 <!-- Resultado -->
@@ -2501,7 +2501,7 @@
                 <!-- Estado inicial -->
                 <div id="personalInicial" style="text-align:center; padding:3rem; color:#9ca3af;">
                     <i class="fas fa-users" style="font-size:3.5rem; margin-bottom:1rem; display:block;"></i>
-                    <p style="font-size:1.1rem;">Selecciona una base de datos y luego ingresa un número de cédula para buscar.</p>
+                    <p style="font-size:1.1rem;">Ingresa un número de cédula para consultar la información del personal.</p>
                 </div>
             </section>
 
@@ -7347,137 +7347,80 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         // PERSONAL HSLV — Carga Excel desde Airtable y búsqueda por cédula
         // ══════════════════════════════════════════════════════════════════════
 
-        const BD_PERSONAL_TABLE = 'BD PERSONAL HSLV';
-        let personalData = [];          // Filas del Excel cargado
-        let personalDbLoaded = false;   // Si ya se cargó algún Excel
-        let personalDbName = '';        // Nombre del archivo cargado
+        const BD_PERSONAL_TABLE = 'Personal HSLV';
+        let personalData = [];          // Registros directos de Airtable
+        let personalDbLoaded = false;   // Si ya se cargó la tabla
+        let personalDbName = BD_PERSONAL_TABLE;
 
-        // ─── Al entrar al tab Personal, cargar lista de archivos ────────────
+        // ─── Al entrar al tab Personal, cargar tabla directa desde Airtable ──
         async function initPersonalTab() {
             await recargarListaBD();
         }
 
-        // ─── Obtiene los registros de la tabla BD PERSONAL HSLV ─────────────
+        async function cargarTodosLosRegistrosPersonal() {
+            let allRecords = [];
+            let offset = '';
+
+            do {
+                const query = new URLSearchParams({ pageSize: '100' });
+                if (offset) query.set('offset', offset);
+
+                const res = await airtableProxyRequest({
+                    method: 'GET',
+                    path: `/${encodeURIComponent(BD_PERSONAL_TABLE)}?${query.toString()}`
+                });
+
+                const records = res?.records || [];
+                allRecords = allRecords.concat(records.map(r => r.fields || {}));
+                offset = res?.offset || '';
+            } while (offset);
+
+            return allRecords;
+        }
+
+        // ─── Carga los registros de la tabla Personal HSLV ──────────────────
         async function recargarListaBD() {
             const sel = document.getElementById('personalDbSelect');
             const status = document.getElementById('personalDbStatus');
             if (!sel || !status) return;
 
-            sel.innerHTML = '<option value="">Cargando archivos...</option>';
+            sel.innerHTML = '<option value="">Conectando con Airtable...</option>';
             sel.disabled = true;
             status.textContent = '';
 
             try {
-                const res = await airtableProxyRequest({
-                    method: 'GET',
-                    path: `/${encodeURIComponent(BD_PERSONAL_TABLE)}?pageSize=50`
-                });
+                const rows = await cargarTodosLosRegistrosPersonal();
+                personalData = rows;
+                personalDbLoaded = rows.length > 0;
 
-                const records = res?.records || [];
-                sel.innerHTML = '<option value="">-- Selecciona una base de datos --</option>';
+                sel.innerHTML = '';
+                const opt = document.createElement('option');
+                opt.value = BD_PERSONAL_TABLE;
+                opt.textContent = `Tabla ${BD_PERSONAL_TABLE}`;
+                sel.appendChild(opt);
+                sel.disabled = true;
 
-                if (records.length === 0) {
-                    sel.innerHTML += '<option disabled>No se encontraron archivos</option>';
-                    status.textContent = '⚠️ No hay archivos en la tabla BD PERSONAL HSLV.';
-                    sel.disabled = false;
+                if (!rows.length) {
+                    status.textContent = `⚠️ La tabla ${BD_PERSONAL_TABLE} no tiene registros.`;
                     return;
                 }
 
-                records.forEach(rec => {
-                    const f = rec.fields || {};
-                    // El campo de adjunto en Airtable puede llamarse "File Content",
-                    // "Attachments", "Archivo" u otros nombres; buscamos el primero con array
-                    const attachKey = Object.keys(f).find(k => Array.isArray(f[k]) && f[k][0]?.url);
-                    const name = f['Name'] || f['File Path'] || rec.id;
-                    const url  = attachKey ? f[attachKey][0]?.url : null;
-
-                    const opt = document.createElement('option');
-                    opt.value = url || '';
-                    opt.textContent = name;
-                    opt.dataset.recordId = rec.id;
-                    opt.dataset.attachKey = attachKey || '';
-                    // Si no hay URL de adjunto, deshabilitar opción
-                    if (!url) {
-                        opt.disabled = true;
-                        opt.textContent += ' (sin adjunto)';
-                    }
-                    sel.appendChild(opt);
-                });
-
-                sel.disabled = false;
-                status.textContent = `${records.length} archivo(s) encontrado(s). Selecciona uno para cargarlo.`;
+                const cols = Object.keys(rows[0] || {});
+                status.innerHTML = `✅ <strong>${BD_PERSONAL_TABLE}</strong> conectada — ${rows.length} registro(s) disponibles.<br><span style="color:#6b7280;">Campos detectados: ${cols.join(', ')}</span>`;
 
             } catch (err) {
-                console.error('Error cargando lista BD Personal:', err);
-                sel.innerHTML = '<option value="">Error al cargar archivos</option>';
-                sel.disabled = false;
-                status.textContent = '❌ No se pudo conectar con la tabla BD PERSONAL HSLV.';
+                console.error('Error cargando tabla Personal HSLV:', err);
+                personalData = [];
+                personalDbLoaded = false;
+                sel.innerHTML = '<option value="">Error al conectar</option>';
+                sel.disabled = true;
+                status.textContent = `❌ No se pudo conectar con la tabla ${BD_PERSONAL_TABLE}.`;
             }
         }
 
-        // ─── Descarga y parsea el Excel seleccionado ────────────────────────
+        // ─── Compatibilidad: ya no se carga Excel, se usa tabla directa ─────
         async function cargarBasePersonal() {
-            const sel = document.getElementById('personalDbSelect');
-            const status = document.getElementById('personalDbStatus');
-            const url = sel?.value;
-            if (!url) {
-                personalData = [];
-                personalDbLoaded = false;
-                if (status) status.textContent = '';
-                return;
-            }
-
-            if (status) status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Descargando y procesando Excel...';
-
-            try {
-                // Descargar el archivo como ArrayBuffer vía proxy (CORS)
-                const proxyUrl = `/api/proxy-file?url=${encodeURIComponent(url)}`;
-                let arrayBuf;
-
-                try {
-                    // Intentar directo (Airtable permite CORS en sus adjuntos)
-                    const resp = await fetch(url);
-                    if (!resp.ok) throw new Error('Fetch directo falló');
-                    arrayBuf = await resp.arrayBuffer();
-                } catch {
-                    // Fallback: proxy Netlify
-                    const resp2 = await fetch(proxyUrl);
-                    if (!resp2.ok) throw new Error('Fetch por proxy también falló');
-                    arrayBuf = await resp2.arrayBuffer();
-                }
-
-                // Parsear con SheetJS (xlsx-js-style ya cargado en la página)
-                const workbook = XLSX.read(arrayBuf, { type: 'array' });
-                const sheetName = workbook.SheetNames[0];
-                const sheet = workbook.Sheets[sheetName];
-                const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
-
-                if (rows.length === 0) {
-                    throw new Error('El archivo Excel está vacío o no tiene datos.');
-                }
-
-                // Detectar nombres de columnas clave (cédula, nombre, correo)
-                const cols = Object.keys(rows[0]);
-                console.log('📊 Columnas detectadas:', cols);
-
-                personalData = rows;
-                personalDbLoaded = true;
-                personalDbName = sel.options[sel.selectedIndex]?.textContent || '';
-
-                if (status) status.innerHTML = `✅ <strong>${personalDbName}</strong> cargado — ${rows.length} registros. Columnas: <em>${cols.join(', ')}</em>`;
-
-            } catch (err) {
-                console.error('Error cargando Excel:', err);
-                personalData = [];
-                personalDbLoaded = false;
-                if (status) status.innerHTML = `❌ Error al cargar el archivo: ${err.message}`;
-                Swal.fire({
-                    icon: 'error',
-                    title: 'No se pudo cargar el Excel',
-                    text: err.message || 'Verifica que el archivo tenga adjunto válido en Airtable.',
-                    confirmButtonColor: 'var(--primary)'
-                });
-            }
+            await recargarListaBD();
         }
 
         // ─── Normaliza texto para comparación (sin tildes, minúsculas) ───────
@@ -7511,7 +7454,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             }
 
             if (!personalDbLoaded || personalData.length === 0) {
-                Swal.fire({ icon: 'warning', title: 'Sin base de datos', text: 'Primero selecciona y carga una base de datos de personal.', confirmButtonColor: 'var(--primary)' });
+                Swal.fire({ icon: 'warning', title: 'Sin datos disponibles', text: 'No se han cargado registros desde la tabla Personal HSLV.', confirmButtonColor: 'var(--primary)' });
                 return;
             }
 
@@ -7529,9 +7472,14 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 // Detectar columnas
                 const colCedula  = detectarCampo(cols, ['Cedula', 'Cédula', 'CC', 'Documento', 'No. Cédula', 'Numero de Cedula', 'Número de Cédula', 'Identificacion', 'Identificación', 'NIT', 'DNI']);
                 const colNombre  = detectarCampo(cols, ['Nombre Completo', 'Nombre', 'NOMBRE COMPLETO', 'Nombres', 'Nombre y Apellido', 'Empleado', 'Funcionario', 'NOMBRE']);
-                const colCorreo  = detectarCampo(cols, ['Correo Electrónico', 'Correo electronico', 'Correo', 'Email', 'E-mail', 'Mail', 'EMAIL', 'CORREO']);
-                const colCargo   = detectarCampo(cols, ['Cargo', 'Profesión', 'Profesion', 'Puesto', 'CARGO']);
-                const colServicio= detectarCampo(cols, ['Servicio', 'Departamento', 'Area', 'Área', 'Dependencia', 'Unidad']);
+                const colCorreo   = detectarCampo(cols, ['Correo Electrónico', 'Correo electronico', 'Correo', 'Email', 'E-mail', 'Mail', 'EMAIL', 'CORREO']);
+                const colCargo    = detectarCampo(cols, ['Cargo', 'Profesión', 'Profesion', 'Puesto', 'CARGO']);
+                const colServicio = detectarCampo(cols, ['Servicio', 'Departamento', 'Area', 'Área', 'Dependencia', 'Unidad', 'Proceso', 'PROCESO']);
+                const colGenero   = detectarCampo(cols, ['Genero', 'Género', 'Sexo', 'GENERO']);
+                const colEntidad  = detectarCampo(cols, ['Entidad', 'Empresa', 'ENTIDAD']);
+                const colPerfil   = detectarCampo(cols, ['Perfil', 'Rol', 'PERFIL']);
+                const colContacto = detectarCampo(cols, ['Contacto', 'Telefono', 'Teléfono', 'Celular', 'CONTACTO']);
+                const colUbicacion= detectarCampo(cols, ['Ubicación', 'Ubicacion', 'Sede', 'Lugar', 'UBICACIÓN']);
 
                 if (!colCedula) {
                     document.getElementById('personalLoading').style.display = 'none';
@@ -7546,13 +7494,8 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 }
 
                 // Buscar coincidencia exacta (comparando como string)
-                const cedStr = String(cedula).trim();
-                const row = personalData.find(r => {
-                    const val = String(r[colCedula] || '').trim();
-                    // Quitar decimales (ej: 12345678.0 → 12345678)
-                    const valClean = val.replace(/\.0+$/, '');
-                    return val === cedStr || valClean === cedStr;
-                });
+                const cedStr = normDoc(cedula);
+                const row = personalData.find(r => normDoc(r[colCedula]) === cedStr);
 
                 document.getElementById('personalLoading').style.display = 'none';
 
@@ -7561,11 +7504,16 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     return;
                 }
 
-                const nombre  = colNombre  ? (row[colNombre]  || '—') : '—';
-                const cedVal  = colCedula  ? (row[colCedula]  || cedula) : cedula;
-                const correo  = colCorreo  ? (row[colCorreo]  || '—') : '—';
-                const cargo   = colCargo   ? (row[colCargo]   || '') : '';
-                const servicio= colServicio? (row[colServicio]|| '') : '';
+                const nombre    = colNombre   ? (row[colNombre]    || '—') : '—';
+                const cedVal    = colCedula   ? (row[colCedula]    || cedula) : cedula;
+                const correo    = colCorreo   ? (row[colCorreo]    || '—') : '—';
+                const cargo     = colCargo    ? (row[colCargo]     || '') : '';
+                const servicio  = colServicio ? (row[colServicio]  || '') : '';
+                const genero    = colGenero   ? (row[colGenero]    || '') : '';
+                const entidad   = colEntidad  ? (row[colEntidad]   || '') : '';
+                const perfil    = colPerfil   ? (row[colPerfil]    || '') : '';
+                const contacto  = colContacto ? (row[colContacto]  || '') : '';
+                const ubicacion = colUbicacion? (row[colUbicacion] || '') : '';
 
                 // Renderizar tarjeta resultado
                 const resultDiv = document.getElementById('personalResultado');
@@ -7607,8 +7555,48 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                             <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
                                 <i class="fas fa-building" style="color:#6b7280; width:22px; text-align:center;"></i>
                                 <div>
-                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Servicio / Departamento</span>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Área / Proceso</span>
                                     <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(servicio)}</p>
+                                </div>
+                            </div>` : ''}
+                            ${genero ? `
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
+                                <i class="fas fa-venus-mars" style="color:#6b7280; width:22px; text-align:center;"></i>
+                                <div>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Género</span>
+                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(genero)}</p>
+                                </div>
+                            </div>` : ''}
+                            ${contacto ? `
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
+                                <i class="fas fa-phone" style="color:#6b7280; width:22px; text-align:center;"></i>
+                                <div>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Contacto</span>
+                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(contacto)}</p>
+                                </div>
+                            </div>` : ''}
+                            ${entidad ? `
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
+                                <i class="fas fa-hospital" style="color:#6b7280; width:22px; text-align:center;"></i>
+                                <div>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Entidad</span>
+                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(entidad)}</p>
+                                </div>
+                            </div>` : ''}
+                            ${perfil ? `
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
+                                <i class="fas fa-user-tag" style="color:#6b7280; width:22px; text-align:center;"></i>
+                                <div>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Perfil</span>
+                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(perfil)}</p>
+                                </div>
+                            </div>` : ''}
+                            ${ubicacion ? `
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
+                                <i class="fas fa-map-marker-alt" style="color:#6b7280; width:22px; text-align:center;"></i>
+                                <div>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Ubicación</span>
+                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(ubicacion)}</p>
                                 </div>
                             </div>` : ''}
                         </div>
