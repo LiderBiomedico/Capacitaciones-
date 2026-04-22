@@ -2444,8 +2444,8 @@
                             <label style="font-weight:600; color:#374151; display:block; margin-bottom:0.4rem;">
                                 <i class="fas fa-database" style="color:#16a34a;"></i> Tabla de personal conectada
                             </label>
-                            <select id="personalDbSelect" style="width:100%; padding:0.6rem 0.9rem; border:1.5px solid #d1d5db; border-radius:8px; font-size:1rem;" disabled>
-                                <option value="">Conectando con Airtable...</option>
+                            <select id="personalDbSelect" style="width:100%; padding:0.6rem 0.9rem; border:1.5px solid #d1d5db; border-radius:8px; font-size:1rem;" onchange="cargarBasePersonal()">
+                                <option value="">Conectando tabla de personal...</option>
                             </select>
                         </div>
                         <div style="display:flex; gap:0.5rem; align-items:flex-end; padding-top:1.4rem;">
@@ -2485,7 +2485,7 @@
                 <!-- Estado de carga -->
                 <div id="personalLoading" style="display:none; text-align:center; padding:2rem;">
                     <i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i>
-                    <p style="color:#1f2937; margin-top:0.75rem; font-weight:600;">Buscando en la tabla de personal...</p>
+                    <p style="color:#1f2937; margin-top:0.75rem; font-weight:600;">Buscando en base de datos de personal...</p>
                 </div>
 
                 <!-- Resultado -->
@@ -2501,7 +2501,7 @@
                 <!-- Estado inicial -->
                 <div id="personalInicial" style="text-align:center; padding:3rem; color:#9ca3af;">
                     <i class="fas fa-users" style="font-size:3.5rem; margin-bottom:1rem; display:block;"></i>
-                    <p style="font-size:1.1rem;">Ingresa un número de cédula para consultar la información del personal.</p>
+                    <p style="font-size:1.1rem;">Selecciona una base de datos y luego ingresa un número de cédula para buscar.</p>
                 </div>
             </section>
 
@@ -7347,19 +7347,21 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         // PERSONAL HSLV — Carga Excel desde Airtable y búsqueda por cédula
         // ══════════════════════════════════════════════════════════════════════
 
-        const BD_PERSONAL_TABLE = 'Personal HSLV';
-        let personalData = [];          // Registros directos de Airtable
-        let personalDbLoaded = false;   // Si ya se cargó la tabla
-        let personalDbName = BD_PERSONAL_TABLE;
 
-        // ─── Al entrar al tab Personal, cargar tabla directa desde Airtable ──
+        const PERSONAL_HSLV_TABLE = 'Personal HSLV';
+        let personalData = [];
+        let personalDbLoaded = false;
+        let personalDbName = PERSONAL_HSLV_TABLE;
+
         async function initPersonalTab() {
-            await recargarListaBD();
+            if (!personalDbLoaded || personalData.length === 0) {
+                await recargarListaBD();
+            }
         }
 
-        async function cargarTodosLosRegistrosPersonal() {
+        async function obtenerTodosLosRegistrosPersonal() {
             let allRecords = [];
-            let offset = '';
+            let offset = null;
 
             do {
                 const query = new URLSearchParams({ pageSize: '100' });
@@ -7367,76 +7369,71 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 const res = await airtableProxyRequest({
                     method: 'GET',
-                    path: `/${encodeURIComponent(BD_PERSONAL_TABLE)}?${query.toString()}`
+                    path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}?${query.toString()}`
                 });
 
-                const records = res?.records || [];
-                allRecords = allRecords.concat(records.map(r => r.fields || {}));
-                offset = res?.offset || '';
+                const records = Array.isArray(res?.records) ? res.records : [];
+                allRecords = allRecords.concat(records);
+                offset = res?.offset || null;
             } while (offset);
 
             return allRecords;
         }
 
-        // ─── Carga los registros de la tabla Personal HSLV ──────────────────
         async function recargarListaBD() {
             const sel = document.getElementById('personalDbSelect');
             const status = document.getElementById('personalDbStatus');
             if (!sel || !status) return;
 
-            sel.innerHTML = '<option value="">Conectando con Airtable...</option>';
+            sel.innerHTML = '<option value="">Conectando tabla...</option>';
             sel.disabled = true;
-            status.textContent = '';
+            status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Consultando Airtable...';
 
             try {
-                const rows = await cargarTodosLosRegistrosPersonal();
+                const records = await obtenerTodosLosRegistrosPersonal();
+                const rows = records.map(r => ({ id: r.id, ...(r.fields || {}) }));
+
                 personalData = rows;
-                personalDbLoaded = rows.length > 0;
+                personalDbLoaded = true;
+                personalDbName = PERSONAL_HSLV_TABLE;
 
-                sel.innerHTML = '';
-                const opt = document.createElement('option');
-                opt.value = BD_PERSONAL_TABLE;
-                opt.textContent = `Tabla ${BD_PERSONAL_TABLE}`;
-                sel.appendChild(opt);
-                sel.disabled = true;
+                sel.innerHTML = `<option value="${PERSONAL_HSLV_TABLE}">Tabla ${PERSONAL_HSLV_TABLE}</option>`;
+                sel.disabled = false;
 
-                if (!rows.length) {
-                    status.textContent = `⚠️ La tabla ${BD_PERSONAL_TABLE} no tiene registros.`;
-                    return;
-                }
-
-                const cols = Object.keys(rows[0] || {});
-                status.innerHTML = `✅ <strong>${BD_PERSONAL_TABLE}</strong> conectada — ${rows.length} registro(s) disponibles.<br><span style="color:#6b7280;">Campos detectados: ${cols.join(', ')}</span>`;
-
+                const cols = rows.length ? Object.keys(rows[0]).filter(c => c !== 'id') : [];
+                status.innerHTML = rows.length
+                    ? `✅ <strong>${PERSONAL_HSLV_TABLE}</strong> conectada — ${rows.length} registro(s) disponibles.<br><span style="font-size:0.85rem; color:#6b7280;">Campos detectados: ${cols.join(', ')}</span>`
+                    : `⚠️ La tabla <strong>${PERSONAL_HSLV_TABLE}</strong> no tiene registros.`;
             } catch (err) {
                 console.error('Error cargando tabla Personal HSLV:', err);
                 personalData = [];
                 personalDbLoaded = false;
-                sel.innerHTML = '<option value="">Error al conectar</option>';
-                sel.disabled = true;
-                status.textContent = `❌ No se pudo conectar con la tabla ${BD_PERSONAL_TABLE}.`;
+                sel.innerHTML = '<option value="">Error al cargar tabla</option>';
+                sel.disabled = false;
+                status.innerHTML = `❌ No se pudo conectar con la tabla <strong>${PERSONAL_HSLV_TABLE}</strong>. ${err.message || ''}`;
             }
         }
 
-        // ─── Compatibilidad: ya no se carga Excel, se usa tabla directa ─────
-        async function cargarBasePersonal() {
-            await recargarListaBD();
-        }
-
-        // ─── Normaliza texto para comparación (sin tildes, minúsculas) ───────
         function normStr(s) {
             return String(s || '')
                 .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
                 .replace(/\s+/g, ' ').trim().toLowerCase();
         }
 
-        // ─── Detecta qué columna del Excel corresponde a cada campo ──────────
+        function normDoc(value) {
+            return String(value || '')
+                .replace(/,/g, '')
+                .replace(/\s+/g, '')
+                .replace(/\.(0+)$/, '')
+                .replace(/\.(?=\d{3}(\D|$))/g, '')
+                .trim();
+        }
+
         function detectarCampo(cols, candidatos) {
             for (const cand of candidatos) {
                 const match = cols.find(c => normStr(c) === normStr(cand));
                 if (match) return match;
             }
-            // Búsqueda parcial
             for (const cand of candidatos) {
                 const match = cols.find(c => normStr(c).includes(normStr(cand)));
                 if (match) return match;
@@ -7444,9 +7441,9 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             return null;
         }
 
-        // ─── Busca en los datos del Excel por cédula ─────────────────────────
         async function buscarPersonalHSLV() {
-            const cedula = (document.getElementById('personalCedulaInput')?.value || '').trim();
+            const cedulaInput = document.getElementById('personalCedulaInput');
+            const cedula = (cedulaInput?.value || '').trim();
 
             if (!cedula) {
                 Swal.fire({ icon: 'warning', title: 'Campo vacío', text: 'Ingresa un número de cédula para buscar.', confirmButtonColor: 'var(--primary)' });
@@ -7454,7 +7451,11 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             }
 
             if (!personalDbLoaded || personalData.length === 0) {
-                Swal.fire({ icon: 'warning', title: 'Sin datos disponibles', text: 'No se han cargado registros desde la tabla Personal HSLV.', confirmButtonColor: 'var(--primary)' });
+                await recargarListaBD();
+            }
+
+            if (!personalDbLoaded || personalData.length === 0) {
+                Swal.fire({ icon: 'warning', title: 'Sin datos', text: 'No fue posible cargar la tabla de personal desde Airtable.', confirmButtonColor: 'var(--primary)' });
                 return;
             }
 
@@ -7463,39 +7464,32 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             document.getElementById('personalNoEncontrado').style.display = 'none';
             document.getElementById('personalInicial').style.display = 'none';
 
-            // Pequeño delay para mostrar el spinner
-            await new Promise(r => setTimeout(r, 100));
+            await new Promise(r => setTimeout(r, 120));
 
             try {
-                const cols = Object.keys(personalData[0] || {});
+                const sample = personalData.find(r => Object.keys(r || {}).length > 1) || personalData[0] || {};
+                const cols = Object.keys(sample).filter(c => c !== 'id');
 
-                // Detectar columnas
-                const colCedula  = detectarCampo(cols, ['Cedula', 'Cédula', 'CC', 'Documento', 'No. Cédula', 'Numero de Cedula', 'Número de Cédula', 'Identificacion', 'Identificación', 'NIT', 'DNI']);
-                const colNombre  = detectarCampo(cols, ['Nombre Completo', 'Nombre', 'NOMBRE COMPLETO', 'Nombres', 'Nombre y Apellido', 'Empleado', 'Funcionario', 'NOMBRE']);
-                const colCorreo   = detectarCampo(cols, ['Correo Electrónico', 'Correo electronico', 'Correo', 'Email', 'E-mail', 'Mail', 'EMAIL', 'CORREO']);
-                const colCargo    = detectarCampo(cols, ['Cargo', 'Profesión', 'Profesion', 'Puesto', 'CARGO']);
-                const colServicio = detectarCampo(cols, ['Servicio', 'Departamento', 'Area', 'Área', 'Dependencia', 'Unidad', 'Proceso', 'PROCESO']);
-                const colGenero   = detectarCampo(cols, ['Genero', 'Género', 'Sexo', 'GENERO']);
-                const colEntidad  = detectarCampo(cols, ['Entidad', 'Empresa', 'ENTIDAD']);
-                const colPerfil   = detectarCampo(cols, ['Perfil', 'Rol', 'PERFIL']);
-                const colContacto = detectarCampo(cols, ['Contacto', 'Telefono', 'Teléfono', 'Celular', 'CONTACTO']);
-                const colUbicacion= detectarCampo(cols, ['Ubicación', 'Ubicacion', 'Sede', 'Lugar', 'UBICACIÓN']);
+                const colCedula    = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
+                const colNombre    = detectarCampo(cols, ['NOMBRE', 'Nombre Completo', 'Nombre', 'Nombres']);
+                const colGenero    = detectarCampo(cols, ['GENERO', 'Género', 'Genero', 'Sexo']);
+                const colNacimiento= detectarCampo(cols, ['F.NACIMIENTO', 'Fecha Nacimiento', 'Nacimiento']);
+                const colEmail     = detectarCampo(cols, ['EMAIL', 'Correo', 'Correo Electrónico', 'Correo electronico', 'E-mail']);
+                const colContacto  = detectarCampo(cols, ['CONTACTO', 'Telefono', 'Teléfono', 'Celular']);
+                const colEntidad   = detectarCampo(cols, ['ENTIDAD', 'Empresa']);
+                const colPerfil    = detectarCampo(cols, ['PERFIL', 'Perfil']);
+                const colCargo     = detectarCampo(cols, ['CARGO', 'Cargo', 'Profesión', 'Profesion']);
+                const colProceso   = detectarCampo(cols, ['PROCESO', 'Proceso']);
+                const colArea      = detectarCampo(cols, ['AREA', 'Área', 'Area']);
+                const colContrato  = detectarCampo(cols, ['CONTRATO', 'Contrato']);
+                const colUbicacion = detectarCampo(cols, ['UBICACIÓN', 'Ubicacion', 'Ubicación', 'SEDE', 'Sede']);
 
                 if (!colCedula) {
-                    document.getElementById('personalLoading').style.display = 'none';
-                    document.getElementById('personalInicial').style.display = 'block';
-                    Swal.fire({
-                        icon: 'warning',
-                        title: 'Columna de cédula no encontrada',
-                        html: `No se encontró una columna de cédula/documento en el Excel.<br><br>Columnas disponibles: <strong>${cols.join(', ')}</strong>`,
-                        confirmButtonColor: 'var(--primary)'
-                    });
-                    return;
+                    throw new Error(`No se encontró una columna de cédula. Campos disponibles: ${cols.join(', ')}`);
                 }
 
-                // Buscar coincidencia exacta (comparando como string)
-                const cedStr = normDoc(cedula);
-                const row = personalData.find(r => normDoc(r[colCedula]) === cedStr);
+                const cedulaBuscada = normDoc(cedula);
+                const row = personalData.find(r => normDoc(r[colCedula]) === cedulaBuscada);
 
                 document.getElementById('personalLoading').style.display = 'none';
 
@@ -7504,18 +7498,42 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     return;
                 }
 
-                const nombre    = colNombre   ? (row[colNombre]    || '—') : '—';
-                const cedVal    = colCedula   ? (row[colCedula]    || cedula) : cedula;
-                const correo    = colCorreo   ? (row[colCorreo]    || '—') : '—';
-                const cargo     = colCargo    ? (row[colCargo]     || '') : '';
-                const servicio  = colServicio ? (row[colServicio]  || '') : '';
-                const genero    = colGenero   ? (row[colGenero]    || '') : '';
-                const entidad   = colEntidad  ? (row[colEntidad]   || '') : '';
-                const perfil    = colPerfil   ? (row[colPerfil]    || '') : '';
-                const contacto  = colContacto ? (row[colContacto]  || '') : '';
-                const ubicacion = colUbicacion? (row[colUbicacion] || '') : '';
+                const valor = (col, fallback = '—') => {
+                    if (!col) return fallback;
+                    const v = row[col];
+                    if (v === undefined || v === null || v === '') return fallback;
+                    return Array.isArray(v) ? v.join(', ') : String(v);
+                };
 
-                // Renderizar tarjeta resultado
+                const nombre = valor(colNombre);
+                const cedVal = colCedula ? normDoc(row[colCedula]) || cedulaBuscada : cedulaBuscada;
+                const genero = valor(colGenero, '—');
+                const nacimiento = valor(colNacimiento, '—');
+                const email = valor(colEmail, '—');
+                const contacto = valor(colContacto, '—');
+                const entidad = valor(colEntidad, '—');
+                const perfil = valor(colPerfil, '—');
+                const cargo = valor(colCargo, '—');
+                const proceso = valor(colProceso, '—');
+                const area = valor(colArea, '—');
+                const contrato = valor(colContrato, '—');
+                const ubicacion = valor(colUbicacion, '—');
+
+                const infoItems = [
+                    ['fas fa-id-card', 'Cédula', cedVal, '#f0fdf4', '#bbf7d0'],
+                    ['fas fa-venus-mars', 'Género', genero, '#f9fafb', '#e5e7eb'],
+                    ['fas fa-calendar-alt', 'Fecha de nacimiento', nacimiento, '#f9fafb', '#e5e7eb'],
+                    ['fas fa-envelope', 'Correo', email, '#f0fdf4', '#bbf7d0'],
+                    ['fas fa-phone', 'Contacto', contacto, '#f9fafb', '#e5e7eb'],
+                    ['fas fa-building', 'Entidad', entidad, '#f9fafb', '#e5e7eb'],
+                    ['fas fa-user-tag', 'Perfil', perfil, '#f9fafb', '#e5e7eb'],
+                    ['fas fa-briefcase', 'Cargo', cargo, '#f9fafb', '#e5e7eb'],
+                    ['fas fa-project-diagram', 'Proceso', proceso, '#f9fafb', '#e5e7eb'],
+                    ['fas fa-sitemap', 'Área', area, '#f9fafb', '#e5e7eb'],
+                    ['fas fa-file-signature', 'Contrato', contrato, '#f9fafb', '#e5e7eb'],
+                    ['fas fa-map-marker-alt', 'Ubicación', ubicacion, '#f9fafb', '#e5e7eb']
+                ];
+
                 const resultDiv = document.getElementById('personalResultado');
                 resultDiv.innerHTML = `
                     <div class="card" style="border-left:5px solid var(--primary); background:#fff;">
@@ -7524,93 +7542,31 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                                 <i class="fas fa-user" style="color:white; font-size:1.6rem;"></i>
                             </div>
                             <div>
-                                <h3 style="margin:0; color:#111827; font-size:1.25rem; font-weight:700;">${String(nombre)}</h3>
-                                ${cargo || servicio ? `<p style="margin:0.2rem 0 0 0; color:#6b7280; font-size:0.9rem; font-weight:500;">${cargo}${cargo && servicio ? ' · ' : ''}${servicio}</p>` : ''}
+                                <h3 style="margin:0; color:#111827; font-size:1.25rem; font-weight:700;">${nombre}</h3>
+                                <p style="margin:0.2rem 0 0 0; color:#6b7280; font-size:0.92rem; font-weight:500;">${cargo !== '—' ? cargo : ''}${cargo !== '—' && area !== '—' ? ' · ' : ''}${area !== '—' ? area : ''}</p>
                             </div>
                         </div>
-                        <div style="display:grid; gap:0.85rem;">
-                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.85rem 1rem; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
-                                <i class="fas fa-id-card" style="color:var(--primary); width:22px; text-align:center; font-size:1.1rem;"></i>
-                                <div>
-                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Cédula / Documento</span>
-                                    <p style="margin:0.1rem 0 0 0; font-weight:700; color:#111827; font-size:1.1rem;">${String(cedVal).replace(/\.0+$/, '')}</p>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:0.85rem;">
+                            ${infoItems.map(([icon, label, value, bg, border]) => `
+                                <div style="display:flex; align-items:flex-start; gap:0.75rem; padding:0.85rem 1rem; background:${bg}; border-radius:8px; border:1px solid ${border};">
+                                    <i class="${icon}" style="color:var(--primary); width:22px; text-align:center; font-size:1rem; margin-top:2px;"></i>
+                                    <div>
+                                        <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">${label}</span>
+                                        <p style="margin:0.15rem 0 0 0; font-weight:600; color:#111827; word-break:break-word;">${value}</p>
+                                    </div>
                                 </div>
-                            </div>
-                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.85rem 1rem; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
-                                <i class="fas fa-envelope" style="color:var(--primary); width:22px; text-align:center; font-size:1.1rem;"></i>
-                                <div>
-                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Correo Electrónico</span>
-                                    <p style="margin:0.1rem 0 0 0; font-weight:600; color:#111827; word-break:break-all; font-size:1rem;">${String(correo)}</p>
-                                </div>
-                            </div>
-                            ${cargo ? `
-                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
-                                <i class="fas fa-briefcase" style="color:#6b7280; width:22px; text-align:center;"></i>
-                                <div>
-                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Cargo / Profesión</span>
-                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(cargo)}</p>
-                                </div>
-                            </div>` : ''}
-                            ${servicio ? `
-                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
-                                <i class="fas fa-building" style="color:#6b7280; width:22px; text-align:center;"></i>
-                                <div>
-                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Área / Proceso</span>
-                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(servicio)}</p>
-                                </div>
-                            </div>` : ''}
-                            ${genero ? `
-                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
-                                <i class="fas fa-venus-mars" style="color:#6b7280; width:22px; text-align:center;"></i>
-                                <div>
-                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Género</span>
-                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(genero)}</p>
-                                </div>
-                            </div>` : ''}
-                            ${contacto ? `
-                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
-                                <i class="fas fa-phone" style="color:#6b7280; width:22px; text-align:center;"></i>
-                                <div>
-                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Contacto</span>
-                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(contacto)}</p>
-                                </div>
-                            </div>` : ''}
-                            ${entidad ? `
-                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
-                                <i class="fas fa-hospital" style="color:#6b7280; width:22px; text-align:center;"></i>
-                                <div>
-                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Entidad</span>
-                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(entidad)}</p>
-                                </div>
-                            </div>` : ''}
-                            ${perfil ? `
-                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
-                                <i class="fas fa-user-tag" style="color:#6b7280; width:22px; text-align:center;"></i>
-                                <div>
-                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Perfil</span>
-                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(perfil)}</p>
-                                </div>
-                            </div>` : ''}
-                            ${ubicacion ? `
-                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
-                                <i class="fas fa-map-marker-alt" style="color:#6b7280; width:22px; text-align:center;"></i>
-                                <div>
-                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Ubicación</span>
-                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(ubicacion)}</p>
-                                </div>
-                            </div>` : ''}
+                            `).join('')}
                         </div>
-                        <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid #e5e7eb; font-size:0.8rem; color:#9ca3af;">
+                        <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid #e5e7eb; font-size:0.8rem; color:#6b7280;">
                             Fuente: <strong>${personalDbName}</strong>
                         </div>
                     </div>`;
                 resultDiv.style.display = 'block';
-
             } catch (err) {
                 console.error('Error en búsqueda:', err);
                 document.getElementById('personalLoading').style.display = 'none';
                 document.getElementById('personalInicial').style.display = 'block';
-                Swal.fire({ icon: 'error', title: 'Error al buscar', text: err.message, confirmButtonColor: 'var(--primary)' });
+                Swal.fire({ icon: 'error', title: 'Error al buscar', text: err.message || 'Ocurrió un error en la búsqueda.', confirmButtonColor: 'var(--primary)' });
             }
         }
 
@@ -7622,7 +7578,6 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             document.getElementById('personalLoading').style.display = 'none';
             document.getElementById('personalInicial').style.display = 'block';
         }
-
 
         function initScheduleTab() {
             // Año por defecto
