@@ -3042,6 +3042,27 @@
                 fields[k] = finalValue;
             });
 
+            const nextSequentialName = (() => {
+                const nameKey = pickExistingFieldName(detectedKeys, ['Name']);
+                if (!nameKey) return null;
+                if (fields[nameKey] !== undefined && fields[nameKey] !== null && String(fields[nameKey]).trim() !== '') return null;
+
+                let maxValue = 0;
+                (personalData || []).forEach((row) => {
+                    const raw = row ? row[nameKey] : '';
+                    const digits = String(raw || '').replace(/\D/g, '');
+                    if (!digits) return;
+                    const num = Number(digits);
+                    if (Number.isFinite(num) && num > maxValue) maxValue = num;
+                });
+
+                return String(maxValue + 1);
+            })();
+
+            if (nextSequentialName) {
+                fields['Name'] = nextSequentialName;
+            }
+
             const created = await airtableProxyRequest({
                 method: 'POST',
                 path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}`,
