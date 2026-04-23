@@ -3158,9 +3158,14 @@
 
             try {
                 setParticipantLookupStatus('<i class="fas fa-spinner fa-spin"></i> Consultando datos del colaborador...', 'info');
-                if (!personalDbLoaded || personalData.length === 0) {
-                    await recargarListaBD();
+                const loadBtn = document.querySelector('#participantRegistrationModal .btn.btn-secondary');
+                if (loadBtn) {
+                    loadBtn.disabled = true;
+                    loadBtn.dataset.originalHtml = loadBtn.dataset.originalHtml || loadBtn.innerHTML;
+                    loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando';
                 }
+
+                await ensurePersonalDbLoaded(false);
                 if (!personalDbLoaded || personalData.length === 0) {
                     throw new Error('No fue posible cargar la tabla Personal HSLV.');
                 }
@@ -3207,7 +3212,37 @@
                 clearParticipantFields();
                 currentParticipantData = {};
                 setParticipantLookupStatus(error.message || 'No se pudieron cargar los datos del colaborador.', 'error');
+            } finally {
+                const loadBtn = document.querySelector('#participantRegistrationModal .btn.btn-secondary');
+                if (loadBtn) {
+                    loadBtn.disabled = false;
+                    if (loadBtn.dataset.originalHtml) loadBtn.innerHTML = loadBtn.dataset.originalHtml;
+                }
             }
+        }
+
+        let participantCedulaLookupTimer = null;
+
+        function setupParticipantCedulaLookup() {
+            const cedulaInput = document.getElementById('participantCedula');
+            if (!cedulaInput || cedulaInput.dataset.lookupBound === '1') return;
+            cedulaInput.dataset.lookupBound = '1';
+
+            cedulaInput.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    cargarDatosParticipantePorCedula();
+                }
+            });
+
+            cedulaInput.addEventListener('input', () => {
+                clearTimeout(participantCedulaLookupTimer);
+                const value = (cedulaInput.value || '').trim();
+                if (value.length < 5) return;
+                participantCedulaLookupTimer = setTimeout(() => {
+                    cargarDatosParticipantePorCedula();
+                }, 450);
+            });
         }
 
         function showParticipantRegistrationModal() {
@@ -3216,6 +3251,7 @@
             participantManualFieldConfig = [];
             const modal = document.getElementById('participantRegistrationModal');
             if (modal) modal.style.display = 'flex';
+            setupParticipantCedulaLookup();
             const cedula = document.getElementById('participantCedula');
             if (cedula) cedula.value = '';
             clearParticipantFields();
@@ -7779,11 +7815,25 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         let personalData = [];
         let personalDbLoaded = false;
         let personalDbName = PERSONAL_HSLV_TABLE;
+        let personalDbLoadingPromise = null;
+
+        async function ensurePersonalDbLoaded(forceReload = false) {
+            if (!forceReload && personalDbLoaded && personalData.length > 0) {
+                return personalData;
+            }
+            if (!forceReload && personalDbLoadingPromise) {
+                return personalDbLoadingPromise;
+            }
+            personalDbLoadingPromise = recargarListaBD(forceReload)
+                .then(() => personalData)
+                .finally(() => {
+                    personalDbLoadingPromise = null;
+                });
+            return personalDbLoadingPromise;
+        }
 
         async function initPersonalTab() {
-            if (!personalDbLoaded || personalData.length === 0) {
-                await recargarListaBD();
-            }
+            await ensurePersonalDbLoaded(false);
         }
 
         async function obtenerTodosLosRegistrosPersonal() {
@@ -7807,7 +7857,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             return allRecords;
         }
 
-        async function recargarListaBD() {
+        async function recargarListaBD(forceReload = false) {
             const sel = document.getElementById('personalDbSelect');
             const status = document.getElementById('personalDbStatus');
             if (!sel || !status) return;
@@ -7817,6 +7867,16 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Consultando Airtable...';
 
             try {
+                if (!forceReload && personalDbLoaded && personalData.length > 0) {
+                    const colsCached = Object.keys(personalData[0] || {}).filter(c => c !== 'id');
+                    sel.innerHTML = `<option value="${PERSONAL_HSLV_TABLE}">Tabla ${PERSONAL_HSLV_TABLE}</option>`;
+                    sel.disabled = false;
+                    status.innerHTML = personalData.length
+                        ? `✅ <strong>${PERSONAL_HSLV_TABLE}</strong> conectada — ${personalData.length} registro(s) disponibles.<br><span style="font-size:0.85rem; color:#6b7280;">Campos detectados: ${colsCached.join(', ')}</span>`
+                        : `⚠️ La tabla <strong>${PERSONAL_HSLV_TABLE}</strong> no tiene registros.`;
+                    return personalData;
+                }
+
                 const records = await obtenerTodosLosRegistrosPersonal();
                 const rows = records.map(r => ({ id: r.id, ...(r.fields || {}) }));
 
@@ -7831,6 +7891,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 status.innerHTML = rows.length
                     ? `✅ <strong>${PERSONAL_HSLV_TABLE}</strong> conectada — ${rows.length} registro(s) disponibles.<br><span style="font-size:0.85rem; color:#6b7280;">Campos detectados: ${cols.join(', ')}</span>`
                     : `⚠️ La tabla <strong>${PERSONAL_HSLV_TABLE}</strong> no tiene registros.`;
+                return rows;
             } catch (err) {
                 console.error('Error cargando tabla Personal HSLV:', err);
                 personalData = [];
@@ -7838,6 +7899,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 sel.innerHTML = '<option value="">Error al cargar tabla</option>';
                 sel.disabled = false;
                 status.innerHTML = `❌ No se pudo conectar con la tabla <strong>${PERSONAL_HSLV_TABLE}</strong>. ${err.message || ''}`;
+                throw err;
             }
         }
 
