@@ -3042,7 +3042,7 @@
                 fields[k] = finalValue;
             });
 
-            const nextSequentialName = (() => {
+            const sequentialNameInfo = (() => {
                 const nameKey = pickExistingFieldName(detectedKeys, ['Name']);
                 if (!nameKey) return null;
                 if (fields[nameKey] !== undefined && fields[nameKey] !== null && String(fields[nameKey]).trim() !== '') return null;
@@ -3056,11 +3056,11 @@
                     if (Number.isFinite(num) && num > maxValue) maxValue = num;
                 });
 
-                return String(maxValue + 1);
+                return { key: nameKey, value: String(maxValue + 1) };
             })();
 
-            if (nextSequentialName) {
-                fields['Name'] = nextSequentialName;
+            if (sequentialNameInfo) {
+                fields[sequentialNameInfo.key] = sequentialNameInfo.value;
             }
 
             const created = await airtableProxyRequest({
@@ -3084,6 +3084,23 @@
                     Object.assign(createdFields, patched.fields || patchFields);
                 } catch (patchErr) {
                     console.warn('No se pudo reforzar el guardado de la cédula en Personal HSLV:', patchErr);
+                }
+            }
+
+            if (sequentialNameInfo) {
+                const createdName = createdFields[sequentialNameInfo.key];
+                if (createdName === undefined || createdName === null || String(createdName).trim() === '') {
+                    const patchFields = { [sequentialNameInfo.key]: sequentialNameInfo.value };
+                    try {
+                        const patched = await airtableProxyRequest({
+                            method: 'PATCH',
+                            path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}/${encodeURIComponent(created.id)}`,
+                            body: { fields: patchFields }
+                        });
+                        Object.assign(createdFields, patched.fields || patchFields);
+                    } catch (patchErr) {
+                        console.warn('No se pudo reforzar el guardado del consecutivo Name en Personal HSLV:', patchErr);
+                    }
                 }
             }
 
