@@ -2631,6 +2631,43 @@
 
         const COMPLETED_TRAININGS_STORAGE_KEY = 'HSLV_COMPLETED_TRAININGS_V1';
 
+
+        function getQuestionExamType(fields = {}) {
+            return String(fields['Tipo Examen'] || fields['Tipo'] || fields['tipo'] || fields['Type'] || '')
+                .trim()
+                .toLowerCase();
+        }
+
+        function getQuestionTrainingIds(fields = {}) {
+            const candidates = [
+                fields['Capacitación'],
+                fields['Capacitaciones'],
+                fields['capacitacion'],
+                fields['capacitaciones'],
+                fields['Capacitación Relacionada'],
+                fields['Capacitacion'],
+                fields['Training'],
+                fields['Capacitación ID']
+            ];
+
+            for (const value of candidates) {
+                if (Array.isArray(value)) return value.filter(Boolean);
+                if (typeof value === 'string' && value.trim()) return [value.trim()];
+            }
+            return [];
+        }
+
+        function questionBelongsToTraining(fields = {}, trainingId) {
+            const ids = getQuestionTrainingIds(fields);
+            return ids.includes(trainingId);
+        }
+
+        async function fetchAllQuestions() {
+            const records = await airtableFetchAll('/Preguntas?pageSize=100');
+            console.log(`📚 Total real de preguntas cargadas con paginación: ${records.length}`);
+            return records;
+        }
+
         function getCompletedTrainingsMap() {
             try {
                 return JSON.parse(localStorage.getItem(COMPLETED_TRAININGS_STORAGE_KEY) || '{}') || {};
@@ -2964,57 +3001,32 @@
                 
                 console.log(`🔍 Buscando preguntas para entrenamiento: ${trainingId} (${trainingTitle})`);
                 
-                // Obtener TODAS las preguntas primero
-                const allQuestionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: `/Preguntas`
-                    })
-                });
-                
-                const allQuestionsData = await allQuestionsResponse.json();
-                
-                console.log('📚 Todas las preguntas disponibles:', allQuestionsData.records?.length || 0);
-                
-                if (!allQuestionsData.success || !allQuestionsData.records) {
+                // Obtener TODAS las preguntas con paginación
+                const allQuestionRecords = await fetchAllQuestions();
+
+                if (!Array.isArray(allQuestionRecords)) {
                     throw new Error('No se pudieron cargar las preguntas');
                 }
+
+                console.log('📚 Todas las preguntas disponibles (paginadas):', allQuestionRecords.length);
                 
                 // IMPORTANTE: Obtener el trainingId correcto de la sesión
                 console.log('🎓 Training ID de la sesión:', trainingId);
                 console.log('📋 Registro de capacitación actual:', currentTrainingRecord);
                 
                 // Filtrar preguntas en JavaScript - más robusto
-                const pretestQuestions = allQuestionsData.records.filter(q => {
+                const pretestQuestions = allQuestionRecords.filter(q => {
                     const fields = q.fields;
                     
-                    // Obtener el tipo de pregunta (intentar diferentes nombres)
-                    const tipo = fields['Tipo Examen'] || fields['Tipo'] || fields['tipo'] || fields['Type'] || '';
-                    
-                    // Verificar si es pretest (case-insensitive)
-                    const isPretest = tipo.toLowerCase() === 'pretest' || tipo.toLowerCase() === 'pre-test' || tipo.toLowerCase() === 'pre test';
-                    
-                    // Obtener capacitación (intentar diferentes nombres)
-                    let capacitacionId = null;
-                    
-                    if (fields['Capacitación'] && Array.isArray(fields['Capacitación'])) {
-                        capacitacionId = fields['Capacitación'][0];
-                    } else if (fields['Capacitaciones'] && Array.isArray(fields['Capacitaciones'])) {
-                        capacitacionId = fields['Capacitaciones'][0];
-                    } else if (fields['capacitacion'] && Array.isArray(fields['capacitacion'])) {
-                        capacitacionId = fields['capacitacion'][0];
-                    } else if (fields['capacitaciones'] && Array.isArray(fields['capacitaciones'])) {
-                        capacitacionId = fields['capacitaciones'][0];
-                    }
-                    
-                    const isMatch = isPretest && capacitacionId === trainingId;
-                    
+                    const tipo = getQuestionExamType(fields);
+                    const isPretest = ['pretest', 'pre-test', 'pre test'].includes(tipo);
+                    const trainingIds = getQuestionTrainingIds(fields);
+                    const isMatch = isPretest && questionBelongsToTraining(fields, trainingId);
+
                     if (!isMatch) {
-                        console.log(`✗ Pregunta NO match: "${fields['Pregunta'] || 'Sin nombre'}" | Tipo: "${tipo}" | CapID: "${capacitacionId}" vs "${trainingId}"`);
+                        console.log(`✗ Pregunta NO match: "${fields['Pregunta'] || fields['name'] || 'Sin nombre'}" | Tipo: "${tipo}" | CapIDs: "${trainingIds.join(', ')}" vs "${trainingId}"`);
                     }
-                    
+
                     return isMatch;
                 });
                 
@@ -3174,18 +3186,9 @@
                 // PASO 2: Obtener preguntas para calcular score
                 // ==========================================
                 
-                const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: `/Preguntas`
-                    })
-                });
-                
-                const questionsData = await questionsResponse.json();
-                
-                if (!questionsData.success || !questionsData.records) {
+                const allQuestionRecords = await fetchAllQuestions();
+
+                if (!Array.isArray(allQuestionRecords)) {
                     throw new Error('No se pudieron obtener las preguntas');
                 }
                 
@@ -3199,7 +3202,7 @@
                 
                 for (const [questionId, userAnswer] of Object.entries(pretestAnswers)) {
                     // Buscar la pregunta en los registros
-                    const question = questionsData.records.find(q => q.id === questionId);
+                    const question = allQuestionRecords.find(q => q.id === questionId);
                     
                     if (question) {
                         totalAnswered++;
@@ -3482,61 +3485,35 @@
                 console.log('🎓 ID de Capacitación para Postest:', trainingId);
                 console.log('📋 Registro de capacitación:', currentTrainingRecord);
                 
-                // Obtener TODAS las preguntas
-                const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: `/Preguntas`
-                    })
-                });
-                
-                const questionsData = await questionsResponse.json();
-                
-                if (!questionsData.success || !questionsData.records) {
+                // Obtener TODAS las preguntas con paginación
+                const allQuestionRecords = await fetchAllQuestions();
+
+                if (!Array.isArray(allQuestionRecords)) {
                     throw new Error('No se pudieron obtener las preguntas del postest');
                 }
-                
-                console.log('📚 Total de preguntas en Airtable:', questionsData.records.length);
+
+                console.log('📚 Total de preguntas en Airtable (paginado):', allQuestionRecords.length);
                 
                 // ═══════════════════════════════════════════════════════════
                 // FILTRO CORRECTO: Por tipo Y por capacitación
                 // ═══════════════════════════════════════════════════════════
                 
-                const postestQuestions = questionsData.records.filter(q => {
+                const postestQuestions = allQuestionRecords.filter(q => {
                     const fields = q.fields;
                     
-                    // 1. Obtener el tipo de examen
-                    const tipoExamen = (fields['Tipo Examen'] || fields['Tipo'] || '').toLowerCase().trim();
-                    
-                    // 2. Verificar que sea postest
-                    const esPosttest = tipoExamen === 'postest' || 
-                                      tipoExamen === 'posttest' || 
-                                      tipoExamen === 'post-test';
-                    
-                    // 3. Obtener el ID de capacitación vinculado
-                    let capacitacionId = null;
-                    
-                    if (fields['Capacitación'] && Array.isArray(fields['Capacitación'])) {
-                        capacitacionId = fields['Capacitación'][0];
-                    } else if (fields['Capacitaciones'] && Array.isArray(fields['Capacitaciones'])) {
-                        capacitacionId = fields['Capacitaciones'][0];
-                    }
-                    
-                    // 4. Verificar que coincida con la capacitación actual
-                    const perteneceACapacitacion = capacitacionId === trainingId;
-                    
-                    // Log de debug
+                    const tipoExamen = getQuestionExamType(fields);
+                    const esPosttest = ['postest', 'posttest', 'post-test', 'post test'].includes(tipoExamen);
+                    const trainingIds = getQuestionTrainingIds(fields);
+                    const perteneceACapacitacion = questionBelongsToTraining(fields, trainingId);
+
                     if (esPosttest) {
                         console.log(`📝 Pregunta Postest encontrada:`);
-                        console.log(`   Texto: "${fields['Pregunta']?.substring(0, 50)}..."`);
+                        console.log(`   Texto: "${(fields['Pregunta'] || fields['name'] || '').substring(0, 50)}..."`);
                         console.log(`   Tipo: "${tipoExamen}"`);
-                        console.log(`   Cap ID: "${capacitacionId}"`);
+                        console.log(`   Cap IDs: "${trainingIds.join(', ')}"`);
                         console.log(`   Match: ${perteneceACapacitacion ? '✅' : '❌'} (buscando: ${trainingId})`);
                     }
-                    
-                    // RETORNAR TRUE solo si cumple AMBAS condiciones
+
                     return esPosttest && perteneceACapacitacion;
                 });
                 
@@ -3693,18 +3670,9 @@
                 // PASO 1: Obtener preguntas para calcular score
                 // ==========================================
                 
-                const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: `/Preguntas`
-                    })
-                });
-                
-                const questionsData = await questionsResponse.json();
-                
-                if (!questionsData.success || !questionsData.records) {
+                const allQuestionRecords = await fetchAllQuestions();
+
+                if (!Array.isArray(allQuestionRecords)) {
                     throw new Error('No se pudieron obtener las preguntas');
                 }
                 
@@ -3717,7 +3685,7 @@
                 const answersToSave = [];
                 
                 for (const [questionId, userAnswer] of Object.entries(postestAnswers)) {
-                    const question = questionsData.records.find(q => q.id === questionId);
+                    const question = allQuestionRecords.find(q => q.id === questionId);
                     
                     if (question) {
                         totalAnswered++;
