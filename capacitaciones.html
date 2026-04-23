@@ -3000,16 +3000,73 @@
             if (missing.length) {
                 throw new Error('Completa los campos requeridos para registrar el colaborador: ' + missing.join(', '));
             }
+
+            const detectedKeys = participantManualFieldConfig.map(f => f.key);
+            const cedulaKey = detectarCampo(detectedKeys, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
+            const contactoKey = detectarCampo(detectedKeys, ['CONTACTO', 'Telefono', 'Teléfono', 'Celular']);
+            const fechaNacimientoKey = detectarCampo(detectedKeys, ['F.NACIMIENTO', 'Fecha Nacimiento', 'Nacimiento']);
+            const nombreKey = detectarCampo(detectedKeys, ['NOMBRE', 'Nombre Completo', 'Nombre', 'Nombres']);
+            const generoKey = detectarCampo(detectedKeys, ['GENERO', 'Género', 'Genero', 'Sexo']);
+
+            const normalizarNumero = (value) => {
+                const cleaned = String(value || '').replace(/[^\d]/g, '');
+                if (!cleaned) return '';
+                const num = Number(cleaned);
+                return Number.isFinite(num) ? num : cleaned;
+            };
+
+            const normalizarFechaAirtable = (value) => {
+                const raw = String(value || '').trim();
+                if (!raw) return '';
+                if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+                const m = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+                if (m) {
+                    const dd = m[1].padStart(2, '0');
+                    const mm = m[2].padStart(2, '0');
+                    return `${m[3]}-${mm}-${dd}`;
+                }
+                return raw;
+            };
+
             const fields = {};
             Object.entries(values).forEach(([k, v]) => {
-                if (v !== '') fields[k] = v;
+                if (v === '') return;
+                let finalValue = v;
+                if (k === cedulaKey || k === contactoKey) {
+                    finalValue = normalizarNumero(v);
+                } else if (k === fechaNacimientoKey) {
+                    finalValue = normalizarFechaAirtable(v);
+                } else if (k === nombreKey || k === generoKey) {
+                    finalValue = String(v).trim().toUpperCase();
+                }
+                fields[k] = finalValue;
             });
+
             const created = await airtableProxyRequest({
                 method: 'POST',
                 path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}`,
                 body: { fields }
             });
-            const row = { id: created.id, ...(created.fields || fields) };
+
+            const createdFields = { ...(created.fields || {}) };
+            const createdCedula = cedulaKey ? normDoc(createdFields[cedulaKey]) : '';
+            const requestedCedula = cedulaKey ? normDoc(values[cedulaKey]) : '';
+
+            if (cedulaKey && requestedCedula && !createdCedula) {
+                const patchFields = { [cedulaKey]: normalizarNumero(values[cedulaKey]) };
+                try {
+                    const patched = await airtableProxyRequest({
+                        method: 'PATCH',
+                        path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}/${encodeURIComponent(created.id)}`,
+                        body: { fields: patchFields }
+                    });
+                    Object.assign(createdFields, patched.fields || patchFields);
+                } catch (patchErr) {
+                    console.warn('No se pudo reforzar el guardado de la cédula en Personal HSLV:', patchErr);
+                }
+            }
+
+            const row = { id: created.id, ...fields, ...createdFields };
             personalData.unshift(row);
             personalDbLoaded = true;
             await recargarListaBD();
