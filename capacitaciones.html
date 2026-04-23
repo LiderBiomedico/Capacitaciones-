@@ -2480,9 +2480,12 @@
                                 <option value="">Conectando tabla de personal...</option>
                             </select>
                         </div>
-                        <div style="display:flex; gap:0.5rem; align-items:flex-end; padding-top:1.4rem;">
+                        <div style="display:flex; gap:0.5rem; align-items:flex-end; padding-top:1.4rem; flex-wrap:wrap;">
                             <button class="btn btn-light" onclick="recargarListaBD()" title="Recargar lista">
                                 <i class="fas fa-sync-alt"></i> Recargar
+                            </button>
+                            <button class="btn btn-primary" onclick="generarEstadisticasPersonal()" title="Generar estadísticas de capacitación del personal">
+                                <i class="fas fa-chart-bar"></i> Estadísticas
                             </button>
                         </div>
                     </div>
@@ -2513,6 +2516,8 @@
                         </button>
                     </div>
                 </div>
+
+                <div id="personalStatsContainer" style="display:none; max-width:1200px; margin:0 auto 1.5rem auto;"></div>
 
                 <!-- Estado de carga -->
                 <div id="personalLoading" style="display:none; text-align:center; padding:2rem;">
@@ -8065,6 +8070,176 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             } catch (err) {
                 console.warn('No se pudo cargar historial de capacitaciones del personal:', err);
                 return [];
+            }
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function groupAndSortStats(rows, fieldName) {
+            const counts = new Map();
+            rows.forEach(row => {
+                let value = fieldName ? row[fieldName] : '';
+                if (Array.isArray(value)) value = value.join(', ');
+                value = String(value || 'Sin dato').trim() || 'Sin dato';
+                counts.set(value, (counts.get(value) || 0) + 1);
+            });
+            return Array.from(counts.entries())
+                .map(([label, count]) => ({ label, count }))
+                .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'es'));
+        }
+
+        function renderStatsTable(title, icon, data, accentColor = '#16a34a') {
+            const rows = data.length
+                ? data.map((item, index) => `
+                    <tr style="border-bottom:1px solid #e5e7eb;">
+                        <td style="padding:0.65rem; text-align:center; color:#64748b; font-weight:700;">${index + 1}</td>
+                        <td style="padding:0.65rem; color:#111827; font-weight:600;">${escapeHtml(item.label)}</td>
+                        <td style="padding:0.65rem; text-align:center; color:#111827; font-weight:800;">${item.count}</td>
+                    </tr>`).join('')
+                : `<tr><td colspan="3" style="padding:1rem; text-align:center; color:#6b7280;">No hay datos para mostrar.</td></tr>`;
+
+            return `
+                <div class="card" style="background:#fff; border-left:5px solid ${accentColor}; height:100%;">
+                    <h3 style="margin:0 0 1rem 0; color:#111827; display:flex; align-items:center; gap:0.6rem;">
+                        <i class="fas ${icon}" style="color:${accentColor};"></i>
+                        ${title}
+                    </h3>
+                    <div style="overflow:auto; border:1px solid #e5e7eb; border-radius:10px;">
+                        <table style="width:100%; border-collapse:collapse; min-width:280px; background:#fff;">
+                            <thead>
+                                <tr style="background:#f8fafc;">
+                                    <th style="padding:0.75rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase; width:56px;">#</th>
+                                    <th style="padding:0.75rem; text-align:left; color:#475569; font-size:0.78rem; text-transform:uppercase;">Categoría</th>
+                                    <th style="padding:0.75rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase; width:84px;">Personas</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rows}</tbody>
+                        </table>
+                    </div>
+                </div>`;
+        }
+
+        async function generarEstadisticasPersonal() {
+            const container = document.getElementById('personalStatsContainer');
+            if (!container) return;
+
+            container.style.display = 'block';
+            container.innerHTML = `
+                <div class="card" style="text-align:center; padding:2rem;">
+                    <i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i>
+                    <p style="margin:0.8rem 0 0 0; color:#1f2937; font-weight:700;">Generando estadísticas del personal capacitado...</p>
+                </div>`;
+
+            try {
+                await ensurePersonalDbLoaded(false);
+                if (!personalDbLoaded || personalData.length === 0) {
+                    throw new Error('No hay datos cargados de Personal HSLV.');
+                }
+
+                const participations = await airtableFetchAll('/Participaciones').catch(() => []);
+                const records = Array.isArray(participations) ? participations : [];
+                if (!records.length) {
+                    container.innerHTML = `
+                        <div class="card" style="background:#fff; border-left:5px solid #94a3b8;">
+                            <h3 style="margin:0 0 0.8rem 0; color:#111827;"><i class="fas fa-chart-bar" style="color:var(--primary);"></i> Estadísticas de capacitación</h3>
+                            <p style="margin:0; color:#6b7280; font-weight:600;">No se encontraron participaciones registradas para generar estadísticas.</p>
+                        </div>`;
+                    return;
+                }
+
+                const personalSample = personalData.find(r => Object.keys(r || {}).length > 1) || personalData[0] || {};
+                const personalCols = Object.keys(personalSample).filter(c => c !== 'id');
+                const colCedula    = detectarCampo(personalCols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
+                const colNombre    = detectarCampo(personalCols, ['NOMBRE', 'Nombre Completo', 'Nombre', 'Nombres']);
+                const colEntidad   = detectarCampo(personalCols, ['ENTIDAD', 'Empresa']);
+                const colCargo     = detectarCampo(personalCols, ['CARGO', 'Cargo', 'Profesión', 'Profesion']);
+                const colProceso   = detectarCampo(personalCols, ['PROCESO', 'Proceso']);
+                const colArea      = detectarCampo(personalCols, ['AREA', 'Área', 'Area']);
+
+                const partSample = records.find(r => Object.keys(r?.fields || {}).length) || { fields: {} };
+                const partCols = Object.keys(partSample.fields || {});
+                const partCedula = detectarCampo(partCols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
+                const partNombre = detectarCampo(partCols, ['Nombre Completo', 'NOMBRE', 'Nombre', 'Participante']);
+
+                const cedulasConCap = new Set();
+                const nombresConCap = new Set();
+                records.forEach(item => {
+                    const f = item.fields || {};
+                    if (partCedula && f[partCedula]) cedulasConCap.add(normDoc(f[partCedula]));
+                    if (partNombre && f[partNombre]) nombresConCap.add(normStr(f[partNombre]));
+                });
+
+                const personalCapacitado = personalData.filter(row => {
+                    const byCedula = colCedula && cedulasConCap.has(normDoc(row[colCedula]));
+                    const byNombre = colNombre && nombresConCap.has(normStr(row[colNombre]));
+                    return !!(byCedula || byNombre);
+                });
+
+                const totalPersonal = personalData.length;
+                const totalCapacitado = personalCapacitado.length;
+                const totalParticipaciones = records.length;
+                const cobertura = totalPersonal ? ((totalCapacitado / totalPersonal) * 100).toFixed(1) : '0.0';
+
+                const porArea = groupAndSortStats(personalCapacitado, colArea);
+                const porEntidad = groupAndSortStats(personalCapacitado, colEntidad);
+                const porCargo = groupAndSortStats(personalCapacitado, colCargo);
+                const porProceso = groupAndSortStats(personalCapacitado, colProceso);
+
+                container.innerHTML = `
+                    <div class="card" style="background:#fff; border-left:5px solid var(--primary); margin-bottom:1rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
+                            <h3 style="margin:0; color:#111827; display:flex; align-items:center; gap:0.65rem;">
+                                <i class="fas fa-chart-pie" style="color:var(--primary);"></i>
+                                Estadísticas de capacitaciones del personal
+                            </h3>
+                            <button class="btn btn-light" onclick="document.getElementById('personalStatsContainer').style.display='none'">
+                                <i class="fas fa-times"></i> Ocultar
+                            </button>
+                        </div>
+                        <p style="margin:0.9rem 0 0 0; color:#475569; font-weight:500;">Resumen de personas de la base <strong>Personal HSLV</strong> que tienen al menos una capacitación registrada.</p>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:1rem; margin-bottom:1rem;">
+                        <div class="card" style="background:#fff; border-left:5px solid #16a34a;">
+                            <div style="font-size:0.82rem; color:#64748b; text-transform:uppercase; font-weight:800;">Personal en base</div>
+                            <div style="font-size:2rem; font-weight:900; color:#111827; margin-top:0.35rem;">${totalPersonal}</div>
+                        </div>
+                        <div class="card" style="background:#fff; border-left:5px solid #2563eb;">
+                            <div style="font-size:0.82rem; color:#64748b; text-transform:uppercase; font-weight:800;">Personas capacitadas</div>
+                            <div style="font-size:2rem; font-weight:900; color:#111827; margin-top:0.35rem;">${totalCapacitado}</div>
+                        </div>
+                        <div class="card" style="background:#fff; border-left:5px solid #7c3aed;">
+                            <div style="font-size:0.82rem; color:#64748b; text-transform:uppercase; font-weight:800;">Participaciones registradas</div>
+                            <div style="font-size:2rem; font-weight:900; color:#111827; margin-top:0.35rem;">${totalParticipaciones}</div>
+                        </div>
+                        <div class="card" style="background:#fff; border-left:5px solid #ea580c;">
+                            <div style="font-size:0.82rem; color:#64748b; text-transform:uppercase; font-weight:800;">Cobertura de capacitación</div>
+                            <div style="font-size:2rem; font-weight:900; color:#111827; margin-top:0.35rem;">${cobertura}%</div>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
+                        ${renderStatsTable('Personas capacitadas por área', 'fa-layer-group', porArea, '#16a34a')}
+                        ${renderStatsTable('Personas capacitadas por entidad', 'fa-building', porEntidad, '#2563eb')}
+                        ${renderStatsTable('Personas capacitadas por cargo', 'fa-briefcase', porCargo, '#7c3aed')}
+                        ${renderStatsTable('Personas capacitadas por proceso', 'fa-project-diagram', porProceso, '#ea580c')}
+                    </div>`;
+
+                container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (err) {
+                console.error('Error generando estadísticas de personal:', err);
+                container.innerHTML = `
+                    <div class="card" style="background:#fff; border-left:5px solid #ef4444;">
+                        <h3 style="margin:0 0 0.6rem 0; color:#111827;"><i class="fas fa-exclamation-triangle" style="color:#ef4444;"></i> No fue posible generar las estadísticas</h3>
+                        <p style="margin:0; color:#6b7280; font-weight:600;">${escapeHtml(err.message || 'Error desconocido')}</p>
+                    </div>`;
             }
         }
 
