@@ -8095,29 +8095,122 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'es'));
         }
 
-        function renderStatsTable(title, icon, data, accentColor = '#16a34a') {
+        let personalStatsCharts = {
+            area: null,
+            entidad: null,
+            cargo: null,
+            proceso: null
+        };
+
+        function destroyPersonalStatsCharts() {
+            Object.keys(personalStatsCharts).forEach(key => {
+                if (personalStatsCharts[key] && typeof personalStatsCharts[key].destroy === 'function') {
+                    personalStatsCharts[key].destroy();
+                }
+                personalStatsCharts[key] = null;
+            });
+        }
+
+        function getPersonalStatsPalette() {
+            return [
+                'rgba(22,163,74,0.88)',
+                'rgba(37,99,235,0.88)',
+                'rgba(124,58,237,0.88)',
+                'rgba(234,88,12,0.88)',
+                'rgba(14,165,233,0.88)',
+                'rgba(236,72,153,0.88)',
+                'rgba(245,158,11,0.88)',
+                'rgba(99,102,241,0.88)',
+                'rgba(16,185,129,0.88)',
+                'rgba(239,68,68,0.88)'
+            ];
+        }
+
+        function renderStatsInsightCard(title, value, subtitle, accentColor, icon) {
+            return `
+                <div class="card" style="background:linear-gradient(180deg,#ffffff 0%, #f8fafc 100%); border:1px solid #e5e7eb; border-top:4px solid ${accentColor}; box-shadow:0 10px 25px rgba(15,23,42,0.08);">
+                    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem;">
+                        <div>
+                            <div style="font-size:0.8rem; color:#64748b; text-transform:uppercase; font-weight:900; letter-spacing:0.06em;">${title}</div>
+                            <div style="font-size:2rem; font-weight:900; color:#111827; margin-top:0.35rem; line-height:1;">${value}</div>
+                            <div style="margin-top:0.5rem; color:#475569; font-weight:600; font-size:0.95rem;">${subtitle}</div>
+                        </div>
+                        <div style="width:52px; height:52px; border-radius:16px; background:${accentColor}; display:flex; align-items:center; justify-content:center; color:#fff; box-shadow:0 12px 20px rgba(15,23,42,0.18); flex-shrink:0;">
+                            <i class="fas ${icon}" style="font-size:1.2rem;"></i>
+                        </div>
+                    </div>
+                </div>`;
+        }
+
+        function renderStatsSummaryChip(label, value, accentColor) {
+            return `
+                <div style="display:flex; flex-direction:column; gap:0.25rem; padding:0.85rem 1rem; border:1px solid #e5e7eb; border-radius:14px; background:#fff; min-width:180px; box-shadow:0 6px 16px rgba(15,23,42,0.06);">
+                    <span style="font-size:0.78rem; color:#64748b; text-transform:uppercase; letter-spacing:0.05em; font-weight:800;">${label}</span>
+                    <span style="font-size:1rem; font-weight:800; color:${accentColor};">${escapeHtml(value)}</span>
+                </div>`;
+        }
+
+        function renderStatsChartCard(canvasId, title, subtitle, icon, accentColor) {
+            return `
+                <div class="card" style="background:#fff; border:1px solid #e5e7eb; box-shadow:0 12px 28px rgba(15,23,42,0.08); height:100%;">
+                    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; margin-bottom:0.9rem;">
+                        <div>
+                            <h3 style="margin:0; color:#111827; display:flex; align-items:center; gap:0.65rem;">
+                                <i class="fas ${icon}" style="color:${accentColor};"></i>
+                                ${title}
+                            </h3>
+                            <p style="margin:0.45rem 0 0 0; color:#64748b; font-size:0.93rem; font-weight:500;">${subtitle}</p>
+                        </div>
+                        <span style="display:inline-flex; align-items:center; justify-content:center; width:40px; height:40px; border-radius:12px; background:${accentColor}; color:#fff; box-shadow:0 10px 18px rgba(15,23,42,0.15);">
+                            <i class="fas ${icon}"></i>
+                        </span>
+                    </div>
+                    <div style="position:relative; height:320px; background:#fcfcfd; border:1px solid #eef2f7; border-radius:14px; padding:0.75rem;">
+                        <canvas id="${canvasId}"></canvas>
+                    </div>
+                </div>`;
+        }
+
+        function renderStatsTable(title, icon, data, accentColor = '#16a34a', total = 0) {
             const rows = data.length
-                ? data.map((item, index) => `
-                    <tr style="border-bottom:1px solid #e5e7eb;">
-                        <td style="padding:0.65rem; text-align:center; color:#64748b; font-weight:700;">${index + 1}</td>
-                        <td style="padding:0.65rem; color:#111827; font-weight:600;">${escapeHtml(item.label)}</td>
-                        <td style="padding:0.65rem; text-align:center; color:#111827; font-weight:800;">${item.count}</td>
-                    </tr>`).join('')
-                : `<tr><td colspan="3" style="padding:1rem; text-align:center; color:#6b7280;">No hay datos para mostrar.</td></tr>`;
+                ? data.map((item, index) => {
+                    const pct = total ? ((item.count / total) * 100) : 0;
+                    return `
+                        <tr style="border-bottom:1px solid #eef2f7;">
+                            <td style="padding:0.8rem; text-align:center; color:#64748b; font-weight:800;">${index + 1}</td>
+                            <td style="padding:0.8rem; color:#111827; font-weight:700;">
+                                <div style="display:flex; flex-direction:column; gap:0.35rem;">
+                                    <span>${escapeHtml(item.label)}</span>
+                                    <div style="width:100%; background:#f1f5f9; border-radius:999px; height:8px; overflow:hidden;">
+                                        <div style="height:100%; width:${Math.max(4, Math.min(100, pct)).toFixed(1)}%; background:${accentColor}; border-radius:999px;"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td style="padding:0.8rem; text-align:center; color:#111827; font-weight:900;">${item.count}</td>
+                            <td style="padding:0.8rem; text-align:center; color:${accentColor}; font-weight:900;">${pct.toFixed(1)}%</td>
+                        </tr>`;
+                }).join('')
+                : `<tr><td colspan="4" style="padding:1rem; text-align:center; color:#6b7280;">No hay datos para mostrar.</td></tr>`;
 
             return `
-                <div class="card" style="background:#fff; border-left:5px solid ${accentColor}; height:100%;">
-                    <h3 style="margin:0 0 1rem 0; color:#111827; display:flex; align-items:center; gap:0.6rem;">
-                        <i class="fas ${icon}" style="color:${accentColor};"></i>
-                        ${title}
-                    </h3>
-                    <div style="overflow:auto; border:1px solid #e5e7eb; border-radius:10px;">
-                        <table style="width:100%; border-collapse:collapse; min-width:280px; background:#fff;">
+                <div class="card" style="background:#fff; border:1px solid #e5e7eb; border-top:4px solid ${accentColor}; height:100%; box-shadow:0 10px 25px rgba(15,23,42,0.07);">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; flex-wrap:wrap;">
+                        <h3 style="margin:0; color:#111827; display:flex; align-items:center; gap:0.6rem;">
+                            <i class="fas ${icon}" style="color:${accentColor};"></i>
+                            ${title}
+                        </h3>
+                        <span style="display:inline-flex; align-items:center; gap:0.35rem; padding:0.35rem 0.8rem; border-radius:999px; background:${accentColor}; color:#fff; font-size:0.82rem; font-weight:800;">
+                            ${data.length} categoría(s)
+                        </span>
+                    </div>
+                    <div style="overflow:auto; border:1px solid #e5e7eb; border-radius:14px;">
+                        <table style="width:100%; border-collapse:collapse; min-width:340px; background:#fff;">
                             <thead>
                                 <tr style="background:#f8fafc;">
-                                    <th style="padding:0.75rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase; width:56px;">#</th>
-                                    <th style="padding:0.75rem; text-align:left; color:#475569; font-size:0.78rem; text-transform:uppercase;">Categoría</th>
-                                    <th style="padding:0.75rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase; width:84px;">Personas</th>
+                                    <th style="padding:0.85rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase; width:56px;">#</th>
+                                    <th style="padding:0.85rem; text-align:left; color:#475569; font-size:0.78rem; text-transform:uppercase;">Categoría</th>
+                                    <th style="padding:0.85rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase; width:92px;">Personas</th>
+                                    <th style="padding:0.85rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase; width:88px;">%</th>
                                 </tr>
                             </thead>
                             <tbody>${rows}</tbody>
@@ -8126,15 +8219,149 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 </div>`;
         }
 
+        function renderPersonalStatsCharts(chartData) {
+            if (typeof Chart === 'undefined') return;
+            destroyPersonalStatsCharts();
+
+            const palette = getPersonalStatsPalette();
+            const topN = (data, n = 10) => (Array.isArray(data) ? data.slice(0, n) : []);
+            const entityData = topN(chartData.porEntidad, 8);
+            const areaData = topN(chartData.porArea, 10);
+            const cargoData = topN(chartData.porCargo, 10);
+            const procesoData = topN(chartData.porProceso, 10);
+
+            const commonBarOptions = {
+                indexAxis: 'y',
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const total = chartData.totalCapacitado || 0;
+                                const value = Number(context.parsed.x ?? context.parsed ?? 0);
+                                const pct = total ? ((value / total) * 100).toFixed(1) : '0.0';
+                                return `${value} persona(s) • ${pct}%`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        ticks: { precision: 0 },
+                        grid: { color: 'rgba(148,163,184,0.18)' }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { color: '#334155', font: { weight: '600' } }
+                    }
+                }
+            };
+
+            const areaCanvas = document.getElementById('personalStatsChartArea');
+            if (areaCanvas) {
+                personalStatsCharts.area = new Chart(areaCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: areaData.map(x => x.label),
+                        datasets: [{
+                            data: areaData.map(x => x.count),
+                            backgroundColor: palette[0],
+                            borderRadius: 10,
+                            borderSkipped: false,
+                            maxBarThickness: 24
+                        }]
+                    },
+                    options: commonBarOptions
+                });
+            }
+
+            const cargoCanvas = document.getElementById('personalStatsChartCargo');
+            if (cargoCanvas) {
+                personalStatsCharts.cargo = new Chart(cargoCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: cargoData.map(x => x.label),
+                        datasets: [{
+                            data: cargoData.map(x => x.count),
+                            backgroundColor: palette[2],
+                            borderRadius: 10,
+                            borderSkipped: false,
+                            maxBarThickness: 24
+                        }]
+                    },
+                    options: commonBarOptions
+                });
+            }
+
+            const procesoCanvas = document.getElementById('personalStatsChartProceso');
+            if (procesoCanvas) {
+                personalStatsCharts.proceso = new Chart(procesoCanvas, {
+                    type: 'bar',
+                    data: {
+                        labels: procesoData.map(x => x.label),
+                        datasets: [{
+                            data: procesoData.map(x => x.count),
+                            backgroundColor: palette[3],
+                            borderRadius: 10,
+                            borderSkipped: false,
+                            maxBarThickness: 24
+                        }]
+                    },
+                    options: commonBarOptions
+                });
+            }
+
+            const entidadCanvas = document.getElementById('personalStatsChartEntidad');
+            if (entidadCanvas) {
+                personalStatsCharts.entidad = new Chart(entidadCanvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: entityData.map(x => x.label),
+                        datasets: [{
+                            data: entityData.map(x => x.count),
+                            backgroundColor: palette,
+                            borderColor: '#ffffff',
+                            borderWidth: 3,
+                            hoverOffset: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '58%',
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { boxWidth: 14, padding: 14, usePointStyle: true, pointStyle: 'circle' }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const total = chartData.totalCapacitado || 0;
+                                        const value = Number(context.parsed ?? 0);
+                                        const pct = total ? ((value / total) * 100).toFixed(1) : '0.0';
+                                        return `${context.label}: ${value} persona(s) • ${pct}%`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
         async function generarEstadisticasPersonal() {
             const container = document.getElementById('personalStatsContainer');
             if (!container) return;
 
             container.style.display = 'block';
             container.innerHTML = `
-                <div class="card" style="text-align:center; padding:2rem;">
+                <div class="card" style="text-align:center; padding:2rem; background:#fff; box-shadow:0 10px 24px rgba(15,23,42,0.08);">
                     <i class="fas fa-spinner fa-spin" style="font-size:2rem; color:var(--primary);"></i>
-                    <p style="margin:0.8rem 0 0 0; color:#1f2937; font-weight:700;">Generando estadísticas del personal capacitado...</p>
+                    <p style="margin:0.8rem 0 0 0; color:#1f2937; font-weight:700;">Generando tablero gerencial de personal capacitado...</p>
                 </div>`;
 
             try {
@@ -8147,7 +8374,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const records = Array.isArray(participations) ? participations : [];
                 if (!records.length) {
                     container.innerHTML = `
-                        <div class="card" style="background:#fff; border-left:5px solid #94a3b8;">
+                        <div class="card" style="background:#fff; border-left:5px solid #94a3b8; box-shadow:0 10px 24px rgba(15,23,42,0.08);">
                             <h3 style="margin:0 0 0.8rem 0; color:#111827;"><i class="fas fa-chart-bar" style="color:var(--primary);"></i> Estadísticas de capacitación</h3>
                             <p style="margin:0; color:#6b7280; font-weight:600;">No se encontraron participaciones registradas para generar estadísticas.</p>
                         </div>`;
@@ -8185,58 +8412,86 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const totalPersonal = personalData.length;
                 const totalCapacitado = personalCapacitado.length;
                 const totalParticipaciones = records.length;
-                const cobertura = totalPersonal ? ((totalCapacitado / totalPersonal) * 100).toFixed(1) : '0.0';
+                const cobertura = totalPersonal ? ((totalCapacitado / totalPersonal) * 100) : 0;
+                const promedioCapacitaciones = totalCapacitado ? (totalParticipaciones / totalCapacitado) : 0;
 
                 const porArea = groupAndSortStats(personalCapacitado, colArea);
                 const porEntidad = groupAndSortStats(personalCapacitado, colEntidad);
                 const porCargo = groupAndSortStats(personalCapacitado, colCargo);
                 const porProceso = groupAndSortStats(personalCapacitado, colProceso);
 
+                const topArea = porArea[0]?.label || 'Sin dato';
+                const topAreaCount = porArea[0]?.count || 0;
+                const topEntidad = porEntidad[0]?.label || 'Sin dato';
+                const topEntidadCount = porEntidad[0]?.count || 0;
+                const topCargo = porCargo[0]?.label || 'Sin dato';
+                const topProceso = porProceso[0]?.label || 'Sin dato';
+                const sinCobertura = Math.max(0, totalPersonal - totalCapacitado);
+
                 container.innerHTML = `
-                    <div class="card" style="background:#fff; border-left:5px solid var(--primary); margin-bottom:1rem;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
-                            <h3 style="margin:0; color:#111827; display:flex; align-items:center; gap:0.65rem;">
-                                <i class="fas fa-chart-pie" style="color:var(--primary);"></i>
-                                Estadísticas de capacitaciones del personal
-                            </h3>
-                            <button class="btn btn-light" onclick="document.getElementById('personalStatsContainer').style.display='none'">
+                    <div class="card" style="background:linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); border:1px solid #e5e7eb; box-shadow:0 14px 32px rgba(15,23,42,0.08); margin-bottom:1rem; overflow:hidden;">
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
+                            <div>
+                                <div style="display:inline-flex; align-items:center; gap:0.45rem; padding:0.4rem 0.85rem; border-radius:999px; background:#dcfce7; color:#166534; font-size:0.8rem; font-weight:900; text-transform:uppercase; letter-spacing:0.05em; margin-bottom:0.9rem;">
+                                    <i class="fas fa-chart-pie"></i> Presentación gerencial
+                                </div>
+                                <h3 style="margin:0; color:#111827; display:flex; align-items:center; gap:0.65rem; font-size:1.4rem;">
+                                    <i class="fas fa-chart-line" style="color:var(--primary);"></i>
+                                    Estadísticas de capacitaciones del personal
+                                </h3>
+                                <p style="margin:0.9rem 0 0 0; color:#475569; font-weight:500; max-width:860px; line-height:1.6;">
+                                    Tablero ejecutivo construido a partir de la base <strong>Personal HSLV</strong> y de las participaciones registradas en capacitaciones. Resume cobertura, concentración de personal capacitado y distribución por estructura organizacional.
+                                </p>
+                            </div>
+                            <button class="btn btn-light" onclick="document.getElementById('personalStatsContainer').style.display='none'" style="box-shadow:0 8px 18px rgba(15,23,42,0.08);">
                                 <i class="fas fa-times"></i> Ocultar
                             </button>
                         </div>
-                        <p style="margin:0.9rem 0 0 0; color:#475569; font-weight:500;">Resumen de personas de la base <strong>Personal HSLV</strong> que tienen al menos una capacitación registrada.</p>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(210px, 1fr)); gap:1rem; margin-bottom:1rem;">
-                        <div class="card" style="background:#fff; border-left:5px solid #16a34a;">
-                            <div style="font-size:0.82rem; color:#64748b; text-transform:uppercase; font-weight:800;">Personal en base</div>
-                            <div style="font-size:2rem; font-weight:900; color:#111827; margin-top:0.35rem;">${totalPersonal}</div>
-                        </div>
-                        <div class="card" style="background:#fff; border-left:5px solid #2563eb;">
-                            <div style="font-size:0.82rem; color:#64748b; text-transform:uppercase; font-weight:800;">Personas capacitadas</div>
-                            <div style="font-size:2rem; font-weight:900; color:#111827; margin-top:0.35rem;">${totalCapacitado}</div>
-                        </div>
-                        <div class="card" style="background:#fff; border-left:5px solid #7c3aed;">
-                            <div style="font-size:0.82rem; color:#64748b; text-transform:uppercase; font-weight:800;">Participaciones registradas</div>
-                            <div style="font-size:2rem; font-weight:900; color:#111827; margin-top:0.35rem;">${totalParticipaciones}</div>
-                        </div>
-                        <div class="card" style="background:#fff; border-left:5px solid #ea580c;">
-                            <div style="font-size:0.82rem; color:#64748b; text-transform:uppercase; font-weight:800;">Cobertura de capacitación</div>
-                            <div style="font-size:2rem; font-weight:900; color:#111827; margin-top:0.35rem;">${cobertura}%</div>
+                        <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-top:1.15rem;">
+                            ${renderStatsSummaryChip('Área líder', `${topArea} (${topAreaCount})`, '#16a34a')}
+                            ${renderStatsSummaryChip('Entidad líder', `${topEntidad} (${topEntidadCount})`, '#2563eb')}
+                            ${renderStatsSummaryChip('Cargo predominante', topCargo, '#7c3aed')}
+                            ${renderStatsSummaryChip('Proceso predominante', topProceso, '#ea580c')}
                         </div>
                     </div>
 
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem;">
-                        ${renderStatsTable('Personas capacitadas por área', 'fa-layer-group', porArea, '#16a34a')}
-                        ${renderStatsTable('Personas capacitadas por entidad', 'fa-building', porEntidad, '#2563eb')}
-                        ${renderStatsTable('Personas capacitadas por cargo', 'fa-briefcase', porCargo, '#7c3aed')}
-                        ${renderStatsTable('Personas capacitadas por proceso', 'fa-project-diagram', porProceso, '#ea580c')}
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:1rem; margin-bottom:1rem;">
+                        ${renderStatsInsightCard('Personal en base', totalPersonal, 'Total de colaboradores registrados en Personal HSLV.', '#16a34a', 'fa-users')}
+                        ${renderStatsInsightCard('Personas capacitadas', totalCapacitado, 'Colaboradores con al menos una capacitación registrada.', '#2563eb', 'fa-user-check')}
+                        ${renderStatsInsightCard('Participaciones registradas', totalParticipaciones, `Promedio de ${promedioCapacitaciones.toFixed(1)} capacitaciones por persona capacitada.`, '#7c3aed', 'fa-graduation-cap')}
+                        ${renderStatsInsightCard('Cobertura de capacitación', `${cobertura.toFixed(1)}%`, `${sinCobertura} colaborador(es) aún no registran capacitación.`, '#ea580c', 'fa-bullseye')}
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:1rem; margin-bottom:1rem;">
+                        ${renderStatsChartCard('personalStatsChartArea', 'Distribución por área', 'Áreas con mayor cantidad de personal capacitado.', 'fa-layer-group', '#16a34a')}
+                        ${renderStatsChartCard('personalStatsChartEntidad', 'Distribución por entidad', 'Participación relativa del personal capacitado por entidad.', 'fa-building', '#2563eb')}
+                        ${renderStatsChartCard('personalStatsChartCargo', 'Distribución por cargo', 'Cargos con mayor cobertura de formación.', 'fa-briefcase', '#7c3aed')}
+                        ${renderStatsChartCard('personalStatsChartProceso', 'Distribución por proceso', 'Procesos con mayor número de colaboradores capacitados.', 'fa-project-diagram', '#ea580c')}
+                    </div>
+
+                    <div class="card" style="background:#fff; border:1px solid #e5e7eb; box-shadow:0 12px 28px rgba(15,23,42,0.08); margin-bottom:1rem;">
+                        <h3 style="margin:0 0 0.45rem 0; color:#111827; display:flex; align-items:center; gap:0.65rem;">
+                            <i class="fas fa-table" style="color:var(--primary);"></i>
+                            Tablas de detalle para análisis gerencial
+                        </h3>
+                        <p style="margin:0; color:#64748b; font-weight:500;">Las tablas incluyen número de personas y porcentaje de participación sobre el total del personal capacitado.</p>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:1rem;">
+                        ${renderStatsTable('Personas capacitadas por área', 'fa-layer-group', porArea, '#16a34a', totalCapacitado)}
+                        ${renderStatsTable('Personas capacitadas por entidad', 'fa-building', porEntidad, '#2563eb', totalCapacitado)}
+                        ${renderStatsTable('Personas capacitadas por cargo', 'fa-briefcase', porCargo, '#7c3aed', totalCapacitado)}
+                        ${renderStatsTable('Personas capacitadas por proceso', 'fa-project-diagram', porProceso, '#ea580c', totalCapacitado)}
                     </div>`;
 
-                container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                setTimeout(() => {
+                    renderPersonalStatsCharts({ porArea, porEntidad, porCargo, porProceso, totalCapacitado });
+                    container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 80);
             } catch (err) {
                 console.error('Error generando estadísticas de personal:', err);
                 container.innerHTML = `
-                    <div class="card" style="background:#fff; border-left:5px solid #ef4444;">
+                    <div class="card" style="background:#fff; border-left:5px solid #ef4444; box-shadow:0 10px 24px rgba(15,23,42,0.08);">
                         <h3 style="margin:0 0 0.6rem 0; color:#111827;"><i class="fas fa-exclamation-triangle" style="color:#ef4444;"></i> No fue posible generar las estadísticas</h3>
                         <p style="margin:0; color:#6b7280; font-weight:600;">${escapeHtml(err.message || 'Error desconocido')}</p>
                     </div>`;
