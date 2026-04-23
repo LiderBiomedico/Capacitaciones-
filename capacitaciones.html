@@ -2442,10 +2442,10 @@
                     <div style="display:flex; gap:1rem; align-items:center; flex-wrap:wrap;">
                         <div class="form-group" style="margin:0; min-width:260px; flex:1;">
                             <label style="font-weight:600; color:#374151; display:block; margin-bottom:0.4rem;">
-                                <i class="fas fa-database" style="color:#16a34a;"></i> Tabla de personal conectada
+                                <i class="fas fa-file-excel" style="color:#16a34a;"></i> Seleccionar archivo de personal
                             </label>
                             <select id="personalDbSelect" style="width:100%; padding:0.6rem 0.9rem; border:1.5px solid #d1d5db; border-radius:8px; font-size:1rem;" onchange="cargarBasePersonal()">
-                                <option value="">Conectando tabla de personal...</option>
+                                <option value="">-- Selecciona una base de datos --</option>
                             </select>
                         </div>
                         <div style="display:flex; gap:0.5rem; align-items:flex-end; padding-top:1.4rem;">
@@ -2489,7 +2489,7 @@
                 </div>
 
                 <!-- Resultado -->
-                <div id="personalResultado" style="display:none; max-width:1200px; margin:0 auto;"></div>
+                <div id="personalResultado" style="display:none; max-width:680px; margin:0 auto;"></div>
 
                 <!-- Sin resultado -->
                 <div id="personalNoEncontrado" style="display:none; text-align:center; padding:2.5rem;">
@@ -2545,44 +2545,48 @@
             <h2 style="text-align: center; margin-bottom: 0.5rem; color: var(--primary);">
                 <i class="fas fa-user-plus"></i> Registro de Participante
             </h2>
-            Ingresa el número de cédula para cargar automáticamente la información del colaborador
-
-            <div class="form-group">
-                <label><i class="fas fa-id-card"></i> Número de Cédula *</label>
-                <div style="display:flex; gap:0.6rem; align-items:center;">
-                    <input type="text" id="participantCedula" placeholder="Ej: 76328229" required onkeydown="if(event.key==='Enter'){event.preventDefault(); cargarDatosParticipantePorCedula();}">
-                    <button type="button" class="btn btn-secondary" onclick="cargarDatosParticipantePorCedula()" style="white-space:nowrap; min-width:150px;">
-                        <i class="fas fa-search"></i> Cargar datos
-                    </button>
-                </div>
-                <small style="display:block; margin-top:0.45rem; color:#6b7280; font-weight:500;">Los datos se consultan desde la tabla <strong>Personal HSLV</strong>.</small>
-            </div>
-
-            <div id="participantLookupStatus" style="display:none; margin:-0.35rem 0 1rem 0; padding:0.75rem 0.9rem; border-radius:8px; font-weight:600;"></div>
+            <p style="text-align: center; color: #4b5563; margin-bottom: 1.5rem; font-weight: 500;">
+                Por favor completa tu información para acceder a la capacitación
+            </p>
             
             <div class="form-group">
-                <label><i class="fas fa-user"></i> Nombre Completo</label>
-                <input type="text" id="participantName" placeholder="Se cargará automáticamente" readonly style="background:#f8fafc;">
+                <label><i class="fas fa-user"></i> Nombre Completo *</label>
+                <input type="text" id="participantName" placeholder="Ej: Juan García López" required>
             </div>
             
             <div class="form-group">
-                <label><i class="fas fa-building"></i> Entidad</label>
-                <input type="text" id="participantEntity" placeholder="Se cargará automáticamente" readonly style="background:#f8fafc;">
+                <label><i class="fas fa-hospital"></i> Servicio *</label>
+                <select id="participantDepartment" required>
+                    <option value="">Seleccione su servicio...</option>
+                    <option value="General">General</option>
+                    <option value="Enfermería">Enfermería</option>
+                    <option value="Medicina">Medicina</option>
+                    <option value="Administración">Administración</option>
+                    <option value="Laboratorio">Laboratorio</option>
+                    <option value="Radiología">Radiología</option>
+                    <option value="Urgencias">Urgencias</option>
+                    <option value="UCI">UCI</option>
+                    <option value="Quirófano">Quirófano</option>
+                    <option value="Pediatría">Pediatría</option>
+                    <option value="Otro">Otro</option>
+                </select>
             </div>
 
             <div class="form-group">
-                <label><i class="fas fa-project-diagram"></i> Proceso</label>
-                <input type="text" id="participantProcess" placeholder="Se cargará automáticamente" readonly style="background:#f8fafc;">
-            </div>
-
-            <div class="form-group">
-                <label><i class="fas fa-user-tag"></i> Perfil</label>
-                <input type="text" id="participantProfile" placeholder="Se cargará automáticamente" readonly style="background:#f8fafc;">
-            </div>
-
-            <div class="form-group">
-                <label><i class="fas fa-briefcase"></i> Cargo</label>
-                <input type="text" id="participantProfession" placeholder="Se cargará automáticamente" readonly style="background:#f8fafc;">
+                <label><i class="fas fa-user-md"></i> Profesión / Cargo *</label>
+                <select id="participantProfession" required>
+                    <option value="">Seleccione su profesión...</option>
+                    <option value="Jefe de enfermería">Jefe de enfermería</option>
+                    <option value="Médico general">Médico general</option>
+                    <option value="Médico especialista">Médico especialista</option>
+                    <option value="Ingeniero biomédico">Ingeniero biomédico</option>
+                    <option value="Estudiante">Estudiante</option>
+                    <option value="Auxiliar de enfermería">Auxiliar de enfermería</option>
+                    <option value="Terapeuta respiratorio">Terapeuta respiratorio</option>
+                    <option value="Fisioterapeuta">Fisioterapeuta</option>
+                    <option value="Conductor">Conductor</option>
+                    <option value="Técnico de rx">Técnico de rx</option>
+                </select>
             </div>
 
             <div class="modal-actions" style="flex-direction: column; gap: 0.75rem;">
@@ -2630,43 +2634,6 @@
         let postestCode = null;
 
         const COMPLETED_TRAININGS_STORAGE_KEY = 'HSLV_COMPLETED_TRAININGS_V1';
-
-
-        function getQuestionExamType(fields = {}) {
-            return String(fields['Tipo Examen'] || fields['Tipo'] || fields['tipo'] || fields['Type'] || '')
-                .trim()
-                .toLowerCase();
-        }
-
-        function getQuestionTrainingIds(fields = {}) {
-            const candidates = [
-                fields['Capacitación'],
-                fields['Capacitaciones'],
-                fields['capacitacion'],
-                fields['capacitaciones'],
-                fields['Capacitación Relacionada'],
-                fields['Capacitacion'],
-                fields['Training'],
-                fields['Capacitación ID']
-            ];
-
-            for (const value of candidates) {
-                if (Array.isArray(value)) return value.filter(Boolean);
-                if (typeof value === 'string' && value.trim()) return [value.trim()];
-            }
-            return [];
-        }
-
-        function questionBelongsToTraining(fields = {}, trainingId) {
-            const ids = getQuestionTrainingIds(fields);
-            return ids.includes(trainingId);
-        }
-
-        async function fetchAllQuestions() {
-            const records = await airtableFetchAll('/Preguntas?pageSize=100');
-            console.log(`📚 Total real de preguntas cargadas con paginación: ${records.length}`);
-            return records;
-        }
 
         function getCompletedTrainingsMap() {
             try {
@@ -2803,145 +2770,8 @@
             }
         }
         
-        function setParticipantLookupStatus(message = '', type = 'info') {
-            const box = document.getElementById('participantLookupStatus');
-            if (!box) return;
-            if (!message) {
-                box.style.display = 'none';
-                box.innerHTML = '';
-                return;
-            }
-            const palette = {
-                success: { bg: '#f0fdf4', border: '#bbf7d0', color: '#166534' },
-                error: { bg: '#fef2f2', border: '#fecaca', color: '#991b1b' },
-                warning: { bg: '#fffbeb', border: '#fde68a', color: '#92400e' },
-                info: { bg: '#eff6ff', border: '#bfdbfe', color: '#1d4ed8' }
-            };
-            const style = palette[type] || palette.info;
-            box.style.display = 'block';
-            box.style.background = style.bg;
-            box.style.border = `1px solid ${style.border}`;
-            box.style.color = style.color;
-            box.innerHTML = message;
-        }
-
-        function clearParticipantFields() {
-            ['participantName', 'participantEntity', 'participantProcess', 'participantProfile', 'participantProfession'].forEach(id => {
-                const el = document.getElementById(id);
-                if (el) el.value = '';
-            });
-        }
-
-        async function cargarDatosParticipantePorCedula() {
-            const cedulaInput = document.getElementById('participantCedula');
-            const cedula = (cedulaInput?.value || '').trim();
-
-            if (!cedula) {
-                setParticipantLookupStatus('Ingresa un número de cédula para consultar el colaborador.', 'warning');
-                clearParticipantFields();
-                currentParticipantData = {};
-                return;
-            }
-
-            try {
-                setParticipantLookupStatus('<i class="fas fa-spinner fa-spin"></i> Consultando datos del colaborador...', 'info');
-                if (!personalDbLoaded || personalData.length === 0) {
-                    await recargarListaBD();
-                }
-                if (!personalDbLoaded || personalData.length === 0) {
-                    throw new Error('No fue posible cargar la tabla Personal HSLV.');
-                }
-
-                const sample = personalData.find(r => Object.keys(r || {}).length > 1) || personalData[0] || {};
-                const cols = Object.keys(sample).filter(c => c !== 'id');
-                const colCedula    = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
-                const colNombre    = detectarCampo(cols, ['NOMBRE', 'Nombre Completo', 'Nombre', 'Nombres']);
-                const colEntidad   = detectarCampo(cols, ['ENTIDAD', 'Empresa']);
-                const colPerfil    = detectarCampo(cols, ['PERFIL', 'Perfil']);
-                const colCargo     = detectarCampo(cols, ['CARGO', 'Cargo', 'Profesión', 'Profesion']);
-                const colProceso   = detectarCampo(cols, ['PROCESO', 'Proceso']);
-                const colArea      = detectarCampo(cols, ['AREA', 'Área', 'Area', 'Servicio', 'Departamento']);
-                const colGenero    = detectarCampo(cols, ['GENERO', 'Género', 'Genero', 'Sexo']);
-                const colNacimiento= detectarCampo(cols, ['F.NACIMIENTO', 'Fecha Nacimiento', 'Nacimiento']);
-                const colEmail     = detectarCampo(cols, ['EMAIL', 'Correo', 'Correo Electrónico', 'Correo electronico', 'E-mail']);
-                const colContacto  = detectarCampo(cols, ['CONTACTO', 'Telefono', 'Teléfono', 'Celular']);
-                const colContrato  = detectarCampo(cols, ['CONTRATO', 'Contrato']);
-                const colUbicacion = detectarCampo(cols, ['UBICACIÓN', 'Ubicacion', 'Ubicación', 'SEDE', 'Sede']);
-
-                if (!colCedula) throw new Error('La tabla Personal HSLV no tiene un campo de cédula identificable.');
-
-                const cedulaBuscada = normDoc(cedula);
-                const row = personalData.find(r => normDoc(r[colCedula]) === cedulaBuscada);
-                if (!row) {
-                    clearParticipantFields();
-                    currentParticipantData = {};
-                    setParticipantLookupStatus(`No se encontró ningún colaborador con la cédula <strong>${cedulaBuscada}</strong>.`, 'error');
-                    return;
-                }
-
-                const valor = (col, fallback = '') => {
-                    if (!col) return fallback;
-                    const v = row[col];
-                    if (v === undefined || v === null || v === '') return fallback;
-                    return Array.isArray(v) ? v.join(', ') : String(v);
-                };
-
-                const name = valor(colNombre);
-                const entity = valor(colEntidad);
-                const process = valor(colProceso);
-                const profile = valor(colPerfil);
-                const cargo = valor(colCargo);
-                const area = valor(colArea);
-                const genero = valor(colGenero);
-                const nacimiento = valor(colNacimiento);
-                const email = valor(colEmail);
-                const contacto = valor(colContacto);
-                const contrato = valor(colContrato);
-                const ubicacion = valor(colUbicacion);
-
-                document.getElementById('participantName').value = name;
-                document.getElementById('participantEntity').value = entity;
-                document.getElementById('participantProcess').value = process;
-                document.getElementById('participantProfile').value = profile;
-                document.getElementById('participantProfession').value = cargo;
-
-                currentParticipantData = {
-                    cedula: cedulaBuscada,
-                    name,
-                    entity,
-                    process,
-                    profile,
-                    cargo,
-                    profession: cargo,
-                    department: area || process || entity || 'General',
-                    area,
-                    genero,
-                    nacimiento,
-                    email,
-                    contacto,
-                    contrato,
-                    ubicacion,
-                    personalRowId: row.id,
-                    accessCode: currentAccessCode
-                };
-
-                setParticipantLookupStatus(`<i class="fas fa-check-circle"></i> Datos cargados correctamente para <strong>${name || 'colaborador'}</strong>.`, 'success');
-            } catch (error) {
-                console.error('❌ Error cargando datos del participante:', error);
-                clearParticipantFields();
-                currentParticipantData = {};
-                setParticipantLookupStatus(error.message || 'No se pudieron cargar los datos del colaborador.', 'error');
-            }
-        }
-
         function showParticipantRegistrationModal() {
-            currentParticipantData = {};
-            const modal = document.getElementById('participantRegistrationModal');
-            if (modal) modal.style.display = 'flex';
-            const cedula = document.getElementById('participantCedula');
-            if (cedula) cedula.value = '';
-            clearParticipantFields();
-            setParticipantLookupStatus('', 'info');
+            document.getElementById('participantRegistrationModal').style.display = 'flex';
         }
         
         function closeParticipantModal() {
@@ -2949,16 +2779,12 @@
         }
         
         async function proceedToPretest() {
-            const cedula = (document.getElementById('participantCedula')?.value || '').trim();
             const name = document.getElementById('participantName').value.trim();
-            const entity = document.getElementById('participantEntity')?.value.trim() || '';
-            const process = document.getElementById('participantProcess')?.value.trim() || '';
-            const profile = document.getElementById('participantProfile')?.value.trim() || '';
-            const profession = document.getElementById('participantProfession') ? document.getElementById('participantProfession').value.trim() : '';
-
-            if (!cedula) { Swal.fire({ icon: 'warning', title: 'Cédula requerida', text: 'Por favor ingresa el número de cédula y carga los datos.', confirmButtonText: 'Entendido' }); return; }
-            if (!name) { Swal.fire({ icon: 'warning', title: 'Datos no cargados', text: 'Primero consulta la cédula para cargar la información del colaborador.', confirmButtonText: 'Entendido' }); return; }
-            if (!entity && !process && !profile && !profession) { Swal.fire({ icon: 'warning', title: 'Información incompleta', text: 'No fue posible cargar todos los datos del colaborador. Verifica la cédula e inténtalo de nuevo.', confirmButtonText: 'Entendido' }); return; }
+            const department = document.getElementById('participantDepartment').value;
+            const profession = document.getElementById('participantProfession') ? document.getElementById('participantProfession').value : '';
+            if (!name) { Swal.fire({ icon: 'warning', title: 'Nombre Requerido', text: 'Por favor ingresa tu nombre completo', confirmButtonText: 'Entendido' }); return; }
+            if (!department) { Swal.fire({ icon: 'warning', title: 'Servicio Requerido', text: 'Por favor selecciona tu servicio', confirmButtonText: 'Entendido' }); return; }
+            if (!profession) { Swal.fire({ icon: 'warning', title: 'Profesión Requerida', text: 'Por favor selecciona tu profesión o cargo', confirmButtonText: 'Entendido' }); return; }
             if (isTrainingCompletedLocally(currentAccessCode, name)) {
                 closeParticipantModal();
                 Swal.fire({
@@ -2971,18 +2797,7 @@
                 });
                 return;
             }
-            currentParticipantData = {
-                ...currentParticipantData,
-                cedula: normDoc(cedula),
-                name,
-                entity,
-                process,
-                profile,
-                cargo: profession,
-                profession,
-                department: currentParticipantData.department || currentParticipantData.area || process || entity || 'General',
-                accessCode: currentAccessCode
-            };
+            currentParticipantData = { name, department, profession, accessCode: currentAccessCode };
             closeParticipantModal();
             loadAndDisplayPretest();
         }
@@ -3001,32 +2816,57 @@
                 
                 console.log(`🔍 Buscando preguntas para entrenamiento: ${trainingId} (${trainingTitle})`);
                 
-                // Obtener TODAS las preguntas con paginación
-                const allQuestionRecords = await fetchAllQuestions();
-
-                if (!Array.isArray(allQuestionRecords)) {
+                // Obtener TODAS las preguntas primero
+                const allQuestionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Preguntas`
+                    })
+                });
+                
+                const allQuestionsData = await allQuestionsResponse.json();
+                
+                console.log('📚 Todas las preguntas disponibles:', allQuestionsData.records?.length || 0);
+                
+                if (!allQuestionsData.success || !allQuestionsData.records) {
                     throw new Error('No se pudieron cargar las preguntas');
                 }
-
-                console.log('📚 Todas las preguntas disponibles (paginadas):', allQuestionRecords.length);
                 
                 // IMPORTANTE: Obtener el trainingId correcto de la sesión
                 console.log('🎓 Training ID de la sesión:', trainingId);
                 console.log('📋 Registro de capacitación actual:', currentTrainingRecord);
                 
                 // Filtrar preguntas en JavaScript - más robusto
-                const pretestQuestions = allQuestionRecords.filter(q => {
+                const pretestQuestions = allQuestionsData.records.filter(q => {
                     const fields = q.fields;
                     
-                    const tipo = getQuestionExamType(fields);
-                    const isPretest = ['pretest', 'pre-test', 'pre test'].includes(tipo);
-                    const trainingIds = getQuestionTrainingIds(fields);
-                    const isMatch = isPretest && questionBelongsToTraining(fields, trainingId);
-
-                    if (!isMatch) {
-                        console.log(`✗ Pregunta NO match: "${fields['Pregunta'] || fields['name'] || 'Sin nombre'}" | Tipo: "${tipo}" | CapIDs: "${trainingIds.join(', ')}" vs "${trainingId}"`);
+                    // Obtener el tipo de pregunta (intentar diferentes nombres)
+                    const tipo = fields['Tipo Examen'] || fields['Tipo'] || fields['tipo'] || fields['Type'] || '';
+                    
+                    // Verificar si es pretest (case-insensitive)
+                    const isPretest = tipo.toLowerCase() === 'pretest' || tipo.toLowerCase() === 'pre-test' || tipo.toLowerCase() === 'pre test';
+                    
+                    // Obtener capacitación (intentar diferentes nombres)
+                    let capacitacionId = null;
+                    
+                    if (fields['Capacitación'] && Array.isArray(fields['Capacitación'])) {
+                        capacitacionId = fields['Capacitación'][0];
+                    } else if (fields['Capacitaciones'] && Array.isArray(fields['Capacitaciones'])) {
+                        capacitacionId = fields['Capacitaciones'][0];
+                    } else if (fields['capacitacion'] && Array.isArray(fields['capacitacion'])) {
+                        capacitacionId = fields['capacitacion'][0];
+                    } else if (fields['capacitaciones'] && Array.isArray(fields['capacitaciones'])) {
+                        capacitacionId = fields['capacitaciones'][0];
                     }
-
+                    
+                    const isMatch = isPretest && capacitacionId === trainingId;
+                    
+                    if (!isMatch) {
+                        console.log(`✗ Pregunta NO match: "${fields['Pregunta'] || 'Sin nombre'}" | Tipo: "${tipo}" | CapID: "${capacitacionId}" vs "${trainingId}"`);
+                    }
+                    
                     return isMatch;
                 });
                 
@@ -3186,9 +3026,18 @@
                 // PASO 2: Obtener preguntas para calcular score
                 // ==========================================
                 
-                const allQuestionRecords = await fetchAllQuestions();
-
-                if (!Array.isArray(allQuestionRecords)) {
+                const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Preguntas`
+                    })
+                });
+                
+                const questionsData = await questionsResponse.json();
+                
+                if (!questionsData.success || !questionsData.records) {
                     throw new Error('No se pudieron obtener las preguntas');
                 }
                 
@@ -3202,7 +3051,7 @@
                 
                 for (const [questionId, userAnswer] of Object.entries(pretestAnswers)) {
                     // Buscar la pregunta en los registros
-                    const question = allQuestionRecords.find(q => q.id === questionId);
+                    const question = questionsData.records.find(q => q.id === questionId);
                     
                     if (question) {
                         totalAnswered++;
@@ -3261,14 +3110,8 @@
                 const participationFields = {};
                 
                 assignIfDetected(participationFields, participationFieldKeys, ['Nombre Completo', 'Nombre'], currentParticipantData.name);
-                assignIfDetected(participationFields, participationFieldKeys, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula'], currentParticipantData.cedula);
-                assignIfDetected(participationFields, participationFieldKeys, ['Servicio', 'Departamento', 'Área', 'Area'], currentParticipantData.department || currentParticipantData.area);
-                assignIfDetected(participationFields, participationFieldKeys, ['Entidad', 'ENTIDAD', 'Empresa'], currentParticipantData.entity);
-                assignIfDetected(participationFields, participationFieldKeys, ['Proceso', 'PROCESO'], currentParticipantData.process);
-                assignIfDetected(participationFields, participationFieldKeys, ['Perfil', 'PERFIL'], currentParticipantData.profile);
-                assignIfDetected(participationFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'CARGO', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.cargo || currentParticipantData.profession || '').trim());
-                assignIfDetected(participationFields, participationFieldKeys, ['Correo', 'EMAIL', 'Email', 'Correo Electrónico', 'Correo electronico'], currentParticipantData.email);
-                assignIfDetected(participationFields, participationFieldKeys, ['Contacto', 'CONTACTO', 'Telefono', 'Teléfono', 'Celular'], currentParticipantData.contacto);
+                assignIfDetected(participationFields, participationFieldKeys, ['Servicio', 'Departamento'], currentParticipantData.department);
+                assignIfDetected(participationFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.profession || '').trim());
                 assignIfDetected(participationFields, participationFieldKeys, ['Pretest Score', 'Pre-test Score', 'Puntuación Pretest', 'Puntuacion Pretest'], pretestScore);
                 assignIfDetected(participationFields, participationFieldKeys, ['Fecha de Inicio', 'Fecha Inicio', 'Fecha'], fechaFormato);
                 assignIfDetected(participationFields, participationFieldKeys, ['Completado Pretest', 'Completado Pre-Test', 'Completado Pre Test'], true);
@@ -3279,9 +3122,6 @@
                 // Fallback: garantizar campos críticos aunque la detección falle
                 if (!Object.keys(participationFields).length) {
                     participationFields['Nombre Completo'] = currentParticipantData.name;
-                }
-                if (!('CEDULA' in participationFields) && currentParticipantData.cedula) {
-                    participationFields['CEDULA'] = currentParticipantData.cedula;
                 }
                 // Asegurar Pretest Score y Completado Pretest con nombres exactos
                 if (!('Pretest Score' in participationFields) && !('Pre-test Score' in participationFields)) {
@@ -3393,7 +3233,7 @@
                             </div>
                             
                             <p style="margin: 0.5rem 0;"><strong>${currentParticipantData.name}</strong></p>
-                            <p style="margin: 0; color: #4b5563; font-size: 1rem; font-weight: 500;">${currentParticipantData.cargo || currentParticipantData.department || '—'}</p>
+                            <p style="margin: 0; color: #4b5563; font-size: 1rem; font-weight: 500;">${currentParticipantData.department}</p>
                             <p style="margin: 1rem 0 0 0; color: #1f2937; font-size: 1rem; font-weight: 600;">${scoreMessage}</p>
                             <p style="margin: 0.5rem 0 0 0; color: #1f2937; font-size: 0.95rem; font-weight: 600;">
                                 Tu asistencia y calificación han sido registradas
@@ -3485,35 +3325,61 @@
                 console.log('🎓 ID de Capacitación para Postest:', trainingId);
                 console.log('📋 Registro de capacitación:', currentTrainingRecord);
                 
-                // Obtener TODAS las preguntas con paginación
-                const allQuestionRecords = await fetchAllQuestions();
-
-                if (!Array.isArray(allQuestionRecords)) {
+                // Obtener TODAS las preguntas
+                const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Preguntas`
+                    })
+                });
+                
+                const questionsData = await questionsResponse.json();
+                
+                if (!questionsData.success || !questionsData.records) {
                     throw new Error('No se pudieron obtener las preguntas del postest');
                 }
-
-                console.log('📚 Total de preguntas en Airtable (paginado):', allQuestionRecords.length);
+                
+                console.log('📚 Total de preguntas en Airtable:', questionsData.records.length);
                 
                 // ═══════════════════════════════════════════════════════════
                 // FILTRO CORRECTO: Por tipo Y por capacitación
                 // ═══════════════════════════════════════════════════════════
                 
-                const postestQuestions = allQuestionRecords.filter(q => {
+                const postestQuestions = questionsData.records.filter(q => {
                     const fields = q.fields;
                     
-                    const tipoExamen = getQuestionExamType(fields);
-                    const esPosttest = ['postest', 'posttest', 'post-test', 'post test'].includes(tipoExamen);
-                    const trainingIds = getQuestionTrainingIds(fields);
-                    const perteneceACapacitacion = questionBelongsToTraining(fields, trainingId);
-
+                    // 1. Obtener el tipo de examen
+                    const tipoExamen = (fields['Tipo Examen'] || fields['Tipo'] || '').toLowerCase().trim();
+                    
+                    // 2. Verificar que sea postest
+                    const esPosttest = tipoExamen === 'postest' || 
+                                      tipoExamen === 'posttest' || 
+                                      tipoExamen === 'post-test';
+                    
+                    // 3. Obtener el ID de capacitación vinculado
+                    let capacitacionId = null;
+                    
+                    if (fields['Capacitación'] && Array.isArray(fields['Capacitación'])) {
+                        capacitacionId = fields['Capacitación'][0];
+                    } else if (fields['Capacitaciones'] && Array.isArray(fields['Capacitaciones'])) {
+                        capacitacionId = fields['Capacitaciones'][0];
+                    }
+                    
+                    // 4. Verificar que coincida con la capacitación actual
+                    const perteneceACapacitacion = capacitacionId === trainingId;
+                    
+                    // Log de debug
                     if (esPosttest) {
                         console.log(`📝 Pregunta Postest encontrada:`);
-                        console.log(`   Texto: "${(fields['Pregunta'] || fields['name'] || '').substring(0, 50)}..."`);
+                        console.log(`   Texto: "${fields['Pregunta']?.substring(0, 50)}..."`);
                         console.log(`   Tipo: "${tipoExamen}"`);
-                        console.log(`   Cap IDs: "${trainingIds.join(', ')}"`);
+                        console.log(`   Cap ID: "${capacitacionId}"`);
                         console.log(`   Match: ${perteneceACapacitacion ? '✅' : '❌'} (buscando: ${trainingId})`);
                     }
-
+                    
+                    // RETORNAR TRUE solo si cumple AMBAS condiciones
                     return esPosttest && perteneceACapacitacion;
                 });
                 
@@ -3670,9 +3536,18 @@
                 // PASO 1: Obtener preguntas para calcular score
                 // ==========================================
                 
-                const allQuestionRecords = await fetchAllQuestions();
-
-                if (!Array.isArray(allQuestionRecords)) {
+                const questionsResponse = await fetch('/.netlify/functions/airtable-proxy', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        method: 'GET',
+                        path: `/Preguntas`
+                    })
+                });
+                
+                const questionsData = await questionsResponse.json();
+                
+                if (!questionsData.success || !questionsData.records) {
                     throw new Error('No se pudieron obtener las preguntas');
                 }
                 
@@ -3685,7 +3560,7 @@
                 const answersToSave = [];
                 
                 for (const [questionId, userAnswer] of Object.entries(postestAnswers)) {
-                    const question = allQuestionRecords.find(q => q.id === questionId);
+                    const question = questionsData.records.find(q => q.id === questionId);
                     
                     if (question) {
                         totalAnswered++;
@@ -3742,12 +3617,7 @@
                 assignIfDetected(updateFields, participationFieldKeys, ['Post-test Score', 'Posttest Score', 'Puntuación Posttest', 'Puntuacion Posttest'], postestScore);
                 assignIfDetected(updateFields, participationFieldKeys, ['Fecha Fin', 'Fecha Final', 'Fecha de Finalización', 'Fecha Finalización', 'Fecha de Fin'], fechaFormato);
                 assignIfDetected(updateFields, participationFieldKeys, ['Completado Posttest', 'Completado Post-Test', 'Completado Post Test'], true);
-                assignIfDetected(updateFields, participationFieldKeys, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula'], currentParticipantData.cedula);
-                assignIfDetected(updateFields, participationFieldKeys, ['Entidad', 'ENTIDAD', 'Empresa'], currentParticipantData.entity);
-                assignIfDetected(updateFields, participationFieldKeys, ['Proceso', 'PROCESO'], currentParticipantData.process);
-                assignIfDetected(updateFields, participationFieldKeys, ['Perfil', 'PERFIL'], currentParticipantData.profile);
-                assignIfDetected(updateFields, participationFieldKeys, ['Servicio', 'Departamento', 'Área', 'Area'], currentParticipantData.department || currentParticipantData.area);
-                assignIfDetected(updateFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'CARGO', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.cargo || currentParticipantData.profession || '').trim());
+                assignIfDetected(updateFields, participationFieldKeys, ['Profesión', 'Profesion', 'Cargo', 'Profesión / Cargo', 'Profesion / Cargo'], (currentParticipantData.profession || '').trim());
                 // Vincular Capacitación si el campo existe
                 if (currentTrainingRecord && currentTrainingRecord.id) {
                     assignIfDetected(updateFields, participationFieldKeys, ['Capacitación', 'Capacitacion'], [currentTrainingRecord.id]);
@@ -3856,7 +3726,7 @@
                             </div>
                             
                             <p style="margin: 0.5rem 0;"><strong>${currentParticipantData.name}</strong></p>
-                            <p style="margin: 0; color: #4b5563; font-size: 1rem; font-weight: 500;">${currentParticipantData.cargo || currentParticipantData.department || '—'}</p>
+                            <p style="margin: 0; color: #4b5563; font-size: 1rem; font-weight: 500;">${currentParticipantData.department}</p>
                             <p style="margin: 1rem 0 0 0; color: #1f2937; font-size: 1rem; font-weight: 600;">${scoreMessage}</p>
                             <p style="margin: 0.5rem 0 0 0; color: #1f2937; font-size: 0.95rem; font-weight: 600;">
                                 Tu evaluación ha sido completada y registrada
@@ -3902,9 +3772,9 @@
             
             // Limpiar formulario
             document.getElementById('accessCode').value = '';
-            if (document.getElementById('participantCedula')) document.getElementById('participantCedula').value = '';
-            clearParticipantFields();
-            setParticipantLookupStatus('', 'info');
+            document.getElementById('participantName').value = '';
+            document.getElementById('participantDepartment').value = '';
+            if (document.getElementById('participantProfession')) document.getElementById('participantProfession').value = '';
             
             // Mostrar/ocultar secciones
             document.getElementById('accessSection').style.display = 'block';
@@ -7477,93 +7347,153 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         // PERSONAL HSLV — Carga Excel desde Airtable y búsqueda por cédula
         // ══════════════════════════════════════════════════════════════════════
 
+        const BD_PERSONAL_TABLE = 'BD PERSONAL HSLV';
+        let personalData = [];          // Filas del Excel cargado
+        let personalDbLoaded = false;   // Si ya se cargó algún Excel
+        let personalDbName = '';        // Nombre del archivo cargado
 
-        const PERSONAL_HSLV_TABLE = 'Personal HSLV';
-        let personalData = [];
-        let personalDbLoaded = false;
-        let personalDbName = PERSONAL_HSLV_TABLE;
-
+        // ─── Al entrar al tab Personal, cargar lista de archivos ────────────
         async function initPersonalTab() {
-            if (!personalDbLoaded || personalData.length === 0) {
-                await recargarListaBD();
-            }
+            await recargarListaBD();
         }
 
-        async function obtenerTodosLosRegistrosPersonal() {
-            let allRecords = [];
-            let offset = null;
-
-            do {
-                const query = new URLSearchParams({ pageSize: '100' });
-                if (offset) query.set('offset', offset);
-
-                const res = await airtableProxyRequest({
-                    method: 'GET',
-                    path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}?${query.toString()}`
-                });
-
-                const records = Array.isArray(res?.records) ? res.records : [];
-                allRecords = allRecords.concat(records);
-                offset = res?.offset || null;
-            } while (offset);
-
-            return allRecords;
-        }
-
+        // ─── Obtiene los registros de la tabla BD PERSONAL HSLV ─────────────
         async function recargarListaBD() {
             const sel = document.getElementById('personalDbSelect');
             const status = document.getElementById('personalDbStatus');
             if (!sel || !status) return;
 
-            sel.innerHTML = '<option value="">Conectando tabla...</option>';
+            sel.innerHTML = '<option value="">Cargando archivos...</option>';
             sel.disabled = true;
-            status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Consultando Airtable...';
+            status.textContent = '';
 
             try {
-                const records = await obtenerTodosLosRegistrosPersonal();
-                const rows = records.map(r => ({ id: r.id, ...(r.fields || {}) }));
+                const res = await airtableProxyRequest({
+                    method: 'GET',
+                    path: `/${encodeURIComponent(BD_PERSONAL_TABLE)}?pageSize=50`
+                });
 
-                personalData = rows;
-                personalDbLoaded = true;
-                personalDbName = PERSONAL_HSLV_TABLE;
+                const records = res?.records || [];
+                sel.innerHTML = '<option value="">-- Selecciona una base de datos --</option>';
 
-                sel.innerHTML = `<option value="${PERSONAL_HSLV_TABLE}">Tabla ${PERSONAL_HSLV_TABLE}</option>`;
+                if (records.length === 0) {
+                    sel.innerHTML += '<option disabled>No se encontraron archivos</option>';
+                    status.textContent = '⚠️ No hay archivos en la tabla BD PERSONAL HSLV.';
+                    sel.disabled = false;
+                    return;
+                }
+
+                records.forEach(rec => {
+                    const f = rec.fields || {};
+                    // El campo de adjunto en Airtable puede llamarse "File Content",
+                    // "Attachments", "Archivo" u otros nombres; buscamos el primero con array
+                    const attachKey = Object.keys(f).find(k => Array.isArray(f[k]) && f[k][0]?.url);
+                    const name = f['Name'] || f['File Path'] || rec.id;
+                    const url  = attachKey ? f[attachKey][0]?.url : null;
+
+                    const opt = document.createElement('option');
+                    opt.value = url || '';
+                    opt.textContent = name;
+                    opt.dataset.recordId = rec.id;
+                    opt.dataset.attachKey = attachKey || '';
+                    // Si no hay URL de adjunto, deshabilitar opción
+                    if (!url) {
+                        opt.disabled = true;
+                        opt.textContent += ' (sin adjunto)';
+                    }
+                    sel.appendChild(opt);
+                });
+
                 sel.disabled = false;
+                status.textContent = `${records.length} archivo(s) encontrado(s). Selecciona uno para cargarlo.`;
 
-                const cols = rows.length ? Object.keys(rows[0]).filter(c => c !== 'id') : [];
-                status.innerHTML = rows.length
-                    ? `✅ <strong>${PERSONAL_HSLV_TABLE}</strong> conectada — ${rows.length} registro(s) disponibles.<br><span style="font-size:0.85rem; color:#6b7280;">Campos detectados: ${cols.join(', ')}</span>`
-                    : `⚠️ La tabla <strong>${PERSONAL_HSLV_TABLE}</strong> no tiene registros.`;
             } catch (err) {
-                console.error('Error cargando tabla Personal HSLV:', err);
-                personalData = [];
-                personalDbLoaded = false;
-                sel.innerHTML = '<option value="">Error al cargar tabla</option>';
+                console.error('Error cargando lista BD Personal:', err);
+                sel.innerHTML = '<option value="">Error al cargar archivos</option>';
                 sel.disabled = false;
-                status.innerHTML = `❌ No se pudo conectar con la tabla <strong>${PERSONAL_HSLV_TABLE}</strong>. ${err.message || ''}`;
+                status.textContent = '❌ No se pudo conectar con la tabla BD PERSONAL HSLV.';
             }
         }
 
+        // ─── Descarga y parsea el Excel seleccionado ────────────────────────
+        async function cargarBasePersonal() {
+            const sel = document.getElementById('personalDbSelect');
+            const status = document.getElementById('personalDbStatus');
+            const url = sel?.value;
+            if (!url) {
+                personalData = [];
+                personalDbLoaded = false;
+                if (status) status.textContent = '';
+                return;
+            }
+
+            if (status) status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Descargando y procesando Excel...';
+
+            try {
+                // Descargar el archivo como ArrayBuffer vía proxy (CORS)
+                const proxyUrl = `/api/proxy-file?url=${encodeURIComponent(url)}`;
+                let arrayBuf;
+
+                try {
+                    // Intentar directo (Airtable permite CORS en sus adjuntos)
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error('Fetch directo falló');
+                    arrayBuf = await resp.arrayBuffer();
+                } catch {
+                    // Fallback: proxy Netlify
+                    const resp2 = await fetch(proxyUrl);
+                    if (!resp2.ok) throw new Error('Fetch por proxy también falló');
+                    arrayBuf = await resp2.arrayBuffer();
+                }
+
+                // Parsear con SheetJS (xlsx-js-style ya cargado en la página)
+                const workbook = XLSX.read(arrayBuf, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const sheet = workbook.Sheets[sheetName];
+                const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+                if (rows.length === 0) {
+                    throw new Error('El archivo Excel está vacío o no tiene datos.');
+                }
+
+                // Detectar nombres de columnas clave (cédula, nombre, correo)
+                const cols = Object.keys(rows[0]);
+                console.log('📊 Columnas detectadas:', cols);
+
+                personalData = rows;
+                personalDbLoaded = true;
+                personalDbName = sel.options[sel.selectedIndex]?.textContent || '';
+
+                if (status) status.innerHTML = `✅ <strong>${personalDbName}</strong> cargado — ${rows.length} registros. Columnas: <em>${cols.join(', ')}</em>`;
+
+            } catch (err) {
+                console.error('Error cargando Excel:', err);
+                personalData = [];
+                personalDbLoaded = false;
+                if (status) status.innerHTML = `❌ Error al cargar el archivo: ${err.message}`;
+                Swal.fire({
+                    icon: 'error',
+                    title: 'No se pudo cargar el Excel',
+                    text: err.message || 'Verifica que el archivo tenga adjunto válido en Airtable.',
+                    confirmButtonColor: 'var(--primary)'
+                });
+            }
+        }
+
+        // ─── Normaliza texto para comparación (sin tildes, minúsculas) ───────
         function normStr(s) {
             return String(s || '')
                 .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
                 .replace(/\s+/g, ' ').trim().toLowerCase();
         }
 
-        function normDoc(value) {
-            return String(value || '')
-                .replace(/,/g, '')
-                .replace(/\s+/g, '')
-                .replace(/\.(0+)$/, '')
-                .replace(/\.(?=\d{3}(\D|$))/g, '')
-                .trim();
-        }
-
+        // ─── Detecta qué columna del Excel corresponde a cada campo ──────────
         function detectarCampo(cols, candidatos) {
             for (const cand of candidatos) {
                 const match = cols.find(c => normStr(c) === normStr(cand));
                 if (match) return match;
             }
+            // Búsqueda parcial
             for (const cand of candidatos) {
                 const match = cols.find(c => normStr(c).includes(normStr(cand)));
                 if (match) return match;
@@ -7571,159 +7501,9 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             return null;
         }
 
-        async function obtenerHistorialCapacitacionesPersonal(row, cols, colCedula, colNombre) {
-            try {
-                const [partsRes, trainingsRes, sessionsRes] = await Promise.all([
-                    airtableFetchAll('/Participaciones').catch(() => []),
-                    airtableFetchAll('/Capacitaciones').catch(() => []),
-                    airtableFetchAll('/Sesiones').catch(() => [])
-                ]);
-
-                const participations = Array.isArray(partsRes) ? partsRes : [];
-                const trainings = Array.isArray(trainingsRes) ? trainingsRes : [];
-                const sessions = Array.isArray(sessionsRes) ? sessionsRes : [];
-
-                const cedulaBuscada = colCedula ? normDoc(row[colCedula]) : '';
-                const nombreBuscado = colNombre ? normStr(row[colNombre]) : '';
-
-                const partSample = participations.find(r => Object.keys(r?.fields || {}).length) || { fields: {} };
-                const partCols = Object.keys(partSample.fields || {});
-
-                const partCedula = detectarCampo(partCols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
-                const partNombre = detectarCampo(partCols, ['Nombre Completo', 'NOMBRE', 'Nombre', 'Participante']);
-                const partPre = detectarCampo(partCols, ['Pretest Score', 'Pre-test Score', 'Puntuación Pretest', 'Puntuacion Pretest']);
-                const partPost = detectarCampo(partCols, ['Post-test Score', 'Posttest Score', 'Puntuación Posttest', 'Puntuacion Posttest']);
-                const partFecha = detectarCampo(partCols, ['Fecha de Inicio', 'Fecha Inicio', 'Fecha']);
-                const partCap = detectarCampo(partCols, ['Capacitación', 'Capacitaciones', 'Capacitacion']);
-                const partSesion = detectarCampo(partCols, ['Sesión', 'Sesion']);
-
-                const sessionToTraining = {};
-                sessions.forEach(s => {
-                    const f = s.fields || {};
-                    const linked = f['Capacitaciones'] || f['Capacitación'] || f['Capacitacion'] || [];
-                    if (Array.isArray(linked) && linked.length > 0) sessionToTraining[s.id] = linked[0];
-                });
-
-                const trainingMap = {};
-                trainings.forEach(t => { trainingMap[t.id] = t; });
-
-                function partMatches(p) {
-                    const f = p.fields || {};
-                    const byCedula = partCedula && cedulaBuscada && normDoc(f[partCedula]) === cedulaBuscada;
-                    const byNombre = partNombre && nombreBuscado && normStr(f[partNombre]) === nombreBuscado;
-                    return !!(byCedula || byNombre);
-                }
-
-                function resolveTrainingId(p) {
-                    const f = p.fields || {};
-                    const direct = partCap ? f[partCap] : (f['Capacitación'] || f['Capacitaciones'] || f['Capacitacion']);
-                    if (Array.isArray(direct) && direct.length > 0) return direct[0];
-                    const ses = partSesion ? f[partSesion] : (f['Sesión'] || f['Sesion']);
-                    if (Array.isArray(ses) && ses.length > 0) {
-                        for (const sid of ses) {
-                            if (sessionToTraining[sid]) return sessionToTraining[sid];
-                        }
-                    }
-                    return null;
-                }
-
-                function getTrainingTitle(t) {
-                    const f = t?.fields || {};
-                    return f['Título'] || f['Titulo'] || f['Capacitación'] || f['Nombre'] || f['Tema'] || 'Capacitación';
-                }
-
-                function getTrainingDate(t, p) {
-                    const tf = t?.fields || {};
-                    const pf = p?.fields || {};
-                    return tf['Fecha de la capacitación'] || tf['Fecha'] || tf['Fecha Creación'] || (partFecha ? pf[partFecha] : null) || pf['Fecha de Inicio'] || pf['Fecha Inicio'] || pf['Fecha'] || p?.createdTime || '';
-                }
-
-                function fmtDate(v) {
-                    if (!v) return '—';
-                    const s = String(v);
-                    const date = new Date(s);
-                    if (!isNaN(date.getTime())) {
-                        return date.toLocaleDateString('es-CO');
-                    }
-                    return s.length >= 10 ? s.slice(0, 10) : s;
-                }
-
-                return participations
-                    .filter(partMatches)
-                    .map(p => {
-                        const trainingId = resolveTrainingId(p);
-                        const training = trainingId ? trainingMap[trainingId] : null;
-                        const f = p.fields || {};
-                        return {
-                            titulo: getTrainingTitle(training),
-                            fecha: fmtDate(getTrainingDate(training, p)),
-                            pretest: partPre && f[partPre] !== undefined && f[partPre] !== null && f[partPre] !== '' ? `${f[partPre]}%` : '—',
-                            posttest: partPost && f[partPost] !== undefined && f[partPost] !== null && f[partPost] !== '' ? `${f[partPost]}%` : '—',
-                            rawFecha: getTrainingDate(training, p) || '',
-                            trainingId: trainingId || '',
-                            participationId: p.id
-                        };
-                    })
-                    .sort((a, b) => String(b.rawFecha).localeCompare(String(a.rawFecha)));
-            } catch (err) {
-                console.warn('No se pudo cargar historial de capacitaciones del personal:', err);
-                return [];
-            }
-        }
-
-        function renderHistorialCapacitaciones(historial) {
-            if (!historial || !historial.length) {
-                return `
-                    <div class="card" style="height:100%; background:#fff; border-left:5px solid #94a3b8;">
-                        <h3 style="margin:0 0 1rem 0; color:#111827; display:flex; align-items:center; gap:0.6rem;">
-                            <i class="fas fa-graduation-cap" style="color:var(--primary);"></i>
-                            Capacitaciones realizadas
-                        </h3>
-                        <div style="text-align:center; padding:2rem 1rem; color:#6b7280;">
-                            <i class="fas fa-folder-open" style="font-size:2.2rem; color:#cbd5e1; margin-bottom:0.75rem;"></i>
-                            <p style="margin:0; font-weight:600;">No se encontraron capacitaciones asociadas a este colaborador.</p>
-                        </div>
-                    </div>`;
-            }
-
-            const rows = historial.map((item, idx) => `
-                <tr style="border-bottom:1px solid #e5e7eb;">
-                    <td style="padding:0.75rem; color:#6b7280; font-weight:700; text-align:center;">${idx + 1}</td>
-                    <td style="padding:0.75rem; font-weight:600; color:#111827;">${item.titulo}</td>
-                    <td style="padding:0.75rem; text-align:center; color:#374151;">${item.fecha}</td>
-                    <td style="padding:0.75rem; text-align:center; font-weight:700; color:#1f2937;">${item.pretest}</td>
-                    <td style="padding:0.75rem; text-align:center; font-weight:700; color:#1f2937;">${item.posttest}</td>
-                </tr>`).join('');
-
-            return `
-                <div class="card" style="height:100%; background:#fff; border-left:5px solid var(--primary);">
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
-                        <h3 style="margin:0; color:#111827; display:flex; align-items:center; gap:0.6rem;">
-                            <i class="fas fa-graduation-cap" style="color:var(--primary);"></i>
-                            Capacitaciones realizadas
-                        </h3>
-                        <span style="background:#ecfdf5; color:#166534; border:1px solid #bbf7d0; padding:0.35rem 0.7rem; border-radius:999px; font-size:0.82rem; font-weight:700;">${historial.length} registro(s)</span>
-                    </div>
-                    <div style="overflow:auto; border:1px solid #e5e7eb; border-radius:10px;">
-                        <table style="width:100%; border-collapse:collapse; min-width:520px; background:#fff;">
-                            <thead>
-                                <tr style="background:#f8fafc;">
-                                    <th style="padding:0.8rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase;">#</th>
-                                    <th style="padding:0.8rem; text-align:left; color:#475569; font-size:0.78rem; text-transform:uppercase;">Capacitación</th>
-                                    <th style="padding:0.8rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase;">Fecha</th>
-                                    <th style="padding:0.8rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase;">Pretest</th>
-                                    <th style="padding:0.8rem; text-align:center; color:#475569; font-size:0.78rem; text-transform:uppercase;">Postest</th>
-                                </tr>
-                            </thead>
-                            <tbody>${rows}</tbody>
-                        </table>
-                    </div>
-                </div>`;
-        }
-
+        // ─── Busca en los datos del Excel por cédula ─────────────────────────
         async function buscarPersonalHSLV() {
-            const cedulaInput = document.getElementById('personalCedulaInput');
-            const cedula = (cedulaInput?.value || '').trim();
+            const cedula = (document.getElementById('personalCedulaInput')?.value || '').trim();
 
             if (!cedula) {
                 Swal.fire({ icon: 'warning', title: 'Campo vacío', text: 'Ingresa un número de cédula para buscar.', confirmButtonColor: 'var(--primary)' });
@@ -7731,11 +7511,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             }
 
             if (!personalDbLoaded || personalData.length === 0) {
-                await recargarListaBD();
-            }
-
-            if (!personalDbLoaded || personalData.length === 0) {
-                Swal.fire({ icon: 'warning', title: 'Sin datos', text: 'No fue posible cargar la tabla de personal desde Airtable.', confirmButtonColor: 'var(--primary)' });
+                Swal.fire({ icon: 'warning', title: 'Sin base de datos', text: 'Primero selecciona y carga una base de datos de personal.', confirmButtonColor: 'var(--primary)' });
                 return;
             }
 
@@ -7744,32 +7520,39 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             document.getElementById('personalNoEncontrado').style.display = 'none';
             document.getElementById('personalInicial').style.display = 'none';
 
-            await new Promise(r => setTimeout(r, 120));
+            // Pequeño delay para mostrar el spinner
+            await new Promise(r => setTimeout(r, 100));
 
             try {
-                const sample = personalData.find(r => Object.keys(r || {}).length > 1) || personalData[0] || {};
-                const cols = Object.keys(sample).filter(c => c !== 'id');
+                const cols = Object.keys(personalData[0] || {});
 
-                const colCedula    = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
-                const colNombre    = detectarCampo(cols, ['NOMBRE', 'Nombre Completo', 'Nombre', 'Nombres']);
-                const colGenero    = detectarCampo(cols, ['GENERO', 'Género', 'Genero', 'Sexo']);
-                const colNacimiento= detectarCampo(cols, ['F.NACIMIENTO', 'Fecha Nacimiento', 'Nacimiento']);
-                const colEmail     = detectarCampo(cols, ['EMAIL', 'Correo', 'Correo Electrónico', 'Correo electronico', 'E-mail']);
-                const colContacto  = detectarCampo(cols, ['CONTACTO', 'Telefono', 'Teléfono', 'Celular']);
-                const colEntidad   = detectarCampo(cols, ['ENTIDAD', 'Empresa']);
-                const colPerfil    = detectarCampo(cols, ['PERFIL', 'Perfil']);
-                const colCargo     = detectarCampo(cols, ['CARGO', 'Cargo', 'Profesión', 'Profesion']);
-                const colProceso   = detectarCampo(cols, ['PROCESO', 'Proceso']);
-                const colArea      = detectarCampo(cols, ['AREA', 'Área', 'Area']);
-                const colContrato  = detectarCampo(cols, ['CONTRATO', 'Contrato']);
-                const colUbicacion = detectarCampo(cols, ['UBICACIÓN', 'Ubicacion', 'Ubicación', 'SEDE', 'Sede']);
+                // Detectar columnas
+                const colCedula  = detectarCampo(cols, ['Cedula', 'Cédula', 'CC', 'Documento', 'No. Cédula', 'Numero de Cedula', 'Número de Cédula', 'Identificacion', 'Identificación', 'NIT', 'DNI']);
+                const colNombre  = detectarCampo(cols, ['Nombre Completo', 'Nombre', 'NOMBRE COMPLETO', 'Nombres', 'Nombre y Apellido', 'Empleado', 'Funcionario', 'NOMBRE']);
+                const colCorreo  = detectarCampo(cols, ['Correo Electrónico', 'Correo electronico', 'Correo', 'Email', 'E-mail', 'Mail', 'EMAIL', 'CORREO']);
+                const colCargo   = detectarCampo(cols, ['Cargo', 'Profesión', 'Profesion', 'Puesto', 'CARGO']);
+                const colServicio= detectarCampo(cols, ['Servicio', 'Departamento', 'Area', 'Área', 'Dependencia', 'Unidad']);
 
                 if (!colCedula) {
-                    throw new Error(`No se encontró una columna de cédula. Campos disponibles: ${cols.join(', ')}`);
+                    document.getElementById('personalLoading').style.display = 'none';
+                    document.getElementById('personalInicial').style.display = 'block';
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Columna de cédula no encontrada',
+                        html: `No se encontró una columna de cédula/documento en el Excel.<br><br>Columnas disponibles: <strong>${cols.join(', ')}</strong>`,
+                        confirmButtonColor: 'var(--primary)'
+                    });
+                    return;
                 }
 
-                const cedulaBuscada = normDoc(cedula);
-                const row = personalData.find(r => normDoc(r[colCedula]) === cedulaBuscada);
+                // Buscar coincidencia exacta (comparando como string)
+                const cedStr = String(cedula).trim();
+                const row = personalData.find(r => {
+                    const val = String(r[colCedula] || '').trim();
+                    // Quitar decimales (ej: 12345678.0 → 12345678)
+                    const valClean = val.replace(/\.0+$/, '');
+                    return val === cedStr || valClean === cedStr;
+                });
 
                 document.getElementById('personalLoading').style.display = 'none';
 
@@ -7778,79 +7561,68 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     return;
                 }
 
-                const valor = (col, fallback = '—') => {
-                    if (!col) return fallback;
-                    const v = row[col];
-                    if (v === undefined || v === null || v === '') return fallback;
-                    return Array.isArray(v) ? v.join(', ') : String(v);
-                };
+                const nombre  = colNombre  ? (row[colNombre]  || '—') : '—';
+                const cedVal  = colCedula  ? (row[colCedula]  || cedula) : cedula;
+                const correo  = colCorreo  ? (row[colCorreo]  || '—') : '—';
+                const cargo   = colCargo   ? (row[colCargo]   || '') : '';
+                const servicio= colServicio? (row[colServicio]|| '') : '';
 
-                const nombre = valor(colNombre);
-                const cedVal = colCedula ? normDoc(row[colCedula]) || cedulaBuscada : cedulaBuscada;
-                const genero = valor(colGenero, '—');
-                const nacimiento = valor(colNacimiento, '—');
-                const email = valor(colEmail, '—');
-                const contacto = valor(colContacto, '—');
-                const entidad = valor(colEntidad, '—');
-                const perfil = valor(colPerfil, '—');
-                const cargo = valor(colCargo, '—');
-                const proceso = valor(colProceso, '—');
-                const area = valor(colArea, '—');
-                const contrato = valor(colContrato, '—');
-                const ubicacion = valor(colUbicacion, '—');
-
-                const infoItems = [
-                    ['fas fa-id-card', 'Cédula', cedVal, '#f0fdf4', '#bbf7d0'],
-                    ['fas fa-venus-mars', 'Género', genero, '#f9fafb', '#e5e7eb'],
-                    ['fas fa-calendar-alt', 'Fecha de nacimiento', nacimiento, '#f9fafb', '#e5e7eb'],
-                    ['fas fa-envelope', 'Correo', email, '#f0fdf4', '#bbf7d0'],
-                    ['fas fa-phone', 'Contacto', contacto, '#f9fafb', '#e5e7eb'],
-                    ['fas fa-building', 'Entidad', entidad, '#f9fafb', '#e5e7eb'],
-                    ['fas fa-user-tag', 'Perfil', perfil, '#f9fafb', '#e5e7eb'],
-                    ['fas fa-briefcase', 'Cargo', cargo, '#f9fafb', '#e5e7eb'],
-                    ['fas fa-project-diagram', 'Proceso', proceso, '#f9fafb', '#e5e7eb'],
-                    ['fas fa-sitemap', 'Área', area, '#f9fafb', '#e5e7eb'],
-                    ['fas fa-file-signature', 'Contrato', contrato, '#f9fafb', '#e5e7eb'],
-                    ['fas fa-map-marker-alt', 'Ubicación', ubicacion, '#f9fafb', '#e5e7eb']
-                ];
-
-                const historialCapacitaciones = await obtenerHistorialCapacitacionesPersonal(row, cols, colCedula, colNombre);
+                // Renderizar tarjeta resultado
                 const resultDiv = document.getElementById('personalResultado');
                 resultDiv.innerHTML = `
-                    <div style="display:grid; grid-template-columns:minmax(320px, 1.05fr) minmax(320px, 1fr); gap:1rem; align-items:start;">
-                        <div class="card" style="border-left:5px solid var(--primary); background:#fff; margin:0;">
-                            <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
-                                <div style="width:60px; height:60px; background:linear-gradient(135deg,var(--primary),var(--secondary)); border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 4px 12px rgba(46,125,50,0.3);">
-                                    <i class="fas fa-user" style="color:white; font-size:1.6rem;"></i>
-                                </div>
-                                <div>
-                                    <h3 style="margin:0; color:#111827; font-size:1.25rem; font-weight:700;">${nombre}</h3>
-                                    <p style="margin:0.2rem 0 0 0; color:#6b7280; font-size:0.92rem; font-weight:500;">${cargo !== '—' ? cargo : ''}${cargo !== '—' && area !== '—' ? ' · ' : ''}${area !== '—' ? area : ''}</p>
-                                </div>
+                    <div class="card" style="border-left:5px solid var(--primary); background:#fff;">
+                        <div style="display:flex; align-items:center; gap:1rem; margin-bottom:1.5rem;">
+                            <div style="width:60px; height:60px; background:linear-gradient(135deg,var(--primary),var(--secondary)); border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; box-shadow:0 4px 12px rgba(46,125,50,0.3);">
+                                <i class="fas fa-user" style="color:white; font-size:1.6rem;"></i>
                             </div>
-                            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:0.85rem;">
-                                ${infoItems.map(([icon, label, value, bg, border]) => `
-                                    <div style="display:flex; align-items:flex-start; gap:0.75rem; padding:0.85rem 1rem; background:${bg}; border-radius:8px; border:1px solid ${border};">
-                                        <i class="${icon}" style="color:var(--primary); width:22px; text-align:center; font-size:1rem; margin-top:2px;"></i>
-                                        <div>
-                                            <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">${label}</span>
-                                            <p style="margin:0.15rem 0 0 0; font-weight:600; color:#111827; word-break:break-word;">${value}</p>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                            <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid #e5e7eb; font-size:0.8rem; color:#6b7280;">
-                                Fuente: <strong>${personalDbName}</strong>
+                            <div>
+                                <h3 style="margin:0; color:#111827; font-size:1.25rem; font-weight:700;">${String(nombre)}</h3>
+                                ${cargo || servicio ? `<p style="margin:0.2rem 0 0 0; color:#6b7280; font-size:0.9rem; font-weight:500;">${cargo}${cargo && servicio ? ' · ' : ''}${servicio}</p>` : ''}
                             </div>
                         </div>
-                        ${renderHistorialCapacitaciones(historialCapacitaciones)}
+                        <div style="display:grid; gap:0.85rem;">
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.85rem 1rem; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
+                                <i class="fas fa-id-card" style="color:var(--primary); width:22px; text-align:center; font-size:1.1rem;"></i>
+                                <div>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Cédula / Documento</span>
+                                    <p style="margin:0.1rem 0 0 0; font-weight:700; color:#111827; font-size:1.1rem;">${String(cedVal).replace(/\.0+$/, '')}</p>
+                                </div>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.85rem 1rem; background:#f0fdf4; border-radius:8px; border:1px solid #bbf7d0;">
+                                <i class="fas fa-envelope" style="color:var(--primary); width:22px; text-align:center; font-size:1.1rem;"></i>
+                                <div>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Correo Electrónico</span>
+                                    <p style="margin:0.1rem 0 0 0; font-weight:600; color:#111827; word-break:break-all; font-size:1rem;">${String(correo)}</p>
+                                </div>
+                            </div>
+                            ${cargo ? `
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
+                                <i class="fas fa-briefcase" style="color:#6b7280; width:22px; text-align:center;"></i>
+                                <div>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Cargo / Profesión</span>
+                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(cargo)}</p>
+                                </div>
+                            </div>` : ''}
+                            ${servicio ? `
+                            <div style="display:flex; align-items:center; gap:0.75rem; padding:0.75rem 1rem; background:#f9fafb; border-radius:8px; border:1px solid #e5e7eb;">
+                                <i class="fas fa-building" style="color:#6b7280; width:22px; text-align:center;"></i>
+                                <div>
+                                    <span style="font-size:0.72rem; color:#6b7280; text-transform:uppercase; font-weight:700; letter-spacing:0.06em;">Servicio / Departamento</span>
+                                    <p style="margin:0.1rem 0 0 0; color:#374151; font-weight:600;">${String(servicio)}</p>
+                                </div>
+                            </div>` : ''}
+                        </div>
+                        <div style="margin-top:1rem; padding-top:0.75rem; border-top:1px solid #e5e7eb; font-size:0.8rem; color:#9ca3af;">
+                            Fuente: <strong>${personalDbName}</strong>
+                        </div>
                     </div>`;
                 resultDiv.style.display = 'block';
+
             } catch (err) {
                 console.error('Error en búsqueda:', err);
                 document.getElementById('personalLoading').style.display = 'none';
                 document.getElementById('personalInicial').style.display = 'block';
-                Swal.fire({ icon: 'error', title: 'Error al buscar', text: err.message || 'Ocurrió un error en la búsqueda.', confirmButtonColor: 'var(--primary)' });
+                Swal.fire({ icon: 'error', title: 'Error al buscar', text: err.message, confirmButtonColor: 'var(--primary)' });
             }
         }
 
@@ -7862,6 +7634,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             document.getElementById('personalLoading').style.display = 'none';
             document.getElementById('personalInicial').style.display = 'block';
         }
+
 
         function initScheduleTab() {
             // Año por defecto
@@ -7980,38 +7753,67 @@ async function airtableProxyRequest(payload) {
 
     const removeUnknownFieldVariant = (msg) => {
         if (!msg) return false;
-        // Maneja tanto "Unknown field name" como "cannot accept the provided value"
-        const matchUnknown = String(msg).match(/Unknown field name/i);
-        const matchInvalid = String(msg).match(/Field .([^.]+). cannot accept the provided value/i);
+        const msgStr = String(msg);
+        const fields = current?.body?.fields;
+        if (!fields || typeof fields !== 'object') return false;
+
+        // 1) Campo inexistente o campo que no acepta el valor enviado
+        const matchUnknown = msgStr.match(/Unknown field name/i);
+        const matchInvalid = msgStr.match(/Field .([^.]+). cannot accept the provided value/i);
         let unknown = '';
         if (matchUnknown) {
-            const m = String(msg).match(/Unknown field name[^"]*"([^"]+)"/i) || String(msg).match(/Unknown field name\s*:?\s*([^\n"]+)/i);
+            const m = msgStr.match(/Unknown field name[^"]*"([^"]+)"/i) || msgStr.match(/Unknown field name\s*:?\s*([^\n"]+)/i);
             unknown = m && m[1] ? m[1].trim() : '';
         } else if (matchInvalid) {
             unknown = matchInvalid[1] ? matchInvalid[1].trim() : '';
         }
-        const fields = current?.body?.fields;
-        if (!unknown || !fields || typeof fields !== 'object') return false;
 
-        const unknownNorm = normalizeKey(unknown);
-        const keys = Object.keys(fields);
-        const candidates = keys.filter((k) => {
-            const norm = normalizeKey(k);
-            return k === unknown || norm === unknownNorm || norm.replace(/\//g, ' ') === unknownNorm.replace(/\//g, ' ');
-        });
-
-        if (!candidates.length) {
-            const compactUnknown = unknownNorm.replace(/\s+/g, '');
-            keys.forEach((k) => {
-                const compactKey = normalizeKey(k).replace(/\s+/g, '');
-                if (compactKey === compactUnknown) candidates.push(k);
+        if (unknown) {
+            const unknownNorm = normalizeKey(unknown);
+            const keys = Object.keys(fields);
+            const candidates = keys.filter((k) => {
+                const norm = normalizeKey(k);
+                return k === unknown || norm === unknownNorm || norm.replace(/\//g, ' ') === unknownNorm.replace(/\//g, ' ');
             });
+
+            if (!candidates.length) {
+                const compactUnknown = unknownNorm.replace(/\s+/g, '');
+                keys.forEach((k) => {
+                    const compactKey = normalizeKey(k).replace(/\s+/g, '');
+                    if (compactKey === compactUnknown) candidates.push(k);
+                });
+            }
+
+            if (candidates.length) {
+                candidates.forEach((k) => delete fields[k]);
+                console.warn('⚠️ Campo no válido eliminado automáticamente:', unknown, '=>', candidates);
+                return true;
+            }
         }
 
-        if (!candidates.length) return false;
-        candidates.forEach((k) => delete fields[k]);
-        console.warn('⚠️ Campo no válido eliminado automáticamente:', unknown, '=>', candidates);
-        return true;
+        // 2) Single select sin permisos para crear nueva opción
+        // Ejemplo: Insufficient permissions to create new select option "Profesional de apoyo"
+        const selectOptionMatch = msgStr.match(/create new select option\s+"([^"]+)"/i);
+        const selectOption = selectOptionMatch && selectOptionMatch[1] ? selectOptionMatch[1].trim() : '';
+        if (selectOption) {
+            const selectNorm = normalizeKey(selectOption);
+            const removedKeys = [];
+            Object.keys(fields).forEach((k) => {
+                const v = fields[k];
+                const isSameScalar = typeof v === 'string' && normalizeKey(v) === selectNorm;
+                const isSameArray = Array.isArray(v) && v.some(item => typeof item === 'string' && normalizeKey(item) === selectNorm);
+                if (isSameScalar || isSameArray) {
+                    removedKeys.push(k);
+                    delete fields[k];
+                }
+            });
+            if (removedKeys.length) {
+                console.warn('⚠️ Campo(s) con opción no permitida eliminados automáticamente:', selectOption, '=>', removedKeys);
+                return true;
+            }
+        }
+
+        return false;
     };
 
     for (let attempt = 0; attempt < 10; attempt++) {
