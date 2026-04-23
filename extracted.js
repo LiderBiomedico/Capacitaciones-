@@ -264,6 +264,11 @@
             });
         }
 
+        function setParticipantAutoFieldsVisible(isVisible) {
+            const section = document.getElementById('participantAutoFieldsSection');
+            if (section) section.style.display = isVisible ? 'block' : 'none';
+        }
+
         function renderParticipantManualRegistrationFields(prefill = {}) {
             const container = document.getElementById('participantManualRegistrationFields');
             if (!container) return;
@@ -287,6 +292,7 @@
             const actions = document.getElementById('participantRegisterActions');
             if (wrap) wrap.style.display = 'none';
             if (actions) actions.style.display = 'none';
+            setParticipantAutoFieldsVisible(true);
             setParticipantFieldsReadonly(true);
         }
 
@@ -296,6 +302,7 @@
             const actions = document.getElementById('participantRegisterActions');
             if (actions) actions.style.display = 'none';
             if (wrap) wrap.style.display = 'block';
+            setParticipantAutoFieldsVisible(false);
             if (!participantManualFieldConfig.length) participantManualFieldConfig = buildPersonalRegistrationFieldConfig();
             const prefill = {};
             const cedulaValue = (document.getElementById('participantCedula')?.value || '').trim();
@@ -385,6 +392,7 @@
             const contrato = valor(colContrato);
             const ubicacion = valor(colUbicacion);
 
+            setParticipantAutoFieldsVisible(true);
             document.getElementById('participantName').value = name;
             document.getElementById('participantEntity').value = entity;
             document.getElementById('participantProcess').value = process;
@@ -468,6 +476,7 @@
                     if (actions) actions.style.display = 'block';
                     const wrap = document.getElementById('participantManualRegistrationSection');
                     if (wrap) wrap.style.display = 'none';
+                    setParticipantAutoFieldsVisible(true);
                     setParticipantFieldsReadonly(true);
                     return;
                 }
