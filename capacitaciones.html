@@ -4676,6 +4676,70 @@
             };
             img.src = url;
         }
+
+        function clearQuestionFileSelection(questionId) {
+            const fileInput = document.getElementById(`${questionId}-image-file`);
+            const hiddenUrl = document.getElementById(`${questionId}-image`);
+            const preview = document.getElementById(`${questionId}-image-preview`);
+            const img = document.getElementById(`${questionId}-image-img`);
+            const info = document.getElementById(`${questionId}-image-file-info`);
+            if (fileInput) {
+                fileInput.value = '';
+                fileInput.dataset.base64 = '';
+                fileInput.dataset.filename = '';
+                fileInput.dataset.contentType = '';
+            }
+            if (hiddenUrl) hiddenUrl.value = '';
+            if (preview) preview.style.display = 'none';
+            if (img) img.removeAttribute('src');
+            if (info) info.textContent = '';
+        }
+
+        function handleQuestionImageFile(questionId) {
+            const fileInput = document.getElementById(`${questionId}-image-file`);
+            const hiddenUrl = document.getElementById(`${questionId}-image`);
+            const preview = document.getElementById(`${questionId}-image-preview`);
+            const img = document.getElementById(`${questionId}-image-img`);
+            const info = document.getElementById(`${questionId}-image-file-info`);
+            if (!fileInput || !preview || !img) return;
+
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) {
+                clearQuestionFileSelection(questionId);
+                return;
+            }
+
+            const maxBytes = 5 * 1024 * 1024;
+            if (file.size > maxBytes) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Imagen demasiado pesada',
+                    text: 'Airtable permite cargar directamente archivos de hasta 5 MB. Selecciona una imagen más liviana.'
+                });
+                clearQuestionFileSelection(questionId);
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const dataUrl = e.target?.result || '';
+                const parts = String(dataUrl).split(',');
+                const base64 = parts.length > 1 ? parts[1] : '';
+                fileInput.dataset.base64 = base64;
+                fileInput.dataset.filename = file.name || 'imagen.png';
+                fileInput.dataset.contentType = file.type || 'image/png';
+                if (hiddenUrl) hiddenUrl.value = '';
+                if (info) info.textContent = `${file.name} • ${(file.size / 1024).toFixed(1)} KB`;
+                img.onload = () => { preview.style.display = 'block'; };
+                img.onerror = () => { preview.style.display = 'none'; };
+                img.src = dataUrl;
+            };
+            reader.onerror = function() {
+                Swal.fire({ icon: 'error', title: 'Error leyendo imagen', text: 'No fue posible cargar la imagen seleccionada.' });
+                clearQuestionFileSelection(questionId);
+            };
+            reader.readAsDataURL(file);
+        }
         
         function addQuestion(type) {
             const container = document.getElementById(`${type}Questions`);
@@ -4718,11 +4782,23 @@
                     
                     <div class="form-group">
                         <label><i class="fas fa-image"></i> Imagen de apoyo (opcional)</label>
-                        <input type="url" id="${questionId}-image" class="question-image-url"
-                               placeholder="https://.../imagen.jpg"
-                               oninput="updateQuestionImagePreview('${questionId}')"
-                               style="width:100%; padding:0.75rem; border:1px solid #d1d5db; border-radius:8px; background:#fff;">
-                        <small class="help-text">Pega una URL pública de la imagen para mostrarla en el pretest o postest.</small>
+                        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:0.85rem; align-items:start;">
+                            <div>
+                                <label style="display:block; font-size:0.9rem; font-weight:700; color:#374151; margin-bottom:0.4rem;">Subir desde el computador</label>
+                                <input type="file" id="${questionId}-image-file" accept="image/*"
+                                       onchange="handleQuestionImageFile('${questionId}')"
+                                       style="width:100%; padding:0.65rem; border:1px solid #d1d5db; border-radius:8px; background:#fff;">
+                                <div id="${questionId}-image-file-info" style="margin-top:0.45rem; font-size:0.82rem; color:#64748b; font-weight:600;"></div>
+                            </div>
+                            <div>
+                                <label style="display:block; font-size:0.9rem; font-weight:700; color:#374151; margin-bottom:0.4rem;">O pegar URL pública</label>
+                                <input type="url" id="${questionId}-image" class="question-image-url"
+                                       placeholder="https://.../imagen.jpg"
+                                       oninput="updateQuestionImagePreview('${questionId}')"
+                                       style="width:100%; padding:0.75rem; border:1px solid #d1d5db; border-radius:8px; background:#fff;">
+                            </div>
+                        </div>
+                        <small class="help-text">Puedes subir una imagen desde tu computador o pegar una URL pública. Si usas archivo local, la imagen se guardará en Airtable en el campo <strong>Imagen</strong>.</small>
                         <div id="${questionId}-image-preview" style="display:none; margin-top:0.75rem; text-align:center;">
                             <img id="${questionId}-image-img" alt="Vista previa de la pregunta"
                                  style="max-width:100%; max-height:220px; border-radius:10px; border:1px solid #d1d5db; box-shadow:0 4px 14px rgba(0,0,0,0.08); background:#fff;">
@@ -4854,7 +4930,15 @@
                 const correctAnswer=card.querySelector(`input[name="${questionId}-correct"]:checked`);
                 if(!correctAnswer){Swal.fire({icon:'warning',title:'Respuesta correcta',text:`Marca la respuesta correcta en la pregunta ${i+1} del ${typeName}`});return null;}
                 const imageUrl=((document.getElementById(`${questionId}-image`)||{value:''}).value||'').trim();
-                questions.push({number:i+1,question:questionText,options,correctAnswer:correctAnswer.value,imageUrl});
+                const fileInput=document.getElementById(`${questionId}-image-file`);
+                const imageFile=(fileInput && fileInput.dataset && fileInput.dataset.base64)
+                    ? {
+                        base64:fileInput.dataset.base64 || '',
+                        filename:fileInput.dataset.filename || 'imagen.png',
+                        contentType:fileInput.dataset.contentType || 'image/png'
+                    }
+                    : null;
+                questions.push({number:i+1,question:questionText,options,correctAnswer:correctAnswer.value,imageUrl,imageFile});
             }
             return questions;
         }
@@ -5023,56 +5107,87 @@ async function sendTrainingToAirtable(trainingData) {
 }
 
 // NUEVA FUNCIÓN: Guarda las preguntas en Airtable
+async function uploadQuestionAttachment(recordId, fieldName, imageFile) {
+    const response = await fetch('/.netlify/functions/upload-airtable-attachment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            recordId,
+            fieldName,
+            filename: imageFile.filename,
+            contentType: imageFile.contentType,
+            base64: imageFile.base64
+        })
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.success) {
+        throw new Error(data.error || 'No fue posible subir la imagen a Airtable');
+    }
+    return data;
+}
+
+// NUEVA FUNCIÓN: Guarda las preguntas en Airtable
 async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
     try {
         console.log(`📝 Guardando ${questions.length} preguntas de ${type}...`);
-        
+
         if (!questions || questions.length === 0) {
             console.log(`⚠️ No hay preguntas de ${type} para guardar`);
             return true;
         }
 
-        const records = questions.map(q => ({
-            fields: {
-                "Capacitación":       [trainingRecordId],
-                "Tipo":               type === 'pretest' ? 'Pretest' : 'Postest',
-                "Pregunta":           q.question,
-                "Opción A":           q.options.a,
-                "Opción B":           q.options.b,
-                "Opción C":           q.options.c,
-                "Opción D":           q.options.d,
-                "Respuesta Correcta": q.correctAnswer.toLowerCase(),
-                ...(q.imageUrl ? {"Imagen URL": q.imageUrl} : {})
-            }
-        }));
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i];
+            const recordPayload = {
+                fields: {
+                    "Capacitación": [trainingRecordId],
+                    "Tipo": type === 'pretest' ? 'Pretest' : 'Postest',
+                    "Pregunta": q.question,
+                    "Opción A": q.options.a,
+                    "Opción B": q.options.b,
+                    "Opción C": q.options.c,
+                    "Opción D": q.options.d,
+                    "Respuesta Correcta": q.correctAnswer.toLowerCase(),
+                    ...(q.imageUrl ? { "Imagen URL": q.imageUrl } : {})
+                }
+            };
 
-        console.log(`📋 Preguntas a guardar:`, records);
-
-        // Guardar todas las preguntas en un solo request
-        // Airtable permite máximo 10 registros por batch
-        const batchSize = 10;
-        for (let i = 0; i < records.length; i += batchSize) {
-            const batch = records.slice(i, i + batchSize);
-            await airtableProxyRequest({
+            const createResp = await airtableProxyRequest({
                 method: 'POST',
                 path: '/Preguntas',
-                body: { records: batch }
+                body: { records: [recordPayload] }
             });
-            console.log(`✅ Batch ${Math.floor(i/batchSize)+1} guardado (${batch.length} preguntas de ${type})`);
+
+            const createdRecord = createResp?.record || createResp?.records?.[0];
+            const createdId = createdRecord?.id || createResp?.id;
+            if (!createdId) {
+                throw new Error(`No se pudo crear la pregunta ${i + 1} del ${type}`);
+            }
+
+            if (q.imageFile && q.imageFile.base64) {
+                try {
+                    await uploadQuestionAttachment(createdId, 'Imagen', q.imageFile);
+                    console.log(`🖼️ Imagen cargada para pregunta ${i + 1} de ${type}`);
+                } catch (uploadErr) {
+                    console.error('Error cargando imagen de pregunta:', uploadErr);
+                    throw new Error(`La pregunta ${i + 1} se creó, pero la imagen no pudo cargarse: ${uploadErr.message}`);
+                }
+            }
         }
-        
+
         console.log(`✅ ${questions.length} preguntas de ${type} guardadas exitosamente`);
         return true;
 
     } catch (err) {
         console.error(`❌ Error guardando preguntas de ${type}:`, err);
-        const hasImages = Array.isArray(questions) && questions.some(q => (q.imageUrl || '').trim());
+        const hasImages = Array.isArray(questions) && questions.some(q => (q.imageUrl || '').trim() || q.imageFile?.base64);
         const message = String(err?.message || err || '');
-        if (hasImages && /UNKNOWN_FIELD_NAME|Unknown field|Imagen URL/i.test(message)) {
+        if (hasImages && /UNKNOWN_FIELD_NAME|Unknown field|Imagen URL|Imagen/i.test(message)) {
             Swal.fire({
                 icon: 'warning',
-                title: 'Campo Imagen URL pendiente en Airtable',
-                html: 'Para guardar imágenes desde la aplicación, crea en la tabla <strong>Preguntas</strong> un campo de texto llamado <strong>Imagen URL</strong>.'
+                title: 'Campos de imagen pendientes en Airtable',
+                html: 'En la tabla <strong>Preguntas</strong> crea estos campos:<br><br><strong>Imagen</strong> → tipo <strong>Adjunto</strong><br><strong>Imagen URL</strong> → tipo <strong>Texto de una sola línea</strong> (opcional).'
             });
         }
         return false;
