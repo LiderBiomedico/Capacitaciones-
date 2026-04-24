@@ -1676,9 +1676,100 @@
                         <i class="fas fa-undo"></i> Limpiar Formulario
                     </button>
                 </div>
+
+                <div class="card" style="margin-top:1.5rem; border-left:5px solid #2563eb; background:linear-gradient(135deg,#ffffff 0%,#eff6ff 100%);">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
+                        <div>
+                            <h3 style="margin:0 0 0.5rem 0;"><i class="fas fa-play-circle" style="color:#2563eb;"></i> Cursos virtuales</h3>
+                            <p style="margin:0; color:#475569; font-weight:500; max-width:760px;">Crea un curso virtual con uno o varios videos y define puntos de control para que el video se pause automáticamente y el participante responda preguntas sobre el tema.</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="openVirtualCourseBuilder()" style="background:#2563eb; border-color:#2563eb;">
+                            <i class="fas fa-video"></i> Crear Curso Virtual
+                        </button>
+                    </div>
+                    <div id="virtualCoursesList" style="margin-top:1rem;"></div>
+                </div>
             </section>
 
-            <!-- Other tabs... -->
+            <!-- Modal creador de curso virtual -->
+            <div id="virtualCourseModal" class="modal-overlay" style="display:none; align-items:flex-start; overflow:auto; padding:2rem 1rem;">
+                <div class="postest-modal" style="max-width:1100px; width:100%; position:relative; background:#fff; border-radius:18px; padding:1.5rem; box-shadow:0 20px 45px rgba(15,23,42,0.22);">
+                    <button class="close-btn" onclick="closeVirtualCourseBuilder()">&times;</button>
+                    <div style="padding-right:2rem;">
+                        <h2 style="margin:0 0 0.35rem 0; color:#111827;"><i class="fas fa-video" style="color:#2563eb;"></i> Crear Curso Virtual</h2>
+                        <p style="margin:0 0 1rem 0; color:#64748b; font-weight:500;">Define el nombre del curso, agrega módulos en video y configura preguntas que interrumpan el video en tiempos específicos.</p>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1.2fr 1fr; gap:1rem; align-items:start;">
+                        <div>
+                            <div class="form-group"><label><i class="fas fa-book"></i> Nombre del curso *</label><input type="text" id="virtualCourseTitle" placeholder="Ej: Curso virtual de seguridad eléctrica"></div>
+                            <div class="form-group"><label><i class="fas fa-align-left"></i> Descripción</label><textarea id="virtualCourseDescription" rows="3" placeholder="Objetivo, alcance y público del curso"></textarea></div>
+                            <div class="form-group"><label><i class="fas fa-user-tie"></i> Facilitador / responsable</label><input type="text" id="virtualCourseInstructor" placeholder="Ej: Ing. Paul Eduardo Muñoz"></div>
+                            <div class="form-group"><label><i class="fas fa-users"></i> Público objetivo</label><input type="text" id="virtualCourseAudience" placeholder="Ej: Enfermería, biomédica, médicos"></div>
+                        </div>
+                        <div class="card" style="background:#f8fafc; border:1px solid #e2e8f0; box-shadow:none;">
+                            <h3 style="margin-top:0; color:#111827;"><i class="fas fa-circle-info" style="color:#2563eb;"></i> Recomendaciones</h3>
+                            <ul style="margin:0; padding-left:1.1rem; color:#475569; line-height:1.7;">
+                                <li>Usa videos con URL directa en formato MP4, WEBM u OGG.</li>
+                                <li>Define los tiempos de pausa en segundos, por ejemplo 45, 120 o 360.</li>
+                                <li>Cada checkpoint detiene el video hasta que el participante responda.</li>
+                                <li>Los cursos virtuales quedan guardados en Airtable para que estén disponibles en todos los equipos.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top:1rem; background:#fff; border:1px solid #e5e7eb; box-shadow:none;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+                            <h3 style="margin:0;"><i class="fas fa-film"></i> Módulos del curso</h3>
+                            <button class="btn btn-secondary" onclick="addVirtualModule()"><i class="fas fa-plus"></i> Agregar módulo</button>
+                        </div>
+                        <div id="virtualModulesContainer"></div>
+                    </div>
+
+                    <div class="form-actions" style="margin-top:1rem; justify-content:flex-end;">
+                        <button class="btn btn-secondary" onclick="closeVirtualCourseBuilder()"><i class="fas fa-times"></i> Cancelar</button>
+                        <button class="btn btn-primary" onclick="saveVirtualCourse()" style="background:#2563eb; border-color:#2563eb;"><i class="fas fa-save"></i> Guardar Curso Virtual</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal reproductor de curso virtual -->
+            <div id="virtualCoursePlayerModal" class="modal-overlay" style="display:none; align-items:flex-start; overflow:auto; padding:2rem 1rem;">
+                <div class="postest-modal" style="max-width:1100px; width:100%; position:relative; background:#fff; border-radius:18px; padding:1.5rem; box-shadow:0 20px 45px rgba(15,23,42,0.22);">
+                    <button class="close-btn" onclick="closeVirtualCoursePlayer()">&times;</button>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; padding-right:2rem;">
+                        <div>
+                            <h2 id="virtualPlayerTitle" style="margin:0 0 0.35rem 0; color:#111827;">Curso virtual</h2>
+                            <p id="virtualPlayerSubtitle" style="margin:0; color:#64748b; font-weight:500;">Reproduce el contenido y responde las preguntas en los puntos de control.</p>
+                        </div>
+                        <div id="virtualPlayerProgress" style="display:flex; gap:0.5rem; flex-wrap:wrap;"></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:2fr 1fr; gap:1rem; align-items:start;">
+                        <div class="card" style="background:#0f172a; color:#fff; box-shadow:none;">
+                            <div id="virtualVideoWrapper" style="background:#000; border-radius:14px; overflow:hidden; min-height:360px; display:flex; align-items:center; justify-content:center;">
+                                <video id="virtualCourseVideo" controls style="width:100%; max-height:70vh; background:#000;"></video>
+                            </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-top:0.85rem;">
+                                <div id="virtualModuleInfo" style="font-weight:700;">Módulo 1</div>
+                                <div style="display:flex; gap:0.5rem;">
+                                    <button class="btn btn-secondary" onclick="playPreviousVirtualModule()"><i class="fas fa-backward"></i> Anterior</button>
+                                    <button class="btn btn-secondary" onclick="playNextVirtualModule()">Siguiente <i class="fas fa-forward"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <div class="card" style="background:#f8fafc; border:1px solid #e2e8f0; box-shadow:none;">
+                                <h3 style="margin-top:0; color:#111827;"><i class="fas fa-list-check" style="color:#2563eb;"></i> Módulos</h3>
+                                <div id="virtualModuleList"></div>
+                            </div>
+                            <div class="card" style="background:#fff; border:1px solid #e5e7eb; box-shadow:none; margin-top:1rem;">
+                                <h3 style="margin-top:0; color:#111827;"><i class="fas fa-chart-line" style="color:#16a34a;"></i> Seguimiento</h3>
+                                <div id="virtualCheckpointSummary" style="color:#475569; font-weight:500;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <section id="manage" class="tab-content">
                 <h2 class="section-title"><i class="fas fa-tasks"></i> Gestionar Capacitaciones</h2>
                 
@@ -11091,6 +11182,526 @@ function makeCronogramaFilterFormula(year, tipo) {
         }
 
         console.log('📊 Módulo de Reportes cargado correctamente');
+
+        // ==================== CURSOS VIRTUALES (AIRTABLE) ====================
+        const VIRTUAL_COURSES_TABLE = 'Cursos Virtuales';
+        const VIRTUAL_COURSE_FIELD_TITLE = 'Nombre';
+        const VIRTUAL_COURSE_FIELD_DESCRIPTION = 'Descripción';
+        const VIRTUAL_COURSE_FIELD_INSTRUCTOR = 'Responsable';
+        const VIRTUAL_COURSE_FIELD_AUDIENCE = 'Público objetivo';
+        const VIRTUAL_COURSE_FIELD_JSON = 'Contenido JSON';
+        const VIRTUAL_COURSE_FIELD_STATUS = 'Estado';
+        const VIRTUAL_COURSE_FIELD_CREATED = 'Fecha Creación';
+
+        let virtualCourses = [];
+        let virtualCoursesLoaded = false;
+        let currentVirtualCourse = null;
+        let currentVirtualModuleIndex = 0;
+        let currentVirtualCheckpointKey = null;
+        let answeredVirtualCheckpoints = new Set();
+
+        function escapeAttr(value) {
+            return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
+        function getVirtualCoursesStorage() {
+            try {
+                return JSON.parse(localStorage.getItem('virtualCourses') || '[]');
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveVirtualCoursesStorage() {
+            // Respaldo local únicamente. La fuente principal ahora es Airtable.
+            try { localStorage.setItem('virtualCourses', JSON.stringify(virtualCourses)); } catch (e) {}
+        }
+
+        function airtableTablePath(tableName) {
+            return '/' + encodeURIComponent(tableName).replace(/%20/g, '%20');
+        }
+
+        function parseVirtualCourseRecord(record) {
+            const f = record?.fields || {};
+            let course = null;
+            const rawJson = f[VIRTUAL_COURSE_FIELD_JSON] || f['ContenidoJSON'] || f['JSON'] || f['Datos'] || '';
+            if (rawJson) {
+                try {
+                    course = typeof rawJson === 'string' ? JSON.parse(rawJson) : rawJson;
+                } catch (e) {
+                    console.warn('No se pudo parsear Contenido JSON del curso virtual:', e);
+                }
+            }
+
+            if (!course || typeof course !== 'object') {
+                course = {
+                    id: `airtable-${record.id}`,
+                    title: f[VIRTUAL_COURSE_FIELD_TITLE] || f['Titulo'] || f['Título'] || 'Curso virtual sin nombre',
+                    description: f[VIRTUAL_COURSE_FIELD_DESCRIPTION] || '',
+                    instructor: f[VIRTUAL_COURSE_FIELD_INSTRUCTOR] || '',
+                    audience: f[VIRTUAL_COURSE_FIELD_AUDIENCE] || '',
+                    modules: [],
+                    createdAt: f[VIRTUAL_COURSE_FIELD_CREATED] || new Date().toISOString()
+                };
+            }
+
+            course.id = course.id || `airtable-${record.id}`;
+            course.airtableRecordId = record.id;
+            course.title = course.title || f[VIRTUAL_COURSE_FIELD_TITLE] || 'Curso virtual sin nombre';
+            course.description = course.description || f[VIRTUAL_COURSE_FIELD_DESCRIPTION] || '';
+            course.instructor = course.instructor || f[VIRTUAL_COURSE_FIELD_INSTRUCTOR] || '';
+            course.audience = course.audience || f[VIRTUAL_COURSE_FIELD_AUDIENCE] || '';
+            course.modules = Array.isArray(course.modules) ? course.modules : [];
+            return course;
+        }
+
+        async function virtualCourseProxy(payload) {
+            const res = await fetch('/.netlify/functions/airtable-proxy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+            const text = await res.text();
+            let data = {};
+            try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
+            if (!res.ok || data.success === false) {
+                throw new Error(data.error || data.message || text || `Error HTTP ${res.status}`);
+            }
+            return data;
+        }
+
+        async function loadVirtualCoursesFromAirtable(showError = false) {
+            try {
+                const params = new URLSearchParams();
+                params.set('pageSize', '100');
+                const data = await virtualCourseProxy({
+                    method: 'GET',
+                    path: `${airtableTablePath(VIRTUAL_COURSES_TABLE)}?${params.toString()}`,
+                    body: null
+                });
+                const records = Array.isArray(data.records) ? data.records : [];
+                virtualCourses = records
+                    .map(parseVirtualCourseRecord)
+                    .filter(c => String(c.status || c.estado || 'Activo').toLowerCase() !== 'inactivo')
+                    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+                virtualCoursesLoaded = true;
+                saveVirtualCoursesStorage();
+                return virtualCourses;
+            } catch (err) {
+                console.warn('No se pudieron cargar cursos virtuales desde Airtable:', err);
+                virtualCoursesLoaded = false;
+                virtualCourses = getVirtualCoursesStorage();
+                if (showError) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'No se pudieron cargar cursos virtuales',
+                        html: `Verifica que exista la tabla <strong>${VIRTUAL_COURSES_TABLE}</strong> en Airtable con el campo <strong>${VIRTUAL_COURSE_FIELD_JSON}</strong>.<br><br>${escapeHtml(err.message || '')}`
+                    });
+                }
+                return virtualCourses;
+            }
+        }
+
+        async function saveVirtualCourseToAirtable(course) {
+            const payloadCourse = { ...course };
+            delete payloadCourse.airtableRecordId;
+            const fields = {
+                [VIRTUAL_COURSE_FIELD_TITLE]: course.title || '',
+                [VIRTUAL_COURSE_FIELD_DESCRIPTION]: course.description || '',
+                [VIRTUAL_COURSE_FIELD_INSTRUCTOR]: course.instructor || '',
+                [VIRTUAL_COURSE_FIELD_AUDIENCE]: course.audience || '',
+                [VIRTUAL_COURSE_FIELD_JSON]: JSON.stringify(payloadCourse),
+                [VIRTUAL_COURSE_FIELD_STATUS]: 'Activo',
+                [VIRTUAL_COURSE_FIELD_CREATED]: (course.createdAt || new Date().toISOString()).slice(0, 10)
+            };
+
+            const data = await virtualCourseProxy({
+                method: 'POST',
+                path: airtableTablePath(VIRTUAL_COURSES_TABLE),
+                body: { fields }
+            });
+            const record = data.record || data.records?.[0] || data;
+            if (!record?.id) throw new Error('Airtable no devolvió ID del curso virtual.');
+            return parseVirtualCourseRecord(record);
+        }
+
+        async function deleteVirtualCourseFromAirtable(course) {
+            if (!course?.airtableRecordId) return;
+            await virtualCourseProxy({
+                method: 'DELETE',
+                path: `${airtableTablePath(VIRTUAL_COURSES_TABLE)}/${course.airtableRecordId}`,
+                body: null
+            });
+        }
+
+        function openVirtualCourseBuilder() {
+            document.getElementById('virtualCourseModal').style.display = 'flex';
+            if (!document.getElementById('virtualModulesContainer').children.length) {
+                addVirtualModule();
+            }
+        }
+
+        function closeVirtualCourseBuilder() {
+            document.getElementById('virtualCourseModal').style.display = 'none';
+        }
+
+        function resetVirtualCourseForm() {
+            ['virtualCourseTitle','virtualCourseDescription','virtualCourseInstructor','virtualCourseAudience'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.value = '';
+            });
+            document.getElementById('virtualModulesContainer').innerHTML = '';
+            addVirtualModule();
+        }
+
+        function addVirtualModule() {
+            const container = document.getElementById('virtualModulesContainer');
+            const index = container.querySelectorAll('.virtual-module-card').length + 1;
+            const moduleId = `virtual-module-${Date.now()}-${index}`;
+            const html = `
+                <div class="virtual-module-card" id="${moduleId}" style="border:1px solid #e5e7eb; border-radius:14px; padding:1rem; margin-bottom:1rem; background:#fcfcfd;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+                        <h4 style="margin:0; color:#111827;"><i class="fas fa-film" style="color:#2563eb;"></i> Módulo <span class="virtual-module-number">${index}</span></h4>
+                        <button class="btn btn-light" onclick="removeVirtualModule('${moduleId}')"><i class="fas fa-trash"></i> Eliminar módulo</button>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.85rem;">
+                        <div class="form-group" style="margin-bottom:0;"><label>Título del módulo *</label><input type="text" class="virtual-module-title" placeholder="Ej: Video 1 - Introducción"></div>
+                        <div class="form-group" style="margin-bottom:0;"><label>URL del video *</label><input type="url" class="virtual-module-url" placeholder="https://.../video.mp4"></div>
+                    </div>
+                    <div class="form-group" style="margin-top:0.85rem; margin-bottom:0;"><label>Descripción del módulo</label><textarea class="virtual-module-description" rows="2" placeholder="Resumen breve del contenido del video"></textarea></div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-top:1rem; margin-bottom:0.5rem;">
+                        <h5 style="margin:0; color:#111827;"><i class="fas fa-stopwatch" style="color:#16a34a;"></i> Checkpoints de preguntas</h5>
+                        <button class="btn btn-secondary" onclick="addVirtualCheckpoint('${moduleId}')"><i class="fas fa-plus"></i> Agregar checkpoint</button>
+                    </div>
+                    <div class="virtual-checkpoints"></div>
+                </div>`;
+            container.insertAdjacentHTML('beforeend', html);
+            addVirtualCheckpoint(moduleId);
+            renumberVirtualModules();
+        }
+
+        function removeVirtualModule(moduleId) {
+            const el = document.getElementById(moduleId);
+            if (el) el.remove();
+            renumberVirtualModules();
+        }
+
+        function renumberVirtualModules() {
+            document.querySelectorAll('#virtualModulesContainer .virtual-module-card').forEach((card, idx) => {
+                const label = card.querySelector('.virtual-module-number');
+                if (label) label.textContent = idx + 1;
+            });
+        }
+
+        function addVirtualCheckpoint(moduleId) {
+            const module = document.getElementById(moduleId);
+            if (!module) return;
+            const container = module.querySelector('.virtual-checkpoints');
+            const index = container.querySelectorAll('.virtual-checkpoint-card').length + 1;
+            const cpId = `${moduleId}-checkpoint-${Date.now()}-${index}`;
+            const html = `
+                <div class="virtual-checkpoint-card" id="${cpId}" style="border:1px dashed #cbd5e1; border-radius:12px; padding:0.9rem; margin-bottom:0.85rem; background:#fff;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:0.75rem;">
+                        <strong style="color:#111827;">Pregunta de pausa ${index}</strong>
+                        <button class="btn btn-light" onclick="removeVirtualCheckpoint('${cpId}')"><i class="fas fa-trash"></i> Eliminar</button>
+                    </div>
+                    <div style="display:grid; grid-template-columns:160px 1fr; gap:0.85rem;">
+                        <div class="form-group" style="margin-bottom:0;"><label>Tiempo (segundos) *</label><input type="number" min="1" step="1" class="virtual-cp-time" placeholder="Ej: 45"></div>
+                        <div class="form-group" style="margin-bottom:0;"><label>Pregunta *</label><input type="text" class="virtual-cp-question" placeholder="Pregunta que aparecerá al pausar"></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.75rem; margin-top:0.75rem;">
+                        <div class="form-group" style="margin-bottom:0;"><label>Opción A *</label><input type="text" class="virtual-cp-a" placeholder="Opción A"></div>
+                        <div class="form-group" style="margin-bottom:0;"><label>Opción B *</label><input type="text" class="virtual-cp-b" placeholder="Opción B"></div>
+                        <div class="form-group" style="margin-bottom:0;"><label>Opción C</label><input type="text" class="virtual-cp-c" placeholder="Opción C"></div>
+                        <div class="form-group" style="margin-bottom:0;"><label>Opción D</label><input type="text" class="virtual-cp-d" placeholder="Opción D"></div>
+                    </div>
+                    <div class="form-group" style="margin-top:0.75rem; margin-bottom:0;"><label>Respuesta correcta *</label>
+                        <select class="virtual-cp-correct"><option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D">D</option></select>
+                    </div>
+                </div>`;
+            container.insertAdjacentHTML('beforeend', html);
+        }
+
+        function removeVirtualCheckpoint(cpId) {
+            const el = document.getElementById(cpId);
+            if (el) el.remove();
+        }
+
+        function collectVirtualCourseData() {
+            const title = document.getElementById('virtualCourseTitle').value.trim();
+            const description = document.getElementById('virtualCourseDescription').value.trim();
+            const instructor = document.getElementById('virtualCourseInstructor').value.trim();
+            const audience = document.getElementById('virtualCourseAudience').value.trim();
+            const moduleEls = Array.from(document.querySelectorAll('#virtualModulesContainer .virtual-module-card'));
+
+            if (!title) {
+                throw new Error('Ingresa el nombre del curso virtual.');
+            }
+            if (!moduleEls.length) {
+                throw new Error('Agrega al menos un módulo de video.');
+            }
+
+            const modules = moduleEls.map((moduleEl, moduleIdx) => {
+                const moduleTitle = (moduleEl.querySelector('.virtual-module-title')?.value || '').trim();
+                const videoUrl = (moduleEl.querySelector('.virtual-module-url')?.value || '').trim();
+                const moduleDescription = (moduleEl.querySelector('.virtual-module-description')?.value || '').trim();
+                if (!moduleTitle || !videoUrl) {
+                    throw new Error(`Completa título y URL del módulo ${moduleIdx + 1}.`);
+                }
+                const checkpoints = Array.from(moduleEl.querySelectorAll('.virtual-checkpoint-card')).map((cpEl, cpIdx) => {
+                    const time = Number(cpEl.querySelector('.virtual-cp-time')?.value || 0);
+                    const question = (cpEl.querySelector('.virtual-cp-question')?.value || '').trim();
+                    const a = (cpEl.querySelector('.virtual-cp-a')?.value || '').trim();
+                    const b = (cpEl.querySelector('.virtual-cp-b')?.value || '').trim();
+                    const c = (cpEl.querySelector('.virtual-cp-c')?.value || '').trim();
+                    const d = (cpEl.querySelector('.virtual-cp-d')?.value || '').trim();
+                    const correct = (cpEl.querySelector('.virtual-cp-correct')?.value || 'A').trim().toUpperCase();
+                    if (!time || !question || !a || !b) {
+                        throw new Error(`Completa tiempo, pregunta y al menos opciones A y B en el módulo ${moduleIdx + 1}, checkpoint ${cpIdx + 1}.`);
+                    }
+                    return { id: `cp-${moduleIdx + 1}-${cpIdx + 1}-${Date.now()}`, time, question, options: { A: a, B: b, C: c, D: d }, correct };
+                }).sort((x, y) => x.time - y.time);
+                return { id: `module-${moduleIdx + 1}-${Date.now()}`, title: moduleTitle, description: moduleDescription, videoUrl, checkpoints };
+            });
+
+            return { id: `virtual-${Date.now()}`, title, description, instructor, audience, modules, createdAt: new Date().toISOString() };
+        }
+
+        async function saveVirtualCourse() {
+            try {
+                const course = collectVirtualCourseData();
+                Swal.fire({
+                    title: 'Guardando curso virtual...',
+                    text: 'Se está creando el curso en Airtable.',
+                    allowOutsideClick: false,
+                    didOpen: () => Swal.showLoading()
+                });
+                const savedCourse = await saveVirtualCourseToAirtable(course);
+                virtualCourses.unshift(savedCourse);
+                saveVirtualCoursesStorage();
+                renderVirtualCoursesList(false);
+                closeVirtualCourseBuilder();
+                resetVirtualCourseForm();
+                Swal.fire({ icon: 'success', title: 'Curso virtual creado', text: 'El curso quedó guardado en Airtable y listo para reproducirse.' });
+            } catch (err) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No se pudo guardar el curso virtual',
+                    html: `Revisa que en Airtable exista la tabla <strong>${VIRTUAL_COURSES_TABLE}</strong> y el campo <strong>${VIRTUAL_COURSE_FIELD_JSON}</strong>.<br><br>${escapeHtml(err.message || 'Revisa los datos del curso virtual.')}`
+                });
+            }
+        }
+
+        function deleteVirtualCourse(id) {
+            const course = virtualCourses.find(c => c.id === id);
+            Swal.fire({
+                icon: 'warning',
+                title: 'Eliminar curso virtual',
+                text: 'Esta acción eliminará el curso virtual guardado en Airtable.',
+                showCancelButton: true,
+                confirmButtonText: 'Eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then(async res => {
+                if (!res.isConfirmed) return;
+                try {
+                    Swal.fire({ title: 'Eliminando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                    await deleteVirtualCourseFromAirtable(course);
+                    virtualCourses = virtualCourses.filter(c => c.id !== id);
+                    saveVirtualCoursesStorage();
+                    renderVirtualCoursesList(false);
+                    Swal.fire({ icon: 'success', title: 'Curso eliminado', timer: 1300, showConfirmButton: false });
+                } catch (err) {
+                    Swal.fire({ icon: 'error', title: 'No se pudo eliminar', text: err.message || 'Error eliminando el curso virtual.' });
+                }
+            });
+        }
+
+        async function renderVirtualCoursesList(loadRemote = false) {
+            const container = document.getElementById('virtualCoursesList');
+            if (!container) return;
+            if (loadRemote) {
+                container.innerHTML = '<div style="padding:1rem; border:1px dashed #cbd5e1; border-radius:12px; color:#64748b; text-align:center; font-weight:700;"><i class="fas fa-spinner fa-spin"></i> Cargando cursos virtuales desde Airtable...</div>';
+                await loadVirtualCoursesFromAirtable(false);
+            }
+            if (!virtualCourses.length) {
+                container.innerHTML = '<div style="padding:1rem; border:1px dashed #cbd5e1; border-radius:12px; color:#64748b; text-align:center; font-weight:500;">Aún no hay cursos virtuales guardados en Airtable.</div>';
+                return;
+            }
+            container.innerHTML = virtualCourses.map(course => `
+                <div class="card" style="background:#fff; border:1px solid #e5e7eb; box-shadow:none; margin-bottom:0.85rem;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:1rem; flex-wrap:wrap;">
+                        <div>
+                            <h4 style="margin:0 0 0.35rem 0; color:#111827;">${escapeHtml(course.title)}</h4>
+                            <p style="margin:0; color:#64748b; font-weight:500;">${escapeHtml(course.description || 'Curso virtual sin descripción')}</p>
+                            <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.6rem;">
+                                <span style="background:#eff6ff; color:#1d4ed8; padding:0.3rem 0.7rem; border-radius:999px; font-size:0.82rem; font-weight:700;">${course.modules.length} módulo(s)</span>
+                                <span style="background:#ecfdf5; color:#047857; padding:0.3rem 0.7rem; border-radius:999px; font-size:0.82rem; font-weight:700;">${course.modules.reduce((acc,m)=>acc+(m.checkpoints?.length||0),0)} checkpoint(s)</span>
+                            </div>
+                        </div>
+                        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                            <button class="btn btn-primary" style="background:#2563eb; border-color:#2563eb;" onclick="playVirtualCourse('${course.id}')"><i class="fas fa-play"></i> Reproducir</button>
+                            <button class="btn btn-light" onclick="deleteVirtualCourse('${course.id}')"><i class="fas fa-trash"></i> Eliminar</button>
+                        </div>
+                    </div>
+                </div>`).join('');
+        }
+
+        function playVirtualCourse(id) {
+            const course = virtualCourses.find(c => c.id === id);
+            if (!course) {
+                Swal.fire({ icon: 'error', title: 'Curso no encontrado', text: 'No fue posible abrir el curso virtual.' });
+                return;
+            }
+            currentVirtualCourse = course;
+            currentVirtualModuleIndex = 0;
+            answeredVirtualCheckpoints = new Set();
+            currentVirtualCheckpointKey = null;
+            document.getElementById('virtualPlayerTitle').textContent = course.title;
+            document.getElementById('virtualPlayerSubtitle').textContent = course.description || 'Curso virtual interactivo con preguntas durante el video.';
+            document.getElementById('virtualCoursePlayerModal').style.display = 'flex';
+            renderVirtualModuleList();
+            loadVirtualModule(0);
+        }
+
+        function renderVirtualModuleList() {
+            const list = document.getElementById('virtualModuleList');
+            const progress = document.getElementById('virtualPlayerProgress');
+            if (!currentVirtualCourse) { list.innerHTML = ''; progress.innerHTML = ''; return; }
+            list.innerHTML = currentVirtualCourse.modules.map((module, idx) => `
+                <button class="btn ${idx === currentVirtualModuleIndex ? 'btn-primary' : 'btn-light'}" style="width:100%; justify-content:flex-start; margin-bottom:0.55rem; ${idx === currentVirtualModuleIndex ? 'background:#2563eb; border-color:#2563eb;' : ''}" onclick="loadVirtualModule(${idx})">
+                    <i class="fas fa-film"></i> ${escapeHtml(module.title)}
+                </button>`).join('');
+            progress.innerHTML = currentVirtualCourse.modules.map((module, idx) => {
+                const totalCp = module.checkpoints?.length || 0;
+                const doneCp = (module.checkpoints || []).filter(cp => answeredVirtualCheckpoints.has(`${idx}-${cp.id}`)).length;
+                return `<span style="padding:0.35rem 0.7rem; border-radius:999px; background:${idx === currentVirtualModuleIndex ? '#dbeafe' : '#f1f5f9'}; color:${idx === currentVirtualModuleIndex ? '#1d4ed8' : '#475569'}; font-size:0.82rem; font-weight:800;">M${idx+1}: ${doneCp}/${totalCp}</span>`;
+            }).join('');
+        }
+
+        function loadVirtualModule(index) {
+            if (!currentVirtualCourse) return;
+            const module = currentVirtualCourse.modules[index];
+            if (!module) return;
+            currentVirtualModuleIndex = index;
+            currentVirtualCheckpointKey = null;
+            const video = document.getElementById('virtualCourseVideo');
+            const info = document.getElementById('virtualModuleInfo');
+            const summary = document.getElementById('virtualCheckpointSummary');
+            if (video) {
+                video.pause();
+                video.src = module.videoUrl;
+                video.load();
+                video.onloadedmetadata = () => {
+                    summary.innerHTML = `Duración detectada: <strong>${Math.round(video.duration || 0)} s</strong><br>Checkpoints configurados: <strong>${module.checkpoints?.length || 0}</strong>`;
+                };
+            }
+            if (info) info.textContent = `${module.title} • ${module.checkpoints?.length || 0} checkpoint(s)`;
+            renderVirtualModuleList();
+        }
+
+        function playPreviousVirtualModule() {
+            if (!currentVirtualCourse) return;
+            loadVirtualModule(Math.max(0, currentVirtualModuleIndex - 1));
+        }
+
+        function playNextVirtualModule() {
+            if (!currentVirtualCourse) return;
+            loadVirtualModule(Math.min(currentVirtualCourse.modules.length - 1, currentVirtualModuleIndex + 1));
+        }
+
+        async function askVirtualCheckpointQuestion(moduleIndex, checkpoint) {
+            currentVirtualCheckpointKey = `${moduleIndex}-${checkpoint.id}`;
+            const options = Object.entries(checkpoint.options || {}).filter(([k,v]) => String(v || '').trim());
+            const html = options.map(([key, value]) => `
+                <label style="display:flex; align-items:flex-start; gap:0.6rem; border:1px solid #d1d5db; border-radius:10px; padding:0.7rem; margin-bottom:0.55rem; cursor:pointer;">
+                    <input type="radio" name="virtualCheckpointAnswer" value="${key}" style="margin-top:0.2rem;">
+                    <span><strong>${key})</strong> ${escapeHtml(value)}</span>
+                </label>`).join('');
+
+            const result = await Swal.fire({
+                title: `Pregunta de control • ${formatSeconds(checkpoint.time)}`,
+                html: `<div style="text-align:left;"><p style="font-weight:700; color:#111827; margin-bottom:0.8rem;">${escapeHtml(checkpoint.question)}</p>${html}</div>`,
+                width: 760,
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                confirmButtonText: 'Validar respuesta',
+                preConfirm: () => {
+                    const selected = document.querySelector('input[name="virtualCheckpointAnswer"]:checked');
+                    if (!selected) {
+                        Swal.showValidationMessage('Selecciona una respuesta para continuar.');
+                        return false;
+                    }
+                    return selected.value;
+                }
+            });
+
+            const selected = result.value;
+            const isCorrect = String(selected || '').toUpperCase() === String(checkpoint.correct || '').toUpperCase();
+            answeredVirtualCheckpoints.add(`${moduleIndex}-${checkpoint.id}`);
+            renderVirtualModuleList();
+            await Swal.fire({
+                icon: isCorrect ? 'success' : 'warning',
+                title: isCorrect ? 'Respuesta correcta' : 'Respuesta registrada',
+                html: isCorrect
+                    ? 'Muy bien. El video continuará.'
+                    : `La respuesta correcta era <strong>${escapeHtml(checkpoint.correct || '')}</strong>. El video continuará.`,
+                timer: 1800,
+                showConfirmButton: false
+            });
+            currentVirtualCheckpointKey = null;
+            const video = document.getElementById('virtualCourseVideo');
+            if (video) video.play().catch(() => {});
+        }
+
+        function formatSeconds(totalSeconds) {
+            const total = Number(totalSeconds || 0);
+            const min = Math.floor(total / 60);
+            const sec = total % 60;
+            return `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+        }
+
+        function closeVirtualCoursePlayer() {
+            const video = document.getElementById('virtualCourseVideo');
+            if (video) {
+                video.pause();
+                video.removeAttribute('src');
+                video.load();
+            }
+            document.getElementById('virtualCoursePlayerModal').style.display = 'none';
+            currentVirtualCourse = null;
+            currentVirtualCheckpointKey = null;
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            virtualCourses = getVirtualCoursesStorage();
+            renderVirtualCoursesList(true);
+            const video = document.getElementById('virtualCourseVideo');
+            if (video && !video.dataset.virtualBound) {
+                video.dataset.virtualBound = '1';
+                video.addEventListener('timeupdate', function() {
+                    if (!currentVirtualCourse || currentVirtualCheckpointKey) return;
+                    const module = currentVirtualCourse.modules[currentVirtualModuleIndex];
+                    if (!module || !Array.isArray(module.checkpoints)) return;
+                    const now = video.currentTime || 0;
+                    const pending = module.checkpoints.find(cp => !answeredVirtualCheckpoints.has(`${currentVirtualModuleIndex}-${cp.id}`) && now >= Number(cp.time || 0));
+                    if (pending) {
+                        video.pause();
+                        askVirtualCheckpointQuestion(currentVirtualModuleIndex, pending);
+                    }
+                });
+                video.addEventListener('ended', function() {
+                    if (!currentVirtualCourse) return;
+                    if (currentVirtualModuleIndex < currentVirtualCourse.modules.length - 1) {
+                        Swal.fire({ icon: 'info', title: 'Módulo completado', text: 'Se cargará el siguiente módulo.' }).then(() => {
+                            loadVirtualModule(currentVirtualModuleIndex + 1);
+                        });
+                    } else {
+                        Swal.fire({ icon: 'success', title: 'Curso finalizado', text: 'Has terminado todos los módulos del curso virtual.' });
+                    }
+                });
+            }
+        });
+
     </script>
 
 <!-- ═════════════════════════════════════════════════════════════════
