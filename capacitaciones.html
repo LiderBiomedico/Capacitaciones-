@@ -3457,6 +3457,7 @@
                 
                 // Buscar el nombre de la pregunta (intentar diferentes campos)
                 const questionText = fields['name'] || fields['Nombre'] || fields['Pregunta'] || fields['Título'] || 'Sin pregunta';
+                const questionImageUrl = getQuestionImageUrl(fields);
                 
                 // Obtener opciones (intentar variaciones de nombres)
                 const options = [
@@ -3966,6 +3967,7 @@
                 
                 // Buscar el nombre de la pregunta (intentar diferentes campos)
                 const questionText = fields['name'] || fields['Nombre'] || fields['Pregunta'] || fields['Título'] || 'Sin pregunta';
+                const questionImageUrl = getQuestionImageUrl(fields);
                 
                 // Obtener opciones (intentar variaciones de nombres)
                 const options = [
@@ -4594,6 +4596,86 @@
         }
 
         // ==================== FUNCIONES DE PREGUNTAS ====================
+
+        function normalizeQuestionImageValue(value) {
+            if (!value) return '';
+            if (typeof value === 'string') return value.trim();
+            if (Array.isArray(value)) {
+                for (const item of value) {
+                    if (!item) continue;
+                    if (typeof item === 'string' && item.trim()) return item.trim();
+                    if (item.url) return item.url;
+                    if (item.thumbnails?.large?.url) return item.thumbnails.large.url;
+                    if (item.thumbnails?.full?.url) return item.thumbnails.full.url;
+                    if (item.thumbnails?.small?.url) return item.thumbnails.small.url;
+                }
+            }
+            if (value?.url) return value.url;
+            return '';
+        }
+
+        function getQuestionImageUrl(fields = {}) {
+            const preferredKeys = [
+                'Imagen URL',
+                'URL Imagen',
+                'Imagen de la Pregunta',
+                'Imagen Pregunta',
+                'Image URL',
+                'Imagen',
+                'Imágenes',
+                'Imagenes',
+                'Image'
+            ];
+
+            for (const key of preferredKeys) {
+                const url = normalizeQuestionImageValue(fields[key]);
+                if (url) return url;
+            }
+
+            for (const [key, value] of Object.entries(fields || {})) {
+                if (/imagen|image|adjunto|attachment|foto/i.test(key || '')) {
+                    const url = normalizeQuestionImageValue(value);
+                    if (url) return url;
+                }
+            }
+
+            return '';
+        }
+
+        function renderQuestionImageHtml(imageUrl, altText = 'Imagen de la pregunta') {
+            if (!imageUrl) return '';
+            const safeUrl = String(imageUrl).replace(/"/g, '&quot;');
+            const safeAlt = String(altText || 'Imagen de la pregunta').replace(/"/g, '&quot;');
+            return `
+                <div style="margin: 0.5rem 0 1rem 0; text-align: center;">
+                    <img src="${safeUrl}" alt="${safeAlt}"
+                         style="max-width: 100%; max-height: 280px; border-radius: 10px; border: 1px solid #d1d5db; box-shadow: 0 4px 14px rgba(0,0,0,0.08); background: #ffffff;"
+                         onerror="this.parentElement.style.display='none'">
+                </div>
+            `;
+        }
+
+        function updateQuestionImagePreview(questionId) {
+            const input = document.getElementById(`${questionId}-image`);
+            const preview = document.getElementById(`${questionId}-image-preview`);
+            const img = document.getElementById(`${questionId}-image-img`);
+            if (!input || !preview || !img) return;
+
+            const url = (input.value || '').trim();
+            if (!url) {
+                preview.style.display = 'none';
+                img.removeAttribute('src');
+                return;
+            }
+
+            img.onload = () => {
+                preview.style.display = 'block';
+            };
+            img.onerror = () => {
+                preview.style.display = 'none';
+            };
+            img.src = url;
+        }
         
         function addQuestion(type) {
             const container = document.getElementById(`${type}Questions`);
@@ -4757,7 +4839,8 @@
                 if(!options.a||!options.b||!options.c||!options.d){Swal.fire({icon:'error',title:'Opciones Incompletas',text:`Completa todas las opciones de la pregunta ${i+1} del ${typeName}`});return null;}
                 const correctAnswer=card.querySelector(`input[name="${questionId}-correct"]:checked`);
                 if(!correctAnswer){Swal.fire({icon:'warning',title:'Respuesta correcta',text:`Marca la respuesta correcta en la pregunta ${i+1} del ${typeName}`});return null;}
-                questions.push({number:i+1,question:questionText,options,correctAnswer:correctAnswer.value});
+                const imageUrl=((document.getElementById(`${questionId}-image`)||{value:''}).value||'').trim();
+                questions.push({number:i+1,question:questionText,options,correctAnswer:correctAnswer.value,imageUrl});
             }
             return questions;
         }
@@ -4944,7 +5027,8 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 "Opción B":           q.options.b,
                 "Opción C":           q.options.c,
                 "Opción D":           q.options.d,
-                "Respuesta Correcta": q.correctAnswer.toLowerCase()
+                "Respuesta Correcta": q.correctAnswer.toLowerCase(),
+                ...(q.imageUrl ? {"Imagen URL": q.imageUrl} : {})
             }
         }));
 
@@ -4968,6 +5052,15 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
     } catch (err) {
         console.error(`❌ Error guardando preguntas de ${type}:`, err);
+        const hasImages = Array.isArray(questions) && questions.some(q => (q.imageUrl || '').trim());
+        const message = String(err?.message || err || '');
+        if (hasImages && /UNKNOWN_FIELD_NAME|Unknown field|Imagen URL/i.test(message)) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Campo Imagen URL pendiente en Airtable',
+                html: 'Para guardar imágenes desde la aplicación, crea en la tabla <strong>Preguntas</strong> un campo de texto llamado <strong>Imagen URL</strong>.'
+            });
+        }
         return false;
     }
 }
@@ -5366,24 +5459,27 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                             <div class="questions-list">
                                 ${questions.map((q, index) => {
                                     const qFields = q.fields;
-                                    const correctAnswer = qFields['Respuesta Corecta'] || '';
+                                    const correctAnswer = (qFields['Respuesta Correcta'] || qFields['Respuesta Corecta'] || '').toString().toUpperCase();
+                                    const qText = qFields['Pregunta'] || qFields['name'] || qFields['Nombre'] || 'Sin pregunta';
+                                    const qImage = getQuestionImageUrl(qFields);
+                                    const detailOptions = [
+                                        { letter: 'A', text: qFields['Opción A'] || qFields['A'] || 'N/A' },
+                                        { letter: 'B', text: qFields['Opción B'] || qFields['B'] || 'N/A' },
+                                        { letter: 'C', text: qFields['Opción C'] || qFields['C'] || 'N/A' },
+                                        { letter: 'D', text: qFields['Opción D'] || qFields['D'] || 'N/A' }
+                                    ];
                                     return `
                                         <div class="question-item">
                                             <div class="question-number">Pregunta ${index + 1}</div>
-                                            <div class="question-text">${qFields['name'] || 'Sin pregunta'}</div>
+                                            <div class="question-text">${qText}</div>
+                                            ${renderQuestionImageHtml(qImage, `Imagen pregunta ${index + 1}`)}
                                             <div class="question-options">
-                                                <div class="question-option ${correctAnswer === 'B' ? 'correct' : ''}">
-                                                    <strong>B)</strong> ${qFields['Opción B'] || 'N/A'}
-                                                    ${correctAnswer === 'B' ? '<i class="fas fa-check-circle" style="color: #1a1a1a; margin-left: auto;"></i>' : ''}
-                                                </div>
-                                                <div class="question-option ${correctAnswer === 'C' ? 'correct' : ''}">
-                                                    <strong>C)</strong> ${qFields['Opción C'] || 'N/A'}
-                                                    ${correctAnswer === 'C' ? '<i class="fas fa-check-circle" style="color: #1a1a1a; margin-left: auto;"></i>' : ''}
-                                                </div>
-                                                <div class="question-option ${correctAnswer === 'D' ? 'correct' : ''}">
-                                                    <strong>D)</strong> ${qFields['Opción D'] || 'N/A'}
-                                                    ${correctAnswer === 'D' ? '<i class="fas fa-check-circle" style="color: #1a1a1a; margin-left: auto;"></i>' : ''}
-                                                </div>
+                                                ${detailOptions.map(opt => `
+                                                    <div class="question-option ${correctAnswer === opt.letter ? 'correct' : ''}">
+                                                        <strong>${opt.letter})</strong> ${opt.text || 'N/A'}
+                                                        ${correctAnswer === opt.letter ? '<i class="fas fa-check-circle" style="color: #1a1a1a; margin-left: auto;"></i>' : ''}
+                                                    </div>
+                                                `).join('')}
                                             </div>
                                         </div>
                                     `;
