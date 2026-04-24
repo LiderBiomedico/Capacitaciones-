@@ -1480,6 +1480,10 @@
                 <i class="fas fa-plus-circle"></i>
                 <span>Crear</span>
             </button>
+            <button class="nav-tab" onclick="switchTab('virtualCourses')">
+                <i class="fas fa-video"></i>
+                <span>Cursos Virtuales</span>
+            </button>
             <button class="nav-tab" onclick="switchTab('manage')">
                 <i class="fas fa-tasks"></i>
                 <span>Gestionar</span>
@@ -1564,9 +1568,14 @@
 
             <!-- Create Tab -->
             <section id="create" class="tab-content">
-                <h2 class="section-title">
-                    <i class="fas fa-plus-circle"></i> Crear Nueva Capacitación
-                </h2>
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+                    <h2 class="section-title" style="margin-bottom:0;">
+                        <i class="fas fa-plus-circle"></i> Crear Nueva Capacitación
+                    </h2>
+                    <button class="btn btn-primary" onclick="switchTab('virtualCourses')" style="background:#2563eb; border-color:#2563eb;">
+                        <i class="fas fa-video"></i> Ir a Cursos Virtuales
+                    </button>
+                </div>
                 
                 <div class="card">
                     <h3>📋 Información General</h3>
@@ -1677,18 +1686,33 @@
                     </button>
                 </div>
 
-                <div class="card" style="margin-top:1.5rem; border-left:5px solid #2563eb; background:linear-gradient(135deg,#ffffff 0%,#eff6ff 100%);">
+                
+            </section>
+
+
+            <section id="virtualCourses" class="tab-content">
+                <h2 class="section-title">
+                    <i class="fas fa-video"></i> Cursos Virtuales
+                </h2>
+
+                <div class="card" style="margin-bottom:1.25rem; border-left:5px solid #2563eb; background:linear-gradient(135deg,#ffffff 0%,#eff6ff 100%);">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
                         <div>
-                            <h3 style="margin:0 0 0.5rem 0;"><i class="fas fa-play-circle" style="color:#2563eb;"></i> Cursos virtuales</h3>
-                            <p style="margin:0; color:#475569; font-weight:500; max-width:760px;">Crea un curso virtual con uno o varios videos y define puntos de control para que el video se pause automáticamente y el participante responda preguntas sobre el tema.</p>
+                            <h3 style="margin:0 0 0.5rem 0;"><i class="fas fa-play-circle" style="color:#2563eb;"></i> Gestión de cursos virtuales</h3>
+                            <p style="margin:0; color:#475569; font-weight:500; max-width:860px;">Crea cursos virtuales con uno o varios videos, define puntos de control para pausar automáticamente la reproducción y formula preguntas sobre el tema para reforzar el aprendizaje.</p>
                         </div>
-                        <button class="btn btn-primary" onclick="openVirtualCourseBuilder()" style="background:#2563eb; border-color:#2563eb;">
-                            <i class="fas fa-video"></i> Crear Curso Virtual
-                        </button>
+                        <div style="display:flex; gap:0.75rem; flex-wrap:wrap;">
+                            <button class="btn btn-light" onclick="renderVirtualCoursesList(true)">
+                                <i class="fas fa-sync-alt"></i> Recargar
+                            </button>
+                            <button class="btn btn-primary" onclick="openVirtualCourseBuilder()" style="background:#2563eb; border-color:#2563eb;">
+                                <i class="fas fa-video"></i> Crear Curso Virtual
+                            </button>
+                        </div>
                     </div>
-                    <div id="virtualCoursesList" style="margin-top:1rem;"></div>
                 </div>
+
+                <div id="virtualCoursesList" style="margin-top:1rem;"></div>
             </section>
 
             <!-- Modal creador de curso virtual -->
@@ -4682,6 +4706,11 @@
             // Al entrar a Personal HSLV, cargar lista de BDs
             if (tabName === 'personal' && typeof initPersonalTab === 'function') {
                 initPersonalTab();
+            }
+
+            // Al entrar a Cursos Virtuales, cargar listado
+            if (tabName === 'virtualCourses' && typeof renderVirtualCoursesList === 'function') {
+                renderVirtualCoursesList(true);
             }
 
             // Al entrar a Cronograma, inicializar valores por defecto
@@ -11193,12 +11222,36 @@ function makeCronogramaFilterFormula(year, tipo) {
         const VIRTUAL_COURSE_FIELD_STATUS = 'Estado';
         const VIRTUAL_COURSE_FIELD_CREATED = 'Fecha Creación';
 
+        const VIRTUAL_RESPONSES_TABLE = 'Respuestas Cursos Virtuales';
+        const VIRTUAL_RESP_FIELD_PARTICIPANT = 'Participante';
+        const VIRTUAL_RESP_FIELD_CEDULA = 'Cédula';
+        const VIRTUAL_RESP_FIELD_COURSE = 'Curso Virtual';
+        const VIRTUAL_RESP_FIELD_COURSE_ID = 'Curso ID';
+        const VIRTUAL_RESP_FIELD_MODULE = 'Módulo';
+        const VIRTUAL_RESP_FIELD_MODULE_INDEX = 'Índice Módulo';
+        const VIRTUAL_RESP_FIELD_CHECKPOINT = 'Checkpoint ID';
+        const VIRTUAL_RESP_FIELD_TIME = 'Tiempo';
+        const VIRTUAL_RESP_FIELD_QUESTION = 'Pregunta';
+        const VIRTUAL_RESP_FIELD_ANSWER = 'Respuesta Usuario';
+        const VIRTUAL_RESP_FIELD_CORRECT = 'Respuesta Correcta';
+        const VIRTUAL_RESP_FIELD_RESULT = 'Resultado';
+        const VIRTUAL_RESP_FIELD_DATE = 'Fecha Respuesta';
+        const VIRTUAL_RESP_FIELD_SCORE = 'Calificación';
+        const VIRTUAL_RESP_FIELD_TYPE = 'Tipo Registro';
+        const VIRTUAL_RESP_FIELD_TOTAL = 'Total Checkpoints';
+        const VIRTUAL_RESP_FIELD_CORRECT_COUNT = 'Correctas';
+        const VIRTUAL_RESP_FIELD_PERCENT = 'Porcentaje';
+
         let virtualCourses = [];
+
         let virtualCoursesLoaded = false;
         let currentVirtualCourse = null;
         let currentVirtualModuleIndex = 0;
         let currentVirtualCheckpointKey = null;
         let answeredVirtualCheckpoints = new Set();
+        let currentVirtualParticipant = null;
+        let currentVirtualResults = [];
+
 
         function escapeAttr(value) {
             return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -11269,6 +11322,101 @@ function makeCronogramaFilterFormula(year, tipo) {
             }
             return data;
         }
+
+        async function promptVirtualParticipantData() {
+            const result = await Swal.fire({
+                title: 'Datos del participante',
+                html: `
+                    <div style="text-align:left;">
+                        <label style="display:block; font-weight:700; margin:0 0 0.35rem 0;">Nombre del participante *</label>
+                        <input id="virtualParticipantName" class="swal2-input" placeholder="Nombre completo" style="margin:0 0 0.75rem 0;">
+                        <label style="display:block; font-weight:700; margin:0 0 0.35rem 0;">Número de cédula *</label>
+                        <input id="virtualParticipantCedula" class="swal2-input" placeholder="Cédula" style="margin:0;">
+                    </div>`,
+                width: 640,
+                allowOutsideClick: false,
+                confirmButtonText: 'Iniciar curso',
+                showCancelButton: true,
+                cancelButtonText: 'Cancelar',
+                preConfirm: () => {
+                    const name = (document.getElementById('virtualParticipantName')?.value || '').trim();
+                    const cedula = (document.getElementById('virtualParticipantCedula')?.value || '').trim();
+                    if (!name || !cedula) {
+                        Swal.showValidationMessage('Ingresa el nombre y la cédula del participante.');
+                        return false;
+                    }
+                    return { name, cedula };
+                }
+            });
+            return result.isConfirmed ? result.value : null;
+        }
+
+        function getVirtualCourseTotals(course) {
+            const totalCheckpoints = (course?.modules || []).reduce((acc, m) => acc + ((m.checkpoints || []).length), 0);
+            return { totalCheckpoints };
+        }
+
+        async function saveVirtualResponseRecord(payloadFields) {
+            await virtualCourseProxy({
+                method: 'POST',
+                path: airtableTablePath(VIRTUAL_RESPONSES_TABLE),
+                body: { fields: payloadFields }
+            });
+        }
+
+        async function saveVirtualCheckpointResult(moduleIndex, checkpoint, selected, isCorrect) {
+            if (!currentVirtualCourse || !currentVirtualParticipant) return;
+            const module = currentVirtualCourse.modules?.[moduleIndex] || {};
+            const totals = getVirtualCourseTotals(currentVirtualCourse);
+            const correctCount = currentVirtualResults.filter(r => r.isCorrect).length + (isCorrect ? 1 : 0);
+            const answeredCount = currentVirtualResults.length + 1;
+            const percentage = answeredCount ? Math.round((correctCount / answeredCount) * 100) : 0;
+
+            const fields = {
+                [VIRTUAL_RESP_FIELD_TYPE]: 'Checkpoint',
+                [VIRTUAL_RESP_FIELD_PARTICIPANT]: currentVirtualParticipant.name,
+                [VIRTUAL_RESP_FIELD_CEDULA]: currentVirtualParticipant.cedula,
+                [VIRTUAL_RESP_FIELD_COURSE]: currentVirtualCourse.title || '',
+                [VIRTUAL_RESP_FIELD_COURSE_ID]: currentVirtualCourse.id || '',
+                [VIRTUAL_RESP_FIELD_MODULE]: module.title || `Módulo ${moduleIndex + 1}`,
+                [VIRTUAL_RESP_FIELD_MODULE_INDEX]: moduleIndex + 1,
+                [VIRTUAL_RESP_FIELD_CHECKPOINT]: checkpoint.id || '',
+                [VIRTUAL_RESP_FIELD_TIME]: formatSeconds(checkpoint.time || 0),
+                [VIRTUAL_RESP_FIELD_QUESTION]: checkpoint.question || '',
+                [VIRTUAL_RESP_FIELD_ANSWER]: selected || '',
+                [VIRTUAL_RESP_FIELD_CORRECT]: checkpoint.correct || '',
+                [VIRTUAL_RESP_FIELD_RESULT]: isCorrect ? 'Correcta' : 'Incorrecta',
+                [VIRTUAL_RESP_FIELD_DATE]: new Date().toISOString(),
+                [VIRTUAL_RESP_FIELD_SCORE]: isCorrect ? 100 : 0,
+                [VIRTUAL_RESP_FIELD_TOTAL]: totals.totalCheckpoints,
+                [VIRTUAL_RESP_FIELD_CORRECT_COUNT]: correctCount,
+                [VIRTUAL_RESP_FIELD_PERCENT]: percentage
+            };
+            await saveVirtualResponseRecord(fields);
+        }
+
+        async function saveVirtualCourseSummary(finalStatus = 'Finalizado') {
+            if (!currentVirtualCourse || !currentVirtualParticipant) return;
+            const totals = getVirtualCourseTotals(currentVirtualCourse);
+            const correctCount = currentVirtualResults.filter(r => r.isCorrect).length;
+            const percentage = totals.totalCheckpoints ? Math.round((correctCount / totals.totalCheckpoints) * 100) : 0;
+            const fields = {
+                [VIRTUAL_RESP_FIELD_TYPE]: finalStatus,
+                [VIRTUAL_RESP_FIELD_PARTICIPANT]: currentVirtualParticipant.name,
+                [VIRTUAL_RESP_FIELD_CEDULA]: currentVirtualParticipant.cedula,
+                [VIRTUAL_RESP_FIELD_COURSE]: currentVirtualCourse.title || '',
+                [VIRTUAL_RESP_FIELD_COURSE_ID]: currentVirtualCourse.id || '',
+                [VIRTUAL_RESP_FIELD_MODULE]: 'Resumen final',
+                [VIRTUAL_RESP_FIELD_DATE]: new Date().toISOString(),
+                [VIRTUAL_RESP_FIELD_TOTAL]: totals.totalCheckpoints,
+                [VIRTUAL_RESP_FIELD_CORRECT_COUNT]: correctCount,
+                [VIRTUAL_RESP_FIELD_PERCENT]: percentage,
+                [VIRTUAL_RESP_FIELD_RESULT]: `${correctCount}/${totals.totalCheckpoints}`,
+                [VIRTUAL_RESP_FIELD_SCORE]: percentage
+            };
+            await saveVirtualResponseRecord(fields);
+        }
+
 
         async function loadVirtualCoursesFromAirtable(showError = false) {
             try {
@@ -11546,18 +11694,24 @@ function makeCronogramaFilterFormula(year, tipo) {
                 </div>`).join('');
         }
 
-        function playVirtualCourse(id) {
+        async function playVirtualCourse(id) {
             const course = virtualCourses.find(c => c.id === id);
             if (!course) {
                 Swal.fire({ icon: 'error', title: 'Curso no encontrado', text: 'No fue posible abrir el curso virtual.' });
                 return;
             }
+
+            const participant = await promptVirtualParticipantData();
+            if (!participant) return;
+
+            currentVirtualParticipant = participant;
             currentVirtualCourse = course;
             currentVirtualModuleIndex = 0;
             answeredVirtualCheckpoints = new Set();
             currentVirtualCheckpointKey = null;
+            currentVirtualResults = [];
             document.getElementById('virtualPlayerTitle').textContent = course.title;
-            document.getElementById('virtualPlayerSubtitle').textContent = course.description || 'Curso virtual interactivo con preguntas durante el video.';
+            document.getElementById('virtualPlayerSubtitle').textContent = `${course.description || 'Curso virtual interactivo con preguntas durante el video.'} • Participante: ${participant.name}`;
             document.getElementById('virtualCoursePlayerModal').style.display = 'flex';
             renderVirtualModuleList();
             loadVirtualModule(0);
@@ -11638,7 +11792,22 @@ function makeCronogramaFilterFormula(year, tipo) {
             const selected = result.value;
             const isCorrect = String(selected || '').toUpperCase() === String(checkpoint.correct || '').toUpperCase();
             answeredVirtualCheckpoints.add(`${moduleIndex}-${checkpoint.id}`);
+            currentVirtualResults.push({
+                moduleIndex,
+                checkpointId: checkpoint.id,
+                question: checkpoint.question || '',
+                selected,
+                correct: checkpoint.correct || '',
+                isCorrect
+            });
             renderVirtualModuleList();
+
+            try {
+                await saveVirtualCheckpointResult(moduleIndex, checkpoint, selected, isCorrect);
+            } catch (saveErr) {
+                console.warn('No se pudo guardar la respuesta del checkpoint en Airtable:', saveErr);
+            }
+
             await Swal.fire({
                 icon: isCorrect ? 'success' : 'warning',
                 title: isCorrect ? 'Respuesta correcta' : 'Respuesta registrada',
@@ -11660,7 +11829,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             return `${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
         }
 
-        function closeVirtualCoursePlayer() {
+        async function closeVirtualCoursePlayer() {
             const video = document.getElementById('virtualCourseVideo');
             if (video) {
                 video.pause();
@@ -11668,8 +11837,17 @@ function makeCronogramaFilterFormula(year, tipo) {
                 video.load();
             }
             document.getElementById('virtualCoursePlayerModal').style.display = 'none';
+            try {
+                if (currentVirtualCourse && currentVirtualParticipant) {
+                    await saveVirtualCourseSummary('Finalizado');
+                }
+            } catch (err) {
+                console.warn('No se pudo guardar el resumen del curso virtual:', err);
+            }
             currentVirtualCourse = null;
             currentVirtualCheckpointKey = null;
+            currentVirtualParticipant = null;
+            currentVirtualResults = [];
         }
 
         document.addEventListener('DOMContentLoaded', function() {
