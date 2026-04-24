@@ -3481,6 +3481,8 @@
                             ${questionText}
                         </p>
                         
+                        ${renderQuestionImageHtml(questionImageUrl, `Imagen pregunta ${questionNumber}`)}
+                        
                         <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                             ${options.length > 0 ? options.map(option => `
                                 <label style="display: flex; align-items: flex-start; padding: 0.75rem; background: white; border-radius: 6px; cursor: pointer; transition: all 0.3s; border: 2px solid #e0e0e0; hover: border-color: var(--primary);">
@@ -3990,6 +3992,8 @@
                         <p style="margin: 0 0 1rem 0; font-weight: 500; color: #1a1a1a; font-size: 1.05rem;">
                             ${questionText}
                         </p>
+                        
+                        ${renderQuestionImageHtml(questionImageUrl, `Imagen pregunta ${questionNumber}`)}
                         
                         <div style="display: flex; flex-direction: column; gap: 0.75rem;">
                             ${options.length > 0 ? options.map(option => `
