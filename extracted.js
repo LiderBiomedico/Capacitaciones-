@@ -2747,18 +2747,29 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const profEntries = Object.entries(byProf)
                     .sort((a, b) => b[1] - a[1])
                     .slice(0, 10);
+                const calcularEscalaGrafica = (values, minimum = 100) => {
+                    const nums = (values || []).map(Number).filter(v => Number.isFinite(v));
+                    const maxValue = nums.length ? Math.max(...nums) : minimum;
+                    const margin = Math.max(10, Math.ceil(maxValue * 0.15));
+                    return Math.ceil((Math.max(minimum, maxValue + margin)) / 10) * 10;
+                };
+
                 if (participationsChart) {
+                    const profValues = profEntries.map(e => e[1]);
                     participationsChart.data.labels = profEntries.map(e => e[0]);
-                    participationsChart.data.datasets[0].data = profEntries.map(e => e[1]);
+                    participationsChart.data.datasets[0].data = profValues;
                     participationsChart.data.datasets[0].label = 'Participantes';
+                    participationsChart.options.scales.x.suggestedMax = calcularEscalaGrafica(profValues, 20);
                     participationsChart.update();
                 }
 
                 // Gráfico por departamento (top 5)
                 const deptEntries = Object.entries(byDept).sort((a, b) => b[1] - a[1]).slice(0, 5);
                 if (departmentChart) {
+                    const deptValues = deptEntries.map(e => e[1]);
                     departmentChart.data.labels = deptEntries.map(e => e[0]);
-                    departmentChart.data.datasets[0].data = deptEntries.map(e => e[1]);
+                    departmentChart.data.datasets[0].data = deptValues;
+                    departmentChart.options.scales.y.max = calcularEscalaGrafica(deptValues, 100);
                     departmentChart.update();
                 }
 
@@ -2851,7 +2862,8 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         scales: {
                             y: {
                                 beginAtZero: true,
-                                max: 100
+                                suggestedMax: 120,
+                                ticks: { precision: 0 }
                             }
                         }
                     }
