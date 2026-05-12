@@ -1910,7 +1910,361 @@
             .loading-screen { background-size: cover !important; }
         }
 
-    </style>
+    
+
+        /* ==========================================================
+           AJUSTE FINAL SOLICITADO - INTERFAZ COMPACTA GLOBAL
+           - Splash 10 segundos con crédito visible
+           - Dashboard interno conservado
+           - Crear, Cursos Virtuales, Gestionar, Examen, Reportes,
+             Personal HSLV y Cronograma compactos y profesionales
+           ========================================================== */
+        :root {
+            --compact-radius: 12px;
+            --compact-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+            --compact-border: 1px solid rgba(46, 125, 50, 0.13);
+        }
+
+        /* Splash: se mantiene la imagen futurista de fondo y se muestra crédito institucional */
+        .loading-screen .loader {
+            display: flex !important;
+            position: absolute !important;
+            left: 50% !important;
+            bottom: 4.5vh !important;
+            transform: translateX(-50%) !important;
+            width: min(620px, 90vw) !important;
+            max-width: 620px !important;
+            padding: 0 !important;
+            flex-direction: column !important;
+            align-items: center !important;
+            justify-content: center !important;
+            text-align: center !important;
+            pointer-events: none !important;
+        }
+
+        .loading-screen .splash-logo-wrap,
+        .loading-screen .loader-title,
+        .loading-screen .loader-subtitle,
+        .loading-screen .loader-divider {
+            display: none !important;
+        }
+
+        .loading-screen .progress-track {
+            width: min(360px, 70vw) !important;
+            height: 5px !important;
+            margin: 0 auto 0.85rem auto !important;
+            border-radius: 999px !important;
+            background: rgba(148, 163, 184, 0.25) !important;
+            overflow: hidden !important;
+            box-shadow: 0 0 16px rgba(96, 165, 250, 0.2) !important;
+        }
+
+        .loading-screen .progress-fill {
+            height: 100% !important;
+            border-radius: inherit !important;
+            background: linear-gradient(90deg, #7c6df2, #60d9ff, #ffffff) !important;
+            animation: progressFill 10s cubic-bezier(0.4, 0, 0.2, 1) forwards, progressFlow 3s linear infinite !important;
+        }
+
+        .loading-screen .loader-credit {
+            display: inline-block !important;
+            margin: 0 !important;
+            padding: 0.48rem 1rem !important;
+            border-radius: 999px !important;
+            font-size: clamp(0.78rem, 1.1vw, 0.95rem) !important;
+            line-height: 1.2 !important;
+            font-weight: 600 !important;
+            letter-spacing: 0.2px !important;
+            color: rgba(255, 255, 255, 0.94) !important;
+            background: rgba(10, 24, 55, 0.45) !important;
+            border: 1px solid rgba(147, 197, 253, 0.28) !important;
+            backdrop-filter: blur(10px) !important;
+            text-shadow: 0 2px 10px rgba(0,0,0,0.35) !important;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.18) !important;
+        }
+
+        /* Estructura global más compacta */
+        .main-content {
+            padding: 0.75rem 1.25rem !important;
+        }
+
+        .tab-content > .card,
+        .tab-content .card,
+        #create .card,
+        #virtualCourses .card,
+        #manage .card,
+        #exam .card,
+        #reports .card,
+        #personal .card,
+        #schedule .card {
+            padding: 0.85rem 1rem !important;
+            margin-bottom: 0.85rem !important;
+            border-radius: var(--compact-radius) !important;
+            box-shadow: var(--compact-shadow) !important;
+            border: var(--compact-border) !important;
+        }
+
+        .tab-content h2.section-title,
+        .section-title {
+            font-size: 1.16rem !important;
+            margin-bottom: 0.75rem !important;
+            gap: 0.4rem !important;
+        }
+
+        .tab-content h3,
+        .card h3 {
+            font-size: 0.98rem !important;
+            margin-bottom: 0.65rem !important;
+        }
+
+        .form-group {
+            margin-bottom: 0.65rem !important;
+        }
+
+        .form-group label,
+        label {
+            font-size: 0.82rem !important;
+            margin-bottom: 0.28rem !important;
+        }
+
+        input,
+        select,
+        textarea,
+        .form-control {
+            padding: 0.48rem 0.62rem !important;
+            font-size: 0.84rem !important;
+            border-radius: 9px !important;
+        }
+
+        textarea {
+            min-height: 72px !important;
+        }
+
+        .btn,
+        button.btn,
+        .btn-action,
+        .form-actions .btn,
+        .modal-actions button,
+        .training-actions button,
+        #personal button,
+        #schedule button,
+        #reports button,
+        #exam button,
+        #virtualCourses button,
+        #create button {
+            min-height: 32px !important;
+            padding: 0.42rem 0.68rem !important;
+            font-size: 0.8rem !important;
+            border-radius: 9px !important;
+            gap: 0.35rem !important;
+            line-height: 1.15 !important;
+        }
+
+        .navigation {
+            top: 72px !important;
+        }
+
+        .nav-tab {
+            min-width: 82px !important;
+            min-height: 40px !important;
+            padding: 0.35rem 0.45rem !important;
+            gap: 0.24rem !important;
+            font-size: 0.74rem !important;
+        }
+
+        .nav-tab i {
+            font-size: 0.82rem !important;
+        }
+
+        /* Gestión de capacitaciones: tarjetas a casi media escala visual */
+        .trainings-grid {
+            grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)) !important;
+            gap: 0.85rem !important;
+            margin-top: 0.9rem !important;
+        }
+
+        .training-card {
+            padding: 0.85rem !important;
+            border-radius: 12px !important;
+            border-width: 1px !important;
+            box-shadow: 0 5px 14px rgba(15,23,42,0.06) !important;
+        }
+
+        .training-card:hover {
+            transform: translateY(-2px) !important;
+            box-shadow: 0 9px 18px rgba(46,125,50,0.13) !important;
+        }
+
+        .training-card::before {
+            height: 3px !important;
+        }
+
+        .training-card-header {
+            margin-bottom: 0.5rem !important;
+        }
+
+        .training-title {
+            font-size: 0.98rem !important;
+            line-height: 1.2 !important;
+            margin-bottom: 0.32rem !important;
+        }
+
+        .training-status {
+            padding: 2px 8px !important;
+            font-size: 0.62rem !important;
+            border-radius: 999px !important;
+        }
+
+        .training-info {
+            gap: 0.42rem !important;
+            margin: 0.55rem 0 !important;
+            padding: 0.62rem 0.7rem !important;
+            border-radius: 9px !important;
+        }
+
+        .training-info-item {
+            font-size: 0.78rem !important;
+            gap: 0.36rem !important;
+        }
+
+        .training-info-item i {
+            width: 16px !important;
+            font-size: 0.78rem !important;
+        }
+
+        .training-code {
+            padding: 0.62rem !important;
+            margin: 0.65rem 0 !important;
+            border-radius: 9px !important;
+        }
+
+        .training-code-label {
+            font-size: 0.76rem !important;
+            margin-bottom: 0.16rem !important;
+        }
+
+        .training-code-value {
+            font-size: 1.1rem !important;
+            letter-spacing: 2px !important;
+        }
+
+        .training-actions {
+            gap: 0.42rem !important;
+            margin-top: 0.65rem !important;
+        }
+
+        .btn-action {
+            padding: 0.45rem 0.55rem !important;
+            font-size: 0.76rem !important;
+        }
+
+        /* Cursos virtuales, examen, reportes, personal y cronograma */
+        #virtualCourses [style*="padding:1rem"],
+        #exam [style*="padding:1rem"],
+        #reports [style*="padding:1rem"],
+        #personal [style*="padding:1rem"],
+        #schedule [style*="padding:1rem"] {
+            padding: 0.72rem !important;
+        }
+
+        #virtualCoursesList,
+        #trainingsList,
+        #scheduleList,
+        #personalResults,
+        #reportContainer,
+        #quarterlyReportContent {
+            margin-top: 0.75rem !important;
+        }
+
+        #virtualCourses .card p,
+        #reports .card p,
+        #personal .card p,
+        #schedule .card p,
+        #exam .card p {
+            font-size: 0.82rem !important;
+            line-height: 1.35 !important;
+        }
+
+        #virtualVideoWrapper {
+            min-height: 220px !important;
+            border-radius: 10px !important;
+        }
+
+        .modal-content,
+        .modal {
+            border-radius: 14px !important;
+        }
+
+        .modal-overlay .card,
+        .modal-overlay > div {
+            max-width: min(920px, 94vw) !important;
+        }
+
+        /* Gráficas globales: más pequeñas y limpias */
+        .charts-container {
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)) !important;
+            gap: 0.75rem !important;
+            margin: 0.65rem 0 !important;
+        }
+
+        .charts-container canvas,
+        #reports canvas,
+        #personal canvas,
+        canvas[id^="qChart"],
+        canvas[id*="Chart"] {
+            height: 165px !important;
+            max-height: 165px !important;
+        }
+
+        #reports .stats-grid,
+        #personal .stats-grid,
+        #schedule .stats-grid,
+        #exam .stats-grid,
+        #virtualCourses .stats-grid {
+            gap: 0.65rem !important;
+            margin-bottom: 0.8rem !important;
+        }
+
+        #reports .stat-card,
+        #personal .stat-card,
+        #schedule .stat-card,
+        #exam .stat-card,
+        #virtualCourses .stat-card {
+            min-height: 66px !important;
+            padding: 0.58rem 0.72rem !important;
+        }
+
+        /* Tablas más densas */
+        table {
+            font-size: 0.78rem !important;
+        }
+
+        th, td {
+            padding: 0.42rem 0.5rem !important;
+        }
+
+        .empty-state {
+            padding: 1.5rem 1rem !important;
+            font-size: 0.86rem !important;
+        }
+
+        @media (max-width: 900px) {
+            .loading-screen .loader { bottom: 3vh !important; }
+            .trainings-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)) !important; }
+            .charts-container canvas,
+            #reports canvas,
+            #personal canvas,
+            canvas[id^="qChart"],
+            canvas[id*="Chart"] { height: 150px !important; max-height: 150px !important; }
+        }
+
+        @media (max-width: 560px) {
+            .main-content { padding: 0.65rem !important; }
+            .trainings-grid { grid-template-columns: 1fr !important; }
+            .nav-tab { min-width: 76px !important; font-size: 0.68rem !important; }
+            .loading-screen .loader-credit { font-size: 0.72rem !important; }
+        }
+</style>
 </head>
 <body>
     <!-- Loading Screen -->
@@ -5018,7 +5372,7 @@
                 setTimeout(() => {
                     document.getElementById('loadingScreen').style.display = 'none';
                 }, 250);
-            }, 5000);
+            }, 10000);
 
             // Si viene por QR (participante), NO pedir contraseña
             if (isParticipantFlow()) {
@@ -5027,7 +5381,7 @@
             }
 
             // Esperar a que se oculte la pantalla de inicio antes de pedir contraseña
-            await new Promise(resolve => setTimeout(resolve, 5200));
+            await new Promise(resolve => setTimeout(resolve, 10200));
 
             // Pedir contraseña (guardada en Airtable)
             await enforceAdminPassword();
