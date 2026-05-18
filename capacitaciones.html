@@ -2,11 +2,14 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Sistema de Capacitaciones - Hospital Susana López de Valencia</title>
     
     <meta name="description" content="Sistema integral de gestión de capacitaciones hospitalarias">
     <meta name="theme-color" content="#2E7D32">
+
+    <!-- UI/UX: Pre-carga del fondo del splash para reducir LCP/CLS y evitar parpadeo -->
+    <link rel="preload" as="image" href="assets/campus-splash-3d.png" fetchpriority="high">
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E🏥%3C/text%3E%3C/svg%3E">
@@ -1975,12 +1978,82 @@
             line-height: 1.2 !important;
             font-weight: 600 !important;
             letter-spacing: 0.2px !important;
-            color: rgba(255, 255, 255, 0.94) !important;
-            background: rgba(10, 24, 55, 0.45) !important;
-            border: 1px solid rgba(147, 197, 253, 0.28) !important;
-            backdrop-filter: blur(10px) !important;
-            text-shadow: 0 2px 10px rgba(0,0,0,0.35) !important;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.18) !important;
+            /* UI/UX: contraste reforzado AA (texto blanco sobre fondo más opaco + sombra) */
+            color: #ffffff !important;
+            background: rgba(8, 18, 42, 0.62) !important;
+            border: 1px solid rgba(147, 197, 253, 0.32) !important;
+            -webkit-backdrop-filter: blur(12px) saturate(140%) !important;
+            backdrop-filter: blur(12px) saturate(140%) !important;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.55), 0 0 14px rgba(0,0,0,0.25) !important;
+            box-shadow:
+                0 8px 24px rgba(0,0,0,0.22),
+                inset 0 1px 0 rgba(255,255,255,0.08) !important;
+        }
+
+        /* ========================================================
+           UI/UX Pro Max — Refinamientos del splash
+           - Micro-label de estado (jerarquía + semántica)
+           - Safe-area iOS (notch / home indicator)
+           - will-change para rendimiento de 60fps
+           - prefers-reduced-motion completo (accesibilidad CRITICAL)
+           ======================================================== */
+
+        /* Micro-etiqueta "Iniciando plataforma…" — pieza de jerarquía sobre la barra */
+        .loading-screen .loader-microlabel {
+            display: block !important;
+            margin: 0 auto 0.55rem auto !important;
+            padding: 0 !important;
+            font-size: clamp(0.66rem, 0.95vw, 0.78rem) !important;
+            font-weight: 500 !important;
+            letter-spacing: 2.2px !important;
+            text-transform: uppercase !important;
+            color: rgba(226, 232, 240, 0.78) !important;
+            text-shadow: 0 1px 6px rgba(0,0,0,0.55) !important;
+            text-align: center !important;
+            animation: microlabelPulse 2.4s ease-in-out infinite;
+        }
+
+        @keyframes microlabelPulse {
+            0%, 100% { opacity: 0.65; }
+            50% { opacity: 1; }
+        }
+
+        /* Reposicionamiento del loader respetando safe-area (notch + home indicator iPhone) */
+        .loading-screen .loader {
+            bottom: max(4.5vh, calc(1rem + env(safe-area-inset-bottom))) !important;
+        }
+
+        /* Hint al compositor para mantener 60fps en las animaciones de splash */
+        .loading-screen .progress-fill,
+        .loading-screen .splash-light-rays,
+        .loading-screen::after {
+            will-change: transform, opacity;
+        }
+
+        /* Accesibilidad CRITICAL: respetar prefers-reduced-motion en TODOS los efectos del splash.
+           La barra de progreso se completa de inmediato (no se queda colgada) y se desactivan
+           Ken Burns, sweep, shimmer, parpadeo de estrellas y aura para usuarios sensibles al movimiento. */
+        @media (prefers-reduced-motion: reduce) {
+            .loading-screen,
+            .loading-screen::before,
+            .loading-screen::after,
+            .loading-screen .splash-light-rays,
+            .loading-screen .progress-fill,
+            .loading-screen .progress-fill::after,
+            .loading-screen .loader-microlabel {
+                animation: none !important;
+            }
+            .loading-screen .progress-fill {
+                width: 100% !important;
+            }
+        }
+
+        /* Móvil pequeño: micro-label más compacta para no apretar la barra */
+        @media (max-width: 520px) {
+            .loading-screen .loader-microlabel {
+                letter-spacing: 1.8px !important;
+                margin-bottom: 0.45rem !important;
+            }
         }
 
         /* Estructura global más compacta */
@@ -2294,14 +2367,15 @@
 </head>
 <body>
     <!-- Loading Screen -->
-    <div id="loadingScreen" class="loading-screen">
-        <div id="tsparticles-splash"></div>
-        <div class="splash-light-rays"></div>
+    <div id="loadingScreen" class="loading-screen" role="status" aria-live="polite" aria-busy="true" aria-label="Cargando Campus Susana, plataforma de capacitación">
+        <div id="tsparticles-splash" aria-hidden="true"></div>
+        <div class="splash-light-rays" aria-hidden="true"></div>
         <div class="loader">
             <div class="splash-logo-wrap" data-tilt data-tilt-max="15" data-tilt-speed="400" data-tilt-perspective="1500" data-tilt-glare data-tilt-max-glare="0.4" data-tilt-scale="1.05">
                 <img class="splash-logo" src="assets/campus-splash-3d.png" alt="Campus Susana">
             </div>
-            <div class="progress-track" aria-label="Cargando">
+            <p class="loader-microlabel" aria-hidden="true">Iniciando plataforma…</p>
+            <div class="progress-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Progreso de carga">
                 <div class="progress-fill"></div>
             </div>
 <p class="loader-title">Campus Susana</p>
