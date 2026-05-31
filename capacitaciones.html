@@ -977,6 +977,23 @@
             #virtualInlineQuestion { width:100% !important; box-sizing:border-box; padding:0.8rem !important; margin-top:0.75rem !important; }
             .virtual-question-title { font-size: 0.95rem; }
             .virtual-question-text { font-size: 0.95rem; }
+
+            /* Celular: ampliar la imagen del video 1.5x para mejorar la lectura visual.
+               Se mantiene dentro del marco del reproductor para no desplazar las preguntas. */
+            body.hslv-participant-flow #virtualVideoWrapper,
+            #virtualCoursePlayerModal #virtualVideoWrapper {
+                overflow: hidden !important;
+            }
+            body.hslv-participant-flow #virtualCourseVideo,
+            body.hslv-participant-flow #virtualYoutubePlayer,
+            body.hslv-participant-flow #virtualYoutubePlayer iframe,
+            #virtualCoursePlayerModal #virtualCourseVideo,
+            #virtualCoursePlayerModal #virtualYoutubePlayer,
+            #virtualCoursePlayerModal #virtualYoutubePlayer iframe {
+                transform: scale(1.5) !important;
+                transform-origin: center center !important;
+                object-fit: cover !important;
+            }
         }
 
         /* Charts */
