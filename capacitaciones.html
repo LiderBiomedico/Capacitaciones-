@@ -8618,7 +8618,40 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         .imgwrap { text-align:center; border:1px solid #e2e8f0; padding:10px; }
                         .no-border td { border:none; }
                         .tblhead th { background:#f8fafc; font-weight:900; }
-                    </style>
+                
+
+        /* FIX móvil 2026-05-31: el flujo por QR no debe cancelar el ingreso ni devolver al campus */
+        body.hslv-participant-flow { background:#fff !important; overflow-x:hidden !important; }
+        .swal2-popup.hslv-virtual-login .swal2-actions,
+        .swal2-popup.hslv-virtual-register .swal2-actions { gap: .65rem !important; }
+        .swal2-popup.hslv-virtual-login .swal2-confirm,
+        .swal2-popup.hslv-virtual-register .swal2-confirm,
+        .swal2-popup.hslv-virtual-login .swal2-cancel,
+        .swal2-popup.hslv-virtual-register .swal2-cancel { min-height:44px !important; border-radius:10px !important; font-weight:800 !important; }
+        #virtualCourseVideo::-webkit-media-controls-fullscreen-button { display:none !important; }
+        @media (max-width: 900px) {
+            .swal2-popup.hslv-virtual-login,
+            .swal2-popup.hslv-virtual-register {
+                width: calc(100vw - 20px) !important;
+                max-width: calc(100vw - 20px) !important;
+                max-height: 94dvh !important;
+                overflow-y: auto !important;
+                padding: .95rem !important;
+            }
+            .swal2-popup.hslv-virtual-login .swal2-title,
+            .swal2-popup.hslv-virtual-register .swal2-title { font-size:1.2rem !important; }
+            .swal2-popup.hslv-virtual-login .swal2-html-container,
+            .swal2-popup.hslv-virtual-register .swal2-html-container { max-height:none !important; }
+            .virtual-login-helper { font-size:.95rem !important; }
+            #virtualCedulaInput, .virtual-auto-field, .virtual-register-field { min-height:44px !important; font-size:.95rem !important; }
+            .virtual-field-group { margin-bottom:.55rem !important; }
+            #virtualCoursePlayerModal { overflow:auto !important; }
+            .virtual-player-fullscreen { min-height:100dvh !important; }
+            #virtualVideoWrapper { min-height: 190px !important; }
+            .virtual-answer-option { min-height:44px !important; }
+        }
+
+    </style>
                 </head>
                 <body>
                     <table>
@@ -13430,8 +13463,9 @@ function makeCronogramaFilterFormula(year, tipo) {
                 allowOutsideClick: false,
                 confirmButtonText: '<i class="fas fa-search"></i> Cargar datos',
                 confirmButtonColor: '#6b7280',
-                showCancelButton: true,
+                showCancelButton: !virtualDirectAccessMode,
                 cancelButtonText: '<i class="fas fa-times"></i> Cancelar',
+                allowEscapeKey: !virtualDirectAccessMode,
                 didOpen: () => setTimeout(() => document.getElementById('virtualCedulaInput')?.focus(), 80),
                 preConfirm: async () => {
                     const cedula = String(document.getElementById('virtualCedulaInput')?.value || '').trim();
@@ -13491,8 +13525,9 @@ function makeCronogramaFilterFormula(year, tipo) {
                 allowOutsideClick: false,
                 confirmButtonText: '<i class="fas fa-user-plus"></i> Registrar nuevo colaborador',
                 confirmButtonColor: '#6b7280',
-                showCancelButton: true,
-                cancelButtonText: '<i class="fas fa-times"></i> Cancelar'
+                showCancelButton: !virtualDirectAccessMode,
+                cancelButtonText: '<i class="fas fa-times"></i> Cancelar',
+                allowEscapeKey: !virtualDirectAccessMode
             });
 
             if (!notFound.isConfirmed) return null;
@@ -13536,8 +13571,9 @@ function makeCronogramaFilterFormula(year, tipo) {
                 allowOutsideClick: false,
                 confirmButtonText: '<i class="fas fa-check"></i> Registrar y continuar',
                 confirmButtonColor: '#16a34a',
-                showCancelButton: true,
+                showCancelButton: !virtualDirectAccessMode,
                 cancelButtonText: '<i class="fas fa-times"></i> Cancelar',
+                allowEscapeKey: !virtualDirectAccessMode,
                 didOpen: () => setTimeout(() => document.getElementById('regNombre')?.focus(), 80),
                 preConfirm: () => {
                     const data = {
@@ -13710,6 +13746,8 @@ function makeCronogramaFilterFormula(year, tipo) {
                     const finalUrl = normalizeVirtualVideoUrl(videoUrl);
                     video.style.display = 'block';
                     video.controls = true;
+                    video.setAttribute('controlsList', 'nofullscreen nodownload noremoteplayback');
+                    video.disablePictureInPicture = true;
                     video.setAttribute('playsinline', '');
                     video.setAttribute('webkit-playsinline', '');
                     video.preload = 'metadata';
@@ -14102,6 +14140,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                 text: 'Buscando el código de acceso...',
                 allowOutsideClick: false,
                 allowEscapeKey: false,
+                showConfirmButton: false,
                 didOpen: () => Swal.showLoading()
             });
             try {
@@ -14124,14 +14163,30 @@ function makeCronogramaFilterFormula(year, tipo) {
                     return;
                 }
                 Swal.close();
-                const participant = await promptVirtualParticipantByCedula(course);
-                if (!participant) {
-                    Swal.fire({ icon: 'info', title: 'Ingreso cancelado', text: 'Para visualizar el curso debes registrar o cargar tus datos.', allowOutsideClick: false, allowEscapeKey: false });
-                    return;
+
+                // En acceso directo por celular no se permite caer al panel del campus.
+                // Si el usuario no completa el registro, se muestra un botón para intentar nuevamente.
+                let participant = null;
+                while (!participant) {
+                    participant = await promptVirtualParticipantByCedula(course);
+                    if (!participant) {
+                        const retry = await Swal.fire({
+                            icon: 'info',
+                            title: 'Registro requerido',
+                            text: 'Para visualizar el curso debes registrar o cargar tus datos. Presiona continuar para intentar nuevamente.',
+                            allowOutsideClick: false,
+                            allowEscapeKey: false,
+                            showCancelButton: false,
+                            confirmButtonText: 'Continuar registro',
+                            confirmButtonColor: '#16a34a'
+                        });
+                        if (!retry.isConfirmed) continue;
+                    }
                 }
                 launchVirtualCoursePlayer(course, participant);
             } catch (err) {
-                Swal.fire({ icon: 'error', title: 'No se pudo abrir el curso', text: err.message || 'Revisa la conexión con Airtable.', allowOutsideClick: false, allowEscapeKey: false });
+                Swal.fire({ icon: 'error', title: 'No se pudo abrir el curso', text: err.message || 'Revisa la conexión con Airtable.', allowOutsideClick: false, allowEscapeKey: false, confirmButtonText: 'Reintentar' })
+                    .then(() => setTimeout(openVirtualCourseFromURLCode, 250));
             }
         }
 
