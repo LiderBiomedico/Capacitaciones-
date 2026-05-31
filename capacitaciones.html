@@ -12776,7 +12776,12 @@ function makeCronogramaFilterFormula(year, tipo) {
                 Swal.fire({
                     icon: 'success',
                     title: 'Curso virtual creado',
-                    html: `El curso quedó guardado en Airtable.<br><br>Código de acceso: <strong style="font-size:1.3rem; letter-spacing:2px;">${escapeHtml(savedCourse.accessCode || '')}</strong><br><span style="color:#64748b;">Genera el código QR desde el listado para compartirlo.</span>`
+                    html: `El curso quedó guardado en Airtable.<br><br>Código de acceso: <strong style="font-size:1.3rem; letter-spacing:2px;">${escapeHtml(savedCourse.accessCode || '')}</strong>`,
+                    timer: 1800,
+                    showConfirmButton: false
+                }).then(() => {
+                    // Abrir automáticamente el generador de QR (como en las otras capacitaciones)
+                    showVirtualCourseQR(savedCourse.id);
                 });
             } catch (err) {
                 Swal.fire({
@@ -12883,19 +12888,31 @@ function makeCronogramaFilterFormula(year, tipo) {
             const accessUrl = `${window.location.origin}${window.location.pathname}?vc=${encodeURIComponent(code)}`;
 
             Swal.fire({
-                title: `<i class="fas fa-qrcode" style="color:#0f766e;"></i> ${escapeHtml(course.title)}`,
+                title: `<i class="fas fa-qrcode" style="color:#0f766e;"></i> Código QR del curso virtual`,
                 html: `
-                    <p style="color:#475569; margin:0 0 1rem 0;">Comparte este código QR. Al escanearlo, el participante ingresa su <strong>número de cédula</strong> para iniciar el curso.</p>
+                    <p style="color:#475569; margin:0 0 0.75rem 0;"><strong>${escapeHtml(course.title)}</strong></p>
+                    <p style="color:#64748b; margin:0 0 1rem 0; font-size:0.9rem;">Captura este código QR o comparte el enlace con tu personal.</p>
                     <div id="virtualQrBox" style="display:flex; justify-content:center; padding:1rem; background:#fff; border-radius:12px; border:1px solid #e5e7eb;"></div>
-                    <p style="margin:1rem 0 0.25rem 0;">Código de acceso:</p>
-                    <p style="font-size:1.6rem; font-weight:800; letter-spacing:3px; color:#0f766e; margin:0;">${escapeHtml(code)}</p>
-                    <p style="margin:0.75rem 0 0 0; font-size:0.8rem; color:#94a3b8; word-break:break-all;">${escapeHtml(accessUrl)}</p>
+                    <p style="margin:1rem 0 0.25rem 0; font-weight:700;"><i class="fas fa-key" style="color:#0f766e;"></i> Código de acceso</p>
+                    <p style="font-size:1.6rem; font-weight:800; letter-spacing:3px; color:#0f766e; margin:0 0 0.75rem 0;">${escapeHtml(code)}</p>
+                    <p style="margin:0 0 0.35rem 0; font-weight:700;"><i class="fas fa-link" style="color:#0f766e;"></i> Enlace de acceso</p>
+                    <input type="text" readonly value="${escapeHtml(accessUrl)}" onclick="this.select()" style="width:100%; padding:0.6rem; border:1px solid #cbd5e1; border-radius:8px; font-size:0.82rem; color:#334155; text-align:center;">
+                    <div style="text-align:left; background:#ecfeff; border:1px solid #a5f3fc; border-radius:10px; padding:0.85rem 1rem; margin-top:1rem; font-size:0.88rem; color:#155e75;">
+                        <strong><i class="fas fa-info-circle"></i> Instrucciones</strong>
+                        <ol style="margin:0.5rem 0 0 1rem; padding:0;">
+                            <li>Imprime este código QR o compártelo.</li>
+                            <li>Colócalo en el hospital (carteles, pasillos) o envíalo por WhatsApp/Email.</li>
+                            <li>Al escanearlo, el colaborador ingresa su <strong>número de cédula</strong>.</li>
+                            <li>Si no está registrado, podrá registrarse en Personal HSLV.</li>
+                            <li>Sus respuestas quedan guardadas automáticamente en Airtable.</li>
+                        </ol>
+                    </div>
                 `,
-                width: 460,
+                width: 480,
                 showCancelButton: true,
                 confirmButtonText: '<i class="fas fa-download"></i> Descargar QR',
                 cancelButtonText: 'Cerrar',
-                confirmButtonColor: '#0f766e',
+                confirmButtonColor: '#16a34a',
                 didOpen: () => {
                     const box = document.getElementById('virtualQrBox');
                     if (box) {
@@ -13161,13 +13178,16 @@ function makeCronogramaFilterFormula(year, tipo) {
                 virtualPlayerMode = 'youtube';
                 if (video) { try { video.pause(); } catch(e){} video.removeAttribute('src'); video.style.display = 'none'; }
                 if (ytContainer) ytContainer.style.display = 'block';
-                if (summary) summary.innerHTML = `Reproduciendo desde YouTube.<br>Checkpoints configurados: <strong>${module.checkpoints?.length || 0}</strong>`;
-                if (virtualYTApiReady && window.YT && window.YT.Player) {
-                    createVirtualYouTubePlayer(youtubeId, module);
-                } else {
-                    // La API aún no carga: queda pendiente y se crea en onYouTubeIframeAPIReady
-                    virtualPendingYT = { videoId: youtubeId, module };
-                }
+                if (summary) summary.innerHTML = `Cargando reproductor de YouTube...<br>Checkpoints configurados: <strong>${module.checkpoints?.length || 0}</strong>`;
+                // Espera de forma robusta a que la API de YouTube esté lista (sin depender del callback global)
+                ensureVirtualYTReady(() => {
+                    // Verifica que el usuario siga en el mismo módulo de YouTube antes de crear el reproductor
+                    const cur = currentVirtualCourse && currentVirtualCourse.modules[currentVirtualModuleIndex];
+                    if (virtualPlayerMode === 'youtube' && cur && parseYouTubeId(cur.videoUrl) === youtubeId) {
+                        if (summary) summary.innerHTML = `Reproduciendo desde YouTube.<br>Checkpoints configurados: <strong>${cur.checkpoints?.length || 0}</strong>`;
+                        createVirtualYouTubePlayer(youtubeId, cur);
+                    }
+                });
             } else {
                 // ----- Archivo de video directo (mp4, webm, etc.) -----
                 virtualPlayerMode = 'file';
@@ -13187,6 +13207,24 @@ function makeCronogramaFilterFormula(year, tipo) {
             renderVirtualModuleList();
         }
 
+        // Espera robusta a que la API de YouTube esté lista (verifica YT.Player directamente + sondeo)
+        function ensureVirtualYTReady(cb) {
+            if (window.YT && typeof window.YT.Player === 'function') { cb(); return; }
+            let waited = 0;
+            const iv = setInterval(() => {
+                waited += 200;
+                if (window.YT && typeof window.YT.Player === 'function') {
+                    clearInterval(iv);
+                    cb();
+                } else if (waited >= 15000) {
+                    clearInterval(iv);
+                    const summary = document.getElementById('virtualCheckpointSummary');
+                    if (summary) summary.innerHTML = '<span style="color:#b45309;">No se pudo cargar el reproductor de YouTube. Verifica tu conexión a internet e intenta de nuevo.</span>';
+                    console.warn('La API de YouTube no se cargó a tiempo.');
+                }
+            }, 200);
+        }
+
         // Crea el reproductor de YouTube y arranca la vigilancia de checkpoints
         function createVirtualYouTubePlayer(videoId, module) {
             const ytContainer = document.getElementById('virtualYoutubePlayer');
@@ -13196,12 +13234,20 @@ function makeCronogramaFilterFormula(year, tipo) {
                 virtualYTPlayer = new YT.Player('virtualYTInner', {
                     videoId: videoId,
                     width: '100%',
-                    playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
+                    host: 'https://www.youtube.com',
+                    playerVars: { rel: 0, modestbranding: 1, playsinline: 1, origin: window.location.origin },
                     events: {
-                        onReady: () => { startVirtualCheckpointTimer(); },
+                        onReady: (e) => {
+                            startVirtualCheckpointTimer();
+                            try { e.target.playVideo(); } catch (err) {} // autoplay tras el gesto de "Iniciar curso"
+                        },
                         onStateChange: (e) => {
                             // 0 = ENDED
                             if (e.data === YT.PlayerState.ENDED) handleVirtualVideoEnded();
+                        },
+                        onError: () => {
+                            const summary = document.getElementById('virtualCheckpointSummary');
+                            if (summary) summary.innerHTML = '<span style="color:#b45309;">Este video no permite reproducirse fuera de YouTube (restricción del propietario) o no está disponible. Usa un video público que permita inserción.</span>';
                         }
                     }
                 });
