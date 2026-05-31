@@ -767,6 +767,7 @@
             box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12);
         }
         .virtual-answer-option input { margin-top: 0.25rem; }
+        .virtual-answer-option span { display:block; color:#111827 !important; font-weight:600; line-height:1.35; }
         .virtual-question-actions {
             display: flex;
             gap: 0.75rem;
@@ -13887,59 +13888,156 @@ function makeCronogramaFilterFormula(year, tipo) {
         // Normaliza preguntas y opciones de checkpoints creados en versiones anteriores o importados desde Airtable.
         function normalizeVirtualCheckpointData(checkpoint = {}) {
             const cp = checkpoint || {};
+
+            // Convierte cualquier valor recibido desde Airtable/JSON a texto limpio.
+            // Airtable puede devolver textos, arreglos, objetos o JSON serializado según cómo se haya guardado el checkpoint.
+            const cleanText = (value) => {
+                if (value === null || value === undefined) return '';
+                if (typeof value === 'string') return value.replace(/\s+/g, ' ').trim();
+                if (typeof value === 'number' || typeof value === 'boolean') return String(value).trim();
+                if (Array.isArray(value)) {
+                    return value.map(cleanText).filter(Boolean).join(' ').trim();
+                }
+                if (typeof value === 'object') {
+                    const preferred = value.text ?? value.Text ?? value.value ?? value.Value ?? value.label ?? value.Label ?? value.nombre ?? value.Nombre ?? value.opcion ?? value.Opcion ?? value.opción ?? value['Opción'] ?? value.respuesta ?? value.Respuesta ?? value.answer ?? value.Answer ?? value.title ?? value.Title;
+                    if (preferred !== undefined) return cleanText(preferred);
+                    return '';
+                }
+                return String(value).trim();
+            };
+
             const firstText = (...values) => {
                 for (const v of values) {
-                    if (v === null || v === undefined) continue;
-                    const text = String(v).trim();
+                    const text = cleanText(v);
                     if (text) return text;
                 }
                 return '';
             };
+
+            const tryParse = (value) => {
+                if (typeof value !== 'string') return value;
+                const t = value.trim();
+                if (!t) return value;
+                if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                    try { return JSON.parse(t); } catch (e) { return value; }
+                }
+                return value;
+            };
+
             const question = firstText(
-                cp.question, cp.pregunta, cp.Pregunta, cp['Pregunta'], cp['Texto Pregunta'], cp['Texto de pregunta'], cp.text, cp.title
+                cp.question, cp.pregunta, cp.Pregunta, cp['Pregunta'], cp['Texto Pregunta'], cp['Texto de pregunta'], cp.text, cp.title, cp.enunciado, cp.Enunciado
             ) || 'Pregunta sin texto';
-            const correct = firstText(
-                cp.correct, cp.correcta, cp.respuestaCorrecta, cp['Respuesta Correcta'], cp['Respuesta correcta'], cp['Correct Answer'], cp.answer, cp.correctAnswer
+
+            let correct = firstText(
+                cp.correct, cp.correcta, cp.respuestaCorrecta, cp['Respuesta Correcta'], cp['Respuesta correcta'], cp['Correct Answer'], cp.answer, cp.correctAnswer, cp.correct_option, cp.opcionCorrecta, cp['Opción Correcta']
             ).toUpperCase();
+            const correctMatch = correct.match(/[A-D]/);
+            correct = correctMatch ? correctMatch[0] : correct;
 
             const optionsMap = {};
-            const addOption = (letter, value) => {
-                const key = String(letter || '').trim().toUpperCase().replace(/[^A-D]/g, '').charAt(0);
-                const text = firstText(value);
+            const normalizeLetter = (rawKey, fallbackIndex = null) => {
+                const k = String(rawKey ?? '').trim().toUpperCase()
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                const explicit = k.match(/(?:^|\b)(?:OPCION|OPCIÓN|RESPUESTA|ALTERNATIVA|OPTION|ANSWER)?\s*([A-D])(?:\b|$|\)|\.|:|-)/);
+                if (explicit) return explicit[1];
+                const endLetter = k.match(/([A-D])$/);
+                if (endLetter && /^(A|B|C|D|OPTION|OPCION|RESPUESTA|ALTERNATIVA|ANSWER)/.test(k)) return endLetter[1];
+                const n = k.match(/(?:^|\b)([1-4])(?:\b|$|\)|\.|:|-)/);
+                if (n) return String.fromCharCode(64 + Number(n[1]));
+                if (typeof fallbackIndex === 'number' && fallbackIndex >= 0 && fallbackIndex < 4) return String.fromCharCode(65 + fallbackIndex);
+                return '';
+            };
+
+            const addOption = (letter, value, fallbackIndex = null) => {
+                const key = normalizeLetter(letter, fallbackIndex);
+                const text = cleanText(value);
                 if (key && text && !optionsMap[key]) optionsMap[key] = text;
             };
+
+            const splitOptionString = (text) => {
+                const t = cleanText(text);
+                if (!t) return false;
+                let found = false;
+                // Formatos soportados: "A) texto B) texto", "A: texto\nB: texto", "1. texto | 2. texto".
+                const re = /(?:^|[\n\r;|])\s*([A-Da-d1-4])\s*[\)\].:\-]\s*([\s\S]*?)(?=(?:[\n\r;|]\s*[A-Da-d1-4]\s*[\)\].:\-])|$)/g;
+                let m;
+                while ((m = re.exec(t)) !== null) {
+                    addOption(m[1], m[2]);
+                    found = true;
+                }
+                if (!found) {
+                    const parts = t.split(/\s*(?:\||;|\n|\r)\s*/).map(x => x.trim()).filter(Boolean);
+                    if (parts.length >= 2 && parts.length <= 4) {
+                        parts.forEach((part, idx) => addOption(String.fromCharCode(65 + idx), part));
+                        found = true;
+                    }
+                }
+                return found;
+            };
+
             const addObjectOptions = (obj) => {
-                if (!obj || typeof obj !== 'object') return;
+                obj = tryParse(obj);
+                if (!obj) return;
+                if (typeof obj === 'string') {
+                    splitOptionString(obj);
+                    return;
+                }
                 if (Array.isArray(obj)) {
                     obj.forEach((item, idx) => {
-                        if (typeof item === 'string') addOption(String.fromCharCode(65 + idx), item);
-                        else if (item && typeof item === 'object') addOption(item.key || item.letra || item.label || String.fromCharCode(65 + idx), item.value || item.text || item.opcion || item.respuesta || item.answer || item.nombre);
+                        if (typeof item === 'string') {
+                            const parsed = tryParse(item);
+                            if (parsed !== item) addObjectOptions(parsed);
+                            else addOption(String.fromCharCode(65 + idx), item);
+                        } else if (item && typeof item === 'object') {
+                            const letter = item.key ?? item.letra ?? item.letter ?? item.label ?? item.opcion ?? item.option ?? item.id ?? String.fromCharCode(65 + idx);
+                            const text = item.value ?? item.text ?? item.Text ?? item.nombre ?? item.Nombre ?? item.titulo ?? item.Titulo ?? item.respuesta ?? item.answer ?? item.Answer ?? item.opcionTexto ?? item['Texto opción'] ?? item['Texto Opción'];
+                            addOption(letter, text, idx);
+                        }
                     });
                     return;
                 }
-                Object.entries(obj).forEach(([rawKey, rawValue]) => {
-                    let key = String(rawKey || '').trim().toUpperCase();
-                    if (['OPCIÓN A','OPCION A','RESPUESTA A','ALTERNATIVA A','OPTION A','A'].includes(key)) key = 'A';
-                    else if (['OPCIÓN B','OPCION B','RESPUESTA B','ALTERNATIVA B','OPTION B','B'].includes(key)) key = 'B';
-                    else if (['OPCIÓN C','OPCION C','RESPUESTA C','ALTERNATIVA C','OPTION C','C'].includes(key)) key = 'C';
-                    else if (['OPCIÓN D','OPCION D','RESPUESTA D','ALTERNATIVA D','OPTION D','D'].includes(key)) key = 'D';
-                    else key = key.replace(/[^A-D]/g, '').charAt(0);
-                    addOption(key, rawValue);
-                });
+                if (typeof obj === 'object') {
+                    Object.entries(obj).forEach(([rawKey, rawValue], idx) => {
+                        const parsedValue = tryParse(rawValue);
+                        if (parsedValue && typeof parsedValue === 'object' && !Array.isArray(parsedValue)) {
+                            const nestedText = parsedValue.text ?? parsedValue.Text ?? parsedValue.value ?? parsedValue.Value ?? parsedValue.nombre ?? parsedValue.Nombre ?? parsedValue.respuesta ?? parsedValue.answer ?? parsedValue.opcion;
+                            addOption(rawKey, nestedText, idx);
+                        } else {
+                            addOption(rawKey, parsedValue, idx);
+                        }
+                    });
+                }
             };
 
+            // Formatos agrupados usados en distintas versiones.
             addObjectOptions(cp.options);
             addObjectOptions(cp.opciones);
+            addObjectOptions(cp.Opciones);
             addObjectOptions(cp.answers);
             addObjectOptions(cp.respuestas);
+            addObjectOptions(cp.Respuestas);
             addObjectOptions(cp.alternativas);
+            addObjectOptions(cp.Alternativas);
+            addObjectOptions(cp.choices);
+            addObjectOptions(cp.Choices);
 
-            addOption('A', firstText(cp.a, cp.A, cp.optionA, cp.OptionA, cp['Option A'], cp['Opción A'], cp['Opcion A'], cp['Respuesta A'], cp['Alternativa A'], cp.opcionA, cp.respuestaA, cp.respuesta1, cp['Respuesta 1']));
-            addOption('B', firstText(cp.b, cp.B, cp.optionB, cp.OptionB, cp['Option B'], cp['Opción B'], cp['Opcion B'], cp['Respuesta B'], cp['Alternativa B'], cp.opcionB, cp.respuestaB, cp.respuesta2, cp['Respuesta 2']));
-            addOption('C', firstText(cp.c, cp.C, cp.optionC, cp.OptionC, cp['Option C'], cp['Opción C'], cp['Opcion C'], cp['Respuesta C'], cp['Alternativa C'], cp.opcionC, cp.respuestaC, cp.respuesta3, cp['Respuesta 3']));
-            addOption('D', firstText(cp.d, cp.D, cp.optionD, cp.OptionD, cp['Option D'], cp['Opción D'], cp['Opcion D'], cp['Respuesta D'], cp['Alternativa D'], cp.opcionD, cp.respuestaD, cp.respuesta4, cp['Respuesta 4']));
+            // Campos individuales usados en Airtable o versiones anteriores.
+            addOption('A', firstText(cp.a, cp.A, cp.optionA, cp.OptionA, cp.option_a, cp['Option A'], cp['Opción A'], cp['Opcion A'], cp['opción a'], cp['opcion a'], cp['Respuesta A'], cp['Alternativa A'], cp.opcionA, cp.respuestaA, cp.respuesta1, cp['Respuesta 1'], cp['Opción 1'], cp['Opcion 1']));
+            addOption('B', firstText(cp.b, cp.B, cp.optionB, cp.OptionB, cp.option_b, cp['Option B'], cp['Opción B'], cp['Opcion B'], cp['opción b'], cp['opcion b'], cp['Respuesta B'], cp['Alternativa B'], cp.opcionB, cp.respuestaB, cp.respuesta2, cp['Respuesta 2'], cp['Opción 2'], cp['Opcion 2']));
+            addOption('C', firstText(cp.c, cp.C, cp.optionC, cp.OptionC, cp.option_c, cp['Option C'], cp['Opción C'], cp['Opcion C'], cp['opción c'], cp['opcion c'], cp['Respuesta C'], cp['Alternativa C'], cp.opcionC, cp.respuestaC, cp.respuesta3, cp['Respuesta 3'], cp['Opción 3'], cp['Opcion 3']));
+            addOption('D', firstText(cp.d, cp.D, cp.optionD, cp.OptionD, cp.option_d, cp['Option D'], cp['Opción D'], cp['Opcion D'], cp['opción d'], cp['opcion d'], cp['Respuesta D'], cp['Alternativa D'], cp.opcionD, cp.respuestaD, cp.respuesta4, cp['Respuesta 4'], cp['Opción 4'], cp['Opcion 4']));
+
+            // Búsqueda final sobre todas las llaves del checkpoint para campos tipo opcion_a, pregunta_opcion_b, etc.
+            Object.entries(cp).forEach(([k, v]) => {
+                const key = String(k || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+                const m = key.match(/(?:opcion|option|respuesta|answer|alternativa)[_\s-]*([a-d1-4])$/);
+                if (m) addOption(m[1], v);
+            });
 
             const options = ['A','B','C','D'].filter(k => optionsMap[k]).map(k => [k, optionsMap[k]]);
+            if (!options.length) {
+                console.warn('Checkpoint sin opciones visibles. Datos recibidos:', checkpoint);
+            }
             return { question, correct, options };
         }
 
