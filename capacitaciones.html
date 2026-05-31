@@ -23,6 +23,9 @@
     
     <!-- QRCode.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <!-- YouTube IFrame Player API (para reproducir videos de YouTube en cursos virtuales) -->
+    <script src="https://www.youtube.com/iframe_api"></script>
     
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -2805,7 +2808,9 @@
                         <div class="card" style="background:#0f172a; color:#fff; box-shadow:none;">
                             <div id="virtualVideoWrapper" style="background:#000; border-radius:14px; overflow:hidden; min-height:360px; display:flex; align-items:center; justify-content:center;">
                                 <video id="virtualCourseVideo" controls style="width:100%; max-height:70vh; background:#000;"></video>
+                                <div id="virtualYoutubePlayer" style="display:none; width:100%; aspect-ratio:16/9;"></div>
                             </div>
+                            <style>#virtualYoutubePlayer iframe, #virtualYoutubePlayer > div { width:100% !important; height:100% !important; border:0; }</style>
                             <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-top:0.85rem;">
                                 <div id="virtualModuleInfo" style="font-weight:700;">Módulo 1</div>
                                 <div style="display:flex; gap:0.5rem;">
@@ -12315,6 +12320,45 @@ function makeCronogramaFilterFormula(year, tipo) {
         let currentVirtualParticipant = null;
         let currentVirtualResults = [];
 
+        // ===== Estado del reproductor de YouTube para cursos virtuales =====
+        let virtualYTPlayer = null;          // instancia del reproductor de YouTube
+        let virtualYTApiReady = false;       // ¿ya cargó la API de YouTube?
+        let virtualPendingYT = null;         // { videoId, module } en espera de que cargue la API
+        let virtualCheckpointTimer = null;   // intervalo que revisa los checkpoints en YouTube
+        let virtualPlayerMode = 'file';      // 'file' (video mp4) | 'youtube'
+
+        // La API de YouTube llama a esta función global cuando termina de cargar
+        window.onYouTubeIframeAPIReady = function() {
+            virtualYTApiReady = true;
+            if (virtualPendingYT) {
+                const pending = virtualPendingYT;
+                virtualPendingYT = null;
+                createVirtualYouTubePlayer(pending.videoId, pending.module);
+            }
+        };
+
+        // Extrae el ID del video desde cualquier formato de URL de YouTube
+        function parseYouTubeId(url) {
+            const u = String(url || '').trim();
+            if (!u) return null;
+            const patterns = [
+                /(?:youtube\.com\/watch\?(?:.*&)?v=)([A-Za-z0-9_-]{11})/,
+                /(?:youtu\.be\/)([A-Za-z0-9_-]{11})/,
+                /(?:youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/,
+                /(?:youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,
+                /(?:youtube\.com\/live\/)([A-Za-z0-9_-]{11})/
+            ];
+            for (const p of patterns) {
+                const m = u.match(p);
+                if (m && m[1]) return m[1];
+            }
+            return null;
+        }
+
+        function isYouTubeUrl(url) {
+            return !!parseYouTubeId(url);
+        }
+
 
         function escapeAttr(value) {
             return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -12999,19 +13043,131 @@ function makeCronogramaFilterFormula(year, tipo) {
             if (!module) return;
             currentVirtualModuleIndex = index;
             currentVirtualCheckpointKey = null;
+
             const video = document.getElementById('virtualCourseVideo');
+            const ytContainer = document.getElementById('virtualYoutubePlayer');
             const info = document.getElementById('virtualModuleInfo');
             const summary = document.getElementById('virtualCheckpointSummary');
-            if (video) {
-                video.pause();
-                video.src = module.videoUrl;
-                video.load();
-                video.onloadedmetadata = () => {
-                    summary.innerHTML = `Duración detectada: <strong>${Math.round(video.duration || 0)} s</strong><br>Checkpoints configurados: <strong>${module.checkpoints?.length || 0}</strong>`;
-                };
+
+            stopVirtualCheckpointTimer();
+            destroyVirtualYTPlayer();
+
+            const youtubeId = parseYouTubeId(module.videoUrl);
+
+            if (youtubeId) {
+                // ----- Video de YouTube -----
+                virtualPlayerMode = 'youtube';
+                if (video) { try { video.pause(); } catch(e){} video.removeAttribute('src'); video.style.display = 'none'; }
+                if (ytContainer) ytContainer.style.display = 'block';
+                if (summary) summary.innerHTML = `Reproduciendo desde YouTube.<br>Checkpoints configurados: <strong>${module.checkpoints?.length || 0}</strong>`;
+                if (virtualYTApiReady && window.YT && window.YT.Player) {
+                    createVirtualYouTubePlayer(youtubeId, module);
+                } else {
+                    // La API aún no carga: queda pendiente y se crea en onYouTubeIframeAPIReady
+                    virtualPendingYT = { videoId: youtubeId, module };
+                }
+            } else {
+                // ----- Archivo de video directo (mp4, webm, etc.) -----
+                virtualPlayerMode = 'file';
+                if (ytContainer) ytContainer.style.display = 'none';
+                if (video) {
+                    video.style.display = 'block';
+                    video.pause();
+                    video.src = module.videoUrl;
+                    video.load();
+                    video.onloadedmetadata = () => {
+                        if (summary) summary.innerHTML = `Duración detectada: <strong>${Math.round(video.duration || 0)} s</strong><br>Checkpoints configurados: <strong>${module.checkpoints?.length || 0}</strong>`;
+                    };
+                }
             }
+
             if (info) info.textContent = `${module.title} • ${module.checkpoints?.length || 0} checkpoint(s)`;
             renderVirtualModuleList();
+        }
+
+        // Crea el reproductor de YouTube y arranca la vigilancia de checkpoints
+        function createVirtualYouTubePlayer(videoId, module) {
+            const ytContainer = document.getElementById('virtualYoutubePlayer');
+            if (!ytContainer) return;
+            ytContainer.innerHTML = '<div id="virtualYTInner"></div>';
+            try {
+                virtualYTPlayer = new YT.Player('virtualYTInner', {
+                    videoId: videoId,
+                    width: '100%',
+                    playerVars: { rel: 0, modestbranding: 1, playsinline: 1 },
+                    events: {
+                        onReady: () => { startVirtualCheckpointTimer(); },
+                        onStateChange: (e) => {
+                            // 0 = ENDED
+                            if (e.data === YT.PlayerState.ENDED) handleVirtualVideoEnded();
+                        }
+                    }
+                });
+            } catch (err) {
+                console.warn('No se pudo crear el reproductor de YouTube:', err);
+            }
+        }
+
+        function destroyVirtualYTPlayer() {
+            if (virtualYTPlayer && typeof virtualYTPlayer.destroy === 'function') {
+                try { virtualYTPlayer.destroy(); } catch (e) {}
+            }
+            virtualYTPlayer = null;
+            virtualPendingYT = null;
+            const inner = document.getElementById('virtualYoutubePlayer');
+            if (inner) inner.innerHTML = '';
+        }
+
+        // Vigila el tiempo del video de YouTube para disparar los checkpoints (la API no tiene timeupdate)
+        function startVirtualCheckpointTimer() {
+            stopVirtualCheckpointTimer();
+            virtualCheckpointTimer = setInterval(() => {
+                if (virtualPlayerMode !== 'youtube' || !virtualYTPlayer || typeof virtualYTPlayer.getCurrentTime !== 'function') return;
+                if (!currentVirtualCourse || currentVirtualCheckpointKey) return;
+                const module = currentVirtualCourse.modules[currentVirtualModuleIndex];
+                if (!module || !Array.isArray(module.checkpoints)) return;
+                const now = virtualYTPlayer.getCurrentTime() || 0;
+                const pending = module.checkpoints.find(cp => !answeredVirtualCheckpoints.has(`${currentVirtualModuleIndex}-${cp.id}`) && now >= Number(cp.time || 0));
+                if (pending) {
+                    pauseVirtualVideo();
+                    askVirtualCheckpointQuestion(currentVirtualModuleIndex, pending);
+                }
+            }, 500);
+        }
+
+        function stopVirtualCheckpointTimer() {
+            if (virtualCheckpointTimer) { clearInterval(virtualCheckpointTimer); virtualCheckpointTimer = null; }
+        }
+
+        // Pausa/Reanuda el video activo, sea YouTube o archivo
+        function pauseVirtualVideo() {
+            if (virtualPlayerMode === 'youtube') {
+                if (virtualYTPlayer && typeof virtualYTPlayer.pauseVideo === 'function') { try { virtualYTPlayer.pauseVideo(); } catch(e){} }
+            } else {
+                const video = document.getElementById('virtualCourseVideo');
+                if (video) { try { video.pause(); } catch(e){} }
+            }
+        }
+
+        function resumeVirtualVideo() {
+            if (virtualPlayerMode === 'youtube') {
+                if (virtualYTPlayer && typeof virtualYTPlayer.playVideo === 'function') { try { virtualYTPlayer.playVideo(); } catch(e){} }
+            } else {
+                const video = document.getElementById('virtualCourseVideo');
+                if (video) video.play().catch(() => {});
+            }
+        }
+
+        // Avanza al siguiente módulo cuando termina el video (compartido entre YouTube y archivo)
+        function handleVirtualVideoEnded() {
+            if (!currentVirtualCourse) return;
+            if (currentVirtualModuleIndex < currentVirtualCourse.modules.length - 1) {
+                Swal.fire({ icon: 'info', title: 'Módulo completado', text: 'Se cargará el siguiente módulo.' }).then(() => {
+                    loadVirtualModule(currentVirtualModuleIndex + 1);
+                });
+            } else {
+                Swal.fire({ icon: 'success', title: 'Curso completado', text: 'Has finalizado todos los módulos del curso virtual.' });
+            }
         }
 
         function playPreviousVirtualModule() {
@@ -13079,8 +13235,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                 showConfirmButton: false
             });
             currentVirtualCheckpointKey = null;
-            const video = document.getElementById('virtualCourseVideo');
-            if (video) video.play().catch(() => {});
+            resumeVirtualVideo();
         }
 
         function formatSeconds(totalSeconds) {
@@ -13091,12 +13246,18 @@ function makeCronogramaFilterFormula(year, tipo) {
         }
 
         async function closeVirtualCoursePlayer() {
+            stopVirtualCheckpointTimer();
+            destroyVirtualYTPlayer();
+            virtualPlayerMode = 'file';
             const video = document.getElementById('virtualCourseVideo');
             if (video) {
                 video.pause();
                 video.removeAttribute('src');
                 video.load();
+                video.style.display = 'block';
             }
+            const ytContainer = document.getElementById('virtualYoutubePlayer');
+            if (ytContainer) ytContainer.style.display = 'none';
             document.getElementById('virtualCoursePlayerModal').style.display = 'none';
             try {
                 if (currentVirtualCourse && currentVirtualParticipant) {
@@ -13118,6 +13279,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             if (video && !video.dataset.virtualBound) {
                 video.dataset.virtualBound = '1';
                 video.addEventListener('timeupdate', function() {
+                    if (virtualPlayerMode !== 'file') return;
                     if (!currentVirtualCourse || currentVirtualCheckpointKey) return;
                     const module = currentVirtualCourse.modules[currentVirtualModuleIndex];
                     if (!module || !Array.isArray(module.checkpoints)) return;
@@ -13129,14 +13291,8 @@ function makeCronogramaFilterFormula(year, tipo) {
                     }
                 });
                 video.addEventListener('ended', function() {
-                    if (!currentVirtualCourse) return;
-                    if (currentVirtualModuleIndex < currentVirtualCourse.modules.length - 1) {
-                        Swal.fire({ icon: 'info', title: 'Módulo completado', text: 'Se cargará el siguiente módulo.' }).then(() => {
-                            loadVirtualModule(currentVirtualModuleIndex + 1);
-                        });
-                    } else {
-                        Swal.fire({ icon: 'success', title: 'Curso finalizado', text: 'Has terminado todos los módulos del curso virtual.' });
-                    }
+                    if (virtualPlayerMode !== 'file') return;
+                    handleVirtualVideoEnded();
                 });
             }
         });
