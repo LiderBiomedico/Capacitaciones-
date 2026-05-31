@@ -13768,7 +13768,9 @@ function makeCronogramaFilterFormula(year, tipo) {
                 }
             }
 
-            if (info) info.textContent = `${module.title || ('Módulo ' + (index + 1))} • ${module.checkpoints?.length || 0} checkpoint(s)`;
+            // En la parte inferior del reproductor no se muestra el nombre de la pregunta ni el conteo de checkpoints.
+            // Esto evita duplicar información y deja la vista móvil más limpia para el estudiante.
+            if (info) info.textContent = `Módulo ${index + 1}`;
             renderVirtualModuleList();
         }
 
