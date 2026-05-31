@@ -12269,7 +12269,8 @@ function makeCronogramaFilterFormula(year, tipo) {
         console.log('📊 Módulo de Reportes cargado correctamente');
 
         // ==================== CURSOS VIRTUALES (AIRTABLE) ====================
-        const VIRTUAL_COURSES_TABLE = 'Cursos Virtuales';
+        const VIRTUAL_COURSES_TABLE = 'tblB5wUrCAPdsXqng'; // ID de la tabla "Cursos Virtuales" (usar ID evita el fallo por el espacio en el nombre)
+        const VIRTUAL_COURSES_TABLE_NAME = 'Cursos Virtuales'; // Solo para mostrar en mensajes
         const VIRTUAL_COURSE_FIELD_TITLE = 'Nombre';
         const VIRTUAL_COURSE_FIELD_DESCRIPTION = 'Descripción';
         const VIRTUAL_COURSE_FIELD_INSTRUCTOR = 'Responsable';
@@ -12278,7 +12279,7 @@ function makeCronogramaFilterFormula(year, tipo) {
         const VIRTUAL_COURSE_FIELD_STATUS = 'Estado';
         const VIRTUAL_COURSE_FIELD_CREATED = 'Fecha Creación';
 
-        const VIRTUAL_RESPONSES_TABLE = 'Respuestas Cursos Virtuales';
+        const VIRTUAL_RESPONSES_TABLE = 'tblKXvyqPQuZieEq7'; // ID de la tabla "Respuestas Cursos Virtuales"
         const VIRTUAL_RESP_FIELD_PARTICIPANT = 'Participante';
         const VIRTUAL_RESP_FIELD_CEDULA = 'Cédula';
         const VIRTUAL_RESP_FIELD_COURSE = 'Curso Virtual';
@@ -12499,7 +12500,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                     Swal.fire({
                         icon: 'warning',
                         title: 'No se pudieron cargar cursos virtuales',
-                        html: `Verifica que exista la tabla <strong>${VIRTUAL_COURSES_TABLE}</strong> en Airtable con el campo <strong>${VIRTUAL_COURSE_FIELD_JSON}</strong>.<br><br>${escapeHtml(err.message || '')}`
+                        html: `Verifica que exista la tabla <strong>${VIRTUAL_COURSES_TABLE_NAME}</strong> en Airtable con el campo <strong>${VIRTUAL_COURSE_FIELD_JSON}</strong>.<br><br>${escapeHtml(err.message || '')}`
                     });
                 }
                 return virtualCourses;
@@ -12691,7 +12692,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                 Swal.fire({
                     icon: 'warning',
                     title: 'No se pudo guardar el curso virtual',
-                    html: `Revisa que en Airtable exista la tabla <strong>${VIRTUAL_COURSES_TABLE}</strong> y el campo <strong>${VIRTUAL_COURSE_FIELD_JSON}</strong>.<br><br>${escapeHtml(err.message || 'Revisa los datos del curso virtual.')}`
+                    html: `Revisa que en Airtable exista la tabla <strong>${VIRTUAL_COURSES_TABLE_NAME}</strong> y el campo <strong>${VIRTUAL_COURSE_FIELD_JSON}</strong>.<br><br>${escapeHtml(err.message || 'Revisa los datos del curso virtual.')}`
                 });
             }
         }
