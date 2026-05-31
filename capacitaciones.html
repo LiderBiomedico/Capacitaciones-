@@ -13598,6 +13598,243 @@ function makeCronogramaFilterFormula(year, tipo) {
             }
         }
 
+
+        // Flujo cuando un participante entra escaneando el QR (?vc=CODIGO)
+        async function enterVirtualCourseByCode(code) {
+            const target = String(code || '').trim().toUpperCase();
+            if (!target) return;
+            document.body.classList.add('hslv-participant-flow');
+            Swal.fire({ title: 'Cargando curso virtual...', text: 'Por favor espera', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                if (!virtualCoursesLoaded || !virtualCourses.length) {
+                    await loadVirtualCoursesFromAirtable(false);
+                }
+                const course = virtualCourses.find(c => String(c.accessCode || '').trim().toUpperCase() === target);
+                Swal.close();
+                if (!course) {
+                    await Swal.fire({ icon: 'error', title: 'Curso no encontrado', text: `No se encontró un curso virtual con el código ${target}.` });
+                    return;
+                }
+                const participant = await promptVirtualParticipantByCedula(course);
+                if (!participant) return;
+                launchVirtualCoursePlayer(course, participant);
+            } catch (err) {
+                Swal.close();
+                await Swal.fire({ icon: 'warning', title: 'No se pudo abrir el curso', text: err.message || 'Intenta nuevamente.' });
+            }
+        }
+
+        function renderVirtualModuleList() {
+            const list = document.getElementById('virtualModuleList');
+            const progress = document.getElementById('virtualPlayerProgress');
+            if (!list || !progress) return;
+            if (!currentVirtualCourse) { list.innerHTML = ''; progress.innerHTML = ''; return; }
+            list.innerHTML = currentVirtualCourse.modules.map((module, idx) => `
+                <button class="btn ${idx === currentVirtualModuleIndex ? 'btn-primary' : 'btn-light'}" style="width:100%; justify-content:flex-start; margin-bottom:0.55rem; ${idx === currentVirtualModuleIndex ? 'background:#2563eb; border-color:#2563eb;' : ''}" onclick="loadVirtualModule(${idx})">
+                    <i class="fas fa-film"></i> ${escapeHtml(module.title || ('Módulo ' + (idx + 1)))}
+                </button>`).join('');
+            progress.innerHTML = currentVirtualCourse.modules.map((module, idx) => {
+                const totalCp = module.checkpoints?.length || 0;
+                const doneCp = (module.checkpoints || []).filter(cp => answeredVirtualCheckpoints.has(`${idx}-${cp.id}`)).length;
+                return `<span style="padding:0.35rem 0.7rem; border-radius:999px; background:${idx === currentVirtualModuleIndex ? '#dbeafe' : '#f1f5f9'}; color:${idx === currentVirtualModuleIndex ? '#1d4ed8' : '#475569'}; font-size:0.82rem; font-weight:800;">M${idx+1}: ${doneCp}/${totalCp}</span>`;
+            }).join('');
+        }
+
+        function normalizeVirtualVideoUrl(url) {
+            const raw = String(url || '').trim();
+            if (!raw) return '';
+            try {
+                const u = new URL(raw, window.location.href);
+                // Google Drive: convertir enlaces compartidos a descarga directa para el <video>.
+                const driveMatch = u.href.match(/drive\.google\.com\/file\/d\/([^/]+)/i) || u.href.match(/[?&]id=([^&]+)/i);
+                if (driveMatch && driveMatch[1]) return `https://drive.google.com/uc?export=download&id=${driveMatch[1]}`;
+                // Dropbox: forzar descarga directa.
+                if (/dropbox\.com$/i.test(u.hostname) || /\.dropbox\.com$/i.test(u.hostname)) {
+                    u.searchParams.set('raw', '1');
+                    u.searchParams.delete('dl');
+                    return u.toString();
+                }
+                return u.toString();
+            } catch(e) {
+                return raw;
+            }
+        }
+
+        function showVirtualVideoError(message) {
+            const summary = document.getElementById('virtualCheckpointSummary');
+            if (summary) {
+                summary.innerHTML = `<span style="color:#b45309;"><i class="fas fa-exclamation-triangle"></i> ${escapeHtml(message || 'No se pudo cargar el video.')}</span>`;
+            }
+        }
+
+        function loadVirtualModule(index) {
+            if (!currentVirtualCourse) return;
+            const module = currentVirtualCourse.modules[index];
+            if (!module) return;
+            currentVirtualModuleIndex = index;
+            currentVirtualCheckpointKey = null;
+            const qPanel = document.getElementById('virtualInlineQuestion');
+            if (qPanel) { qPanel.classList.remove('active'); qPanel.style.display = 'none'; }
+
+            const video = document.getElementById('virtualCourseVideo');
+            const ytContainer = document.getElementById('virtualYoutubePlayer');
+            const info = document.getElementById('virtualModuleInfo');
+            const summary = document.getElementById('virtualCheckpointSummary');
+
+            stopVirtualCheckpointTimer();
+            destroyVirtualYTPlayer();
+
+            const videoUrl = String(module.videoUrl || '').trim();
+            const youtubeId = parseYouTubeId(videoUrl);
+
+            if (!videoUrl) {
+                if (video) { try { video.pause(); } catch(e){} video.removeAttribute('src'); video.style.display = 'none'; }
+                if (ytContainer) ytContainer.style.display = 'none';
+                showVirtualVideoError('Este módulo no tiene URL de video configurada. Edita el curso y agrega la URL del video.');
+            } else if (youtubeId) {
+                virtualPlayerMode = 'youtube';
+                if (video) { try { video.pause(); } catch(e){} video.removeAttribute('src'); video.style.display = 'none'; }
+                if (ytContainer) ytContainer.style.display = 'block';
+                if (summary) summary.innerHTML = `Cargando reproductor de YouTube...<br>Checkpoints configurados: <strong>${module.checkpoints?.length || 0}</strong>`;
+                ensureVirtualYTReady(() => {
+                    const cur = currentVirtualCourse && currentVirtualCourse.modules[currentVirtualModuleIndex];
+                    if (virtualPlayerMode === 'youtube' && cur && parseYouTubeId(cur.videoUrl) === youtubeId) {
+                        if (summary) summary.innerHTML = `Video cargado desde YouTube.<br>Checkpoints configurados: <strong>${cur.checkpoints?.length || 0}</strong>`;
+                        createVirtualYouTubePlayer(youtubeId, cur);
+                    }
+                });
+            } else {
+                virtualPlayerMode = 'file';
+                if (ytContainer) { ytContainer.style.display = 'none'; ytContainer.innerHTML = ''; }
+                if (video) {
+                    const finalUrl = normalizeVirtualVideoUrl(videoUrl);
+                    video.style.display = 'block';
+                    video.controls = true;
+                    video.setAttribute('playsinline', '');
+                    video.setAttribute('webkit-playsinline', '');
+                    video.preload = 'metadata';
+                    video.onloadedmetadata = () => {
+                        if (summary) summary.innerHTML = `Video cargado correctamente.<br>Duración detectada: <strong>${Math.round(video.duration || 0)} s</strong><br>Checkpoints configurados: <strong>${module.checkpoints?.length || 0}</strong>`;
+                    };
+                    video.onerror = () => {
+                        showVirtualVideoError('No se pudo reproducir el video. Verifica que la URL sea directa a un archivo MP4/WebM o usa un enlace de YouTube público. Si usas Google Drive, comparte el archivo como público.');
+                    };
+                    try { video.pause(); } catch(e) {}
+                    video.src = finalUrl;
+                    video.load();
+                    if (summary) summary.innerHTML = `Cargando video...<br>Checkpoints configurados: <strong>${module.checkpoints?.length || 0}</strong>`;
+                }
+            }
+
+            if (info) info.textContent = `${module.title || ('Módulo ' + (index + 1))} • ${module.checkpoints?.length || 0} checkpoint(s)`;
+            renderVirtualModuleList();
+        }
+
+        function ensureVirtualYTReady(cb) {
+            if (window.YT && typeof window.YT.Player === 'function') { cb(); return; }
+            if (!document.getElementById('youtube-iframe-api')) {
+                const tag = document.createElement('script');
+                tag.id = 'youtube-iframe-api';
+                tag.src = 'https://www.youtube.com/iframe_api';
+                document.head.appendChild(tag);
+            }
+            let waited = 0;
+            const iv = setInterval(() => {
+                waited += 250;
+                if (window.YT && typeof window.YT.Player === 'function') {
+                    clearInterval(iv);
+                    cb();
+                } else if (waited >= 15000) {
+                    clearInterval(iv);
+                    showVirtualVideoError('No se pudo cargar el reproductor de YouTube. Verifica la conexión e intenta nuevamente.');
+                }
+            }, 250);
+        }
+
+        function createVirtualYouTubePlayer(videoId, module) {
+            const ytContainer = document.getElementById('virtualYoutubePlayer');
+            if (!ytContainer) return;
+            ytContainer.style.display = 'block';
+            ytContainer.innerHTML = '<div id="virtualYTInner"></div>';
+            try {
+                virtualYTPlayer = new YT.Player('virtualYTInner', {
+                    videoId: videoId,
+                    width: '100%',
+                    height: '100%',
+                    host: 'https://www.youtube.com',
+                    playerVars: { rel: 0, modestbranding: 1, playsinline: 1, origin: window.location.origin },
+                    events: {
+                        onReady: () => { startVirtualCheckpointTimer(); },
+                        onStateChange: (e) => { if (e.data === YT.PlayerState.ENDED) handleVirtualVideoEnded(); },
+                        onError: () => showVirtualVideoError('Este video no permite reproducción insertada o no está disponible. Usa un video público que permita inserción.')
+                    }
+                });
+            } catch (err) {
+                showVirtualVideoError('No se pudo crear el reproductor de YouTube.');
+                console.warn('No se pudo crear el reproductor de YouTube:', err);
+            }
+        }
+
+        function destroyVirtualYTPlayer() {
+            if (virtualYTPlayer && typeof virtualYTPlayer.destroy === 'function') {
+                try { virtualYTPlayer.destroy(); } catch (e) {}
+            }
+            virtualYTPlayer = null;
+            virtualPendingYT = null;
+            const inner = document.getElementById('virtualYoutubePlayer');
+            if (inner) inner.innerHTML = '';
+        }
+
+        function startVirtualCheckpointTimer() {
+            stopVirtualCheckpointTimer();
+            virtualCheckpointTimer = setInterval(() => {
+                if (virtualPlayerMode !== 'youtube' || !virtualYTPlayer || typeof virtualYTPlayer.getCurrentTime !== 'function') return;
+                if (!currentVirtualCourse || currentVirtualCheckpointKey) return;
+                const module = currentVirtualCourse.modules[currentVirtualModuleIndex];
+                if (!module || !Array.isArray(module.checkpoints)) return;
+                let now = 0;
+                try { now = virtualYTPlayer.getCurrentTime() || 0; } catch(e) { return; }
+                const pending = module.checkpoints.find(cp => !answeredVirtualCheckpoints.has(`${currentVirtualModuleIndex}-${cp.id}`) && now >= Number(cp.time || 0));
+                if (pending) {
+                    pauseVirtualVideo();
+                    askVirtualCheckpointQuestion(currentVirtualModuleIndex, pending);
+                }
+            }, 500);
+        }
+
+        function stopVirtualCheckpointTimer() {
+            if (virtualCheckpointTimer) { clearInterval(virtualCheckpointTimer); virtualCheckpointTimer = null; }
+        }
+
+        function pauseVirtualVideo() {
+            if (virtualPlayerMode === 'youtube') {
+                if (virtualYTPlayer && typeof virtualYTPlayer.pauseVideo === 'function') { try { virtualYTPlayer.pauseVideo(); } catch(e){} }
+            } else {
+                const video = document.getElementById('virtualCourseVideo');
+                if (video) { try { video.pause(); } catch(e){} }
+            }
+        }
+
+        function resumeVirtualVideo() {
+            if (virtualPlayerMode === 'youtube') {
+                if (virtualYTPlayer && typeof virtualYTPlayer.playVideo === 'function') { try { virtualYTPlayer.playVideo(); } catch(e){} }
+            } else {
+                const video = document.getElementById('virtualCourseVideo');
+                if (video) video.play().catch(() => {});
+            }
+        }
+
+        function handleVirtualVideoEnded() {
+            if (!currentVirtualCourse) return;
+            if (currentVirtualModuleIndex < currentVirtualCourse.modules.length - 1) {
+                Swal.fire({ icon: 'info', title: 'Módulo completado', text: 'Se cargará el siguiente módulo.' }).then(() => {
+                    loadVirtualModule(currentVirtualModuleIndex + 1);
+                });
+            } else {
+                Swal.fire({ icon: 'success', title: 'Curso completado', text: 'Has finalizado todos los módulos del curso virtual.' });
+            }
+        }
+
         function playPreviousVirtualModule() {
             if (!currentVirtualCourse) return;
             loadVirtualModule(Math.max(0, currentVirtualModuleIndex - 1));
@@ -13833,6 +14070,31 @@ function makeCronogramaFilterFormula(year, tipo) {
             const video = document.getElementById('virtualCourseVideo');
             if (video && !video.dataset.virtualBound) {
                 video.dataset.virtualBound = '1';
+                video.addEventListener('timeupdate', function() {
+                    if (virtualPlayerMode !== 'file') return;
+                    if (!currentVirtualCourse || currentVirtualCheckpointKey) return;
+                    const module = currentVirtualCourse.modules[currentVirtualModuleIndex];
+                    if (!module || !Array.isArray(module.checkpoints)) return;
+                    const now = video.currentTime || 0;
+                    const pending = module.checkpoints.find(cp => !answeredVirtualCheckpoints.has(`${currentVirtualModuleIndex}-${cp.id}`) && now >= Number(cp.time || 0));
+                    if (pending) {
+                        video.pause();
+                        askVirtualCheckpointQuestion(currentVirtualModuleIndex, pending);
+                    }
+                });
+                video.addEventListener('ended', function() {
+                    if (virtualPlayerMode !== 'file') return;
+                    handleVirtualVideoEnded();
+                });
+            }
+        });
+
+
+        // Enlace robusto de eventos del video directo: evita que se pierdan los checkpoints y el avance de módulos.
+        document.addEventListener('DOMContentLoaded', function() {
+            const video = document.getElementById('virtualCourseVideo');
+            if (video && !video.dataset.virtualFixedBound) {
+                video.dataset.virtualFixedBound = '1';
                 video.addEventListener('timeupdate', function() {
                     if (virtualPlayerMode !== 'file') return;
                     if (!currentVirtualCourse || currentVirtualCheckpointKey) return;
