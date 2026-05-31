@@ -2815,6 +2815,7 @@
                                 <div id="virtualModuleInfo" style="font-weight:700;">Módulo 1</div>
                                 <div style="display:flex; gap:0.5rem;">
                                     <button class="btn btn-secondary" onclick="playPreviousVirtualModule()"><i class="fas fa-backward"></i> Anterior</button>
+                                    <button class="btn btn-secondary" onclick="toggleVirtualFullscreen()" title="Pantalla completa"><i class="fas fa-expand"></i> Pantalla completa</button>
                                     <button class="btn btn-secondary" onclick="playNextVirtualModule()">Siguiente <i class="fas fa-forward"></i></button>
                                 </div>
                             </div>
@@ -12952,49 +12953,150 @@ function makeCronogramaFilterFormula(year, tipo) {
 
         // Pide la cédula del participante; busca el nombre en Personal HSLV (como en pretest/postest)
         async function promptVirtualParticipantByCedula(course) {
-            const result = await Swal.fire({
+            // Paso 1: pedir la cédula
+            const cedulaRes = await Swal.fire({
                 title: '<i class="fas fa-id-card" style="color:#2563eb;"></i> Ingreso al curso virtual',
+                html: `<p style="color:#475569; margin:0 0 0.75rem 0;">${escapeHtml(course?.title || 'Curso virtual')}</p>`,
+                input: 'text',
+                inputLabel: 'Número de cédula',
+                inputPlaceholder: 'Ej: 76328229',
+                inputAttributes: { inputmode: 'numeric', autocapitalize: 'off' },
+                allowOutsideClick: false,
+                confirmButtonText: 'Continuar',
+                showCancelButton: true,
+                cancelButtonText: 'Cancelar',
+                preConfirm: (val) => {
+                    const cedula = String(val || '').trim();
+                    if (!cedula) { Swal.showValidationMessage('Ingresa tu número de cédula.'); return false; }
+                    return cedula;
+                }
+            });
+            if (!cedulaRes.isConfirmed) return null;
+            const cedula = String(cedulaRes.value).trim();
+
+            // Paso 2: buscar en Personal HSLV
+            Swal.fire({ title: 'Verificando cédula...', text: 'Buscando en Personal HSLV', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            const nombre = await buscarNombrePorCedula(cedula);
+            Swal.close();
+
+            if (nombre) {
+                // Encontrado: confirmar e iniciar
+                const conf = await Swal.fire({
+                    icon: 'success',
+                    title: 'Colaborador encontrado',
+                    html: `Bienvenido(a) <strong>${escapeHtml(nombre)}</strong>.<br>Cédula: <strong>${escapeHtml(cedula)}</strong>`,
+                    confirmButtonText: 'Iniciar curso',
+                    showCancelButton: true,
+                    cancelButtonText: 'Cancelar'
+                });
+                return conf.isConfirmed ? { name: nombre, cedula } : null;
+            }
+
+            // No encontrado: ofrecer registro (igual que pretest/postest)
+            const choice = await Swal.fire({
+                icon: 'warning',
+                title: 'No estás registrado',
+                html: `La cédula <strong>${escapeHtml(cedula)}</strong> no está en <strong>Personal HSLV</strong>.<br>¿Deseas registrar tus datos para continuar?`,
+                showDenyButton: true,
+                showCancelButton: true,
+                confirmButtonText: '<i class="fas fa-user-plus"></i> Registrarme',
+                confirmButtonColor: '#16a34a',
+                denyButtonText: 'Solo escribir mi nombre',
+                denyButtonColor: '#64748b',
+                cancelButtonText: 'Cancelar'
+            });
+
+            if (choice.isConfirmed) {
+                const reg = await registrarPersonalDesdeVirtual(cedula);
+                return reg ? { name: reg.name, cedula } : null;
+            }
+            if (choice.isDenied) {
+                const nameRes = await Swal.fire({
+                    title: 'Nombre del participante',
+                    input: 'text',
+                    inputLabel: 'Escribe tu nombre completo',
+                    inputPlaceholder: 'Nombre y apellidos',
+                    allowOutsideClick: false,
+                    confirmButtonText: 'Iniciar curso',
+                    showCancelButton: true,
+                    cancelButtonText: 'Cancelar',
+                    preConfirm: (val) => {
+                        const name = String(val || '').trim();
+                        if (!name) { Swal.showValidationMessage('Ingresa tu nombre.'); return false; }
+                        return name;
+                    }
+                });
+                return nameRes.isConfirmed ? { name: String(nameRes.value).trim(), cedula } : null;
+            }
+            return null;
+        }
+
+        // Registra un nuevo colaborador en Personal HSLV (versión para el curso virtual)
+        async function registrarPersonalDesdeVirtual(cedula) {
+            const form = await Swal.fire({
+                title: '<i class="fas fa-user-plus" style="color:#16a34a;"></i> Registro en Personal HSLV',
                 html: `
-                    <p style="text-align:center; color:#475569; margin:0 0 1rem 0;">${escapeHtml(course?.title || 'Curso virtual')}</p>
                     <div style="text-align:left;">
-                        <label style="display:block; font-weight:700; margin:0 0 0.35rem 0;">Número de cédula *</label>
-                        <input id="virtualCedulaInput" class="swal2-input" placeholder="Ej: 76328229" style="margin:0 0 0.75rem 0;" inputmode="numeric">
-                        <label style="display:block; font-weight:700; margin:0 0 0.35rem 0;">Nombre del participante *</label>
-                        <input id="virtualNombreInput" class="swal2-input" placeholder="Se completa al validar la cédula" style="margin:0;">
-                        <small id="virtualCedulaStatus" style="display:block; margin-top:0.5rem; color:#6b7280;">Escribe la cédula y presiona <strong>Buscar</strong> para cargar el nombre.</small>
+                        <label style="display:block; font-weight:700; margin:0 0 0.35rem 0;">Cédula</label>
+                        <input class="swal2-input" value="${escapeHtml(cedula)}" disabled style="margin:0 0 0.75rem 0; background:#f1f5f9;">
+                        <label style="display:block; font-weight:700; margin:0 0 0.35rem 0;">Nombre completo *</label>
+                        <input id="regNombre" class="swal2-input" placeholder="Nombre y apellidos" style="margin:0 0 0.75rem 0;">
+                        <label style="display:block; font-weight:700; margin:0 0 0.35rem 0;">Cargo</label>
+                        <input id="regCargo" class="swal2-input" placeholder="Ej: Auxiliar de enfermería" style="margin:0 0 0.75rem 0;">
+                        <label style="display:block; font-weight:700; margin:0 0 0.35rem 0;">Correo electrónico</label>
+                        <input id="regEmail" class="swal2-input" placeholder="correo@ejemplo.com" style="margin:0;">
                     </div>`,
                 width: 560,
                 allowOutsideClick: false,
-                showDenyButton: true,
-                denyButtonText: '<i class="fas fa-search"></i> Buscar cédula',
-                denyButtonColor: '#0f766e',
-                confirmButtonText: 'Iniciar curso',
+                confirmButtonText: 'Registrar y continuar',
+                confirmButtonColor: '#16a34a',
                 showCancelButton: true,
                 cancelButtonText: 'Cancelar',
-                preDeny: async () => {
-                    const cedula = (document.getElementById('virtualCedulaInput')?.value || '').trim();
-                    const status = document.getElementById('virtualCedulaStatus');
-                    if (!cedula) { if (status) status.innerHTML = '<span style="color:#b45309;">Ingresa un número de cédula.</span>'; return false; }
-                    if (status) status.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buscando en Personal HSLV...';
-                    const nombre = await buscarNombrePorCedula(cedula);
-                    const nombreEl = document.getElementById('virtualNombreInput');
-                    if (nombre) {
-                        if (nombreEl) nombreEl.value = nombre;
-                        if (status) status.innerHTML = `<span style="color:#15803d;"><i class="fas fa-check-circle"></i> Colaborador encontrado.</span>`;
-                    } else {
-                        if (status) status.innerHTML = '<span style="color:#b45309;">No se encontró en Personal HSLV. Puedes escribir el nombre manualmente.</span>';
-                    }
-                    return false; // mantener el diálogo abierto tras buscar
-                },
                 preConfirm: () => {
-                    const cedula = (document.getElementById('virtualCedulaInput')?.value || '').trim();
-                    const name = (document.getElementById('virtualNombreInput')?.value || '').trim();
-                    if (!cedula) { Swal.showValidationMessage('Ingresa el número de cédula del participante.'); return false; }
-                    if (!name) { Swal.showValidationMessage('Ingresa o busca el nombre del participante.'); return false; }
-                    return { name, cedula };
+                    const nombre = (document.getElementById('regNombre')?.value || '').trim();
+                    const cargo = (document.getElementById('regCargo')?.value || '').trim();
+                    const email = (document.getElementById('regEmail')?.value || '').trim();
+                    if (!nombre) { Swal.showValidationMessage('El nombre es obligatorio.'); return false; }
+                    return { nombre, cargo, email };
                 }
             });
-            return result.isConfirmed ? result.value : null;
+            if (!form.isConfirmed) return null;
+            const { nombre, cargo, email } = form.value;
+
+            Swal.fire({ title: 'Registrando...', text: 'Guardando en Personal HSLV', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                if (!virtualPersonalCache) {
+                    virtualPersonalCache = await obtenerTodosLosRegistrosPersonal();
+                }
+                const cols = (virtualPersonalCache && virtualPersonalCache.length) ? Object.keys(virtualPersonalCache[0].fields || {}) : [];
+                const colCedula = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento']) || 'CEDULA';
+                const colNombre = detectarCampo(cols, ['NOMBRE', 'Nombre', 'Nombre Completo', 'Nombres']) || 'NOMBRE';
+                const colCargo = detectarCampo(cols, ['CARGO', 'Cargo', 'Perfil']) || 'CARGO';
+                const colEmail = detectarCampo(cols, ['EMAIL', 'Email', 'Correo', 'Correo Electrónico']) || 'EMAIL';
+
+                const fields = {};
+                const cedNum = Number(String(cedula).replace(/\D/g, ''));
+                fields[colCedula] = Number.isFinite(cedNum) && cedNum > 0 ? cedNum : cedula;
+                fields[colNombre] = nombre.toUpperCase();
+                if (cargo) fields[colCargo] = cargo;
+                if (email) fields[colEmail] = email;
+
+                const created = await airtableProxyRequest({
+                    method: 'POST',
+                    path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}`,
+                    body: { fields }
+                });
+                if (!created || !created.id) throw new Error('Airtable no confirmó el registro.');
+
+                virtualPersonalCache = null; // forzar recarga en próximas búsquedas
+                Swal.close();
+                await Swal.fire({ icon: 'success', title: 'Registro exitoso', text: 'Tus datos quedaron guardados en Personal HSLV.', timer: 1600, showConfirmButton: false });
+                return { name: nombre.toUpperCase() };
+            } catch (err) {
+                Swal.close();
+                await Swal.fire({ icon: 'error', title: 'No se pudo registrar', text: err.message || 'Verifica la tabla Personal HSLV e intenta de nuevo.' });
+                return null;
+            }
         }
 
         // Flujo cuando un participante entra escaneando el QR (?vc=CODIGO)
@@ -13178,6 +13280,28 @@ function makeCronogramaFilterFormula(year, tipo) {
         function playNextVirtualModule() {
             if (!currentVirtualCourse) return;
             loadVirtualModule(Math.min(currentVirtualCourse.modules.length - 1, currentVirtualModuleIndex + 1));
+        }
+
+        // Pantalla completa del reproductor (funciona con YouTube y con archivos de video)
+        function toggleVirtualFullscreen() {
+            const inFullscreen = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
+            if (inFullscreen) {
+                const exit = document.exitFullscreen || document.webkitExitFullscreen || document.msExitFullscreen;
+                if (exit) exit.call(document);
+                return;
+            }
+            // Si es archivo de video, usa la pantalla completa nativa del <video>
+            const video = document.getElementById('virtualCourseVideo');
+            if (virtualPlayerMode === 'file' && video && (video.requestFullscreen || video.webkitRequestFullscreen || video.webkitEnterFullscreen)) {
+                const reqV = video.requestFullscreen || video.webkitRequestFullscreen || video.webkitEnterFullscreen;
+                try { reqV.call(video); return; } catch (e) {}
+            }
+            // Para YouTube (o como respaldo), pantalla completa del contenedor
+            const wrapper = document.getElementById('virtualVideoWrapper');
+            if (wrapper) {
+                const req = wrapper.requestFullscreen || wrapper.webkitRequestFullscreen || wrapper.msRequestFullscreen;
+                if (req) { try { req.call(wrapper); } catch (e) {} }
+            }
         }
 
         async function askVirtualCheckpointQuestion(moduleIndex, checkpoint) {
