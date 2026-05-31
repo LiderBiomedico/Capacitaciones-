@@ -3161,7 +3161,7 @@
                     <div class="virtual-player-layout" style="display:grid; grid-template-columns:minmax(0,3fr) minmax(260px,0.8fr); gap:1rem; align-items:start;">
                         <div class="card virtual-video-card" style="background:#0f172a; color:#fff; box-shadow:none;">
                             <div id="virtualVideoWrapper" style="background:#000; border-radius:14px; overflow:hidden; min-height:360px; display:flex; align-items:center; justify-content:center;">
-                                <video id="virtualCourseVideo" controls style="width:100%; max-height:70vh; background:#000;"></video>
+                                <video id="virtualCourseVideo" controls playsinline webkit-playsinline x5-playsinline controlsList="nofullscreen nodownload noremoteplayback" disablePictureInPicture style="width:100%; max-height:70vh; background:#000;"></video>
                                 <div id="virtualYoutubePlayer" style="display:none; width:100%; aspect-ratio:16/9;"></div>
                             </div>
                             <div id="virtualInlineQuestion" aria-live="polite">
@@ -8629,7 +8629,13 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         .swal2-popup.hslv-virtual-register .swal2-confirm,
         .swal2-popup.hslv-virtual-login .swal2-cancel,
         .swal2-popup.hslv-virtual-register .swal2-cancel { min-height:44px !important; border-radius:10px !important; font-weight:800 !important; }
-        #virtualCourseVideo::-webkit-media-controls-fullscreen-button { display:none !important; }
+
+        /* Bloqueo visual del botón de pantalla completa en reproductores HTML5 */
+        #virtualCourseVideo::-webkit-media-controls-fullscreen-button,
+        #virtualCourseVideo::-webkit-media-controls-toggle-closed-captions-button { display:none !important; }
+        #virtualCourseVideo::-webkit-media-controls-enclosure { overflow:hidden !important; }
+        #virtualYoutubePlayer iframe { max-width:100% !important; }
+
         @media (max-width: 900px) {
             .swal2-popup.hslv-virtual-login,
             .swal2-popup.hslv-virtual-register {
@@ -13707,6 +13713,70 @@ function makeCronogramaFilterFormula(year, tipo) {
             }
         }
 
+
+        // FIX 2026-05-31: bloquear pantalla completa durante la capacitación.
+        // Algunos navegadores móviles muestran el botón fullscreen nativo aunque el video tenga playsinline.
+        // Esta protección oculta el botón, evita doble toque y sale automáticamente si el navegador intenta abrir fullscreen.
+        function installVirtualNoFullscreenGuard() {
+            const video = document.getElementById('virtualCourseVideo');
+            const wrapper = document.getElementById('virtualVideoWrapper');
+            const yt = document.getElementById('virtualYoutubePlayer');
+            if (video && !video.dataset.noFullscreenGuard) {
+                video.dataset.noFullscreenGuard = '1';
+                video.setAttribute('playsinline', '');
+                video.setAttribute('webkit-playsinline', '');
+                video.setAttribute('x5-playsinline', '');
+                video.setAttribute('x5-video-player-type', 'h5-page');
+                video.setAttribute('x5-video-player-fullscreen', 'false');
+                video.setAttribute('controlsList', 'nofullscreen nodownload noremoteplayback');
+                video.disablePictureInPicture = true;
+
+                const stopFull = (ev) => {
+                    if (ev) { try { ev.preventDefault(); ev.stopPropagation(); } catch(e){} }
+                    try { if (document.fullscreenElement) document.exitFullscreen(); } catch(e){}
+                    try { if (document.webkitFullscreenElement) document.webkitExitFullscreen(); } catch(e){}
+                    try { if (document.mozFullScreenElement) document.mozCancelFullScreen(); } catch(e){}
+                    try { if (document.msFullscreenElement) document.msExitFullscreen(); } catch(e){}
+                    try { if (video.webkitDisplayingFullscreen && video.webkitExitFullscreen) video.webkitExitFullscreen(); } catch(e){}
+                    return false;
+                };
+
+                // Evita pantalla completa por doble clic/doble toque sobre el video.
+                video.addEventListener('dblclick', stopFull, true);
+                video.addEventListener('webkitbeginfullscreen', stopFull, true);
+                video.addEventListener('fullscreenchange', stopFull, true);
+                video.addEventListener('webkitfullscreenchange', stopFull, true);
+
+                // Sobrescribe peticiones de fullscreen originadas desde el elemento video.
+                try { video.requestFullscreen = stopFull; } catch(e){}
+                try { video.webkitRequestFullscreen = stopFull; } catch(e){}
+                try { video.webkitEnterFullscreen = stopFull; } catch(e){}
+                try { video.mozRequestFullScreen = stopFull; } catch(e){}
+                try { video.msRequestFullscreen = stopFull; } catch(e){}
+            }
+
+            const exitIfVirtualFullscreen = () => {
+                const fs = document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement;
+                if (!fs) return;
+                const isVirtual = (video && (fs === video || video.contains(fs))) ||
+                                  (wrapper && (fs === wrapper || wrapper.contains(fs))) ||
+                                  (yt && (fs === yt || yt.contains(fs)));
+                if (isVirtual) {
+                    try { if (document.exitFullscreen) document.exitFullscreen(); } catch(e){}
+                    try { if (document.webkitExitFullscreen) document.webkitExitFullscreen(); } catch(e){}
+                    try { if (document.mozCancelFullScreen) document.mozCancelFullScreen(); } catch(e){}
+                    try { if (document.msExitFullscreen) document.msExitFullscreen(); } catch(e){}
+                }
+            };
+            if (!window.__virtualNoFullscreenDocumentGuard) {
+                window.__virtualNoFullscreenDocumentGuard = true;
+                document.addEventListener('fullscreenchange', exitIfVirtualFullscreen, true);
+                document.addEventListener('webkitfullscreenchange', exitIfVirtualFullscreen, true);
+                document.addEventListener('mozfullscreenchange', exitIfVirtualFullscreen, true);
+                document.addEventListener('MSFullscreenChange', exitIfVirtualFullscreen, true);
+            }
+        }
+
         function loadVirtualModule(index) {
             if (!currentVirtualCourse) return;
             const module = currentVirtualCourse.modules[index];
@@ -13717,6 +13787,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             if (qPanel) { qPanel.classList.remove('active'); qPanel.style.display = 'none'; }
 
             const video = document.getElementById('virtualCourseVideo');
+            installVirtualNoFullscreenGuard();
             const ytContainer = document.getElementById('virtualYoutubePlayer');
             const info = document.getElementById('virtualModuleInfo');
             const summary = document.getElementById('virtualCheckpointSummary');
@@ -13754,6 +13825,9 @@ function makeCronogramaFilterFormula(year, tipo) {
                     video.disablePictureInPicture = true;
                     video.setAttribute('playsinline', '');
                     video.setAttribute('webkit-playsinline', '');
+                    video.setAttribute('x5-playsinline', '');
+                    video.setAttribute('x5-video-player-type', 'h5-page');
+                    video.setAttribute('x5-video-player-fullscreen', 'false');
                     video.preload = 'metadata';
                     video.onloadedmetadata = () => {
                         if (summary) summary.innerHTML = `Video cargado correctamente.<br>Duración detectada: <strong>${Math.round(video.duration || 0)} s</strong><br>Checkpoints configurados: <strong>${module.checkpoints?.length || 0}</strong>`;
@@ -13806,9 +13880,9 @@ function makeCronogramaFilterFormula(year, tipo) {
                     width: '100%',
                     height: '100%',
                     host: 'https://www.youtube.com',
-                    playerVars: { rel: 0, modestbranding: 1, playsinline: 1, origin: window.location.origin },
+                    playerVars: { rel: 0, modestbranding: 1, playsinline: 1, fs: 0, iv_load_policy: 3, origin: window.location.origin },
                     events: {
-                        onReady: () => { startVirtualCheckpointTimer(); },
+                        onReady: (event) => { try { const iframe = event.target.getIframe(); iframe.removeAttribute('allowfullscreen'); iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture'); } catch(e){} startVirtualCheckpointTimer(); },
                         onStateChange: (e) => { if (e.data === YT.PlayerState.ENDED) handleVirtualVideoEnded(); },
                         onError: () => showVirtualVideoError('Este video no permite reproducción insertada o no está disponible. Usa un video público que permita inserción.')
                     }
