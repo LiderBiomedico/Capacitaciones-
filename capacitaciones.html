@@ -3173,6 +3173,7 @@
                                     <span id="virtualInlineFeedback"></span>
                                 </div>
                             </div>
+                            <div id="virtualCourseFinalResultPanel" style="display:none; margin-top:1rem;"></div>
                             <style>#virtualYoutubePlayer iframe, #virtualYoutubePlayer > div { width:100% !important; height:100% !important; border:0; }</style>
                             <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-top:0.85rem;">
                                 <div id="virtualModuleInfo" style="font-weight:700;">Módulo 1</div>
@@ -13787,6 +13788,8 @@ function makeCronogramaFilterFormula(year, tipo) {
             currentVirtualCheckpointKey = null;
             const qPanel = document.getElementById('virtualInlineQuestion');
             if (qPanel) { qPanel.classList.remove('active'); qPanel.style.display = 'none'; }
+            const finalPanel = document.getElementById('virtualCourseFinalResultPanel');
+            if (finalPanel) { finalPanel.innerHTML = ''; finalPanel.style.display = 'none'; }
 
             const video = document.getElementById('virtualCourseVideo');
             installVirtualNoFullscreenGuard();
@@ -13954,6 +13957,119 @@ function makeCronogramaFilterFormula(year, tipo) {
             return { totalQuestions, correctCount, answeredCount, percentage, grade };
         }
 
+        function buildVirtualResultIllustration(type = 'success') {
+            if (type === 'success') {
+                return `
+                    <svg viewBox="0 0 180 180" width="140" height="140" aria-hidden="true" style="display:block; margin:0 auto 0.8rem auto;">
+                        <defs>
+                            <linearGradient id="gradSuccessMedal" x1="0" x2="1" y1="0" y2="1">
+                                <stop offset="0%" stop-color="#22c55e"/>
+                                <stop offset="100%" stop-color="#15803d"/>
+                            </linearGradient>
+                        </defs>
+                        <circle cx="90" cy="78" r="44" fill="url(#gradSuccessMedal)" opacity="0.18"></circle>
+                        <path d="M58 20h24l8 32-20 14-20-14z" fill="#1d4ed8"></path>
+                        <path d="M98 20h24l8 32-20 14-20-14z" fill="#2563eb"></path>
+                        <circle cx="90" cy="82" r="34" fill="url(#gradSuccessMedal)"></circle>
+                        <circle cx="90" cy="82" r="24" fill="#dcfce7"></circle>
+                        <path d="M79 82l8 8 15-17" fill="none" stroke="#15803d" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"></path>
+                    </svg>`;
+            }
+            return `
+                <svg viewBox="0 0 180 180" width="140" height="140" aria-hidden="true" style="display:block; margin:0 auto 0.8rem auto;">
+                    <defs>
+                        <linearGradient id="gradWarnPanel" x1="0" x2="1" y1="0" y2="1">
+                            <stop offset="0%" stop-color="#fb923c"/>
+                            <stop offset="100%" stop-color="#ea580c"/>
+                        </linearGradient>
+                    </defs>
+                    <circle cx="90" cy="90" r="58" fill="url(#gradWarnPanel)" opacity="0.16"></circle>
+                    <circle cx="90" cy="90" r="40" fill="url(#gradWarnPanel)"></circle>
+                    <rect x="84" y="64" width="12" height="40" rx="6" fill="#fff"></rect>
+                    <circle cx="90" cy="118" r="7" fill="#fff"></circle>
+                </svg>`;
+        }
+
+        function renderVirtualCourseFinalResultInline(result, passed, unanswered) {
+            const panel = document.getElementById('virtualCourseFinalResultPanel');
+            const questionBox = document.getElementById('virtualInlineQuestion');
+            if (!panel) return;
+
+            if (questionBox) questionBox.style.display = 'none';
+
+            const summary = document.getElementById('virtualCheckpointSummary');
+            if (summary) {
+                summary.innerHTML = passed
+                    ? `Curso finalizado. Nota final: <strong>${result.grade.toFixed(1)} / 5.0</strong>. Resultado: <strong>Aprobado</strong>.`
+                    : `Curso finalizado. Nota final: <strong>${result.grade.toFixed(1)} / 5.0</strong>. Resultado: <strong>Reprobado</strong>. Debe repetir la capacitación.`;
+            }
+
+            panel.style.display = 'block';
+            panel.innerHTML = `
+                <div style="background:#ffffff; border:1px solid ${passed ? '#86efac' : '#fdba74'}; border-radius:18px; padding:1rem; color:#111827; box-shadow:0 10px 30px rgba(15,23,42,0.12);">
+                    <div style="text-align:center; margin-bottom:0.8rem;">
+                        ${buildVirtualResultIllustration(passed ? 'success' : 'warning')}
+                        <div style="font-size:1.4rem; line-height:1.2; font-weight:900; color:${passed ? '#166534' : '#9a3412'}; margin-bottom:0.25rem;">${passed ? '¡Felicitaciones, aprobaste!' : 'Capacitación no aprobada'}</div>
+                        <div style="font-size:0.98rem; color:#475569;">${passed ? 'Has superado satisfactoriamente la capacitación virtual.' : 'Tu nota quedó por debajo de 4.0. Debes repetir la capacitación.'}</div>
+                    </div>
+                    <div style="background:${passed ? '#ecfdf5' : '#fff7ed'}; border:1px solid ${passed ? '#86efac' : '#fdba74'}; border-radius:16px; padding:1rem; margin-bottom:1rem; text-align:center;">
+                        <div style="font-size:0.95rem; font-weight:800; color:${passed ? '#166534' : '#9a3412'}; margin-bottom:0.35rem;">${passed ? 'RESULTADO FINAL' : 'RESULTADO OBTENIDO'}</div>
+                        <div style="font-size:2.4rem; line-height:1; font-weight:900; color:${passed ? '#15803d' : '#c2410c'};">${result.grade.toFixed(1)} / 5.0</div>
+                        <div style="font-size:0.88rem; color:#475569; margin-top:0.45rem;">Nota mínima aprobatoria: <strong>4.0 / 5.0</strong></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(110px,1fr)); gap:0.65rem; margin-bottom:1rem;">
+                        <div style="border:1px solid #e5e7eb; border-radius:12px; padding:0.7rem; text-align:center; background:#fff;"><strong>${result.correctCount}</strong><br><span style="font-size:0.82rem; color:#64748b;">Correctas</span></div>
+                        <div style="border:1px solid #e5e7eb; border-radius:12px; padding:0.7rem; text-align:center; background:#fff;"><strong>${result.totalQuestions}</strong><br><span style="font-size:0.82rem; color:#64748b;">Preguntas</span></div>
+                        <div style="border:1px solid #e5e7eb; border-radius:12px; padding:0.7rem; text-align:center; background:#fff;"><strong>${result.percentage}%</strong><br><span style="font-size:0.82rem; color:#64748b;">Resultado</span></div>
+                    </div>
+                    ${unanswered ? `<div style="border:1px solid #fecaca; background:#fef2f2; color:#991b1b; border-radius:12px; padding:0.8rem; font-weight:700; margin-bottom:1rem;"><i class="fas fa-exclamation-triangle"></i> Quedaron ${unanswered} pregunta(s) sin responder y se calificaron como incorrectas.</div>` : ''}
+                    <div style="display:flex; flex-wrap:wrap; gap:0.75rem; justify-content:center; align-items:center; margin-top:0.6rem;">
+                        ${passed ? '' : `<button type="button" class="btn btn-primary" onclick="restartVirtualCourseAfterFailure()" style="background:#dc2626; border-color:#dc2626; font-weight:700;"><i class="fas fa-redo-alt"></i> Volver a realizar la capacitación</button>`}
+                        <button type="button" class="btn btn-secondary" onclick="exitVirtualCourseApp()" style="font-weight:700;"><i class="fas fa-sign-out-alt"></i> Salir</button>
+                    </div>
+                </div>`;
+
+            try {
+                panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            } catch (e) {}
+        }
+
+        function restartVirtualCourseAfterFailure() {
+            answeredVirtualCheckpoints = new Set();
+            currentVirtualResults = [];
+            virtualFinalSummarySaved = false;
+            currentVirtualCheckpointKey = null;
+            const panel = document.getElementById('virtualCourseFinalResultPanel');
+            if (panel) { panel.innerHTML = ''; panel.style.display = 'none'; }
+            const questionBox = document.getElementById('virtualInlineQuestion');
+            if (questionBox) questionBox.style.display = 'none';
+            loadVirtualModule(0);
+            setTimeout(() => resumeVirtualVideo(), 700);
+        }
+
+        function exitVirtualCourseApp() {
+            try {
+                if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{});
+            } catch(e) {}
+            try { window.close(); } catch (e) {}
+            setTimeout(() => {
+                try { closeVirtualCoursePlayer(); } catch (e) {}
+                try {
+                    if (window.opener) {
+                        window.close();
+                        return;
+                    }
+                    if (history.length > 1) {
+                        history.back();
+                        return;
+                    }
+                    window.location.href = 'about:blank';
+                } catch (e) {
+                    closeVirtualCoursePlayer();
+                }
+            }, 100);
+        }
+
         async function showVirtualCourseFinalResult() {
             if (!currentVirtualCourse) return;
             pauseVirtualVideo();
@@ -13971,47 +14087,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                 console.warn('No se pudo guardar el resumen final del curso virtual:', err);
             }
 
-            const html = `
-                <div style="text-align:left; font-size:1rem; color:#111827;">
-                    <div style="background:${passed ? '#ecfdf5' : '#fff7ed'}; border:1px solid ${passed ? '#86efac' : '#fdba74'}; border-radius:14px; padding:1rem; margin-bottom:1rem; text-align:center;">
-                        <div style="font-size:0.95rem; font-weight:800; color:${passed ? '#166534' : '#9a3412'}; margin-bottom:0.35rem;">${passed ? 'CAPACITACIÓN APROBADA' : 'CAPACITACIÓN NO APROBADA'}</div>
-                        <div style="font-size:2.6rem; line-height:1; font-weight:900; color:${passed ? '#15803d' : '#c2410c'};">${result.grade.toFixed(1)} / 5.0</div>
-                        <div style="font-size:0.88rem; color:#475569; margin-top:0.45rem;">Nota mínima aprobatoria: <strong>4.0 / 5.0</strong></div>
-                    </div>
-                    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:0.6rem; margin-bottom:1rem;">
-                        <div style="border:1px solid #e5e7eb; border-radius:12px; padding:0.7rem; text-align:center;"><strong>${result.correctCount}</strong><br><span style="font-size:0.82rem; color:#64748b;">Correctas</span></div>
-                        <div style="border:1px solid #e5e7eb; border-radius:12px; padding:0.7rem; text-align:center;"><strong>${result.totalQuestions}</strong><br><span style="font-size:0.82rem; color:#64748b;">Preguntas</span></div>
-                        <div style="border:1px solid #e5e7eb; border-radius:12px; padding:0.7rem; text-align:center;"><strong>${result.percentage}%</strong><br><span style="font-size:0.82rem; color:#64748b;">Resultado</span></div>
-                    </div>
-                    ${unanswered ? `<div style="border:1px solid #fecaca; background:#fef2f2; color:#991b1b; border-radius:12px; padding:0.8rem; font-weight:700; margin-bottom:1rem;"><i class="fas fa-exclamation-triangle"></i> Quedaron ${unanswered} pregunta(s) sin responder y se calificaron como incorrectas.</div>` : ''}
-                    <p style="margin:0; color:#334155;">${passed ? 'Puedes finalizar la capacitación.' : 'La nota está por debajo de 4.0. Debes repetir la capacitación para aprobar.'}</p>
-                </div>`;
-
-            await Swal.fire({
-                icon: passed ? 'success' : 'warning',
-                title: 'Resultado de la capacitación',
-                html,
-                width: 680,
-                allowOutsideClick: false,
-                allowEscapeKey: false,
-                showCancelButton: passed,
-                confirmButtonText: passed ? 'Finalizar' : 'Repetir capacitación',
-                cancelButtonText: 'Cerrar',
-                confirmButtonColor: passed ? '#16a34a' : '#dc2626'
-            }).then((swalResult) => {
-                if (!passed) {
-                    answeredVirtualCheckpoints = new Set();
-                    currentVirtualResults = [];
-                    virtualFinalSummarySaved = false;
-                    currentVirtualCheckpointKey = null;
-                    loadVirtualModule(0);
-                    setTimeout(() => resumeVirtualVideo(), 700);
-                    return;
-                }
-                if (swalResult.isConfirmed) {
-                    closeVirtualCoursePlayer();
-                }
-            });
+            renderVirtualCourseFinalResultInline(result, passed, unanswered);
         }
 
         function handleVirtualVideoEnded() {
