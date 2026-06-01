@@ -12722,6 +12722,7 @@ function makeCronogramaFilterFormula(year, tipo) {
         let answeredVirtualCheckpoints = new Set();
         let currentVirtualParticipant = null;
         let currentVirtualResults = [];
+        let virtualFinalSummarySaved = false;
 
         // ===== Estado del reproductor de YouTube para cursos virtuales =====
         let virtualYTPlayer = null;          // instancia del reproductor de YouTube
@@ -13270,6 +13271,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             answeredVirtualCheckpoints = new Set();
             currentVirtualCheckpointKey = null;
             currentVirtualResults = [];
+            virtualFinalSummarySaved = false;
             document.getElementById('virtualPlayerTitle').textContent = course.title;
             document.getElementById('virtualPlayerSubtitle').textContent = `${course.description || 'Curso virtual interactivo con preguntas durante el video.'} • Participante: ${participant.name}`;
             document.getElementById('virtualCoursePlayerModal').style.display = 'flex';
@@ -13942,6 +13944,76 @@ function makeCronogramaFilterFormula(year, tipo) {
             }
         }
 
+        function getVirtualCourseFinalGrade() {
+            const totals = getVirtualCourseTotals(currentVirtualCourse || {});
+            const totalQuestions = Number(totals.totalCheckpoints || 0);
+            const correctCount = currentVirtualResults.filter(r => r && r.isCorrect).length;
+            const answeredCount = currentVirtualResults.length;
+            const percentage = totalQuestions ? Math.round((correctCount / totalQuestions) * 100) : 100;
+            const grade = totalQuestions ? Math.round(((correctCount / totalQuestions) * 5) * 10) / 10 : 5;
+            return { totalQuestions, correctCount, answeredCount, percentage, grade };
+        }
+
+        async function showVirtualCourseFinalResult() {
+            if (!currentVirtualCourse) return;
+            pauseVirtualVideo();
+            stopVirtualCheckpointTimer();
+
+            const result = getVirtualCourseFinalGrade();
+            const passed = result.grade >= 4;
+            const unanswered = Math.max(0, result.totalQuestions - result.answeredCount);
+            const status = passed ? 'Aprobado' : 'Reprobado - Repetir capacitación';
+
+            try {
+                await saveVirtualCourseSummary(status);
+                virtualFinalSummarySaved = true;
+            } catch (err) {
+                console.warn('No se pudo guardar el resumen final del curso virtual:', err);
+            }
+
+            const html = `
+                <div style="text-align:left; font-size:1rem; color:#111827;">
+                    <div style="background:${passed ? '#ecfdf5' : '#fff7ed'}; border:1px solid ${passed ? '#86efac' : '#fdba74'}; border-radius:14px; padding:1rem; margin-bottom:1rem; text-align:center;">
+                        <div style="font-size:0.95rem; font-weight:800; color:${passed ? '#166534' : '#9a3412'}; margin-bottom:0.35rem;">${passed ? 'CAPACITACIÓN APROBADA' : 'CAPACITACIÓN NO APROBADA'}</div>
+                        <div style="font-size:2.6rem; line-height:1; font-weight:900; color:${passed ? '#15803d' : '#c2410c'};">${result.grade.toFixed(1)} / 5.0</div>
+                        <div style="font-size:0.88rem; color:#475569; margin-top:0.45rem;">Nota mínima aprobatoria: <strong>4.0 / 5.0</strong></div>
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:0.6rem; margin-bottom:1rem;">
+                        <div style="border:1px solid #e5e7eb; border-radius:12px; padding:0.7rem; text-align:center;"><strong>${result.correctCount}</strong><br><span style="font-size:0.82rem; color:#64748b;">Correctas</span></div>
+                        <div style="border:1px solid #e5e7eb; border-radius:12px; padding:0.7rem; text-align:center;"><strong>${result.totalQuestions}</strong><br><span style="font-size:0.82rem; color:#64748b;">Preguntas</span></div>
+                        <div style="border:1px solid #e5e7eb; border-radius:12px; padding:0.7rem; text-align:center;"><strong>${result.percentage}%</strong><br><span style="font-size:0.82rem; color:#64748b;">Resultado</span></div>
+                    </div>
+                    ${unanswered ? `<div style="border:1px solid #fecaca; background:#fef2f2; color:#991b1b; border-radius:12px; padding:0.8rem; font-weight:700; margin-bottom:1rem;"><i class="fas fa-exclamation-triangle"></i> Quedaron ${unanswered} pregunta(s) sin responder y se calificaron como incorrectas.</div>` : ''}
+                    <p style="margin:0; color:#334155;">${passed ? 'Puedes finalizar la capacitación.' : 'La nota está por debajo de 4.0. Debes repetir la capacitación para aprobar.'}</p>
+                </div>`;
+
+            await Swal.fire({
+                icon: passed ? 'success' : 'warning',
+                title: 'Resultado de la capacitación',
+                html,
+                width: 680,
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+                showCancelButton: passed,
+                confirmButtonText: passed ? 'Finalizar' : 'Repetir capacitación',
+                cancelButtonText: 'Cerrar',
+                confirmButtonColor: passed ? '#16a34a' : '#dc2626'
+            }).then((swalResult) => {
+                if (!passed) {
+                    answeredVirtualCheckpoints = new Set();
+                    currentVirtualResults = [];
+                    virtualFinalSummarySaved = false;
+                    currentVirtualCheckpointKey = null;
+                    loadVirtualModule(0);
+                    setTimeout(() => resumeVirtualVideo(), 700);
+                    return;
+                }
+                if (swalResult.isConfirmed) {
+                    closeVirtualCoursePlayer();
+                }
+            });
+        }
+
         function handleVirtualVideoEnded() {
             if (!currentVirtualCourse) return;
             if (currentVirtualModuleIndex < currentVirtualCourse.modules.length - 1) {
@@ -13949,7 +14021,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                     loadVirtualModule(currentVirtualModuleIndex + 1);
                 });
             } else {
-                Swal.fire({ icon: 'success', title: 'Curso completado', text: 'Has finalizado todos los módulos del curso virtual.' });
+                showVirtualCourseFinalResult();
             }
         }
 
@@ -14281,8 +14353,9 @@ function makeCronogramaFilterFormula(year, tipo) {
             if (ytContainer) ytContainer.style.display = 'none';
             document.getElementById('virtualCoursePlayerModal').style.display = 'none';
             try {
-                if (currentVirtualCourse && currentVirtualParticipant) {
+                if (currentVirtualCourse && currentVirtualParticipant && !virtualFinalSummarySaved) {
                     await saveVirtualCourseSummary('Finalizado');
+                    virtualFinalSummarySaved = true;
                 }
             } catch (err) {
                 console.warn('No se pudo guardar el resumen del curso virtual:', err);
@@ -14293,6 +14366,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             currentVirtualCheckpointKey = null;
             currentVirtualParticipant = null;
             currentVirtualResults = [];
+            virtualFinalSummarySaved = false;
             if (virtualDirectAccessMode) {
                 document.body.classList.add('hslv-participant-flow');
                 Swal.fire({ icon: 'success', title: 'Curso finalizado', text: 'La capacitación ha sido cerrada. Puedes cerrar esta pestaña.', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false });
