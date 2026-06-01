@@ -715,6 +715,22 @@
         .participant-helper-text i { color: var(--primary); margin-right: 0.35rem; }
 
 
+        /* Registro participante: los datos automáticos permanecen ocultos hasta presionar cargar datos */
+        #participantAutoFieldsSection,
+        #participantAutoFieldsSection.participant-fields-hidden {
+            display: none !important;
+        }
+        #participantAutoFieldsSection.participant-fields-visible {
+            display: block !important;
+        }
+        #participantContinueBtn.participant-continue-hidden {
+            display: none !important;
+        }
+        #participantContinueBtn.participant-continue-visible {
+            display: block !important;
+        }
+
+
         body.participant-registration-active {
             overflow: hidden;
             touch-action: none;
@@ -2755,6 +2771,12 @@
         @media (max-width: 900px) { .extension-builder-grid,.extension-resource-grid { grid-template-columns:1fr; } }
 
 </style>
+
+<style id="virtual-fields-hidden-fix">
+/* FIX cursos virtuales: los campos institucionales no deben mostrarse en la primera ventana de cédula. */
+.hslv-virtual-login .virtual-field-group.virtual-initial-hidden,
+.hslv-virtual-login .virtual-fields-initial-hidden { display: none !important; }
+</style>
 </head>
 <body>
     <!-- Loading Screen -->
@@ -4163,8 +4185,8 @@
                 <label><i class="fas fa-id-card"></i> Número de Cédula *</label>
                 <div style="display:flex; gap:0.6rem; align-items:center;">
                     <input type="text" id="participantCedula" placeholder="Ej: 76328229" required onkeydown="if(event.key==='Enter'){event.preventDefault(); cargarDatosParticipantePorCedula();}">
-                    <button type="button" class="btn btn-secondary" onclick="cargarDatosParticipantePorCedula()" style="white-space:nowrap; min-width:150px;">
-                        <i class="fas fa-search"></i> Cargar datos
+                    <button type="button" id="participantLoadDataBtn" class="btn btn-secondary" onclick="cargarDatosParticipantePorCedula()" style="white-space:nowrap; min-width:150px;">
+                        <i class="fas fa-search"></i> Presione para cargar datos
                     </button>
                 </div>
                 <small style="display:block; margin-top:0.45rem; color:#6b7280; font-weight:500;">Los datos se consultan desde la tabla <strong>Personal HSLV</strong>.</small>
@@ -4178,7 +4200,7 @@
                 </button>
             </div>
 
-            <div id="participantAutoFieldsSection">
+            <div id="participantAutoFieldsSection" class="participant-fields-hidden" style="display:none;">
                 <div class="form-group">
                     <label><i class="fas fa-user"></i> Nombre Completo</label>
                     <input type="text" id="participantName" placeholder="Se cargará automáticamente" readonly style="background:#f8fafc;">
@@ -4214,7 +4236,7 @@
             </div>
 
             <div class="modal-actions" style="flex-direction: column; gap: 0.75rem;">
-                <button class="btn btn-success" onclick="proceedToPretest()" style="width: 100%;">
+                <button id="participantContinueBtn" class="btn btn-success participant-continue-hidden" onclick="proceedToPretest()" style="width: 100%; display:none;">
                     <i class="fas fa-check"></i> Continuar al Pre-Test
                 </button>
                 <button class="btn btn-light" onclick="closeParticipantModal()" style="width: 100%;">
@@ -4507,7 +4529,19 @@
 
         function setParticipantAutoFieldsVisible(isVisible) {
             const section = document.getElementById('participantAutoFieldsSection');
-            if (section) section.style.display = isVisible ? 'block' : 'none';
+            const continueBtn = document.getElementById('participantContinueBtn');
+            if (section) {
+                section.classList.toggle('participant-fields-visible', !!isVisible);
+                section.classList.toggle('participant-fields-hidden', !isVisible);
+                section.style.setProperty('display', isVisible ? 'block' : 'none', 'important');
+                section.setAttribute('aria-hidden', isVisible ? 'false' : 'true');
+            }
+            if (continueBtn) {
+                continueBtn.classList.toggle('participant-continue-visible', !!isVisible);
+                continueBtn.classList.toggle('participant-continue-hidden', !isVisible);
+                continueBtn.style.setProperty('display', isVisible ? 'block' : 'none', 'important');
+                continueBtn.disabled = !isVisible;
+            }
         }
 
         function renderParticipantManualRegistrationFields(prefill = {}) {
@@ -4533,7 +4567,6 @@
             const actions = document.getElementById('participantRegisterActions');
             if (wrap) wrap.style.display = 'none';
             if (actions) actions.style.display = 'none';
-            setParticipantAutoFieldsVisible(true);
             setParticipantFieldsReadonly(true);
         }
 
@@ -4544,6 +4577,13 @@
             if (actions) actions.style.display = 'none';
             if (wrap) wrap.style.display = 'block';
             setParticipantAutoFieldsVisible(false);
+            const continueBtnManual = document.getElementById('participantContinueBtn');
+            if (continueBtnManual) {
+                continueBtnManual.classList.remove('participant-continue-hidden');
+                continueBtnManual.classList.add('participant-continue-visible');
+                continueBtnManual.style.setProperty('display', 'block', 'important');
+                continueBtnManual.disabled = false;
+            }
             if (!participantManualFieldConfig.length) participantManualFieldConfig = buildPersonalRegistrationFieldConfig();
             const prefill = {};
             const cedulaValue = (document.getElementById('participantCedula')?.value || '').trim();
@@ -4770,13 +4810,14 @@
             if (!cedula) {
                 setParticipantLookupStatus('Ingresa un número de cédula para consultar el colaborador.', 'warning');
                 clearParticipantFields();
+                setParticipantAutoFieldsVisible(false);
                 currentParticipantData = {};
                 return;
             }
 
             try {
                 setParticipantLookupStatus('<i class="fas fa-spinner fa-spin"></i> Consultando datos del colaborador...', 'info');
-                const loadBtn = document.querySelector('#participantRegistrationModal .btn.btn-secondary');
+                const loadBtn = document.getElementById('participantLoadDataBtn');
                 if (loadBtn) {
                     loadBtn.disabled = true;
                     loadBtn.dataset.originalHtml = loadBtn.dataset.originalHtml || loadBtn.innerHTML;
@@ -4817,7 +4858,7 @@
                     if (actions) actions.style.display = 'block';
                     const wrap = document.getElementById('participantManualRegistrationSection');
                     if (wrap) wrap.style.display = 'none';
-                    setParticipantAutoFieldsVisible(true);
+                    setParticipantAutoFieldsVisible(false);
                     setParticipantFieldsReadonly(true);
                     return;
                 }
@@ -4828,10 +4869,11 @@
             } catch (error) {
                 console.error('❌ Error cargando datos del participante:', error);
                 clearParticipantFields();
+                setParticipantAutoFieldsVisible(false);
                 currentParticipantData = {};
                 setParticipantLookupStatus(error.message || 'No se pudieron cargar los datos del colaborador.', 'error');
             } finally {
-                const loadBtn = document.querySelector('#participantRegistrationModal .btn.btn-secondary');
+                const loadBtn = document.getElementById('participantLoadDataBtn');
                 if (loadBtn) {
                     loadBtn.disabled = false;
                     if (loadBtn.dataset.originalHtml) loadBtn.innerHTML = loadBtn.dataset.originalHtml;
@@ -4855,11 +4897,14 @@
 
             cedulaInput.addEventListener('input', () => {
                 clearTimeout(participantCedulaLookupTimer);
-                const value = (cedulaInput.value || '').trim();
-                if (value.length < 5) return;
-                participantCedulaLookupTimer = setTimeout(() => {
-                    cargarDatosParticipantePorCedula();
-                }, 450);
+                clearParticipantFields();
+                currentParticipantData = {};
+                setParticipantAutoFieldsVisible(false);
+                const actions = document.getElementById('participantRegisterActions');
+                if (actions) actions.style.display = 'none';
+                const manualWrap = document.getElementById('participantManualRegistrationSection');
+                if (manualWrap) manualWrap.style.display = 'none';
+                setParticipantLookupStatus('', 'info');
             });
         }
 
@@ -4876,6 +4921,10 @@
             participantRegistrationMode = 'lookup';
             participantManualFieldConfig = [];
             const modal = document.getElementById('participantRegistrationModal');
+            clearParticipantFields();
+            hideParticipantManualRegistration();
+            setParticipantAutoFieldsVisible(false);
+            setParticipantLookupStatus('', 'info');
             if (modal) {
                 modal.style.display = 'flex';
                 modal.classList.add('participant-modal-open');
@@ -4884,9 +4933,6 @@
             setupParticipantCedulaLookup();
             const cedula = document.getElementById('participantCedula');
             if (cedula) cedula.value = '';
-            clearParticipantFields();
-            hideParticipantManualRegistration();
-            setParticipantLookupStatus('', 'info');
             resetParticipantModalPosition();
             requestAnimationFrame(() => {
                 resetParticipantModalPosition();
@@ -14099,20 +14145,15 @@ function makeCronogramaFilterFormula(year, tipo) {
                         <div class="virtual-login-row">
                             <input type="text" id="virtualCedulaInput" placeholder="Ej: 76328229" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault(); Swal.clickConfirm();}">
                             <button type="button" class="btn btn-secondary" onclick="Swal.clickConfirm()" style="white-space:nowrap; min-width:145px;">
-                                <i class="fas fa-search"></i> Cargar datos
+                                <i class="fas fa-search"></i> Presione para cargar datos
                             </button>
                         </div>
                         <small class="virtual-login-note">Los datos se consultan desde la tabla <strong>Personal HSLV</strong>.</small>
-                        ${virtualAutoField('Nombre Completo', 'fa-user')}
-                        ${virtualAutoField('Entidad', 'fa-building')}
-                        ${virtualAutoField('Proceso', 'fa-project-diagram')}
-                        ${virtualAutoField('Perfil', 'fa-user-tag')}
-                        ${virtualAutoField('Cargo', 'fa-briefcase')}
                     </div>
                 `,
                 width: 520,
                 allowOutsideClick: false,
-                confirmButtonText: '<i class="fas fa-search"></i> Cargar datos',
+                confirmButtonText: '<i class="fas fa-search"></i> Presione para cargar datos',
                 showConfirmButton: true,
                 confirmButtonColor: '#6b7280',
                 showCancelButton: !virtualDirectAccessMode,
@@ -14162,15 +14203,10 @@ function makeCronogramaFilterFormula(year, tipo) {
                         <label><i class="fas fa-id-card"></i> Número de Cédula *</label>
                         <div class="virtual-login-row">
                             <input class="virtual-auto-field" value="${escapeHtml(cedula)}" readonly>
-                            <button type="button" class="btn btn-secondary" disabled style="white-space:nowrap; min-width:145px; opacity:.85;"><i class="fas fa-search"></i> Cargar datos</button>
+                            <button type="button" class="btn btn-secondary" disabled style="white-space:nowrap; min-width:145px; opacity:.85;"><i class="fas fa-search"></i> Presione para cargar datos</button>
                         </div>
                         <small class="virtual-login-note">Los datos se consultan desde la tabla <strong>Personal HSLV</strong>.</small>
                         <div class="virtual-not-found">No se encontró ningún colaborador con la cédula ${escapeHtml(cedula)}. Puedes registrarlo para continuar con el curso virtual, el pre-test y el postest.</div>
-                        ${virtualAutoField('Nombre Completo', 'fa-user')}
-                        ${virtualAutoField('Entidad', 'fa-building')}
-                        ${virtualAutoField('Proceso', 'fa-project-diagram')}
-                        ${virtualAutoField('Perfil', 'fa-user-tag')}
-                        ${virtualAutoField('Cargo', 'fa-briefcase')}
                     </div>
                 `,
                 width: 520,
