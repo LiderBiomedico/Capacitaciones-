@@ -3367,7 +3367,23 @@
                         </select>
                     </div>
                 </div>
-                
+
+                <!-- Reporte de Cursos Virtuales -->
+                <div class="card" style="margin-top: 1.25rem; border-left:5px solid #7c3aed;">
+                    <h3><i class="fas fa-video" style="color:#7c3aed;"></i> Reporte de Cursos Virtuales</h3>
+                    <p style="color: #1a1a1a; margin-bottom: 1rem;">Selecciona un curso virtual para ver el reporte con nombre completo, entidad, proceso, perfil, cargo, resultados de la evaluación y su análisis.</p>
+                    <div style="display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end;">
+                        <div class="form-group" style="flex:1; min-width:260px; margin-bottom:0;">
+                            <label><i class="fas fa-list"></i> Curso virtual</label>
+                            <select id="virtualReportCourseSelect">
+                                <option value="">-- Selecciona un curso virtual --</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-light" onclick="loadVirtualReportOptions(true)" title="Recargar lista"><i class="fas fa-sync-alt"></i></button>
+                        <button class="btn btn-primary" style="background:#7c3aed; border-color:#7c3aed;" onclick="generateVirtualReportFromSelect()"><i class="fas fa-chart-column"></i> Generar reporte</button>
+                    </div>
+                </div>
+
                 
                 <!-- Reportes Trimestrales -->
                 <div class="card" style="margin-top: 1.25rem;">
@@ -6115,6 +6131,7 @@
             if (tabName === 'reports') {
                 if (typeof loadReportOptions === 'function') loadReportOptions();
                 if (typeof initQuarterlyReportDefaults === 'function') initQuarterlyReportDefaults();
+                if (typeof loadVirtualReportOptions === 'function') loadVirtualReportOptions(false);
             }
 
             // Al entrar a Personal HSLV, cargar lista de BDs
@@ -13337,7 +13354,6 @@ function makeCronogramaFilterFormula(year, tipo) {
                         </div>
                         <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
                             <button class="btn btn-primary" style="background:#2563eb; border-color:#2563eb;" onclick="playVirtualCourse('${course.id}')"><i class="fas fa-play"></i> Reproducir</button>
-                            <button class="btn btn-secondary" style="background:#7c3aed; border-color:#7c3aed;" onclick="openVirtualCourseReport('${course.id}')"><i class="fas fa-chart-column"></i> Reporte</button>
                             <button class="btn btn-secondary" style="background:#0f766e; border-color:#0f766e;" onclick="showVirtualCourseQR('${course.id}')"><i class="fas fa-qrcode"></i> Código QR</button>
                             <button class="btn btn-light" onclick="deleteVirtualCourse('${course.id}')"><i class="fas fa-trash"></i> Eliminar</button>
                         </div>
@@ -13612,13 +13628,42 @@ function makeCronogramaFilterFormula(year, tipo) {
             return map[type] || map.INFO;
         }
 
+        // Llena el selector de cursos virtuales en la pestaña de Reportes
+        async function loadVirtualReportOptions(forceReload = false) {
+            const select = document.getElementById('virtualReportCourseSelect');
+            if (!select) return;
+            try {
+                if (forceReload || !virtualCourses.length) {
+                    select.innerHTML = '<option value="">Cargando cursos virtuales...</option>';
+                    select.disabled = true;
+                    await loadVirtualCoursesFromAirtable(false);
+                }
+            } catch (e) {
+                console.warn('No se pudieron cargar cursos virtuales para el reporte:', e);
+            }
+            select.disabled = false;
+            const current = select.value;
+            select.innerHTML = '<option value="">-- Selecciona un curso virtual --</option>' +
+                virtualCourses.map(c => `<option value="${escapeHtml(c.id)}">${escapeHtml(c.title || 'Curso virtual')}</option>`).join('');
+            if (current) select.value = current;
+        }
+
+        function generateVirtualReportFromSelect() {
+            const select = document.getElementById('virtualReportCourseSelect');
+            const courseId = select ? select.value : '';
+            if (!courseId) {
+                Swal.fire({ icon: 'info', title: 'Selecciona un curso', text: 'Elige un curso virtual de la lista para generar su reporte.' });
+                return;
+            }
+            openVirtualCourseReport(courseId);
+        }
+
         async function openVirtualCourseReport(courseId) {
             const course = virtualCourses.find(c => c.id === courseId);
             if (!course) {
                 Swal.fire({ icon: 'error', title: 'Curso no encontrado', text: 'No fue posible abrir el reporte.' });
                 return;
-            }
-            Swal.fire({ title: 'Generando reporte...', text: 'Consultando respuestas en Airtable.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            }            Swal.fire({ title: 'Generando reporte...', text: 'Consultando respuestas en Airtable.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             try {
                 const records = await fetchVirtualCourseResponses(course);
                 currentVirtualReportModel = buildVirtualReportModel(course, records);
