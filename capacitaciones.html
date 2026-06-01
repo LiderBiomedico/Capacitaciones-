@@ -713,6 +713,40 @@
             text-align: left;
         }
         .participant-helper-text i { color: var(--primary); margin-right: 0.35rem; }
+
+
+        body.participant-registration-active {
+            overflow: hidden;
+            touch-action: none;
+        }
+
+        #participantRegistrationModal.participant-modal-open {
+            align-items: flex-start !important;
+            justify-content: center !important;
+            padding-top: max(0.85rem, env(safe-area-inset-top));
+            padding-bottom: max(0.85rem, env(safe-area-inset-bottom));
+            overflow-y: hidden;
+        }
+
+        #participantRegistrationModal.participant-modal-open .modal-content {
+            margin: 0 auto !important;
+            max-height: calc(100dvh - 1.7rem);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
+            transform: translateZ(0);
+        }
+
+        @media (max-width: 768px) {
+            #participantRegistrationModal.participant-modal-open {
+                padding: 0.55rem 0.75rem max(0.75rem, env(safe-area-inset-bottom)) 0.75rem !important;
+            }
+            #participantRegistrationModal.participant-modal-open .modal-content {
+                width: min(94vw, 560px) !important;
+                max-height: calc(100dvh - 1.1rem) !important;
+                padding-top: 1.4rem !important;
+            }
+        }
         #participantRegistrationModal .modal-content,
         .swal2-popup.hslv-participant-popup {
             border-radius: 18px !important;
@@ -4829,22 +4863,45 @@
             });
         }
 
+        function resetParticipantModalPosition() {
+            const modal = document.getElementById('participantRegistrationModal');
+            const modalContent = modal ? modal.querySelector('.modal-content') : null;
+            try { window.scrollTo({ top: 0, left: 0, behavior: 'auto' }); } catch (e) { window.scrollTo(0, 0); }
+            if (modal) modal.scrollTop = 0;
+            if (modalContent) modalContent.scrollTop = 0;
+        }
+
         function showParticipantRegistrationModal() {
             currentParticipantData = {};
             participantRegistrationMode = 'lookup';
             participantManualFieldConfig = [];
             const modal = document.getElementById('participantRegistrationModal');
-            if (modal) modal.style.display = 'flex';
+            if (modal) {
+                modal.style.display = 'flex';
+                modal.classList.add('participant-modal-open');
+            }
+            document.body.classList.add('participant-registration-active');
             setupParticipantCedulaLookup();
             const cedula = document.getElementById('participantCedula');
             if (cedula) cedula.value = '';
             clearParticipantFields();
             hideParticipantManualRegistration();
             setParticipantLookupStatus('', 'info');
+            resetParticipantModalPosition();
+            requestAnimationFrame(() => {
+                resetParticipantModalPosition();
+                requestAnimationFrame(resetParticipantModalPosition);
+            });
+            setTimeout(resetParticipantModalPosition, 250);
         }
         
         function closeParticipantModal() {
-            document.getElementById('participantRegistrationModal').style.display = 'none';
+            const modal = document.getElementById('participantRegistrationModal');
+            if (modal) {
+                modal.style.display = 'none';
+                modal.classList.remove('participant-modal-open');
+            }
+            document.body.classList.remove('participant-registration-active');
             hideParticipantManualRegistration();
         }
         
