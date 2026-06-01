@@ -5957,7 +5957,7 @@
                 setTimeout(() => {
                     document.getElementById('loadingScreen').style.display = 'none';
                 }, 250);
-            }, 10000);
+            }, 5000);
 
             // Si viene por QR (participante), NO pedir contraseña
             if (isParticipantFlow()) {
@@ -5967,7 +5967,7 @@
             }
 
             // Esperar a que se oculte la pantalla de inicio antes de pedir contraseña
-            await new Promise(resolve => setTimeout(resolve, 10200));
+            await new Promise(resolve => setTimeout(resolve, 5200));
 
             // Pedir contraseña (guardada en Airtable)
             await enforceAdminPassword();
