@@ -3168,6 +3168,9 @@
                                 <video id="virtualCourseVideo" controls playsinline webkit-playsinline x5-playsinline controlsList="nofullscreen nodownload noremoteplayback" disablePictureInPicture style="width:100%; max-height:70vh; background:#000;"></video>
                                 <div id="virtualYoutubePlayer" style="display:none; width:100%; aspect-ratio:16/9;"></div>
                             </div>
+                            <div id="virtualVideoNotice" style="margin-top:0.75rem; background:#eff6ff; border:1px solid #bfdbfe; color:#1e3a8a; border-radius:14px; padding:0.75rem 0.9rem; font-weight:800; text-align:center; line-height:1.35;">
+                                <i class="fas fa-info-circle"></i> Espere las preguntas en el transcurso del video
+                            </div>
                             <div id="virtualInlineQuestion" aria-live="polite">
                                 <div class="virtual-question-title"><i class="fas fa-question-circle"></i><span id="virtualInlineQuestionTitle">Pregunta de control</span></div>
                                 <p id="virtualInlineQuestionText" class="virtual-question-text"></p>
@@ -14629,26 +14632,49 @@ function makeCronogramaFilterFormula(year, tipo) {
         }
 
         function exitVirtualCourseApp() {
+            // Cierra el curso y fuerza el cierre de la pestaña cuando el navegador lo permite.
+            // En móviles/Chrome, si el QR abrió la pestaña directamente, algunos navegadores bloquean window.close();
+            // por eso se dejan rutas de respaldo para salir de la capacitación sin regresar al curso.
             try {
                 if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(()=>{});
             } catch(e) {}
-            try { window.close(); } catch (e) {}
-            setTimeout(() => {
-                try { closeVirtualCoursePlayer(); } catch (e) {}
+            try { closeVirtualCoursePlayer(); } catch (e) {}
+
+            const showClosedScreen = () => {
                 try {
-                    if (window.opener) {
-                        window.close();
-                        return;
+                    document.body.innerHTML = `
+                        <div style="min-height:100dvh; display:flex; align-items:center; justify-content:center; padding:1.5rem; font-family:Arial, sans-serif; background:#f8fafc; color:#111827; text-align:center;">
+                            <div style="max-width:420px; width:100%; background:#fff; border:1px solid #e5e7eb; border-radius:20px; padding:1.5rem; box-shadow:0 20px 50px rgba(15,23,42,0.12);">
+                                <div style="font-size:2.4rem; margin-bottom:0.6rem;">✅</div>
+                                <h2 style="margin:0 0 0.5rem 0; color:#166534;">Capacitación cerrada</h2>
+                                <p style="margin:0; color:#475569; font-weight:600; line-height:1.45;">Puede cerrar esta pestaña o regresar al navegador.</p>
+                            </div>
+                        </div>`;
+                } catch (e) {}
+            };
+
+            setTimeout(() => {
+                try { window.open('', '_self'); } catch(e) {}
+                try { window.close(); } catch (e) {}
+
+                setTimeout(() => {
+                    try {
+                        if (window.closed) return;
+                        if (window.opener) {
+                            window.close();
+                            return;
+                        }
+                        // Reemplaza la página para que no quede visible el curso cuando el navegador impide cerrar.
+                        if (typeof location.replace === 'function') {
+                            location.replace('about:blank');
+                            return;
+                        }
+                        showClosedScreen();
+                    } catch (e) {
+                        showClosedScreen();
                     }
-                    if (history.length > 1) {
-                        history.back();
-                        return;
-                    }
-                    window.location.href = 'about:blank';
-                } catch (e) {
-                    closeVirtualCoursePlayer();
-                }
-            }, 100);
+                }, 250);
+            }, 120);
         }
 
         async function showVirtualCourseFinalResult() {
