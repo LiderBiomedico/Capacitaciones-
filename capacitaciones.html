@@ -3127,6 +3127,7 @@
                                 <li>Usa videos con URL directa en formato MP4, WEBM u OGG.</li>
                                 <li>Define los tiempos de pausa en segundos, por ejemplo 45, 120 o 360.</li>
                                 <li>Cada checkpoint detiene el video hasta que el participante responda.</li>
+                                <li><strong>Máximo 10 preguntas por curso</strong>, sumando todas las de cada módulo.</li>
                                 <li>Los cursos virtuales quedan guardados en Airtable para que estén disponibles en todos los equipos.</li>
                             </ul>
                         </div>
@@ -3135,7 +3136,10 @@
                     <div class="card" style="margin-top:1rem; background:#fff; border:1px solid #e5e7eb; box-shadow:none;">
                         <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:0.75rem;">
                             <h3 style="margin:0;"><i class="fas fa-film"></i> Módulos del curso</h3>
-                            <button class="btn btn-secondary" onclick="addVirtualModule()"><i class="fas fa-plus"></i> Agregar módulo</button>
+                            <div style="display:flex; align-items:center; gap:0.6rem; flex-wrap:wrap;">
+                                <span id="virtualQuestionCounter" style="background:#ecfdf5; color:#047857; padding:0.3rem 0.7rem; border-radius:999px; font-size:0.82rem; font-weight:800;">0 / 10 preguntas</span>
+                                <button class="btn btn-secondary" onclick="addVirtualModule()"><i class="fas fa-plus"></i> Agregar módulo</button>
+                            </div>
                         </div>
                         <div id="virtualModulesContainer"></div>
                     </div>
@@ -12713,6 +12717,18 @@ function makeCronogramaFilterFormula(year, tipo) {
         const VIRTUAL_RESP_FIELD_TOTAL = 'Total Checkpoints';
         const VIRTUAL_RESP_FIELD_CORRECT_COUNT = 'Correctas';
         const VIRTUAL_RESP_FIELD_PERCENT = 'Porcentaje';
+        // Datos institucionales del participante (se guardan junto a cada respuesta).
+        // Crear estos campos en Airtable como "Texto de una sola línea" (no Single Select).
+        const VIRTUAL_RESP_FIELD_ENTITY = 'Entidad';
+        const VIRTUAL_RESP_FIELD_PROCESS = 'Proceso';
+        const VIRTUAL_RESP_FIELD_PROFILE = 'Perfil';
+        const VIRTUAL_RESP_FIELD_CARGO = 'Cargo';
+        // Campos personales opcionales que se omiten en un reintento si Airtable los rechaza.
+        const VIRTUAL_RESP_PERSONAL_FIELDS = [VIRTUAL_RESP_FIELD_ENTITY, VIRTUAL_RESP_FIELD_PROCESS, VIRTUAL_RESP_FIELD_PROFILE, VIRTUAL_RESP_FIELD_CARGO];
+        // Máximo de preguntas (checkpoints) por curso virtual, sumando todos los módulos.
+        const VIRTUAL_MAX_QUESTIONS = 10;
+        // Nota mínima aprobatoria del curso virtual (porcentaje). 80% = 4.0/5.0
+        const VIRTUAL_PASS_PERCENT = 80;
 
         let virtualCourses = [];
 
@@ -12891,12 +12907,40 @@ function makeCronogramaFilterFormula(year, tipo) {
             return { totalCheckpoints };
         }
 
+        // Construye los campos institucionales del participante para guardarlos junto a cada respuesta.
+        // Solo incluye los que tienen valor (evita enviar cadenas vacías a Airtable).
+        function virtualParticipantPersonalFields() {
+            const p = currentVirtualParticipant || {};
+            const fields = {};
+            const v = (x) => String(x || '').trim();
+            if (v(p.entity))  fields[VIRTUAL_RESP_FIELD_ENTITY]  = v(p.entity);
+            if (v(p.process)) fields[VIRTUAL_RESP_FIELD_PROCESS] = v(p.process);
+            if (v(p.profile)) fields[VIRTUAL_RESP_FIELD_PROFILE] = v(p.profile);
+            if (v(p.cargo))   fields[VIRTUAL_RESP_FIELD_CARGO]   = v(p.cargo);
+            return fields;
+        }
+
         async function saveVirtualResponseRecord(payloadFields) {
-            await virtualCourseProxy({
-                method: 'POST',
-                path: airtableTablePath(VIRTUAL_RESPONSES_TABLE),
-                body: { fields: payloadFields }
-            });
+            try {
+                await virtualCourseProxy({
+                    method: 'POST',
+                    path: airtableTablePath(VIRTUAL_RESPONSES_TABLE),
+                    body: { fields: payloadFields }
+                });
+            } catch (err) {
+                // Si Airtable rechaza el registro porque algún campo institucional aún no existe
+                // (o tiene un tipo incompatible), reintenta SIN esos campos para no perder la respuesta.
+                const hasPersonal = VIRTUAL_RESP_PERSONAL_FIELDS.some(k => k in payloadFields);
+                if (!hasPersonal) throw err;
+                const reduced = { ...payloadFields };
+                VIRTUAL_RESP_PERSONAL_FIELDS.forEach(k => delete reduced[k]);
+                console.warn('No se pudieron guardar los campos institucionales en la respuesta; se reintenta sin ellos. Crea los campos Entidad, Proceso, Perfil y Cargo (texto) en la tabla de respuestas.', err);
+                await virtualCourseProxy({
+                    method: 'POST',
+                    path: airtableTablePath(VIRTUAL_RESPONSES_TABLE),
+                    body: { fields: reduced }
+                });
+            }
         }
 
         async function saveVirtualCheckpointResult(moduleIndex, checkpoint, selected, isCorrect) {
@@ -12925,7 +12969,8 @@ function makeCronogramaFilterFormula(year, tipo) {
                 [VIRTUAL_RESP_FIELD_SCORE]: isCorrect ? 100 : 0,
                 [VIRTUAL_RESP_FIELD_TOTAL]: totals.totalCheckpoints,
                 [VIRTUAL_RESP_FIELD_CORRECT_COUNT]: correctCount,
-                [VIRTUAL_RESP_FIELD_PERCENT]: percentage
+                [VIRTUAL_RESP_FIELD_PERCENT]: percentage,
+                ...virtualParticipantPersonalFields()
             };
             await saveVirtualResponseRecord(fields);
         }
@@ -12947,7 +12992,8 @@ function makeCronogramaFilterFormula(year, tipo) {
                 [VIRTUAL_RESP_FIELD_CORRECT_COUNT]: correctCount,
                 [VIRTUAL_RESP_FIELD_PERCENT]: percentage,
                 [VIRTUAL_RESP_FIELD_RESULT]: `${correctCount}/${totals.totalCheckpoints}`,
-                [VIRTUAL_RESP_FIELD_SCORE]: percentage
+                [VIRTUAL_RESP_FIELD_SCORE]: percentage,
+                ...virtualParticipantPersonalFields()
             };
             await saveVirtualResponseRecord(fields);
         }
@@ -13022,6 +13068,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             if (!document.getElementById('virtualModulesContainer').children.length) {
                 addVirtualModule();
             }
+            updateVirtualQuestionCounter();
         }
 
         function closeVirtualCourseBuilder() {
@@ -13054,19 +13101,21 @@ function makeCronogramaFilterFormula(year, tipo) {
                     <div class="form-group" style="margin-top:0.85rem; margin-bottom:0;"><label>Descripción del módulo</label><textarea class="virtual-module-description" rows="2" placeholder="Resumen breve del contenido del video"></textarea></div>
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-top:1rem; margin-bottom:0.5rem;">
                         <h5 style="margin:0; color:#111827;"><i class="fas fa-stopwatch" style="color:#16a34a;"></i> Checkpoints de preguntas</h5>
-                        <button class="btn btn-secondary" onclick="addVirtualCheckpoint('${moduleId}')"><i class="fas fa-plus"></i> Agregar checkpoint</button>
+                        <button class="btn btn-secondary virtual-add-checkpoint-btn" onclick="addVirtualCheckpoint('${moduleId}')"><i class="fas fa-plus"></i> Agregar checkpoint</button>
                     </div>
                     <div class="virtual-checkpoints"></div>
                 </div>`;
             container.insertAdjacentHTML('beforeend', html);
-            addVirtualCheckpoint(moduleId);
+            addVirtualCheckpoint(moduleId, true);
             renumberVirtualModules();
+            updateVirtualQuestionCounter();
         }
 
         function removeVirtualModule(moduleId) {
             const el = document.getElementById(moduleId);
             if (el) el.remove();
             renumberVirtualModules();
+            updateVirtualQuestionCounter();
         }
 
         function renumberVirtualModules() {
@@ -13076,9 +13125,45 @@ function makeCronogramaFilterFormula(year, tipo) {
             });
         }
 
-        function addVirtualCheckpoint(moduleId) {
+        // Cuenta el total de preguntas (checkpoints) en TODO el constructor (todos los módulos)
+        function countVirtualQuestions() {
+            return document.querySelectorAll('#virtualModulesContainer .virtual-checkpoint-card').length;
+        }
+
+        // Actualiza el contador visible "X / 10 preguntas" y habilita/deshabilita los botones de agregar
+        function updateVirtualQuestionCounter() {
+            const total = countVirtualQuestions();
+            const counter = document.getElementById('virtualQuestionCounter');
+            if (counter) {
+                counter.textContent = `${total} / ${VIRTUAL_MAX_QUESTIONS} preguntas`;
+                const limit = total >= VIRTUAL_MAX_QUESTIONS;
+                counter.style.background = limit ? '#fee2e2' : '#ecfdf5';
+                counter.style.color = limit ? '#b91c1c' : '#047857';
+            }
+            // Deshabilitar los botones "Agregar checkpoint" al alcanzar el máximo
+            document.querySelectorAll('#virtualModulesContainer .virtual-add-checkpoint-btn').forEach(btn => {
+                const limit = total >= VIRTUAL_MAX_QUESTIONS;
+                btn.disabled = limit;
+                btn.style.opacity = limit ? '0.5' : '1';
+                btn.style.cursor = limit ? 'not-allowed' : 'pointer';
+            });
+        }
+
+        function addVirtualCheckpoint(moduleId, silent = false) {
             const module = document.getElementById(moduleId);
             if (!module) return;
+            // Límite máximo de preguntas por curso (sumando todos los módulos)
+            if (countVirtualQuestions() >= VIRTUAL_MAX_QUESTIONS) {
+                if (!silent && window.Swal) {
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'Límite de preguntas alcanzado',
+                        text: `Cada curso virtual admite un máximo de ${VIRTUAL_MAX_QUESTIONS} preguntas en total (sumando todos los módulos).`
+                    });
+                }
+                updateVirtualQuestionCounter();
+                return;
+            }
             const container = module.querySelector('.virtual-checkpoints');
             const index = container.querySelectorAll('.virtual-checkpoint-card').length + 1;
             const cpId = `${moduleId}-checkpoint-${Date.now()}-${index}`;
@@ -13103,11 +13188,13 @@ function makeCronogramaFilterFormula(year, tipo) {
                     </div>
                 </div>`;
             container.insertAdjacentHTML('beforeend', html);
+            updateVirtualQuestionCounter();
         }
 
         function removeVirtualCheckpoint(cpId) {
             const el = document.getElementById(cpId);
             if (el) el.remove();
+            updateVirtualQuestionCounter();
         }
 
         function collectVirtualCourseData() {
@@ -13146,6 +13233,11 @@ function makeCronogramaFilterFormula(year, tipo) {
                 }).sort((x, y) => x.time - y.time);
                 return { id: `module-${moduleIdx + 1}-${Date.now()}`, title: moduleTitle, description: moduleDescription, videoUrl, checkpoints };
             });
+
+            const totalQuestions = modules.reduce((acc, m) => acc + (m.checkpoints?.length || 0), 0);
+            if (totalQuestions > VIRTUAL_MAX_QUESTIONS) {
+                throw new Error(`El curso tiene ${totalQuestions} preguntas y el máximo permitido es ${VIRTUAL_MAX_QUESTIONS}. Elimina ${totalQuestions - VIRTUAL_MAX_QUESTIONS} pregunta(s).`);
+            }
 
             return { id: `virtual-${Date.now()}`, accessCode: generateVirtualAccessCode(), title, description, instructor, audience, modules, createdAt: new Date().toISOString() };
         }
@@ -13245,6 +13337,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                         </div>
                         <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
                             <button class="btn btn-primary" style="background:#2563eb; border-color:#2563eb;" onclick="playVirtualCourse('${course.id}')"><i class="fas fa-play"></i> Reproducir</button>
+                            <button class="btn btn-secondary" style="background:#7c3aed; border-color:#7c3aed;" onclick="openVirtualCourseReport('${course.id}')"><i class="fas fa-chart-column"></i> Reporte</button>
                             <button class="btn btn-secondary" style="background:#0f766e; border-color:#0f766e;" onclick="showVirtualCourseQR('${course.id}')"><i class="fas fa-qrcode"></i> Código QR</button>
                             <button class="btn btn-light" onclick="deleteVirtualCourse('${course.id}')"><i class="fas fa-trash"></i> Eliminar</button>
                         </div>
@@ -13348,7 +13441,450 @@ function makeCronogramaFilterFormula(year, tipo) {
             document.body.removeChild(a);
         }
 
-        // ==================== INGRESO POR CÉDULA (igual que pretest/postest) ====================
+        // ==================== REPORTE DE CURSOS VIRTUALES ====================
+        // Incluye datos institucionales del participante (nombre completo, entidad,
+        // proceso, perfil, cargo) + resultados de la evaluación y su análisis.
+        let currentVirtualReportModel = null;
+
+        // Lee un campo con varios alias posibles
+        function virtualRespValue(fields, keys) {
+            for (const k of keys) {
+                if (fields[k] !== undefined && fields[k] !== null && String(fields[k]).trim() !== '') {
+                    return String(fields[k]).trim();
+                }
+            }
+            return '';
+        }
+
+        // Descarga todas las respuestas y filtra por curso en el cliente (robusto ante nombres con espacios)
+        async function fetchVirtualCourseResponses(course) {
+            const all = [];
+            let offset = null;
+            let pages = 0;
+            do {
+                const params = new URLSearchParams();
+                params.set('pageSize', '100');
+                if (offset) params.set('offset', offset);
+                const data = await virtualCourseProxy({
+                    method: 'GET',
+                    path: `${airtableTablePath(VIRTUAL_RESPONSES_TABLE)}?${params.toString()}`,
+                    body: null
+                });
+                (Array.isArray(data.records) ? data.records : []).forEach(r => all.push(r));
+                offset = data.offset || null;
+                pages++;
+            } while (offset && pages < 25);
+
+            const courseId = String(course.id || '');
+            const courseTitle = String(course.title || '').trim().toLowerCase();
+            return all.filter(r => {
+                const f = r.fields || {};
+                const cid = virtualRespValue(f, [VIRTUAL_RESP_FIELD_COURSE_ID, 'Curso ID']);
+                const ctitle = virtualRespValue(f, [VIRTUAL_RESP_FIELD_COURSE, 'Curso Virtual']).toLowerCase();
+                if (cid) return cid === courseId;
+                return courseTitle && ctitle === courseTitle; // respaldo para registros antiguos sin Curso ID
+            });
+        }
+
+        function isVirtualSummaryRow(f) {
+            const modulo = virtualRespValue(f, [VIRTUAL_RESP_FIELD_MODULE, 'Módulo']);
+            const tipo = virtualRespValue(f, [VIRTUAL_RESP_FIELD_TYPE, 'Tipo Registro']);
+            if (modulo === 'Resumen final') return true;
+            return tipo && tipo.toLowerCase() !== 'checkpoint';
+        }
+
+        function virtualPercentToGrade(percent) {
+            return Math.round((Number(percent || 0) / 100) * 5 * 10) / 10;
+        }
+
+        // Construye el modelo del reporte agrupando por cédula
+        function buildVirtualReportModel(course, records) {
+            const byCedula = new Map();
+            records.forEach(rec => {
+                const f = rec.fields || {};
+                const cedula = virtualRespValue(f, [VIRTUAL_RESP_FIELD_CEDULA, 'Cédula', 'Cedula']) || '(sin cédula)';
+                if (!byCedula.has(cedula)) byCedula.set(cedula, []);
+                byCedula.get(cedula).push(f);
+            });
+
+            const participants = [];
+            byCedula.forEach((rows, cedula) => {
+                const dateOf = (f) => new Date(virtualRespValue(f, [VIRTUAL_RESP_FIELD_DATE, 'Fecha Respuesta']) || 0).getTime();
+                const sorted = [...rows].sort((a, b) => dateOf(a) - dateOf(b));
+                const summaries = sorted.filter(isVirtualSummaryRow);
+                const checkpoints = sorted.filter(f => !isVirtualSummaryRow(f));
+                const lastSummary = summaries.length ? summaries[summaries.length - 1] : null;
+                const anyRow = lastSummary || sorted[sorted.length - 1] || {};
+
+                let correct, total, percent, statusRaw;
+                if (lastSummary) {
+                    correct = Number(virtualRespValue(lastSummary, [VIRTUAL_RESP_FIELD_CORRECT_COUNT, 'Correctas']) || 0);
+                    total = Number(virtualRespValue(lastSummary, [VIRTUAL_RESP_FIELD_TOTAL, 'Total Checkpoints']) || 0);
+                    percent = Number(virtualRespValue(lastSummary, [VIRTUAL_RESP_FIELD_PERCENT, 'Porcentaje']) || 0);
+                    statusRaw = virtualRespValue(lastSummary, [VIRTUAL_RESP_FIELD_TYPE, 'Tipo Registro']);
+                } else {
+                    correct = checkpoints.filter(f => virtualRespValue(f, [VIRTUAL_RESP_FIELD_RESULT, 'Resultado']).toLowerCase() === 'correcta').length;
+                    total = checkpoints.reduce((m, f) => Math.max(m, Number(virtualRespValue(f, [VIRTUAL_RESP_FIELD_TOTAL, 'Total Checkpoints']) || 0)), 0) || checkpoints.length;
+                    percent = total ? Math.round((correct / total) * 100) : 0;
+                    statusRaw = '';
+                }
+
+                let passed;
+                const sl = (statusRaw || '').toLowerCase();
+                if (sl.startsWith('aprob')) passed = true;
+                else if (sl.startsWith('reprob')) passed = false;
+                else passed = percent >= VIRTUAL_PASS_PERCENT;
+
+                // Buscar datos institucionales en cualquier fila (preferir el resumen)
+                const fieldFrom = (keys) => {
+                    if (lastSummary && virtualRespValue(lastSummary, keys)) return virtualRespValue(lastSummary, keys);
+                    for (const f of sorted) { const v = virtualRespValue(f, keys); if (v) return v; }
+                    return '';
+                };
+
+                participants.push({
+                    cedula,
+                    name: fieldFrom([VIRTUAL_RESP_FIELD_PARTICIPANT, 'Participante']) || '(sin nombre)',
+                    entity: fieldFrom([VIRTUAL_RESP_FIELD_ENTITY, 'Entidad']),
+                    process: fieldFrom([VIRTUAL_RESP_FIELD_PROCESS, 'Proceso']),
+                    profile: fieldFrom([VIRTUAL_RESP_FIELD_PROFILE, 'Perfil']),
+                    cargo: fieldFrom([VIRTUAL_RESP_FIELD_CARGO, 'Cargo']),
+                    correct, total, percent,
+                    grade: virtualPercentToGrade(percent),
+                    passed,
+                    status: passed ? 'Aprobado' : 'Reprobado',
+                    date: virtualRespValue(anyRow, [VIRTUAL_RESP_FIELD_DATE, 'Fecha Respuesta']),
+                    attempts: summaries.length || 1
+                });
+            });
+
+            participants.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+
+            const totalParticipants = participants.length;
+            const approved = participants.filter(p => p.passed).length;
+            const failed = totalParticipants - approved;
+            const passRate = totalParticipants ? Math.round((approved / totalParticipants) * 100) : 0;
+            const avgPercent = totalParticipants ? Math.round(participants.reduce((s, p) => s + p.percent, 0) / totalParticipants) : 0;
+            const avgGrade = virtualPercentToGrade(avgPercent);
+
+            return {
+                course,
+                generatedAt: new Date(),
+                participants,
+                kpis: { totalParticipants, approved, failed, passRate, avgPercent, avgGrade, totalResponses: records.length }
+            };
+        }
+
+        // Análisis dinámico con etiquetas de color
+        function buildVirtualReportInsights(model) {
+            const k = model.kpis;
+            const insights = [];
+            if (!k.totalParticipants) {
+                insights.push({ type: 'INFO', text: 'Aún no hay respuestas registradas para este curso virtual. El análisis se generará cuando los colaboradores completen la evaluación.' });
+                return insights;
+            }
+            if (k.passRate >= 80) {
+                insights.push({ type: 'POSITIVO', text: `El ${k.passRate}% de los participantes aprobó el curso virtual (nota mínima ${VIRTUAL_PASS_PERCENT}%, equivalente a 4.0/5.0), lo que refleja una buena asimilación del contenido.` });
+            } else if (k.passRate >= 60) {
+                insights.push({ type: 'ALERTA', text: `La tasa de aprobación fue del ${k.passRate}%. Es aceptable, pero conviene reforzar los temas con mayor número de respuestas incorrectas.` });
+            } else {
+                insights.push({ type: 'CRITICO', text: `Solo el ${k.passRate}% de los participantes aprobó el curso virtual. Se recomienda un plan de refuerzo y nueva evaluación para quienes no alcanzaron la competencia mínima.` });
+            }
+            insights.push({ type: 'DATO', text: `El promedio general de aciertos fue del ${k.avgPercent}%, con una nota promedio de ${k.avgGrade}/5.0.` });
+            insights.push({ type: 'INFO', text: `Participaron ${k.totalParticipants} colaborador(es), con un total de ${k.totalResponses} registro(s) almacenados en la tabla de respuestas.` });
+            if (k.failed > 0) {
+                insights.push({ type: 'PLAN', text: `${k.failed} participante(s) no aprobaron y deben repetir la capacitación para alcanzar la competencia requerida.` });
+            } else if (k.totalParticipants > 0) {
+                insights.push({ type: 'POSITIVO', text: 'Todos los participantes evaluados aprobaron el curso virtual.' });
+            }
+            return insights;
+        }
+
+        function virtualInsightStyle(type) {
+            const map = {
+                POSITIVO: { bg: '#ecfdf5', color: '#047857', bar: '#10b981' },
+                ALERTA:   { bg: '#fffbeb', color: '#b45309', bar: '#f59e0b' },
+                CRITICO:  { bg: '#fef2f2', color: '#b91c1c', bar: '#ef4444' },
+                DATO:     { bg: '#eff6ff', color: '#1d4ed8', bar: '#3b82f6' },
+                INFO:     { bg: '#f8fafc', color: '#334155', bar: '#94a3b8' },
+                PLAN:     { bg: '#faf5ff', color: '#7c3aed', bar: '#a855f7' }
+            };
+            return map[type] || map.INFO;
+        }
+
+        async function openVirtualCourseReport(courseId) {
+            const course = virtualCourses.find(c => c.id === courseId);
+            if (!course) {
+                Swal.fire({ icon: 'error', title: 'Curso no encontrado', text: 'No fue posible abrir el reporte.' });
+                return;
+            }
+            Swal.fire({ title: 'Generando reporte...', text: 'Consultando respuestas en Airtable.', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            try {
+                const records = await fetchVirtualCourseResponses(course);
+                currentVirtualReportModel = buildVirtualReportModel(course, records);
+                Swal.close();
+                renderVirtualReportModal(currentVirtualReportModel);
+            } catch (err) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No se pudo generar el reporte',
+                    html: `Verifica que exista la tabla <strong>Respuestas Cursos Virtuales</strong> en Airtable.<br><br>${escapeHtml(err.message || '')}`
+                });
+            }
+        }
+
+        function renderVirtualReportModal(model) {
+            const k = model.kpis;
+            const insights = buildVirtualReportInsights(model);
+
+            const kpiCard = (value, label, color) => `
+                <div style="flex:1; min-width:120px; background:#fff; border:1px solid #e5e7eb; border-radius:12px; padding:0.85rem 1rem; text-align:center;">
+                    <div style="font-size:1.6rem; font-weight:900; color:${color};">${value}</div>
+                    <div style="font-size:0.78rem; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">${label}</div>
+                </div>`;
+
+            const rowsHtml = model.participants.length ? model.participants.map((p, i) => `
+                <tr style="border-bottom:1px solid #eef2f7;">
+                    <td style="padding:0.5rem 0.6rem; color:#64748b;">${i + 1}</td>
+                    <td style="padding:0.5rem 0.6rem; font-weight:700; color:#111827;">${escapeHtml(p.name)}</td>
+                    <td style="padding:0.5rem 0.6rem; color:#334155;">${escapeHtml(p.cedula)}</td>
+                    <td style="padding:0.5rem 0.6rem; color:#334155;">${escapeHtml(p.entity || '-')}</td>
+                    <td style="padding:0.5rem 0.6rem; color:#334155;">${escapeHtml(p.process || '-')}</td>
+                    <td style="padding:0.5rem 0.6rem; color:#334155;">${escapeHtml(p.profile || '-')}</td>
+                    <td style="padding:0.5rem 0.6rem; color:#334155;">${escapeHtml(p.cargo || '-')}</td>
+                    <td style="padding:0.5rem 0.6rem; text-align:center; color:#111827;">${p.correct}/${p.total}</td>
+                    <td style="padding:0.5rem 0.6rem; text-align:center; font-weight:800; color:${p.passed ? '#047857' : '#b91c1c'};">${p.percent}%</td>
+                    <td style="padding:0.5rem 0.6rem; text-align:center; color:#111827;">${p.grade.toFixed(1)}</td>
+                    <td style="padding:0.5rem 0.6rem; text-align:center;">
+                        <span style="background:${p.passed ? '#ecfdf5' : '#fef2f2'}; color:${p.passed ? '#047857' : '#b91c1c'}; padding:0.2rem 0.6rem; border-radius:999px; font-size:0.75rem; font-weight:800;">${p.status}</span>
+                    </td>
+                    <td style="padding:0.5rem 0.6rem; color:#64748b; white-space:nowrap;">${escapeHtml(formatDateForReport(p.date))}</td>
+                </tr>`).join('') : `<tr><td colspan="12" style="padding:1.5rem; text-align:center; color:#64748b;">Aún no hay respuestas registradas para este curso virtual.</td></tr>`;
+
+            const insightsHtml = insights.map(ins => {
+                const s = virtualInsightStyle(ins.type);
+                return `<div style="display:flex; gap:0.75rem; background:${s.bg}; border-left:4px solid ${s.bar}; border-radius:8px; padding:0.7rem 0.9rem; margin-bottom:0.6rem;">
+                    <span style="flex:0 0 auto; align-self:flex-start; background:${s.bar}; color:#fff; font-size:0.66rem; font-weight:800; letter-spacing:0.5px; padding:0.15rem 0.5rem; border-radius:6px;">${ins.type}</span>
+                    <span style="color:${s.color}; font-size:0.9rem; line-height:1.45; font-weight:500;">${escapeHtml(ins.text)}</span>
+                </div>`;
+            }).join('');
+
+            const existing = document.getElementById('virtualReportModal');
+            if (existing) existing.remove();
+
+            const overlay = document.createElement('div');
+            overlay.id = 'virtualReportModal';
+            overlay.className = 'modal-overlay';
+            overlay.style.cssText = 'display:flex; align-items:flex-start; overflow:auto; padding:2rem 1rem; position:fixed; inset:0; background:rgba(15,23,42,0.55); z-index:9999;';
+            overlay.innerHTML = `
+                <div style="max-width:1180px; width:100%; position:relative; background:#fff; border-radius:18px; padding:1.5rem; box-shadow:0 20px 45px rgba(15,23,42,0.25);">
+                    <button onclick="closeVirtualReportModal()" style="position:absolute; top:1rem; right:1rem; border:none; background:#f1f5f9; width:38px; height:38px; border-radius:50%; font-size:1.2rem; cursor:pointer; color:#475569;">&times;</button>
+                    <div style="padding-right:2.5rem; margin-bottom:1rem;">
+                        <h2 style="margin:0 0 0.3rem 0; color:#111827;"><i class="fas fa-chart-column" style="color:#7c3aed;"></i> Reporte del curso virtual</h2>
+                        <p style="margin:0; color:#64748b; font-weight:600;">${escapeHtml(model.course.title)} &bull; Generado el ${escapeHtml(formatDateForReport(model.generatedAt))}</p>
+                    </div>
+
+                    <div style="display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:1.25rem;">
+                        ${kpiCard(k.totalParticipants, 'Participantes', '#1d4ed8')}
+                        ${kpiCard(k.approved, 'Aprobados', '#047857')}
+                        ${kpiCard(k.failed, 'Reprobados', '#b91c1c')}
+                        ${kpiCard(k.passRate + '%', 'Aprobación', '#7c3aed')}
+                        ${kpiCard(k.avgPercent + '%', 'Promedio', '#0f766e')}
+                        ${kpiCard(k.avgGrade.toFixed(1), 'Nota prom.', '#b45309')}
+                    </div>
+
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:0.6rem;">
+                        <h3 style="margin:0; color:#111827; font-size:1.05rem;"><i class="fas fa-users" style="color:#2563eb;"></i> Detalle por participante</h3>
+                        <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                            <button class="btn btn-secondary" style="background:#16a34a; border-color:#16a34a;" onclick="exportVirtualReportExcel()"><i class="fas fa-file-excel"></i> Excel</button>
+                            <button class="btn btn-secondary" style="background:#dc2626; border-color:#dc2626;" onclick="exportVirtualReportPDF()"><i class="fas fa-file-pdf"></i> PDF</button>
+                        </div>
+                    </div>
+
+                    <div style="overflow:auto; border:1px solid #e5e7eb; border-radius:12px; max-height:48vh;">
+                        <table style="width:100%; border-collapse:collapse; font-size:0.86rem; min-width:980px;">
+                            <thead>
+                                <tr style="background:#f8fafc; position:sticky; top:0;">
+                                    <th style="padding:0.6rem; text-align:left; color:#475569; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.4px;">#</th>
+                                    <th style="padding:0.6rem; text-align:left; color:#475569; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.4px;">Nombre completo</th>
+                                    <th style="padding:0.6rem; text-align:left; color:#475569; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.4px;">Cédula</th>
+                                    <th style="padding:0.6rem; text-align:left; color:#475569; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.4px;">Entidad</th>
+                                    <th style="padding:0.6rem; text-align:left; color:#475569; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.4px;">Proceso</th>
+                                    <th style="padding:0.6rem; text-align:left; color:#475569; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.4px;">Perfil</th>
+                                    <th style="padding:0.6rem; text-align:left; color:#475569; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.4px;">Cargo</th>
+                                    <th style="padding:0.6rem; text-align:center; color:#475569; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.4px;">Aciertos</th>
+                                    <th style="padding:0.6rem; text-align:center; color:#475569; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.4px;">%</th>
+                                    <th style="padding:0.6rem; text-align:center; color:#475569; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.4px;">Nota</th>
+                                    <th style="padding:0.6rem; text-align:center; color:#475569; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.4px;">Resultado</th>
+                                    <th style="padding:0.6rem; text-align:left; color:#475569; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.4px;">Fecha</th>
+                                </tr>
+                            </thead>
+                            <tbody>${rowsHtml}</tbody>
+                        </table>
+                    </div>
+
+                    <h3 style="margin:1.4rem 0 0.6rem 0; color:#111827; font-size:1.05rem;"><i class="fas fa-lightbulb" style="color:#f59e0b;"></i> Análisis de resultados</h3>
+                    ${insightsHtml}
+                </div>`;
+            document.body.appendChild(overlay);
+            overlay.addEventListener('click', (e) => { if (e.target === overlay) closeVirtualReportModal(); });
+        }
+
+        function closeVirtualReportModal() {
+            const el = document.getElementById('virtualReportModal');
+            if (el) el.remove();
+        }
+
+        // Limpia emojis / caracteres Unicode no soportados por jsPDF
+        function virtualCleanForPdf(text) {
+            return String(text || '')
+                .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+                .replace(/[\u{2600}-\u{27BF}]/gu, '')
+                .replace(/[\u{FE00}-\u{FE0F}]/gu, '')
+                .replace(/[\u{200D}\u{20E3}]/gu, '')
+                .replace(/[\u{2139}\u{2705}\u{26A0}]/gu, '')
+                .replace(/\u{2265}/gu, '>=')
+                .replace(/\u{2264}/gu, '<=')
+                .replace(/[\u{2013}\u{2014}]/gu, '-')
+                .replace(/[\u{201C}\u{201D}]/gu, '"')
+                .replace(/[\u{2018}\u{2019}]/gu, "'")
+                .replace(/\u{2022}/gu, '-')
+                .trim();
+        }
+
+        function exportVirtualReportPDF() {
+            const model = currentVirtualReportModel;
+            if (!model) return;
+            try {
+                const { jsPDF } = window.jspdf;
+                const doc = new jsPDF('l', 'mm', 'a4');
+                const pageWidth = doc.internal.pageSize.getWidth();
+                const margin = 12;
+                const k = model.kpis;
+
+                doc.setFillColor(124, 58, 237);
+                doc.rect(0, 0, pageWidth, 22, 'F');
+                doc.setTextColor(255, 255, 255);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(15);
+                doc.text('Reporte de Curso Virtual', margin, 10);
+                doc.setFont('helvetica', 'normal');
+                doc.setFontSize(9);
+                doc.text(virtualCleanForPdf(model.course.title), margin, 16);
+                doc.text('Hospital Susana Lopez de Valencia E.S.E.', pageWidth - margin, 10, { align: 'right' });
+                doc.text('Generado: ' + virtualCleanForPdf(formatDateForReport(model.generatedAt)), pageWidth - margin, 16, { align: 'right' });
+
+                doc.setTextColor(51, 65, 85);
+                doc.setFontSize(10);
+                const kpiLine = `Participantes: ${k.totalParticipants}   |   Aprobados: ${k.approved}   |   Reprobados: ${k.failed}   |   Aprobacion: ${k.passRate}%   |   Promedio: ${k.avgPercent}% (${k.avgGrade.toFixed(1)}/5.0)`;
+                doc.text(kpiLine, margin, 30);
+
+                const head = [['#', 'Nombre completo', 'Cedula', 'Entidad', 'Proceso', 'Perfil', 'Cargo', 'Aciertos', '%', 'Nota', 'Resultado', 'Fecha']];
+                const body = model.participants.map((p, i) => [
+                    i + 1,
+                    virtualCleanForPdf(p.name),
+                    virtualCleanForPdf(p.cedula),
+                    virtualCleanForPdf(p.entity || '-'),
+                    virtualCleanForPdf(p.process || '-'),
+                    virtualCleanForPdf(p.profile || '-'),
+                    virtualCleanForPdf(p.cargo || '-'),
+                    `${p.correct}/${p.total}`,
+                    `${p.percent}%`,
+                    p.grade.toFixed(1),
+                    p.status,
+                    virtualCleanForPdf(formatDateForReport(p.date))
+                ]);
+
+                doc.autoTable({
+                    head, body,
+                    startY: 35,
+                    margin: { left: margin, right: margin },
+                    styles: { fontSize: 7.5, cellPadding: 1.6, overflow: 'linebreak', valign: 'middle' },
+                    headStyles: { fillColor: [124, 58, 237], textColor: 255, fontStyle: 'bold', fontSize: 7.5 },
+                    alternateRowStyles: { fillColor: [248, 250, 252] },
+                    columnStyles: {
+                        0: { cellWidth: 8, halign: 'center' },
+                        7: { halign: 'center' },
+                        8: { halign: 'center', fontStyle: 'bold' },
+                        9: { halign: 'center' },
+                        10: { halign: 'center' }
+                    },
+                    didParseCell: (data) => {
+                        if (data.section === 'body' && data.column.index === 10) {
+                            const passed = String(data.cell.raw).toLowerCase().startsWith('aprob');
+                            data.cell.styles.textColor = passed ? [4, 120, 87] : [185, 28, 28];
+                            data.cell.styles.fontStyle = 'bold';
+                        }
+                    }
+                });
+
+                let y = (doc.lastAutoTable?.finalY || 40) + 8;
+                const pageHeight = doc.internal.pageSize.getHeight();
+                if (y > pageHeight - 30) { doc.addPage(); y = 20; }
+                doc.setTextColor(17, 24, 39);
+                doc.setFont('helvetica', 'bold');
+                doc.setFontSize(12);
+                doc.text('Analisis de resultados', margin, y);
+                y += 6;
+
+                const insights = buildVirtualReportInsights(model);
+                doc.setFontSize(9);
+                insights.forEach(ins => {
+                    const s = virtualInsightStyle(ins.type);
+                    const rgb = (hex) => [parseInt(hex.slice(1, 3), 16), parseInt(hex.slice(3, 5), 16), parseInt(hex.slice(5, 7), 16)];
+                    const barRgb = rgb(s.bar);
+                    const text = virtualCleanForPdf(`[${ins.type}] ${ins.text}`);
+                    const lines = doc.splitTextToSize(text, pageWidth - 2 * margin - 6);
+                    const boxH = lines.length * 4.4 + 4;
+                    if (y + boxH > pageHeight - 12) { doc.addPage(); y = 20; }
+                    doc.setFillColor(barRgb[0], barRgb[1], barRgb[2]);
+                    doc.rect(margin, y, 1.6, boxH, 'F');
+                    doc.setTextColor(51, 65, 85);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(lines, margin + 4, y + 5);
+                    y += boxH + 3;
+                });
+
+                const fileName = `Reporte_CursoVirtual_${String(model.course.title || 'curso').replace(/[^a-z0-9]+/gi, '_').slice(0, 40)}_${formatDateForFile(new Date())}.pdf`;
+                doc.save(fileName);
+            } catch (err) {
+                console.error('Error al exportar PDF del reporte virtual:', err);
+                Swal.fire({ icon: 'error', title: 'No se pudo generar el PDF', text: err.message || 'Intenta nuevamente.' });
+            }
+        }
+
+        function exportVirtualReportExcel() {
+            const model = currentVirtualReportModel;
+            if (!model) return;
+            try {
+                const k = model.kpis;
+                const aoa = [];
+                aoa.push(['REPORTE DE CURSO VIRTUAL']);
+                aoa.push([model.course.title]);
+                aoa.push(['Generado', formatDateForReport(model.generatedAt)]);
+                aoa.push([]);
+                aoa.push(['Participantes', k.totalParticipants, 'Aprobados', k.approved, 'Reprobados', k.failed]);
+                aoa.push(['Aprobación (%)', k.passRate, 'Promedio (%)', k.avgPercent, 'Nota prom.', k.avgGrade]);
+                aoa.push([]);
+                aoa.push(['#', 'Nombre completo', 'Cédula', 'Entidad', 'Proceso', 'Perfil', 'Cargo', 'Correctas', 'Total', '%', 'Nota', 'Resultado', 'Fecha']);
+                model.participants.forEach((p, i) => {
+                    aoa.push([i + 1, p.name, p.cedula, p.entity || '', p.process || '', p.profile || '', p.cargo || '', p.correct, p.total, p.percent, p.grade, p.status, formatDateForReport(p.date)]);
+                });
+                aoa.push([]);
+                aoa.push(['ANÁLISIS DE RESULTADOS']);
+                buildVirtualReportInsights(model).forEach(ins => aoa.push([ins.type, ins.text]));
+
+                const ws = XLSX.utils.aoa_to_sheet(aoa);
+                ws['!cols'] = [{ wch: 5 }, { wch: 28 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 10 }, { wch: 8 }, { wch: 7 }, { wch: 7 }, { wch: 12 }, { wch: 18 }];
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Reporte');
+                const fileName = `Reporte_CursoVirtual_${String(model.course.title || 'curso').replace(/[^a-z0-9]+/gi, '_').slice(0, 40)}_${formatDateForFile(new Date())}.xlsx`;
+                XLSX.writeFile(wb, fileName);
+            } catch (err) {
+                console.error('Error al exportar Excel del reporte virtual:', err);
+                Swal.fire({ icon: 'error', title: 'No se pudo generar el Excel', text: err.message || 'Intenta nuevamente.' });
+            }
+        }
         let virtualPersonalCache = null;
 
         async function buscarNombrePorCedula(cedula) {
