@@ -2798,6 +2798,86 @@
         </div>
     </div>
 
+    <!-- ==================== LOGIN (Usuario + Contraseña) ==================== -->
+    <style>
+        #loginScreen{position:fixed;inset:0;z-index:99990;display:none;align-items:center;justify-content:center;padding:1.25rem;
+            background:radial-gradient(1200px 800px at 50% -10%, #13284f 0%, #0b1b38 45%, #07142b 100%);}
+        #loginScreen.show{display:flex;}
+        body.app-locked .container{display:none !important;}
+        .login-card{width:100%;max-width:420px;background:rgba(255,255,255,.98);border-radius:20px;
+            box-shadow:0 30px 80px rgba(2,8,23,.55);padding:2.2rem 2rem 2rem;border:1px solid rgba(148,163,184,.25);}
+        .login-logo{display:flex;justify-content:center;margin-bottom:.75rem;}
+        .login-logo img{height:64px;width:auto;filter:drop-shadow(0 6px 14px rgba(2,8,23,.25));}
+        .login-card h2{margin:.25rem 0 .15rem;text-align:center;color:#0f172a;font-size:1.4rem;font-weight:800;}
+        .login-card .login-sub{margin:0 0 1.4rem;text-align:center;color:#64748b;font-size:.9rem;}
+        .login-field{margin-bottom:1rem;}
+        .login-field label{display:block;font-size:.8rem;font-weight:700;color:#334155;margin-bottom:.4rem;}
+        .login-input-wrap{position:relative;}
+        .login-input-wrap i{position:absolute;left:.9rem;top:50%;transform:translateY(-50%);color:#94a3b8;font-size:.95rem;}
+        .login-field input{width:100%;padding:.8rem .9rem .8rem 2.4rem;border:1.5px solid #e2e8f0;border-radius:12px;
+            font-size:.98rem;color:#0f172a;background:#f8fafc;transition:border-color .15s, box-shadow .15s;}
+        .login-field input:focus{outline:none;border-color:#2563eb;background:#fff;box-shadow:0 0 0 3px rgba(37,99,235,.15);}
+        .login-toggle-pass{position:absolute;right:.6rem;top:50%;transform:translateY(-50%);background:none;border:none;
+            color:#94a3b8;cursor:pointer;padding:.35rem;font-size:.95rem;}
+        .login-btn{width:100%;margin-top:.4rem;padding:.85rem 1rem;border:none;border-radius:12px;cursor:pointer;
+            background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;font-weight:800;font-size:1rem;
+            box-shadow:0 12px 24px rgba(37,99,235,.35);transition:transform .12s, box-shadow .12s, opacity .12s;}
+        .login-btn:hover{transform:translateY(-1px);box-shadow:0 16px 30px rgba(37,99,235,.45);}
+        .login-btn:disabled{opacity:.65;cursor:not-allowed;transform:none;}
+        .login-error{display:none;margin-top:.9rem;padding:.7rem .85rem;border-radius:10px;background:#fef2f2;color:#b91c1c;
+            border:1px solid #fecaca;font-size:.85rem;text-align:center;}
+        .login-error.show{display:block;}
+        .login-foot{margin-top:1.3rem;text-align:center;color:#94a3b8;font-size:.72rem;line-height:1.4;}
+        .nav-tab.module-hidden{display:none !important;}
+        .auth-userbox{display:flex;align-items:center;gap:.55rem;background:rgba(255,255,255,.12);
+            border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:.3rem .35rem .3rem .8rem;color:#fff;}
+        .auth-userbox .auth-name{font-size:.82rem;font-weight:700;line-height:1.1;}
+        .auth-userbox .auth-role{font-size:.68rem;opacity:.8;line-height:1.1;}
+        .auth-logout-btn{display:inline-flex;align-items:center;gap:.35rem;border:none;cursor:pointer;
+            background:rgba(239,68,68,.9);color:#fff;border-radius:999px;padding:.45rem .7rem;font-size:.78rem;font-weight:700;}
+        .auth-logout-btn:hover{background:#dc2626;}
+    </style>
+    <div id="loginScreen" role="dialog" aria-modal="true" aria-label="Inicio de sesión">
+        <div class="login-card">
+            <div class="login-logo">
+                <img src="assets/campus-header-logo-3d.png" alt="Campus Susana López" onerror="this.style.display='none'">
+            </div>
+            <h2>Campus Susana López</h2>
+            <p class="login-sub">Ingresa tu usuario y contraseña</p>
+
+            <div class="login-field">
+                <label for="loginUser">Usuario</label>
+                <div class="login-input-wrap">
+                    <i class="fas fa-user"></i>
+                    <input id="loginUser" type="text" autocomplete="username" placeholder="usuario"
+                           autocapitalize="off" spellcheck="false">
+                </div>
+            </div>
+
+            <div class="login-field">
+                <label for="loginPass">Contraseña</label>
+                <div class="login-input-wrap">
+                    <i class="fas fa-lock"></i>
+                    <input id="loginPass" type="password" autocomplete="current-password" placeholder="••••••••">
+                    <button type="button" class="login-toggle-pass" id="loginTogglePass" title="Mostrar / ocultar">
+                        <i class="fas fa-eye"></i>
+                    </button>
+                </div>
+            </div>
+
+            <button type="button" class="login-btn" id="loginSubmitBtn" onclick="handleLoginSubmit()">
+                <i class="fas fa-right-to-bracket"></i> Ingresar
+            </button>
+
+            <div class="login-error" id="loginError"></div>
+
+            <p class="login-foot">
+                Hospital Susana López de Valencia E.S.E.<br>
+                Acceso restringido por nivel y vigencia de cuenta
+            </p>
+        </div>
+    </div>
+
     <!-- Main Container -->
     <div class="container">
         <!-- Header -->
@@ -2820,6 +2900,15 @@
                         <span id="connectionText">Sistema en línea</span>
                     </div>
                     <span id="currentDateTime"></span>
+                    <div class="auth-userbox" id="authUserBox" style="display:none;">
+                        <div>
+                            <div class="auth-name" id="authUserName">Usuario</div>
+                            <div class="auth-role" id="authUserRole">Nivel</div>
+                        </div>
+                        <button type="button" class="auth-logout-btn" onclick="logoutApp()" title="Cerrar sesión">
+                            <i class="fas fa-right-from-bracket"></i> Salir
+                        </button>
+                    </div>
                 </div>
             </div>
         </header>
@@ -5995,54 +6084,210 @@
             return true;
         }
 
-        async function enforceAdminPassword() {
-            // ⚠️ SEGURIDAD: Siempre pedir contraseña, nunca usar sesión previa
-            // Limpiar cualquier dato de autenticación guardado
+        // ==================== AUTENTICACIÓN POR USUARIO/CONTRASEÑA ====================
+        // 🔐 Las credenciales se leen de la tabla "Contraseñas" (Airtable) vía el proxy de Netlify.
+        //    - Nivel "Administrador" => acceso a todos los módulos.
+        //    - Otros niveles => solo los módulos marcados en "Módulos Permitidos".
+        //    - Se valida que la cuenta esté "Activo" y dentro de la ventana [Fecha Inicio, Fecha Fin].
+        const AUTH_TABLE = 'tbl5lvdRbOEL4Zn1G'; // ID de la tabla "Contraseñas" (se usa el ID para evitar fallos por la ñ/espacios)
+        // Etiqueta del módulo (en Airtable) -> id de la pestaña (tab) en la app
+        const MODULE_TAB_MAP = {
+            'Dashboard': 'dashboard',
+            'Crear': 'create',
+            'Cursos Virtuales': 'virtualCourses',
+            'Cursos de Extensión': 'extensionCourses',
+            'Gestionar': 'manage',
+            'Examen': 'exam',
+            'Reportes': 'reports',
+            'Personal HSLV': 'personal',
+            'Cronograma': 'schedule'
+        };
+        const ALL_MODULE_TABS = Object.values(MODULE_TAB_MAP);
+
+        // Estado de la sesión actual (en memoria; no se persiste)
+        let currentAuthUser = null;
+        let allowedTabs = new Set(ALL_MODULE_TABS);
+
+        function escapeAirtableFormulaValue(v) {
+            return String(v == null ? '' : v).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+        }
+
+        function todayISO() {
+            const d = new Date();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${d.getFullYear()}-${mm}-${dd}`;
+        }
+
+        // Consulta el usuario en Airtable y valida credenciales + vigencia.
+        // Devuelve { ok:true, user } o { ok:false, error }.
+        async function authenticateUser(usuario, contrasena) {
+            const user = String(usuario || '').trim();
+            const pass = String(contrasena || '');
+            if (!user || !pass) return { ok: false, error: 'Ingresa usuario y contraseña.' };
+
+            const formula = `LOWER({Usuario})='${escapeAirtableFormulaValue(user.toLowerCase())}'`;
+            const params = new URLSearchParams();
+            params.set('filterByFormula', formula);
+            params.set('maxRecords', '1');
+
+            let data;
             try {
-                localStorage.removeItem(ADMIN_AUTH_STORAGE_KEY);
-            } catch (e) {
-                // No hacer nada si localStorage no está disponible
-            }
-
-            // Pedir contraseña hasta que sea correcta
-            console.log('🔐 SEGURIDAD: Pidiendo contraseña administrativa...');
-            while (true) {
-                const result = await Swal.fire({
-                    title: '🔐 Acceso Administrativo',
-                    text: 'Ingresa la contraseña para administrar el sistema\n(Se pide cada vez que accedes)',
-                    input: 'password',
-                    inputPlaceholder: 'Contraseña',
-                    inputAttributes: {
-                        autocapitalize: 'off',
-                        autocomplete: 'off' // No autocompletar para mayor seguridad
-                    },
-                    confirmButtonText: 'Ingresar',
-                    showCancelButton: false,
-                    allowOutsideClick: false,
-                    allowEscapeKey: false,
-                    showLoaderOnConfirm: true,
-                    preConfirm: async (pwd) => {
-                        if (!pwd || String(pwd).trim().length < 6) {
-                            Swal.showValidationMessage('Ingresa una contraseña válida');
-                            return false;
-                        }
-                        try {
-                            await validateAdminPassword(String(pwd));
-                            return true;
-                        } catch (e) {
-                            Swal.showValidationMessage(e.message || 'Contraseña incorrecta');
-                            return false;
-                        }
-                    }
+                data = await airtableProxyRequest({
+                    method: 'GET',
+                    path: `/${AUTH_TABLE}?${params.toString()}`
                 });
-
-                if (result.isConfirmed) {
-                    setStoredAdminAuth(); // No hace nada (por seguridad)
-                    console.log('✅ Autenticado - Contraseña NO guardada');
-                    document.body.classList.add('authenticated');
-                    return true;
-                }
+            } catch (e) {
+                return { ok: false, error: 'No se pudo conectar con el servidor. Intenta de nuevo.' };
             }
+
+            const records = (data && data.records) ? data.records : [];
+            if (!records.length) return { ok: false, error: 'Usuario o contraseña incorrectos.' };
+
+            const f = records[0].fields || {};
+            const storedPass = String(f['Contraseña'] != null ? f['Contraseña'] : '');
+            if (storedPass !== pass) return { ok: false, error: 'Usuario o contraseña incorrectos.' };
+
+            if (f['Activo'] !== true) return { ok: false, error: 'La cuenta está inactiva. Contacta al administrador.' };
+
+            const hoy = todayISO();
+            const ini = (f['Fecha Inicio'] || '').slice(0, 10);
+            const fin = (f['Fecha Fin'] || '').slice(0, 10);
+            if (ini && hoy < ini) return { ok: false, error: `Tu acceso inicia el ${ini}.` };
+            if (fin && hoy > fin) return { ok: false, error: `Tu acceso venció el ${fin}. Contacta al administrador.` };
+
+            const nivel = f['Nivel de Acceso'] || 'Consulta';
+            let modulos;
+            if (nivel === 'Administrador') {
+                modulos = ALL_MODULE_TABS.slice();
+            } else {
+                const etiquetas = Array.isArray(f['Módulos Permitidos']) ? f['Módulos Permitidos'] : [];
+                modulos = etiquetas.map(et => MODULE_TAB_MAP[et]).filter(Boolean);
+            }
+            if (!modulos.length) return { ok: false, error: 'Tu cuenta no tiene módulos asignados. Contacta al administrador.' };
+
+            return {
+                ok: true,
+                user: {
+                    recordId: records[0].id,
+                    usuario: f['Usuario'] || user,
+                    nombre: f['Nombre Completo'] || f['Usuario'] || user,
+                    nivel,
+                    modulos,
+                    vence: fin || ''
+                }
+            };
+        }
+
+        // Aplica las restricciones de módulos en la barra de navegación.
+        function applyModuleRestrictions(authUser) {
+            allowedTabs = new Set(authUser.modulos);
+            document.querySelectorAll('.nav-tab').forEach(btn => {
+                const oc = btn.getAttribute('onclick') || '';
+                const m = oc.match(/switchTab\('([^']+)'/);
+                const tab = m ? m[1] : null;
+                if (tab && !allowedTabs.has(tab)) {
+                    btn.classList.add('module-hidden');
+                } else {
+                    btn.classList.remove('module-hidden');
+                }
+            });
+
+            // Insignia de usuario en el encabezado
+            const box = document.getElementById('authUserBox');
+            if (box) {
+                box.style.display = 'flex';
+                const nm = document.getElementById('authUserName');
+                const rl = document.getElementById('authUserRole');
+                if (nm) nm.textContent = authUser.nombre;
+                if (rl) rl.textContent = authUser.nivel + (authUser.vence ? ` · vence ${authUser.vence}` : '');
+            }
+
+            // Ir a la primera pestaña permitida (si la activa no lo está)
+            const firstTab = authUser.modulos[0];
+            if (firstTab && typeof switchTab === 'function') switchTab(firstTab);
+        }
+
+        // Muestra mensaje de error en el login
+        function showLoginError(msg) {
+            const el = document.getElementById('loginError');
+            if (!el) return;
+            el.textContent = msg || 'Error al iniciar sesión.';
+            el.classList.add('show');
+        }
+        function clearLoginError() {
+            const el = document.getElementById('loginError');
+            if (el) { el.textContent = ''; el.classList.remove('show'); }
+        }
+
+        // Maneja el clic del botón "Ingresar"
+        let _loginResolver = null;
+        async function handleLoginSubmit() {
+            clearLoginError();
+            const btn = document.getElementById('loginSubmitBtn');
+            const userEl = document.getElementById('loginUser');
+            const passEl = document.getElementById('loginPass');
+            const usuario = userEl ? userEl.value : '';
+            const contrasena = passEl ? passEl.value : '';
+
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Verificando...'; }
+
+            const res = await authenticateUser(usuario, contrasena);
+
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-right-to-bracket"></i> Ingresar'; }
+
+            if (!res.ok) {
+                showLoginError(res.error);
+                if (passEl) { passEl.value = ''; passEl.focus(); }
+                return;
+            }
+
+            currentAuthUser = res.user;
+            console.log('✅ Sesión iniciada:', res.user.usuario, '· Nivel:', res.user.nivel);
+
+            // Ocultar login y mostrar la app
+            const screen = document.getElementById('loginScreen');
+            if (screen) screen.classList.remove('show');
+            document.body.classList.remove('app-locked');
+            document.body.classList.add('authenticated');
+
+            applyModuleRestrictions(res.user);
+
+            if (typeof _loginResolver === 'function') {
+                const r = _loginResolver; _loginResolver = null; r(res.user);
+            }
+        }
+
+        function logoutApp() {
+            // Salir = recargar para forzar nuevo inicio de sesión (no se almacena sesión)
+            currentAuthUser = null;
+            try { window.location.reload(); } catch (e) { window.location.href = window.location.pathname; }
+        }
+
+        // Reemplaza el antiguo "enforceAdminPassword": muestra el login y resuelve al autenticar.
+        async function enforceAdminPassword() {
+            document.body.classList.add('app-locked');
+            const screen = document.getElementById('loginScreen');
+            if (screen) screen.classList.add('show');
+
+            // Enter para enviar; botón mostrar/ocultar contraseña
+            const userEl = document.getElementById('loginUser');
+            const passEl = document.getElementById('loginPass');
+            const toggle = document.getElementById('loginTogglePass');
+            const onEnter = (e) => { if (e.key === 'Enter') { e.preventDefault(); handleLoginSubmit(); } };
+            if (userEl) { userEl.addEventListener('keydown', onEnter); }
+            if (passEl) { passEl.addEventListener('keydown', onEnter); }
+            if (toggle && passEl && !toggle.dataset.bound) {
+                toggle.dataset.bound = '1';
+                toggle.addEventListener('click', () => {
+                    passEl.type = passEl.type === 'password' ? 'text' : 'password';
+                    const ic = toggle.querySelector('i');
+                    if (ic) ic.className = passEl.type === 'password' ? 'fas fa-eye' : 'fas fa-eye-slash';
+                });
+            }
+            setTimeout(() => { if (userEl) userEl.focus(); }, 100);
+
+            return new Promise((resolve) => { _loginResolver = resolve; });
         }
 
         function startAdminApp() {
@@ -6054,6 +6299,12 @@
         
 
         async function initializeApp() {
+            // Bloquear la app desde el inicio (se libera al iniciar sesión).
+            // En el flujo participante (QR) se libera más abajo.
+            if (!isParticipantFlow()) {
+                document.body.classList.add('app-locked');
+            }
+
             // Mantener splash / pantalla de inicio
             setTimeout(() => {
                 document.getElementById('loadingScreen').style.opacity = '0';
@@ -6064,6 +6315,7 @@
 
             // Si viene por QR (participante), NO pedir contraseña
             if (isParticipantFlow()) {
+                document.body.classList.remove('app-locked');
                 document.body.classList.add('hslv-participant-flow');
                 checkForAccessCode();
                 return;
@@ -15898,6 +16150,26 @@ function makeCronogramaFilterFormula(year, tipo) {
     window.switchTab = function(tabName){
         if(typeof previousSwitch === 'function') previousSwitch(tabName);
         if(tabName === 'extensionCourses') renderExtensionCoursesList(true);
+    };
+})();
+
+// ==================== GUARDIA DE ACCESO A MÓDULOS ====================
+// Envoltura externa: impide entrar a un módulo no permitido para el usuario autenticado.
+(function(){
+    const guardedSwitch = window.switchTab;
+    window.switchTab = function(tabName, event){
+        try {
+            if (typeof currentAuthUser !== 'undefined' && currentAuthUser &&
+                typeof allowedTabs !== 'undefined' && allowedTabs && allowedTabs.size &&
+                tabName && !allowedTabs.has(tabName)) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({ icon: 'warning', title: 'Acceso restringido',
+                        text: 'Tu cuenta no tiene permiso para este módulo.', timer: 2200, showConfirmButton: false });
+                }
+                return;
+            }
+        } catch (e) { /* en caso de error, no bloquear la navegación normal */ }
+        return guardedSwitch.call(this, tabName, event);
     };
 })();
 </script>
