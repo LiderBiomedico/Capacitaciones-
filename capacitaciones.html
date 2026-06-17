@@ -6130,55 +6130,34 @@
             const pass = String(contrasena || '');
             if (!user || !pass) return { ok: false, error: 'Ingresa usuario y contraseña.' };
 
-            const formula = `LOWER({Usuario})='${escapeAirtableFormulaValue(user.toLowerCase())}'`;
-            const params = new URLSearchParams();
-            params.set('filterByFormula', formula);
-            params.set('maxRecords', '1');
-
-            let data;
+            // Validación del lado del servidor: las contraseñas no salen de Netlify.
+            let res, data;
             try {
-                data = await airtableProxyRequest({
-                    method: 'GET',
-                    path: `/${AUTH_TABLE}?${params.toString()}`
+                res = await fetch('/.netlify/functions/validate-login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ usuario: user, contrasena: pass })
                 });
+                data = await res.json().catch(() => ({}));
             } catch (e) {
                 return { ok: false, error: 'No se pudo conectar con el servidor. Intenta de nuevo.' };
             }
 
-            const records = (data && data.records) ? data.records : [];
-            if (!records.length) return { ok: false, error: 'Usuario o contraseña incorrectos.' };
-
-            const f = records[0].fields || {};
-            const storedPass = String(f['Contraseña'] != null ? f['Contraseña'] : '');
-            if (storedPass !== pass) return { ok: false, error: 'Usuario o contraseña incorrectos.' };
-
-            if (f['Activo'] !== true) return { ok: false, error: 'La cuenta está inactiva. Contacta al administrador.' };
-
-            const hoy = todayISO();
-            const ini = (f['Fecha Inicio'] || '').slice(0, 10);
-            const fin = (f['Fecha Fin'] || '').slice(0, 10);
-            if (ini && hoy < ini) return { ok: false, error: `Tu acceso inicia el ${ini}.` };
-            if (fin && hoy > fin) return { ok: false, error: `Tu acceso venció el ${fin}. Contacta al administrador.` };
-
-            const nivel = f['Nivel de Acceso'] || 'Consulta';
-            let modulos;
-            if (nivel === 'Administrador') {
-                modulos = ALL_MODULE_TABS.slice();
-            } else {
-                const etiquetas = Array.isArray(f['Módulos Permitidos']) ? f['Módulos Permitidos'] : [];
-                modulos = etiquetas.map(et => MODULE_TAB_MAP[et]).filter(Boolean);
+            if (!res.ok || !data || data.success !== true) {
+                return { ok: false, error: (data && data.error) ? data.error : 'Usuario o contraseña incorrectos.' };
             }
+
+            const modulos = Array.isArray(data.modulos) ? data.modulos.filter(t => ALL_MODULE_TABS.includes(t)) : [];
             if (!modulos.length) return { ok: false, error: 'Tu cuenta no tiene módulos asignados. Contacta al administrador.' };
 
             return {
                 ok: true,
                 user: {
-                    recordId: records[0].id,
-                    usuario: f['Usuario'] || user,
-                    nombre: f['Nombre Completo'] || f['Usuario'] || user,
-                    nivel,
+                    usuario: data.usuario || user,
+                    nombre: data.nombre || data.usuario || user,
+                    nivel: data.nivel || 'Consulta',
                     modulos,
-                    vence: fin || ''
+                    vence: data.vence || ''
                 }
             };
         }
