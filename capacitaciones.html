@@ -2840,6 +2840,52 @@
         .auth-logout-btn{display:inline-flex;align-items:center;gap:.35rem;border:none;cursor:pointer;
             background:rgba(239,68,68,.9);color:#fff;border-radius:999px;padding:.45rem .7rem;font-size:.78rem;font-weight:700;}
         .auth-logout-btn:hover{background:#dc2626;}
+
+        /* ----- Gestión de usuarios ----- */
+        .users-table{width:100%;border-collapse:collapse;font-size:.9rem;}
+        .users-table th,.users-table td{padding:.7rem .75rem;border-bottom:1px solid #eef2f7;text-align:left;vertical-align:middle;}
+        .users-table th{font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;color:#64748b;background:#f8fafc;}
+        .users-table tbody tr:hover{background:#f8fafc;}
+        .u-badge{display:inline-block;padding:.18rem .55rem;border-radius:999px;font-size:.72rem;font-weight:700;}
+        .u-badge.admin{background:#fee2e2;color:#b91c1c;}
+        .u-badge.editor{background:#dbeafe;color:#1d4ed8;}
+        .u-badge.consulta{background:#dcfce7;color:#15803d;}
+        .u-badge.on{background:#dcfce7;color:#15803d;}
+        .u-badge.off{background:#f1f5f9;color:#64748b;}
+        .u-badge.exp{background:#fef9c3;color:#a16207;}
+        .u-mods{color:#475569;font-size:.82rem;}
+        .u-actions{display:flex;gap:.4rem;justify-content:flex-end;}
+        .u-actions button{border:none;cursor:pointer;border-radius:8px;padding:.4rem .6rem;font-size:.78rem;font-weight:700;}
+        .u-edit{background:#e0e7ff;color:#3730a3;}
+        .u-edit:hover{background:#c7d2fe;}
+        .u-del{background:#fee2e2;color:#b91c1c;}
+        .u-del:hover{background:#fecaca;}
+
+        .user-modal-overlay{position:fixed;inset:0;z-index:99995;display:none;align-items:flex-start;justify-content:center;
+            padding:2.5rem 1rem;background:rgba(8,15,30,.55);overflow-y:auto;}
+        .user-modal-overlay.show{display:flex;}
+        .user-modal{width:100%;max-width:640px;background:#fff;border-radius:18px;box-shadow:0 30px 70px rgba(2,8,23,.45);overflow:hidden;}
+        .user-modal-head{display:flex;align-items:center;justify-content:space-between;padding:1.1rem 1.3rem;
+            background:linear-gradient(135deg,#1d4ed8,#2563eb);color:#fff;}
+        .user-modal-head h3{margin:0;font-size:1.1rem;font-weight:800;}
+        .user-modal-close{background:none;border:none;color:#fff;font-size:1.6rem;line-height:1;cursor:pointer;opacity:.9;}
+        .user-modal-close:hover{opacity:1;}
+        .user-modal-body{padding:1.3rem;}
+        .um-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;}
+        .um-col-2{grid-column:1 / -1;}
+        .um-field label{display:block;font-size:.78rem;font-weight:700;color:#334155;margin-bottom:.35rem;}
+        .um-field input[type="text"],.um-field input[type="date"],.um-field select{
+            box-sizing:border-box;width:100%;padding:.6rem .7rem;border:1.5px solid #e2e8f0;border-radius:10px;
+            font-size:.92rem;color:#0f172a;background:#f8fafc;}
+        .um-field input:focus,.um-field select:focus{outline:none;border-color:#2563eb;background:#fff;box-shadow:0 0 0 3px rgba(37,99,235,.15);}
+        .um-modules{display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem .9rem;margin-top:.3rem;}
+        .um-check{display:flex;align-items:center;gap:.45rem;font-size:.85rem;color:#334155;font-weight:500;cursor:pointer;}
+        .um-check input{width:16px;height:16px;}
+        .user-modal-error{display:none;margin-top:1rem;padding:.7rem .85rem;border-radius:10px;background:#fef2f2;color:#b91c1c;
+            border:1px solid #fecaca;font-size:.85rem;}
+        .user-modal-error.show{display:block;}
+        .user-modal-foot{display:flex;justify-content:flex-end;gap:.6rem;padding:1rem 1.3rem;background:#f8fafc;border-top:1px solid #eef2f7;}
+        @media (max-width:560px){ .um-grid{grid-template-columns:1fr;} .um-modules{grid-template-columns:1fr 1fr;} }
     </style>
     <div id="loginScreen" role="dialog" aria-modal="true" aria-label="Inicio de sesión">
         <div class="login-card">
@@ -2958,6 +3004,12 @@
             <button class="nav-tab" onclick="switchTab('schedule')">
                 <i class="fas fa-calendar-alt"></i>
                 <span>Cronograma</span>
+            </button>
+
+            <!-- Gestión de usuarios (solo Administrador) -->
+            <button class="nav-tab" id="navTabUsers" onclick="switchTab('users')">
+                <i class="fas fa-user-shield"></i>
+                <span>Usuarios</span>
             </button>
         </nav>
 
@@ -4232,7 +4284,112 @@
                 </div>
             </section>
 
+            <!-- ==================== USUARIOS (Administrador) ==================== -->
+            <section id="users" class="tab-content">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+                    <h2 class="section-title" style="margin-bottom:0;">
+                        <i class="fas fa-user-shield"></i> Gestión de Usuarios
+                    </h2>
+                    <button class="btn btn-primary" onclick="openUserModal()" style="background:#2563eb; border-color:#2563eb;">
+                        <i class="fas fa-user-plus"></i> Nuevo usuario
+                    </button>
+                </div>
+
+                <div class="card">
+                    <div style="overflow-x:auto;">
+                        <table class="users-table" id="usersTable">
+                            <thead>
+                                <tr>
+                                    <th>Usuario</th>
+                                    <th>Nombre</th>
+                                    <th>Nivel</th>
+                                    <th>Módulos</th>
+                                    <th>Vigencia</th>
+                                    <th>Estado</th>
+                                    <th style="text-align:right;">Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="usersTbody">
+                                <tr><td colspan="7" style="text-align:center; color:#9ca3af; padding:2rem;">Cargando usuarios…</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
         </main>
+
+        <!-- Modal crear/editar usuario -->
+        <div class="user-modal-overlay" id="userModal">
+            <div class="user-modal">
+                <div class="user-modal-head">
+                    <h3 id="userModalTitle"><i class="fas fa-user-plus"></i> Nuevo usuario</h3>
+                    <button type="button" class="user-modal-close" onclick="closeUserModal()" title="Cerrar">&times;</button>
+                </div>
+                <div class="user-modal-body">
+                    <input type="hidden" id="umRecordId" value="">
+                    <div class="um-grid">
+                        <div class="um-field">
+                            <label for="umUsuario">Usuario</label>
+                            <input id="umUsuario" type="text" autocapitalize="off" spellcheck="false" placeholder="ej: jperez">
+                        </div>
+                        <div class="um-field">
+                            <label for="umPass">Contraseña</label>
+                            <input id="umPass" type="text" placeholder="Contraseña">
+                            <small id="umPassHint" style="display:none; color:#64748b;">Déjala en blanco para no cambiarla.</small>
+                        </div>
+                        <div class="um-field um-col-2">
+                            <label for="umNombre">Nombre completo</label>
+                            <input id="umNombre" type="text" placeholder="Nombre y apellido">
+                        </div>
+                        <div class="um-field">
+                            <label for="umNivel">Nivel de acceso</label>
+                            <select id="umNivel" onchange="onUserLevelChange()">
+                                <option value="Administrador">Administrador</option>
+                                <option value="Editor">Editor</option>
+                                <option value="Consulta">Consulta</option>
+                            </select>
+                        </div>
+                        <div class="um-field">
+                            <label>Estado</label>
+                            <label class="um-check" style="margin-top:.35rem;">
+                                <input id="umActivo" type="checkbox" checked> Cuenta activa
+                            </label>
+                        </div>
+                        <div class="um-field">
+                            <label for="umInicio">Fecha inicio</label>
+                            <input id="umInicio" type="date">
+                        </div>
+                        <div class="um-field">
+                            <label for="umFin">Fecha fin (vence)</label>
+                            <input id="umFin" type="date">
+                        </div>
+                        <div class="um-field um-col-2" id="umModulesWrap">
+                            <label>Módulos permitidos</label>
+                            <div class="um-modules" id="umModules">
+                                <label class="um-check"><input type="checkbox" value="Dashboard"> Dashboard</label>
+                                <label class="um-check"><input type="checkbox" value="Crear"> Crear</label>
+                                <label class="um-check"><input type="checkbox" value="Cursos Virtuales"> Cursos Virtuales</label>
+                                <label class="um-check"><input type="checkbox" value="Cursos de Extensión"> Cursos de Extensión</label>
+                                <label class="um-check"><input type="checkbox" value="Gestionar"> Gestionar</label>
+                                <label class="um-check"><input type="checkbox" value="Examen"> Examen</label>
+                                <label class="um-check"><input type="checkbox" value="Reportes"> Reportes</label>
+                                <label class="um-check"><input type="checkbox" value="Personal HSLV"> Personal HSLV</label>
+                                <label class="um-check"><input type="checkbox" value="Cronograma"> Cronograma</label>
+                            </div>
+                            <small id="umModulesAdminNote" style="display:none; color:#64748b;">Un Administrador tiene acceso a todos los módulos automáticamente.</small>
+                        </div>
+                    </div>
+                    <div class="user-modal-error" id="umError"></div>
+                </div>
+                <div class="user-modal-foot">
+                    <button type="button" class="btn btn-light" onclick="closeUserModal()">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="umSaveBtn" onclick="saveUser()" style="background:#2563eb; border-color:#2563eb;">
+                        <i class="fas fa-save"></i> Guardar
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <!-- Footer -->
         <footer class="footer">
@@ -6165,6 +6322,8 @@
         // Aplica las restricciones de módulos en la barra de navegación.
         function applyModuleRestrictions(authUser) {
             allowedTabs = new Set(authUser.modulos);
+            // La pestaña "Usuarios" solo para Administrador
+            if (authUser.nivel === 'Administrador') allowedTabs.add('users');
             document.querySelectorAll('.nav-tab').forEach(btn => {
                 const oc = btn.getAttribute('onclick') || '';
                 const m = oc.match(/switchTab\('([^']+)'/);
@@ -6245,6 +6404,224 @@
             // Salir = recargar para forzar nuevo inicio de sesión (no se almacena sesión)
             currentAuthUser = null;
             try { window.location.reload(); } catch (e) { window.location.href = window.location.pathname; }
+        }
+
+        // ==================== GESTIÓN DE USUARIOS (Administrador) ====================
+        const USERS_TABLE = 'tbl5lvdRbOEL4Zn1G'; // tabla "Contraseñas"
+        const USER_MODULE_LABELS = Object.keys(MODULE_TAB_MAP); // etiquetas tal cual están en Airtable
+        let usersCache = [];
+
+        function umEscape(s) {
+            return String(s == null ? '' : s)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        async function loadUsers() {
+            const tbody = document.getElementById('usersTbody');
+            if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:2rem;">Cargando usuarios…</td></tr>';
+
+            // Importante: NO pedimos el campo "Contraseña" -> nunca llega al navegador.
+            const params = new URLSearchParams();
+            ['Usuario', 'Nombre Completo', 'Nivel de Acceso', 'Módulos Permitidos', 'Fecha Inicio', 'Fecha Fin', 'Activo']
+                .forEach(f => params.append('fields[]', f));
+            params.set('pageSize', '100');
+
+            try {
+                const data = await airtableProxyRequest({
+                    method: 'GET',
+                    path: `/${USERS_TABLE}?${params.toString()}`
+                });
+                usersCache = (data && data.records) ? data.records : [];
+                renderUsersTable();
+            } catch (e) {
+                console.error('❌ Error cargando usuarios:', e);
+                if (tbody) tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#b91c1c;padding:2rem;">No se pudieron cargar los usuarios.</td></tr>';
+            }
+        }
+
+        function renderUsersTable() {
+            const tbody = document.getElementById('usersTbody');
+            if (!tbody) return;
+            if (!usersCache.length) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#9ca3af;padding:2rem;">No hay usuarios registrados.</td></tr>';
+                return;
+            }
+            const hoy = todayISO();
+            tbody.innerHTML = usersCache.map(rec => {
+                const f = rec.fields || {};
+                const usuario = umEscape(f['Usuario'] || '');
+                const nombre = umEscape(f['Nombre Completo'] || '');
+                const nivel = f['Nivel de Acceso'] || 'Consulta';
+                const nivelClass = nivel === 'Administrador' ? 'admin' : (nivel === 'Editor' ? 'editor' : 'consulta');
+                const activo = f['Activo'] === true;
+                const ini = (f['Fecha Inicio'] || '').slice(0, 10);
+                const fin = (f['Fecha Fin'] || '').slice(0, 10);
+                const vencido = fin && hoy > fin;
+                const mods = nivel === 'Administrador'
+                    ? 'Todos'
+                    : (Array.isArray(f['Módulos Permitidos']) ? f['Módulos Permitidos'].join(', ') : '—');
+                const vigencia = (ini || '—') + (fin ? ` → ${fin}` : '');
+                let estado = activo
+                    ? '<span class="u-badge on">Activo</span>'
+                    : '<span class="u-badge off">Inactivo</span>';
+                if (activo && vencido) estado = '<span class="u-badge exp">Vencido</span>';
+                return `<tr>
+                    <td><strong>${usuario}</strong></td>
+                    <td>${nombre}</td>
+                    <td><span class="u-badge ${nivelClass}">${umEscape(nivel)}</span></td>
+                    <td class="u-mods">${umEscape(mods)}</td>
+                    <td style="white-space:nowrap;">${umEscape(vigencia)}</td>
+                    <td>${estado}</td>
+                    <td>
+                        <div class="u-actions">
+                            <button class="u-edit" onclick="openUserModal('${rec.id}')"><i class="fas fa-pen"></i> Editar</button>
+                            <button class="u-del" onclick="deleteUser('${rec.id}', '${usuario}')"><i class="fas fa-trash"></i></button>
+                        </div>
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        function onUserLevelChange() {
+            const nivel = document.getElementById('umNivel')?.value;
+            const wrap = document.getElementById('umModules');
+            const note = document.getElementById('umModulesAdminNote');
+            const isAdmin = nivel === 'Administrador';
+            if (wrap) wrap.style.opacity = isAdmin ? '.45' : '1';
+            if (wrap) wrap.querySelectorAll('input').forEach(i => i.disabled = isAdmin);
+            if (note) note.style.display = isAdmin ? 'block' : 'none';
+        }
+
+        function showUserModalError(msg) {
+            const el = document.getElementById('umError');
+            if (el) { el.textContent = msg; el.classList.add('show'); }
+        }
+        function clearUserModalError() {
+            const el = document.getElementById('umError');
+            if (el) { el.textContent = ''; el.classList.remove('show'); }
+        }
+
+        function openUserModal(recordId) {
+            clearUserModalError();
+            const editing = !!recordId;
+            const rec = editing ? usersCache.find(r => r.id === recordId) : null;
+            const f = (rec && rec.fields) ? rec.fields : {};
+
+            document.getElementById('userModalTitle').innerHTML = editing
+                ? '<i class="fas fa-user-pen"></i> Editar usuario'
+                : '<i class="fas fa-user-plus"></i> Nuevo usuario';
+            document.getElementById('umRecordId').value = editing ? recordId : '';
+            document.getElementById('umUsuario').value = f['Usuario'] || '';
+            document.getElementById('umPass').value = '';
+            document.getElementById('umNombre').value = f['Nombre Completo'] || '';
+            document.getElementById('umNivel').value = f['Nivel de Acceso'] || 'Consulta';
+            document.getElementById('umActivo').checked = editing ? (f['Activo'] === true) : true;
+            document.getElementById('umInicio').value = (f['Fecha Inicio'] || '').slice(0, 10);
+            document.getElementById('umFin').value = (f['Fecha Fin'] || '').slice(0, 10);
+
+            const hint = document.getElementById('umPassHint');
+            if (hint) hint.style.display = editing ? 'block' : 'none';
+            document.getElementById('umPass').placeholder = editing ? 'Dejar en blanco para no cambiar' : 'Contraseña';
+
+            const allowed = Array.isArray(f['Módulos Permitidos']) ? f['Módulos Permitidos'] : [];
+            document.querySelectorAll('#umModules input').forEach(i => { i.checked = allowed.includes(i.value); });
+
+            onUserLevelChange();
+            document.getElementById('userModal').classList.add('show');
+            setTimeout(() => document.getElementById('umUsuario').focus(), 80);
+        }
+
+        function closeUserModal() {
+            document.getElementById('userModal').classList.remove('show');
+        }
+
+        async function saveUser() {
+            clearUserModalError();
+            const recordId = document.getElementById('umRecordId').value;
+            const editing = !!recordId;
+            const usuario = document.getElementById('umUsuario').value.trim();
+            const pass = document.getElementById('umPass').value;
+            const nombre = document.getElementById('umNombre').value.trim();
+            const nivel = document.getElementById('umNivel').value;
+            const activo = document.getElementById('umActivo').checked;
+            const ini = document.getElementById('umInicio').value;
+            const fin = document.getElementById('umFin').value;
+
+            if (!usuario) return showUserModalError('El usuario es obligatorio.');
+            if (!editing && !pass) return showUserModalError('La contraseña es obligatoria para un usuario nuevo.');
+            if (ini && fin && fin < ini) return showUserModalError('La fecha fin no puede ser anterior a la fecha inicio.');
+
+            let modulos = [];
+            if (nivel === 'Administrador') {
+                modulos = USER_MODULE_LABELS.slice(); // todos
+            } else {
+                document.querySelectorAll('#umModules input:checked').forEach(i => modulos.push(i.value));
+                if (!modulos.length) return showUserModalError('Selecciona al menos un módulo para este nivel.');
+            }
+
+            const fields = {
+                'Usuario': usuario,
+                'Nombre Completo': nombre,
+                'Nivel de Acceso': nivel,
+                'Módulos Permitidos': modulos,
+                'Activo': activo,
+                'Fecha Inicio': ini || null,
+                'Fecha Fin': fin || null
+            };
+            if (pass) fields['Contraseña'] = pass; // solo se envía si se escribió
+
+            const btn = document.getElementById('umSaveBtn');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando…'; }
+
+            try {
+                if (editing) {
+                    await airtableProxyRequest({ method: 'PATCH', path: `/${USERS_TABLE}/${recordId}`, body: { fields, typecast: true } });
+                } else {
+                    await airtableProxyRequest({ method: 'POST', path: `/${USERS_TABLE}`, body: { fields, typecast: true } });
+                }
+                closeUserModal();
+                await loadUsers();
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({ icon: 'success', title: editing ? 'Usuario actualizado' : 'Usuario creado', timer: 1200, showConfirmButton: false });
+                }
+            } catch (e) {
+                console.error('❌ Error guardando usuario:', e);
+                showUserModalError('No se pudo guardar. Revisa los datos e intenta de nuevo.');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-save"></i> Guardar'; }
+            }
+        }
+
+        async function deleteUser(recordId, usuario) {
+            // Evitar que el admin se borre a sí mismo
+            if (currentAuthUser && currentAuthUser.usuario &&
+                String(usuario).toLowerCase() === String(currentAuthUser.usuario).toLowerCase()) {
+                if (typeof Swal !== 'undefined') {
+                    Swal.fire({ icon: 'info', title: 'Acción no permitida', text: 'No puedes eliminar el usuario con el que iniciaste sesión.' });
+                }
+                return;
+            }
+            const confirm = await Swal.fire({
+                icon: 'warning',
+                title: 'Eliminar usuario',
+                html: `¿Eliminar al usuario <strong>${umEscape(usuario)}</strong>? Esta acción no se puede deshacer.`,
+                showCancelButton: true,
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#dc2626'
+            });
+            if (!confirm.isConfirmed) return;
+            try {
+                Swal.fire({ title: 'Eliminando…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+                await airtableProxyRequest({ method: 'DELETE', path: `/${USERS_TABLE}/${recordId}` });
+                Swal.close();
+                await loadUsers();
+                Swal.fire({ icon: 'success', title: 'Usuario eliminado', timer: 1000, showConfirmButton: false });
+            } catch (e) {
+                console.error('❌ Error eliminando usuario:', e);
+                Swal.fire({ icon: 'error', title: 'No se pudo eliminar', text: 'Intenta de nuevo.' });
+            }
         }
 
         // Reemplaza el antiguo "enforceAdminPassword": muestra el login y resuelve al autenticar.
@@ -16152,7 +16529,9 @@ function makeCronogramaFilterFormula(year, tipo) {
                 return;
             }
         } catch (e) { /* en caso de error, no bloquear la navegación normal */ }
-        return guardedSwitch.call(this, tabName, event);
+        const r = guardedSwitch.call(this, tabName, event);
+        if (tabName === 'users' && typeof loadUsers === 'function') { try { loadUsers(); } catch (e) {} }
+        return r;
     };
 })();
 </script>
