@@ -4319,6 +4319,55 @@
 
         </main>
 
+        <!-- Modal: enviar curso por correo -->
+        <div class="user-modal-overlay" id="sendCourseModal">
+            <div class="user-modal" style="max-width:600px;">
+                <div class="user-modal-head" style="background:linear-gradient(135deg,#6d28d9,#7c3aed);">
+                    <h3><i class="fas fa-paper-plane"></i> Enviar curso por correo</h3>
+                    <button type="button" class="user-modal-close" onclick="closeSendCourseModal()" title="Cerrar">&times;</button>
+                </div>
+                <div class="user-modal-body">
+                    <input type="hidden" id="scCourseId" value="">
+                    <p style="margin:0 0 1rem;color:#475569;">Curso: <strong id="scCourseTitle" style="color:#0f172a;"></strong></p>
+
+                    <div class="um-grid">
+                        <div class="um-field">
+                            <label for="scFiltroEntidad">Filtrar por Entidad</label>
+                            <select id="scFiltroEntidad" onchange="updateSendRecipients()"><option value="">Todas</option></select>
+                        </div>
+                        <div class="um-field">
+                            <label for="scFiltroProceso">Filtrar por Proceso</label>
+                            <select id="scFiltroProceso" onchange="updateSendRecipients()"><option value="">Todos</option></select>
+                        </div>
+                        <div class="um-field um-col-2">
+                            <label for="scSubject">Asunto</label>
+                            <input id="scSubject" type="text" placeholder="Asunto del correo">
+                        </div>
+                        <div class="um-field um-col-2">
+                            <label for="scIntro">Mensaje (opcional)</label>
+                            <input id="scIntro" type="text" placeholder="Ej: Te invitamos a realizar este curso antes del 30 de junio.">
+                        </div>
+                        <div class="um-field um-col-2">
+                            <label>Correos adicionales (separados por coma, opcional)</label>
+                            <input id="scExtra" type="text" oninput="updateSendRecipients()" placeholder="correo1@ejemplo.com, correo2@ejemplo.com">
+                        </div>
+                    </div>
+
+                    <div style="margin-top:1rem;padding:.8rem 1rem;background:#f5f3ff;border:1px solid #ddd6fe;border-radius:10px;color:#5b21b6;font-size:.9rem;">
+                        <i class="fas fa-users"></i> Se enviará a <strong id="scCount">0</strong> persona(s) con correo registrado.
+                        <span id="scLoading" style="color:#7c3aed;"> Cargando personal…</span>
+                    </div>
+                    <div class="user-modal-error" id="scError"></div>
+                </div>
+                <div class="user-modal-foot">
+                    <button type="button" class="btn btn-light" onclick="closeSendCourseModal()">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="scSendBtn" onclick="sendCourseEmails()" style="background:#7c3aed; border-color:#7c3aed;">
+                        <i class="fas fa-paper-plane"></i> Enviar
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal crear/editar usuario -->
         <div class="user-modal-overlay" id="userModal">
             <div class="user-modal">
@@ -6621,6 +6670,174 @@
             } catch (e) {
                 console.error('❌ Error eliminando usuario:', e);
                 Swal.fire({ icon: 'error', title: 'No se pudo eliminar', text: 'Intenta de nuevo.' });
+            }
+        }
+
+        // ==================== ENVÍO DE CURSOS VIRTUALES POR CORREO ====================
+        const SEND_PERSONAL_TABLE = 'tbl5A7rayv5BbiYF1'; // "Personal HSLV" (por ID)
+        let sendStaffCache = [];     // [{nombre, email, entidad, proceso}]
+        let sendCurrentCourse = null;
+        const SEND_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+        function buildVirtualCourseUrl(course) {
+            const code = course.accessCode || (typeof deriveVirtualAccessCode === 'function' ? deriveVirtualAccessCode(course.id) : '');
+            return `${window.location.origin}${window.location.pathname}?vc=${encodeURIComponent(code)}`;
+        }
+
+        async function openSendCourseModal(courseId) {
+            const course = (typeof virtualCourses !== 'undefined' ? virtualCourses : []).find(c => c.id === courseId);
+            if (!course) {
+                Swal.fire({ icon: 'error', title: 'Curso no encontrado' });
+                return;
+            }
+            sendCurrentCourse = course;
+            document.getElementById('scCourseId').value = courseId;
+            document.getElementById('scCourseTitle').textContent = course.title || 'Curso virtual';
+            document.getElementById('scSubject').value = `Nuevo curso virtual: ${course.title || ''}`.trim();
+            document.getElementById('scIntro').value = '';
+            document.getElementById('scExtra').value = '';
+            const err = document.getElementById('scError'); if (err) { err.textContent = ''; err.classList.remove('show'); }
+            document.getElementById('scFiltroEntidad').value = '';
+            document.getElementById('scFiltroProceso').value = '';
+            document.getElementById('sendCourseModal').classList.add('show');
+            await loadSendStaff();
+        }
+
+        function closeSendCourseModal() {
+            document.getElementById('sendCourseModal').classList.remove('show');
+        }
+
+        async function loadSendStaff() {
+            const loading = document.getElementById('scLoading');
+            if (loading) loading.style.display = 'inline';
+            try {
+                const params = new URLSearchParams();
+                ['NOMBRE', 'EMAIL', 'ENTIDAD', 'PROCESO'].forEach(f => params.append('fields[]', f));
+                params.set('pageSize', '100');
+
+                let all = [];
+                let offset = '';
+                // Paginar (Personal HSLV puede tener cientos de registros)
+                for (let i = 0; i < 30; i++) {
+                    const p = new URLSearchParams(params);
+                    if (offset) p.set('offset', offset);
+                    const data = await airtableProxyRequest({ method: 'GET', path: `/${SEND_PERSONAL_TABLE}?${p.toString()}` });
+                    const recs = (data && data.records) ? data.records : [];
+                    all = all.concat(recs);
+                    offset = data && data.offset ? data.offset : '';
+                    if (!offset) break;
+                }
+
+                sendStaffCache = all.map(r => {
+                    const f = r.fields || {};
+                    return {
+                        nombre: String(f['NOMBRE'] || '').trim(),
+                        email: String(f['EMAIL'] || '').trim().toLowerCase(),
+                        entidad: String(f['ENTIDAD'] || '').trim(),
+                        proceso: String(f['PROCESO'] || '').trim()
+                    };
+                }).filter(p => SEND_EMAIL_RE.test(p.email));
+
+                // Poblar filtros con valores únicos
+                const entidades = [...new Set(sendStaffCache.map(p => p.entidad).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+                const procesos = [...new Set(sendStaffCache.map(p => p.proceso).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+                const selE = document.getElementById('scFiltroEntidad');
+                const selP = document.getElementById('scFiltroProceso');
+                if (selE) selE.innerHTML = '<option value="">Todas</option>' + entidades.map(v => `<option value="${umEscape(v)}">${umEscape(v)}</option>`).join('');
+                if (selP) selP.innerHTML = '<option value="">Todos</option>' + procesos.map(v => `<option value="${umEscape(v)}">${umEscape(v)}</option>`).join('');
+            } catch (e) {
+                console.error('❌ Error cargando personal para envío:', e);
+                sendStaffCache = [];
+            } finally {
+                if (loading) loading.style.display = 'none';
+                updateSendRecipients();
+            }
+        }
+
+        function getSendRecipients() {
+            const entidad = document.getElementById('scFiltroEntidad')?.value || '';
+            const proceso = document.getElementById('scFiltroProceso')?.value || '';
+            let list = sendStaffCache.filter(p =>
+                (!entidad || p.entidad === entidad) && (!proceso || p.proceso === proceso));
+
+            // Correos adicionales
+            const extra = String(document.getElementById('scExtra')?.value || '')
+                .split(/[,;\s]+/).map(s => s.trim().toLowerCase()).filter(s => SEND_EMAIL_RE.test(s));
+            extra.forEach(em => list.push({ nombre: '', email: em, entidad: '', proceso: '' }));
+
+            // Deduplicar por correo
+            const seen = new Set();
+            return list.filter(p => { if (seen.has(p.email)) return false; seen.add(p.email); return true; })
+                .map(p => ({ email: p.email, nombre: p.nombre }));
+        }
+
+        function updateSendRecipients() {
+            const n = getSendRecipients().length;
+            const el = document.getElementById('scCount');
+            if (el) el.textContent = String(n);
+        }
+
+        async function sendCourseEmails() {
+            const err = document.getElementById('scError');
+            if (err) { err.textContent = ''; err.classList.remove('show'); }
+
+            const course = sendCurrentCourse;
+            if (!course) return;
+            const recipients = getSendRecipients();
+            if (!recipients.length) {
+                if (err) { err.textContent = 'No hay destinatarios con correo. Ajusta los filtros o agrega correos.'; err.classList.add('show'); }
+                return;
+            }
+
+            const confirm = await Swal.fire({
+                icon: 'question',
+                title: 'Confirmar envío',
+                html: `Se enviará el curso <strong>${umEscape(course.title || '')}</strong> a <strong>${recipients.length}</strong> destinatario(s).`,
+                showCancelButton: true, confirmButtonText: 'Sí, enviar', cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#7c3aed'
+            });
+            if (!confirm.isConfirmed) return;
+
+            const btn = document.getElementById('scSendBtn');
+            if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando…'; }
+            Swal.fire({ title: 'Enviando correos…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+            try {
+                const res = await fetch('/.netlify/functions/send-course-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        courseTitle: course.title || 'Curso virtual',
+                        courseDescription: course.description || '',
+                        courseUrl: buildVirtualCourseUrl(course),
+                        subject: document.getElementById('scSubject')?.value || '',
+                        intro: document.getElementById('scIntro')?.value || '',
+                        recipients
+                    })
+                });
+                const data = await res.json().catch(() => ({}));
+                Swal.close();
+
+                if (res.ok && data && data.sent > 0) {
+                    closeSendCourseModal();
+                    Swal.fire({
+                        icon: data.failed ? 'warning' : 'success',
+                        title: data.failed ? 'Envío parcial' : 'Correos enviados',
+                        html: `Enviados: <strong>${data.sent}</strong> de <strong>${data.total}</strong>.` +
+                            (data.failed ? `<br>Fallaron: <strong>${data.failed}</strong>.` : '')
+                    });
+                } else {
+                    const msg = (data && data.error) ? data.error : 'No se pudieron enviar los correos.';
+                    if (err) { err.textContent = msg; err.classList.add('show'); }
+                    document.getElementById('sendCourseModal').classList.add('show');
+                }
+            } catch (e) {
+                Swal.close();
+                console.error('❌ Error enviando correos:', e);
+                if (err) { err.textContent = 'Error de conexión al enviar.'; err.classList.add('show'); }
+                document.getElementById('sendCourseModal').classList.add('show');
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar'; }
             }
         }
 
@@ -14073,6 +14290,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                         <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
                             <button class="btn btn-primary" style="background:#2563eb; border-color:#2563eb;" onclick="playVirtualCourse('${course.id}')"><i class="fas fa-play"></i> Reproducir</button>
                             <button class="btn btn-secondary" style="background:#0f766e; border-color:#0f766e;" onclick="showVirtualCourseQR('${course.id}')"><i class="fas fa-qrcode"></i> Código QR</button>
+                            <button class="btn btn-secondary" style="background:#7c3aed; border-color:#7c3aed;" onclick="openSendCourseModal('${course.id}')"><i class="fas fa-paper-plane"></i> Enviar por correo</button>
                             <button class="btn btn-light" onclick="deleteVirtualCourse('${course.id}')"><i class="fas fa-trash"></i> Eliminar</button>
                         </div>
                     </div>
