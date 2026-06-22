@@ -1,12 +1,14 @@
 // netlify/functions/upload-campaign-image.js
 // ============================================================================
-// Guarda la imagen de una campaña en Netlify Blobs y devuelve una URL pública
-// y estable (servida por la función campaign-image) para usarla en el <img>
-// del correo. Esto evita incrustar la imagen como adjunto (que NO funciona en
-// el endpoint batch de Resend) y mejora la visualización en webmail.
+// Sube la imagen de una campaña a ImgBB (https://imgbb.com) y devuelve una URL
+// pública y PERMANENTE para usarla en el <img src> del correo. Se usa imagen
+// enlazada (no adjunto) porque es la única forma confiable de que se vea en
+// webmail (Gmail/Outlook/Apple Mail) y permite el envío rápido por lotes.
 //
-// Entrada (POST JSON): { base64, contentType }
-// Salida: { success, url, id }  |  { success:false, error, detail }
+// Requiere la variable de entorno IMGBB_API_KEY (clave gratuita de imgbb.com).
+//
+// Entrada (POST JSON): { base64 }
+// Salida: { success, url }  |  { success:false, error, detail }
 // ============================================================================
 
 const CORS = {
@@ -22,15 +24,9 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers: CORS, body: JSON.stringify({ success: false, error: 'Método no permitido.' }) };
   }
 
-  // Carga defensiva del módulo (si el deploy no reinstaló dependencias, se reporta claramente)
-  let getStore;
-  try {
-    ({ getStore } = require('@netlify/blobs'));
-  } catch (e) {
-    return {
-      statusCode: 500, headers: CORS,
-      body: JSON.stringify({ success: false, error: 'No se pudo cargar el almacenamiento (@netlify/blobs). El deploy debe reinstalar dependencias (npm install).', detail: String((e && e.message) || e) })
-    };
+  const apiKey = (process.env.IMGBB_API_KEY || process.env.IMGBB_KEY || '').trim();
+  if (!apiKey) {
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ success: false, error: 'Falta IMGBB_API_KEY en el servidor. Crea una clave gratuita en imgbb.com y agrégala en Netlify.' }) };
   }
 
   let body = {};
@@ -38,43 +34,34 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ success: false, error: 'Solicitud inválida.' }) };
   }
 
-  const contentType = String(body.contentType || 'image/jpeg').trim() || 'image/jpeg';
   const clean = String(body.base64 || '').replace(/^data:[^,]+,/, '').trim();
   if (!clean) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ success: false, error: 'No se recibió la imagen.' }) };
   }
 
-  // Crear el "store". Si el contexto de Blobs no está inyectado (deploy manual),
-  // intentar configuración explícita con SITE_ID + token de Netlify.
-  let store;
   try {
-    store = getStore('campaign-images');
-  } catch (e) {
-    const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID || '';
-    const token = process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_AUTH_TOKEN || '';
-    if (siteID && token) {
-      try { store = getStore({ name: 'campaign-images', siteID, token }); }
-      catch (e2) {
-        return { statusCode: 500, headers: CORS, body: JSON.stringify({ success: false, error: 'El almacenamiento de imágenes (Netlify Blobs) no está disponible.', detail: String((e2 && e2.message) || e2) }) };
-      }
-    } else {
-      return { statusCode: 500, headers: CORS, body: JSON.stringify({ success: false, error: 'El almacenamiento de imágenes (Netlify Blobs) no está disponible en este entorno.', detail: String((e && e.message) || e) }) };
+    const form = new URLSearchParams();
+    form.set('key', apiKey);
+    form.set('image', clean);
+
+    const res = await fetch('https://api.imgbb.com/1/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString()
+    });
+    const data = await res.json().catch(() => ({}));
+
+    if (res.ok && data && data.success && data.data) {
+      // url directa de la imagen (permanente)
+      const url = data.data.url || (data.data.image && data.data.image.url) || data.data.display_url || '';
+      if (url) return { statusCode: 200, headers: CORS, body: JSON.stringify({ success: true, url }) };
+      return { statusCode: 502, headers: CORS, body: JSON.stringify({ success: false, error: 'ImgBB no devolvió una URL.', detail: JSON.stringify(data).slice(0, 300) }) };
     }
-  }
 
-  try {
-    const crypto = require('crypto');
-    const id = crypto.randomBytes(16).toString('hex');
-    await store.set(id, Buffer.from(clean, 'base64'), { metadata: { contentType } });
-
-    const proto = (event.headers['x-forwarded-proto'] || 'https');
-    const host = event.headers.host || '';
-    const base = (process.env.URL && /^https?:\/\//i.test(process.env.URL)) ? process.env.URL : `${proto}://${host}`;
-    const url = `${base}/.netlify/functions/campaign-image?id=${id}`;
-
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ success: true, url, id }) };
+    const detail = (data && data.error && data.error.message) ? data.error.message : `HTTP ${res.status}`;
+    return { statusCode: 502, headers: CORS, body: JSON.stringify({ success: false, error: 'ImgBB rechazó la imagen.', detail }) };
   } catch (e) {
-    console.error('Error guardando imagen de campaña:', e);
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ success: false, error: 'No se pudo almacenar la imagen.', detail: String((e && e.message) || e) }) };
+    console.error('Error subiendo imagen a ImgBB:', e);
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ success: false, error: 'No se pudo subir la imagen.', detail: String((e && e.message) || e) }) };
   }
 };

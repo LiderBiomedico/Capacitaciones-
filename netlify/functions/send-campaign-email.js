@@ -1,18 +1,14 @@
 // netlify/functions/send-campaign-email.js
 // ============================================================================
 // Envía una publicidad / comunicación (campaña o capacitación) al personal.
-//
-// Imagen: se incrusta DIRECTAMENTE en cada correo como adjunto inline (CID).
-//   - El endpoint individual de Resend (/emails) SÍ admite adjuntos.
-//   - El endpoint de lotes (/emails/batch) NO admite adjuntos; por eso, cuando
-//     hay imagen, se envía de forma individual. Sin imagen, se usa el lote (rápido).
-//   - No depende de ningún almacenamiento externo (ni Netlify Blobs ni hosting).
-// Video: si hay enlace, se incluye un botón "Ver el video".
+// La imagen se referencia por URL pública (alojada con upload-campaign-image →
+// ImgBB) y se incluye con <img src="https://…">. Esto es lo único confiable
+// para que la imagen se vea en webmail (Gmail/Outlook), y permite envío rápido
+// por lotes. Si hay enlace de video, se incluye un botón "Ver el video".
 // Resend: clave en RESEND_API_KEY, remitente en EMAIL_FROM.
 //
 // Entrada (POST JSON):
-//   { subject, title, message, videoUrl,
-//     imageBase64, imageType, imageName,     // imagen opcional
+//   { subject, title, message, videoUrl, imageUrl,
 //     recipients: [ { email, nombre } ] }
 // Salida: { success, sent, failed, total, errors:[{email,error}] }
 // ============================================================================
@@ -37,15 +33,14 @@ function esc(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// imageSrc: "cid:campaignimg" cuando la imagen se incrusta.
-function buildHtml({ nombre, title, message, videoUrl, imageSrc }) {
+function buildHtml({ nombre, title, message, videoUrl, imageUrl }) {
   const saludo = nombre ? `Hola ${esc(nombre)},` : 'Hola,';
   const titleHtml = title
     ? `<h2 style="margin:0 0 12px;color:#6d28d9;font-size:21px;line-height:1.3;">${esc(title)}</h2>` : '';
   const msgHtml = message
     ? `<p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6;">${esc(message).replace(/\n/g, '<br>')}</p>` : '';
-  const imgHtml = imageSrc
-    ? `<div style="margin:6px 0 18px;"><img src="${imageSrc}" alt="${esc(title || 'Campaña')}" width="504" style="display:block;width:100%;max-width:504px;height:auto;border-radius:12px;border:1px solid #ede9fe;"></div>` : '';
+  const imgHtml = imageUrl
+    ? `<div style="margin:6px 0 18px;"><img src="${esc(imageUrl)}" alt="${esc(title || 'Campaña')}" width="504" style="display:block;width:100%;max-width:504px;height:auto;border-radius:12px;border:1px solid #ede9fe;"></div>` : '';
   const videoHtml = videoUrl
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 8px;"><tr><td style="border-radius:10px;background:#7c3aed;">
          <a href="${esc(videoUrl)}" style="display:inline-block;padding:13px 26px;color:#fff;font-size:15px;font-weight:700;text-decoration:none;">&#9654;&nbsp; Ver el video</a>
@@ -82,23 +77,6 @@ function chunk(arr, size) {
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const CID = 'campaignimg';
-
-// fetch con un reintento ante 429 (límite de tasa)
-async function resendPost(apiKey, url, payloadStr) {
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-      body: payloadStr
-    });
-    if (res.status === 429 && attempt === 0) {
-      await new Promise(r => setTimeout(r, 1200));
-      continue;
-    }
-    return res;
-  }
-}
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
@@ -121,12 +99,10 @@ exports.handler = async (event) => {
   const title = String(body.title || '').trim();
   const message = String(body.message || '').trim();
   const videoUrl = String(body.videoUrl || '').trim();
-  const imageBase64 = String(body.imageBase64 || '').replace(/^data:[^,]+,/, '').trim();
-  const imageType = String(body.imageType || 'image/jpeg').trim() || 'image/jpeg';
-  const imageName = String(body.imageName || 'campana.jpg').trim() || 'campana.jpg';
+  const imageUrl = String(body.imageUrl || '').trim();
   let recipients = Array.isArray(body.recipients) ? body.recipients : [];
 
-  if (!message && !imageBase64 && !videoUrl) {
+  if (!message && !imageUrl && !videoUrl) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ success: false, error: 'No hay contenido para enviar (mensaje, imagen o video).' }) };
   }
 
@@ -142,72 +118,46 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ success: false, error: 'No hay destinatarios con correo válido.' }) };
   }
 
-  const hasImage = !!imageBase64;
+  const batches = chunk(recipients, 100);
+
   let sent = 0, failed = 0;
   const errors = [];
 
-  if (!hasImage) {
-    // ---- Sin imagen: envío por lotes (rápido) ----
-    const imageSrc = '';
-    const batches = chunk(recipients, 100);
-
-    async function sendBatch(batch) {
-      const payload = batch.map(r => ({
-        from, to: [r.email], subject,
-        html: buildHtml({ nombre: r.nombre, title, message, videoUrl, imageSrc })
-      }));
+  async function sendBatch(batch) {
+    const payload = batch.map(r => ({
+      from, to: [r.email], subject,
+      html: buildHtml({ nombre: r.nombre, title, message, videoUrl, imageUrl })
+    }));
+    const reqBody = JSON.stringify(payload);
+    for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        const res = await resendPost(apiKey, 'https://api.resend.com/emails/batch', JSON.stringify(payload));
+        const res = await fetch('https://api.resend.com/emails/batch', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: reqBody
+        });
         const txt = await res.text();
         if (res.ok) { sent += batch.length; return; }
+        if (res.status === 429 && attempt === 0) { await new Promise(r => setTimeout(r, 1200)); continue; }
         failed += batch.length;
         let m = `HTTP ${res.status}`;
         try { const j = JSON.parse(txt); m = (j && (j.message || j.error)) ? (j.message || j.error) : m; } catch (e) {}
         batch.forEach(r => errors.push({ email: r.email, error: m }));
         console.error('Resend batch error', res.status, txt);
+        return;
       } catch (e) {
+        if (attempt === 0) { await new Promise(r => setTimeout(r, 800)); continue; }
         failed += batch.length;
         batch.forEach(r => errors.push({ email: r.email, error: 'fallo de red' }));
         console.error('Resend batch fetch error', e);
+        return;
       }
     }
+  }
 
-    const CONCURRENCY = 2;
-    for (let i = 0; i < batches.length; i += CONCURRENCY) {
-      await Promise.all(batches.slice(i, i + CONCURRENCY).map(sendBatch));
-    }
-  } else {
-    // ---- Con imagen: envío individual con adjunto inline (CID) ----
-    const imageSrc = `cid:${CID}`;
-    const attachments = [{ filename: imageName, content: imageBase64, content_id: CID, content_type: imageType }];
-
-    async function sendOne(r) {
-      const msg = {
-        from, to: [r.email], subject,
-        html: buildHtml({ nombre: r.nombre, title, message, videoUrl, imageSrc }),
-        attachments
-      };
-      try {
-        const res = await resendPost(apiKey, 'https://api.resend.com/emails', JSON.stringify(msg));
-        const txt = await res.text();
-        if (res.ok) { sent += 1; return; }
-        failed += 1;
-        let m = `HTTP ${res.status}`;
-        try { const j = JSON.parse(txt); m = (j && (j.message || j.error)) ? (j.message || j.error) : m; } catch (e) {}
-        errors.push({ email: r.email, error: m });
-        console.error('Resend send error', res.status, txt);
-      } catch (e) {
-        failed += 1;
-        errors.push({ email: r.email, error: 'fallo de red' });
-        console.error('Resend send fetch error', e);
-      }
-    }
-
-    // Concurrencia conservadora para respetar el límite de tasa de Resend (~2/s).
-    const CONCURRENCY = 2;
-    for (let i = 0; i < recipients.length; i += CONCURRENCY) {
-      await Promise.all(recipients.slice(i, i + CONCURRENCY).map(sendOne));
-    }
+  const CONCURRENCY = 2;
+  for (let i = 0; i < batches.length; i += CONCURRENCY) {
+    await Promise.all(batches.slice(i, i + CONCURRENCY).map(sendBatch));
   }
 
   return {
