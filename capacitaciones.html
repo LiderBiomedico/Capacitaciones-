@@ -17380,40 +17380,76 @@ function makeCronogramaFilterFormula(year, tipo) {
 
         const btn = document.getElementById('pubSendBtn');
         if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando…'; }
-        Swal.fire({ title: 'Enviando publicidad…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
 
-        try {
-            const res = await fetch('/.netlify/functions/send-campaign-email', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    subject, title, message, videoUrl,
-                    imageBase64: pubImage ? pubImage.base64 : '',
-                    imageType: pubImage ? pubImage.type : '',
-                    imageName: pubImage ? pubImage.name : '',
-                    recipients
-                })
-            });
-            const data = await res.json().catch(() => ({}));
-            Swal.close();
+        const payloadBase = {
+            subject, title, message, videoUrl,
+            imageBase64: pubImage ? pubImage.base64 : '',
+            imageType: pubImage ? pubImage.type : '',
+            imageName: pubImage ? pubImage.name : ''
+        };
 
-            if (res.ok && data && data.sent > 0) {
-                Swal.fire({
-                    icon: data.failed ? 'warning' : 'success',
-                    title: data.failed ? 'Envío parcial' : 'Publicidad enviada',
-                    html: `Enviados: <strong>${data.sent}</strong> de <strong>${data.total}</strong>.` +
-                        (data.failed ? `<br>Fallaron: <strong>${data.failed}</strong>.` : '')
+        // Trocear los destinatarios en tandas: cada invocación de la función queda
+        // corta y nunca se agota (evita el error 504 con listas grandes).
+        const CLIENT_CHUNK = 120;
+        const chunks = [];
+        for (let i = 0; i < recipients.length; i += CLIENT_CHUNK) {
+            chunks.push(recipients.slice(i, i + CLIENT_CHUNK));
+        }
+
+        let totalSent = 0, totalFailed = 0, processed = 0;
+        const total = recipients.length;
+        let globalError = '';
+
+        Swal.fire({
+            title: 'Enviando publicidad…',
+            html: `Progreso: <strong id="pubProg">0</strong> / ${total}`,
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
+        });
+
+        for (const ch of chunks) {
+            try {
+                const res = await fetch('/.netlify/functions/send-campaign-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...payloadBase, recipients: ch })
                 });
-            } else {
-                const msg = (data && data.error) ? data.error : 'No se pudieron enviar los correos.';
-                if (err) { err.textContent = msg; err.classList.add('show'); }
+                const data = await res.json().catch(() => ({}));
+                if (res.ok && data) {
+                    totalSent += Number(data.sent || 0);
+                    totalFailed += Number(data.failed || 0);
+                    // Error global de la tanda (p. ej. falta RESEND_API_KEY): nada enviado
+                    if (data.error && !data.sent && !data.failed) {
+                        totalFailed += ch.length;
+                        if (!globalError) globalError = data.error;
+                    }
+                } else {
+                    totalFailed += ch.length;
+                    if (!globalError && data && data.error) globalError = data.error;
+                }
+            } catch (e) {
+                console.error('❌ Error enviando tanda de publicidad:', e);
+                totalFailed += ch.length;
             }
-        } catch (e) {
-            Swal.close();
-            console.error('❌ Error enviando publicidad:', e);
-            if (err) { err.textContent = 'Error de conexión al enviar.'; err.classList.add('show'); }
-        } finally {
-            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar publicidad'; }
+            processed += ch.length;
+            const prog = document.getElementById('pubProg');
+            if (prog) prog.textContent = String(processed);
+        }
+
+        Swal.close();
+        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar publicidad'; }
+
+        if (totalSent > 0) {
+            Swal.fire({
+                icon: totalFailed ? 'warning' : 'success',
+                title: totalFailed ? 'Envío parcial' : 'Publicidad enviada',
+                html: `Enviados: <strong>${totalSent}</strong> de <strong>${total}</strong>.` +
+                    (totalFailed ? `<br>Fallaron: <strong>${totalFailed}</strong>.` : '')
+            });
+        } else {
+            const msg = globalError || 'No se pudieron enviar los correos.';
+            if (err) { err.textContent = msg; err.classList.add('show'); }
+            Swal.fire({ icon: 'error', title: 'No se pudo enviar', text: msg });
         }
     }
 

@@ -136,13 +136,14 @@ exports.handler = async (event) => {
     : undefined;
 
   // Con imagen incrustada el payload pesa más: usar lotes pequeños para no exceder límites.
-  const batchSize = hasImage ? 20 : 100;
+  const batchSize = hasImage ? 25 : 100;
   const batches = chunk(recipients, batchSize);
 
   let sent = 0, failed = 0;
   const errors = [];
 
-  for (const batch of batches) {
+  // Envía un lote (hasta 'batchSize' destinatarios) a Resend, con un reintento ante 429.
+  async function sendBatch(batch) {
     const payload = batch.map(r => {
       const msg = {
         from,
@@ -153,27 +154,43 @@ exports.handler = async (event) => {
       if (attachments) msg.attachments = attachments;
       return msg;
     });
-    try {
-      const res = await fetch('https://api.resend.com/emails/batch', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const txt = await res.text();
-      if (res.ok) {
-        sent += batch.length;
-      } else {
+    const body = JSON.stringify(payload);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetch('https://api.resend.com/emails/batch', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body
+        });
+        const txt = await res.text();
+        if (res.ok) { sent += batch.length; return; }
+        // 429 = límite de tasa: esperar y reintentar una vez
+        if (res.status === 429 && attempt === 0) {
+          await new Promise(r => setTimeout(r, 1200));
+          continue;
+        }
         failed += batch.length;
         let m = `HTTP ${res.status}`;
         try { const j = JSON.parse(txt); m = (j && (j.message || j.error)) ? (j.message || j.error) : m; } catch (e) {}
         batch.forEach(r => errors.push({ email: r.email, error: m }));
         console.error('Resend campaign batch error', res.status, txt);
+        return;
+      } catch (e) {
+        if (attempt === 0) { await new Promise(r => setTimeout(r, 800)); continue; }
+        failed += batch.length;
+        batch.forEach(r => errors.push({ email: r.email, error: 'fallo de red' }));
+        console.error('Resend campaign fetch error', e);
+        return;
       }
-    } catch (e) {
-      failed += batch.length;
-      batch.forEach(r => errors.push({ email: r.email, error: 'fallo de red' }));
-      console.error('Resend campaign fetch error', e);
     }
+  }
+
+  // Concurrencia conservadora para respetar el límite de tasa de Resend (~2 req/s).
+  // El cliente además trocea por tandas, así que cada invocación es corta.
+  const CONCURRENCY = 2;
+  for (let i = 0; i < batches.length; i += CONCURRENCY) {
+    const slice = batches.slice(i, i + CONCURRENCY);
+    await Promise.all(slice.map(sendBatch));
   }
 
   return {
