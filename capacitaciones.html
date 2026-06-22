@@ -17379,14 +17379,41 @@ function makeCronogramaFilterFormula(year, tipo) {
         if (!confirm.isConfirmed) return;
 
         const btn = document.getElementById('pubSendBtn');
-        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando…'; }
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando…'; }
 
-        const payloadBase = {
-            subject, title, message, videoUrl,
-            imageBase64: pubImage ? pubImage.base64 : '',
-            imageType: pubImage ? pubImage.type : '',
-            imageName: pubImage ? pubImage.name : ''
-        };
+        // Si hay imagen, primero se aloja para enviarla por URL: así se ve en todos
+        // los clientes de correo (Gmail/Outlook/Apple Mail) y el envío por lotes es rápido.
+        let imageUrl = '';
+        if (pubImage) {
+            Swal.fire({ title: 'Preparando la imagen…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            let ok = false;
+            try {
+                const up = await fetch('/.netlify/functions/upload-campaign-image', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ base64: pubImage.base64, contentType: pubImage.type })
+                });
+                const upData = await up.json().catch(() => ({}));
+                if (up.ok && upData && upData.success && upData.url) { imageUrl = upData.url; ok = true; }
+            } catch (e) {
+                console.error('❌ Error subiendo imagen de campaña:', e);
+            }
+            if (!ok) {
+                Swal.close();
+                const cont = await Swal.fire({
+                    icon: 'warning',
+                    title: 'No se pudo preparar la imagen',
+                    text: '¿Deseas enviar la publicidad sin la imagen?',
+                    showCancelButton: true, confirmButtonText: 'Enviar sin imagen', cancelButtonText: 'Cancelar'
+                });
+                if (!cont.isConfirmed) {
+                    if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar publicidad'; }
+                    return;
+                }
+            }
+        }
+
+        const payloadBase = { subject, title, message, videoUrl, imageUrl };
 
         // Trocear los destinatarios en tandas: cada invocación de la función queda
         // corta y nunca se agota (evita el error 504 con listas grandes).

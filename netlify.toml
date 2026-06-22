@@ -13,6 +13,15 @@
 [functions."upload-attendance-pdf"]
   node_bundler = "esbuild"
 
+[functions."upload-campaign-image"]
+  node_bundler = "esbuild"
+
+[functions."campaign-image"]
+  node_bundler = "esbuild"
+
+[functions."send-campaign-email"]
+  node_bundler = "esbuild"
+
 # CORS básico
 [[headers]]
   for = "/*"
