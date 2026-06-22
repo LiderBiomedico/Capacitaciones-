@@ -3011,6 +3011,12 @@
                 <i class="fas fa-user-shield"></i>
                 <span>Usuarios</span>
             </button>
+
+            <!-- Publicidad / Comunicaciones (solo Administrador) -->
+            <button class="nav-tab" id="navTabPublicity" onclick="switchTab('publicity')">
+                <i class="fas fa-bullhorn"></i>
+                <span>Publicidad</span>
+            </button>
         </nav>
 
         <!-- Main Content -->
@@ -4313,6 +4319,96 @@
                                 <tr><td colspan="7" style="text-align:center; color:#9ca3af; padding:2rem;">Cargando usuarios…</td></tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ==================== PUBLICIDAD / COMUNICACIONES (Administrador) ==================== -->
+            <section id="publicity" class="tab-content">
+                <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:1rem;">
+                    <h2 class="section-title" style="margin-bottom:0;">
+                        <i class="fas fa-bullhorn"></i> Publicidad y comunicaciones
+                    </h2>
+                </div>
+
+                <p style="margin:0 0 1.25rem; color:#475569; font-weight:500; max-width:900px;">
+                    Difunde una campaña o capacitación al personal del hospital. La <strong>imagen</strong> se incrusta en el cuerpo del correo
+                    y, si agregas un <strong>enlace de video</strong> (YouTube, Drive, etc.), se incluye un botón para verlo.
+                </p>
+
+                <div style="display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap:1.25rem; align-items:start;">
+                    <!-- Columna izquierda: formulario -->
+                    <div class="card">
+                        <h3 style="margin:0 0 1rem; color:#0f172a; font-size:1.05rem;"><i class="fas fa-pen-to-square" style="color:#7c3aed;"></i> Contenido del mensaje</h3>
+                        <div class="um-grid">
+                            <div class="um-field um-col-2">
+                                <label for="pubSubject">Asunto del correo</label>
+                                <input id="pubSubject" type="text" placeholder="Ej: Campaña de lavado de manos – Mayo" oninput="pubRefreshPreview()">
+                            </div>
+                            <div class="um-field um-col-2">
+                                <label for="pubTitle">Título de la campaña</label>
+                                <input id="pubTitle" type="text" placeholder="Ej: ¡Cuida tus manos, salva vidas!" oninput="pubRefreshPreview()">
+                            </div>
+                            <div class="um-field um-col-2">
+                                <label for="pubMessage">Mensaje</label>
+                                <textarea id="pubMessage" rows="4" placeholder="Escribe aquí el cuerpo del mensaje para los colaboradores…" oninput="pubRefreshPreview()" style="resize:vertical;"></textarea>
+                            </div>
+
+                            <div class="um-field um-col-2">
+                                <label>Imagen de la campaña (afiche, banner…)</label>
+                                <input id="pubImageInput" type="file" accept="image/*" onchange="pubOnImageSelected(this)">
+                                <small style="color:#64748b;">Se optimiza automáticamente para el correo. Formatos: JPG, PNG, WebP.</small>
+                                <div id="pubImagePreviewWrap" style="display:none; margin-top:.6rem;">
+                                    <img id="pubImagePreview" alt="Vista previa de la imagen" style="max-width:100%; max-height:220px; border-radius:10px; border:1px solid #e2e8f0;">
+                                    <div>
+                                        <button type="button" class="btn btn-light" onclick="pubRemoveImage()" style="margin-top:.5rem;"><i class="fas fa-trash"></i> Quitar imagen</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="um-field um-col-2">
+                                <label for="pubVideoUrl">Enlace del video (opcional)</label>
+                                <input id="pubVideoUrl" type="url" placeholder="https://youtu.be/…  o  https://drive.google.com/…" oninput="pubRefreshPreview()">
+                                <small style="color:#64748b;">Sube el video a YouTube o Google Drive y pega aquí el enlace. Se mostrará un botón <strong>“Ver el video”</strong>.</small>
+                            </div>
+                        </div>
+
+                        <hr style="border:none; border-top:1px solid #eef2f7; margin:1.25rem 0;">
+
+                        <h3 style="margin:0 0 1rem; color:#0f172a; font-size:1.05rem;"><i class="fas fa-users" style="color:#7c3aed;"></i> Destinatarios</h3>
+                        <div class="um-grid">
+                            <div class="um-field">
+                                <label for="pubFiltroEntidad">Filtrar por Entidad</label>
+                                <select id="pubFiltroEntidad" onchange="pubUpdateRecipients()"><option value="">Todas</option></select>
+                            </div>
+                            <div class="um-field">
+                                <label for="pubFiltroProceso">Filtrar por Proceso</label>
+                                <select id="pubFiltroProceso" onchange="pubUpdateRecipients()"><option value="">Todos</option></select>
+                            </div>
+                            <div class="um-field um-col-2">
+                                <label>Correos adicionales (separados por coma, opcional)</label>
+                                <input id="pubExtra" type="text" oninput="pubUpdateRecipients()" placeholder="correo1@ejemplo.com, correo2@ejemplo.com">
+                            </div>
+                        </div>
+
+                        <div style="margin-top:1rem; padding:.8rem 1rem; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:10px; color:#5b21b6; font-size:.9rem;">
+                            <i class="fas fa-paper-plane"></i> Se enviará a <strong id="pubCount">0</strong> colaborador(es) con correo registrado.
+                            <span id="pubLoading" style="color:#7c3aed;"> Cargando personal…</span>
+                        </div>
+                        <div class="user-modal-error" id="pubError"></div>
+
+                        <div style="margin-top:1.1rem; display:flex; gap:.6rem; flex-wrap:wrap;">
+                            <button type="button" class="btn btn-primary" id="pubSendBtn" onclick="pubSendCampaign()" style="background:#7c3aed; border-color:#7c3aed;">
+                                <i class="fas fa-paper-plane"></i> Enviar publicidad
+                            </button>
+                            <button type="button" class="btn btn-light" onclick="pubResetForm()"><i class="fas fa-rotate-left"></i> Limpiar</button>
+                        </div>
+                    </div>
+
+                    <!-- Columna derecha: vista previa -->
+                    <div class="card">
+                        <h3 style="margin:0 0 1rem; color:#0f172a; font-size:1.05rem;"><i class="fas fa-eye" style="color:#7c3aed;"></i> Vista previa del correo</h3>
+                        <iframe id="pubPreviewFrame" title="Vista previa del correo" style="width:100%; height:560px; border:1px solid #e2e8f0; border-radius:12px; background:#f1f5f9;"></iframe>
                     </div>
                 </div>
             </section>
@@ -6380,8 +6476,8 @@
         // Aplica las restricciones de módulos en la barra de navegación.
         function applyModuleRestrictions(authUser) {
             allowedTabs = new Set(authUser.modulos);
-            // La pestaña "Usuarios" solo para Administrador
-            if (authUser.nivel === 'Administrador') allowedTabs.add('users');
+            // Las pestañas "Usuarios" y "Publicidad" solo para Administrador
+            if (authUser.nivel === 'Administrador') { allowedTabs.add('users'); allowedTabs.add('publicity'); }
             document.querySelectorAll('.nav-tab').forEach(btn => {
                 const oc = btn.getAttribute('onclick') || '';
                 const m = oc.match(/switchTab\('([^']+)'/);
@@ -17036,6 +17132,307 @@ function makeCronogramaFilterFormula(year, tipo) {
         } catch (e) { /* en caso de error, no bloquear la navegación normal */ }
         const r = guardedSwitch.call(this, tabName, event);
         if (tabName === 'users' && typeof loadUsers === 'function') { try { loadUsers(); } catch (e) {} }
+        return r;
+    };
+})();
+</script>
+
+<!-- ==================== MÓDULO PUBLICIDAD / COMUNICACIONES ==================== -->
+<script>
+(function () {
+    const PUB_PERSONAL_TABLE = 'tbl5A7rayv5BbiYF1'; // "Personal HSLV" (por ID)
+    const PUB_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    let pubStaffCache = [];   // [{nombre, email, entidad, proceso}]
+    let pubImage = null;      // { base64, type, name, dataUrl } o null
+    let pubStaffLoaded = false;
+
+    function pubEscape(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    // ---- Carga del personal (paginado) ----
+    async function pubLoadStaff(force) {
+        if (pubStaffLoaded && !force) { pubUpdateRecipients(); return; }
+        const loading = document.getElementById('pubLoading');
+        if (loading) loading.style.display = 'inline';
+        try {
+            const base = new URLSearchParams();
+            ['NOMBRE', 'EMAIL', 'ENTIDAD', 'PROCESO'].forEach(f => base.append('fields[]', f));
+            base.set('pageSize', '100');
+
+            let all = [];
+            let offset = '';
+            for (let i = 0; i < 30; i++) {
+                const p = new URLSearchParams(base);
+                if (offset) p.set('offset', offset);
+                const data = await airtableProxyRequest({ method: 'GET', path: `/${PUB_PERSONAL_TABLE}?${p.toString()}` });
+                const recs = (data && data.records) ? data.records : [];
+                all = all.concat(recs);
+                offset = data && data.offset ? data.offset : '';
+                if (!offset) break;
+            }
+
+            pubStaffCache = all.map(r => {
+                const f = r.fields || {};
+                return {
+                    nombre: String(f['NOMBRE'] || '').trim(),
+                    email: String(f['EMAIL'] || '').trim().toLowerCase(),
+                    entidad: String(f['ENTIDAD'] || '').trim(),
+                    proceso: String(f['PROCESO'] || '').trim()
+                };
+            }).filter(p => PUB_EMAIL_RE.test(p.email));
+
+            const entidades = [...new Set(pubStaffCache.map(p => p.entidad).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+            const procesos = [...new Set(pubStaffCache.map(p => p.proceso).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+            const selE = document.getElementById('pubFiltroEntidad');
+            const selP = document.getElementById('pubFiltroProceso');
+            if (selE) selE.innerHTML = '<option value="">Todas</option>' + entidades.map(v => `<option value="${pubEscape(v)}">${pubEscape(v)}</option>`).join('');
+            if (selP) selP.innerHTML = '<option value="">Todos</option>' + procesos.map(v => `<option value="${pubEscape(v)}">${pubEscape(v)}</option>`).join('');
+
+            pubStaffLoaded = true;
+        } catch (e) {
+            console.error('❌ Error cargando personal para publicidad:', e);
+            pubStaffCache = [];
+        } finally {
+            if (loading) loading.style.display = 'none';
+            pubUpdateRecipients();
+        }
+    }
+
+    function pubGetRecipients() {
+        const entidad = document.getElementById('pubFiltroEntidad')?.value || '';
+        const proceso = document.getElementById('pubFiltroProceso')?.value || '';
+        let list = pubStaffCache.filter(p =>
+            (!entidad || p.entidad === entidad) && (!proceso || p.proceso === proceso));
+
+        const extra = String(document.getElementById('pubExtra')?.value || '')
+            .split(/[,;\s]+/).map(s => s.trim().toLowerCase()).filter(s => PUB_EMAIL_RE.test(s));
+        extra.forEach(em => list.push({ nombre: '', email: em, entidad: '', proceso: '' }));
+
+        const seen = new Set();
+        return list.filter(p => { if (seen.has(p.email)) return false; seen.add(p.email); return true; })
+            .map(p => ({ email: p.email, nombre: p.nombre }));
+    }
+
+    function pubUpdateRecipients() {
+        const n = pubGetRecipients().length;
+        const el = document.getElementById('pubCount');
+        if (el) el.textContent = String(n);
+    }
+
+    // ---- Imagen: lectura + optimización en canvas ----
+    function pubOnImageSelected(input) {
+        const file = input && input.files && input.files[0];
+        if (!file) return;
+        if (!/^image\//i.test(file.type)) {
+            Swal.fire({ icon: 'error', title: 'Archivo no válido', text: 'Selecciona una imagen (JPG, PNG o WebP).' });
+            input.value = '';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            const img = new Image();
+            img.onload = () => {
+                const maxW = 1000;
+                let w = img.naturalWidth || img.width;
+                let h = img.naturalHeight || img.height;
+                if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0, w, h);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+                pubImage = {
+                    base64: dataUrl.split(',')[1],
+                    type: 'image/jpeg',
+                    name: (file.name || 'campaña').replace(/\.[^.]+$/, '') + '.jpg',
+                    dataUrl
+                };
+                const wrap = document.getElementById('pubImagePreviewWrap');
+                const prev = document.getElementById('pubImagePreview');
+                if (prev) prev.src = dataUrl;
+                if (wrap) wrap.style.display = 'block';
+                pubRefreshPreview();
+            };
+            img.onerror = () => Swal.fire({ icon: 'error', title: 'No se pudo leer la imagen' });
+            img.src = reader.result;
+        };
+        reader.onerror = () => Swal.fire({ icon: 'error', title: 'No se pudo leer el archivo' });
+        reader.readAsDataURL(file);
+    }
+
+    function pubRemoveImage() {
+        pubImage = null;
+        const input = document.getElementById('pubImageInput');
+        if (input) input.value = '';
+        const wrap = document.getElementById('pubImagePreviewWrap');
+        if (wrap) wrap.style.display = 'none';
+        pubRefreshPreview();
+    }
+
+    // ---- Plantilla del correo (idéntica a la del servidor; imageSrc = dataUrl en preview o cid: en envío) ----
+    function pubBuildEmailHtml(opts) {
+        const o = opts || {};
+        const nombre = o.nombre || '';
+        const title = String(o.title || '').trim();
+        const message = String(o.message || '').trim();
+        const videoUrl = String(o.videoUrl || '').trim();
+        const imageSrc = o.imageSrc || '';
+
+        const saludo = nombre ? `Hola ${pubEscape(nombre)},` : 'Hola,';
+        const titleHtml = title
+            ? `<h2 style="margin:0 0 12px;color:#6d28d9;font-size:21px;line-height:1.3;">${pubEscape(title)}</h2>` : '';
+        const msgHtml = message
+            ? `<p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6;">${pubEscape(message).replace(/\n/g, '<br>')}</p>` : '';
+        const imgHtml = imageSrc
+            ? `<div style="margin:6px 0 18px;"><img src="${imageSrc}" alt="${pubEscape(title || 'Campaña')}" style="display:block;width:100%;max-width:504px;border-radius:12px;border:1px solid #ede9fe;"></div>` : '';
+        const videoHtml = videoUrl
+            ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 8px;"><tr><td style="border-radius:10px;background:#7c3aed;">
+                 <a href="${pubEscape(videoUrl)}" style="display:inline-block;padding:13px 26px;color:#fff;font-size:15px;font-weight:700;text-decoration:none;">&#9654;&nbsp; Ver el video</a>
+               </td></tr></table>
+               <p style="margin:0 0 6px;color:#64748b;font-size:13px;">O copia este enlace en tu navegador:</p>
+               <p style="margin:0 0 6px;font-size:13px;word-break:break-all;"><a href="${pubEscape(videoUrl)}" style="color:#7c3aed;">${pubEscape(videoUrl)}</a></p>` : '';
+
+        return `<!DOCTYPE html><html><body style="margin:0;background:#f1f5f9;padding:24px;font-family:Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 8px 24px rgba(2,8,23,.08);">
+        <tr><td style="background:linear-gradient(135deg,#6d28d9,#7c3aed);padding:22px 28px;">
+          <span style="color:#fff;font-size:18px;font-weight:800;">Campus Susana López</span><br>
+          <span style="color:#ede9fe;font-size:12px;">Hospital Susana López de Valencia E.S.E.</span>
+        </td></tr>
+        <tr><td style="padding:28px;">
+          <p style="margin:0 0 14px;color:#0f172a;font-size:16px;">${saludo}</p>
+          ${titleHtml}
+          ${msgHtml}
+          ${imgHtml}
+          ${videoHtml}
+        </td></tr>
+        <tr><td style="background:#f8fafc;padding:16px 28px;border-top:1px solid #eef2f7;">
+          <span style="color:#94a3b8;font-size:11px;">Mensaje institucional de capacitación y comunicaciones. Por favor no respondas a este correo.</span>
+        </td></tr>
+      </table>
+    </td></tr></table>
+  </body></html>`;
+    }
+
+    function pubRefreshPreview() {
+        const frame = document.getElementById('pubPreviewFrame');
+        if (!frame) return;
+        const html = pubBuildEmailHtml({
+            nombre: '',
+            title: document.getElementById('pubTitle')?.value || '',
+            message: document.getElementById('pubMessage')?.value || '',
+            videoUrl: document.getElementById('pubVideoUrl')?.value || '',
+            imageSrc: pubImage ? pubImage.dataUrl : ''
+        });
+        frame.srcdoc = html;
+    }
+
+    function pubResetForm() {
+        ['pubSubject', 'pubTitle', 'pubMessage', 'pubVideoUrl', 'pubExtra'].forEach(id => {
+            const el = document.getElementById(id); if (el) el.value = '';
+        });
+        const selE = document.getElementById('pubFiltroEntidad'); if (selE) selE.value = '';
+        const selP = document.getElementById('pubFiltroProceso'); if (selP) selP.value = '';
+        pubRemoveImage();
+        const err = document.getElementById('pubError'); if (err) { err.textContent = ''; err.classList.remove('show'); }
+        pubUpdateRecipients();
+        pubRefreshPreview();
+    }
+
+    async function pubSendCampaign() {
+        const err = document.getElementById('pubError');
+        if (err) { err.textContent = ''; err.classList.remove('show'); }
+
+        const subject = String(document.getElementById('pubSubject')?.value || '').trim();
+        const title = String(document.getElementById('pubTitle')?.value || '').trim();
+        const message = String(document.getElementById('pubMessage')?.value || '').trim();
+        const videoUrl = String(document.getElementById('pubVideoUrl')?.value || '').trim();
+        const recipients = pubGetRecipients();
+
+        if (!subject) { if (err) { err.textContent = 'Escribe un asunto para el correo.'; err.classList.add('show'); } return; }
+        if (!message && !pubImage && !videoUrl) {
+            if (err) { err.textContent = 'Agrega al menos un mensaje, una imagen o un enlace de video.'; err.classList.add('show'); }
+            return;
+        }
+        if (videoUrl && !/^https?:\/\//i.test(videoUrl)) {
+            if (err) { err.textContent = 'El enlace del video debe iniciar con http:// o https://'; err.classList.add('show'); }
+            return;
+        }
+        if (!recipients.length) {
+            if (err) { err.textContent = 'No hay destinatarios con correo. Ajusta los filtros o agrega correos.'; err.classList.add('show'); }
+            return;
+        }
+
+        const confirm = await Swal.fire({
+            icon: 'question',
+            title: 'Confirmar envío',
+            html: `Se enviará esta publicidad a <strong>${recipients.length}</strong> colaborador(es).`,
+            showCancelButton: true, confirmButtonText: 'Sí, enviar', cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#7c3aed'
+        });
+        if (!confirm.isConfirmed) return;
+
+        const btn = document.getElementById('pubSendBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando…'; }
+        Swal.fire({ title: 'Enviando publicidad…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+
+        try {
+            const res = await fetch('/.netlify/functions/send-campaign-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    subject, title, message, videoUrl,
+                    imageBase64: pubImage ? pubImage.base64 : '',
+                    imageType: pubImage ? pubImage.type : '',
+                    imageName: pubImage ? pubImage.name : '',
+                    recipients
+                })
+            });
+            const data = await res.json().catch(() => ({}));
+            Swal.close();
+
+            if (res.ok && data && data.sent > 0) {
+                Swal.fire({
+                    icon: data.failed ? 'warning' : 'success',
+                    title: data.failed ? 'Envío parcial' : 'Publicidad enviada',
+                    html: `Enviados: <strong>${data.sent}</strong> de <strong>${data.total}</strong>.` +
+                        (data.failed ? `<br>Fallaron: <strong>${data.failed}</strong>.` : '')
+                });
+            } else {
+                const msg = (data && data.error) ? data.error : 'No se pudieron enviar los correos.';
+                if (err) { err.textContent = msg; err.classList.add('show'); }
+            }
+        } catch (e) {
+            Swal.close();
+            console.error('❌ Error enviando publicidad:', e);
+            if (err) { err.textContent = 'Error de conexión al enviar.'; err.classList.add('show'); }
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar publicidad'; }
+        }
+    }
+
+    // Exponer handlers usados desde el HTML
+    window.pubOnImageSelected = pubOnImageSelected;
+    window.pubRemoveImage = pubRemoveImage;
+    window.pubRefreshPreview = pubRefreshPreview;
+    window.pubUpdateRecipients = pubUpdateRecipients;
+    window.pubResetForm = pubResetForm;
+    window.pubSendCampaign = pubSendCampaign;
+
+    // Cargar personal y refrescar la vista previa al entrar a la pestaña "Publicidad"
+    const prevSwitch = window.switchTab;
+    window.switchTab = function (tabName, event) {
+        const r = (typeof prevSwitch === 'function') ? prevSwitch.call(this, tabName, event) : undefined;
+        if (tabName === 'publicity') {
+            try { pubLoadStaff(false); } catch (e) {}
+            try { pubRefreshPreview(); } catch (e) {}
+        }
         return r;
     };
 })();
