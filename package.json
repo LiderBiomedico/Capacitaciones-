@@ -8,7 +8,6 @@
     "deploy": "netlify deploy --prod"
   },
   "dependencies": {
-    "@netlify/blobs": "^8.2.0",
     "node-fetch": "^2.6.7"
   },
   "devDependencies": {
