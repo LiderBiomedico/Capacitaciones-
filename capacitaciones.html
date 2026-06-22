@@ -4332,8 +4332,8 @@
                 </div>
 
                 <p style="margin:0 0 1.25rem; color:#475569; font-weight:500; max-width:900px;">
-                    Difunde una campaña o capacitación al personal del hospital. La <strong>imagen</strong> se incrusta en el cuerpo del correo
-                    y, si agregas un <strong>enlace de video</strong> (YouTube, Drive, etc.), se incluye un botón para verlo.
+                    Difunde una campaña o capacitación al personal del hospital. La <strong>imagen</strong> se carga automáticamente en el cuerpo del correo
+                    sin depender de ImgBB y, si agregas un <strong>enlace de video</strong> (YouTube, Drive, etc.), se incluye un botón para verlo.
                 </p>
 
                 <div style="display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap:1.25rem; align-items:start;">
@@ -4394,6 +4394,7 @@
                         <div style="margin-top:1rem; padding:.8rem 1rem; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:10px; color:#5b21b6; font-size:.9rem;">
                             <i class="fas fa-paper-plane"></i> Se enviará a <strong id="pubCount">0</strong> colaborador(es) con correo registrado.
                             <span id="pubLoading" style="color:#7c3aed;"> Cargando personal…</span>
+                            <div id="pubRecipientsList" style="margin-top:.55rem; color:#475569; font-size:.82rem; max-height:84px; overflow:auto; word-break:break-word;"></div>
                         </div>
                         <div class="user-modal-error" id="pubError"></div>
 
@@ -17160,7 +17161,8 @@ function makeCronogramaFilterFormula(year, tipo) {
         if (loading) loading.style.display = 'inline';
         try {
             const base = new URLSearchParams();
-            ['NOMBRE', 'EMAIL', 'ENTIDAD', 'PROCESO'].forEach(f => base.append('fields[]', f));
+            // Se cargan todos los campos para soportar tablas donde el correo se llame
+            // EMAIL, Email, Correo, CORREO o similar.
             base.set('pageSize', '100');
 
             let all = [];
@@ -17177,11 +17179,12 @@ function makeCronogramaFilterFormula(year, tipo) {
 
             pubStaffCache = all.map(r => {
                 const f = r.fields || {};
+                const email = f['EMAIL'] || f['Email'] || f['Correo'] || f['CORREO'] || f['E-mail'] || f['MAIL'] || '';
                 return {
-                    nombre: String(f['NOMBRE'] || '').trim(),
-                    email: String(f['EMAIL'] || '').trim().toLowerCase(),
-                    entidad: String(f['ENTIDAD'] || '').trim(),
-                    proceso: String(f['PROCESO'] || '').trim()
+                    nombre: String(f['NOMBRE'] || f['Nombre'] || f['Nombre completo'] || f['NOMBRE COMPLETO'] || '').trim(),
+                    email: String(email || '').trim().toLowerCase(),
+                    entidad: String(f['ENTIDAD'] || f['Entidad'] || '').trim(),
+                    proceso: String(f['PROCESO'] || f['Proceso'] || '').trim()
                 };
             }).filter(p => PUB_EMAIL_RE.test(p.email));
 
@@ -17218,9 +17221,19 @@ function makeCronogramaFilterFormula(year, tipo) {
     }
 
     function pubUpdateRecipients() {
-        const n = pubGetRecipients().length;
+        const recipients = pubGetRecipients();
+        const n = recipients.length;
         const el = document.getElementById('pubCount');
         if (el) el.textContent = String(n);
+        const listEl = document.getElementById('pubRecipientsList');
+        if (listEl) {
+            if (!n) listEl.innerHTML = '<em>No hay correos destino seleccionados.</em>';
+            else {
+                const first = recipients.slice(0, 20).map(r => pubEscape(r.email)).join(', ');
+                const more = n > 20 ? ` y ${n - 20} más` : '';
+                listEl.innerHTML = `<strong>Correos destino:</strong> ${first}${more}`;
+            }
+        }
     }
 
     // ---- Imagen: lectura + optimización en canvas ----
@@ -17381,8 +17394,8 @@ function makeCronogramaFilterFormula(year, tipo) {
         const btn = document.getElementById('pubSendBtn');
         if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando…'; }
 
-        // Si hay imagen, primero se sube a un alojamiento para enviarla por URL:
-        // así se ve en Gmail/Outlook/Apple Mail y el envío por lotes es rápido.
+        // Si hay imagen, primero se guarda en Netlify Blobs para obtener una URL pública.
+        // No requiere IMGBB_API_KEY.
         let imageUrl = '';
         if (pubImage) {
             Swal.fire({ title: 'Preparando la imagen…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
@@ -17391,7 +17404,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                 const up = await fetch('/.netlify/functions/upload-campaign-image', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ base64: pubImage.base64 })
+                    body: JSON.stringify({ base64: pubImage.base64, contentType: pubImage.type, name: pubImage.name })
                 });
                 const upData = await up.json().catch(() => ({}));
                 if (up.ok && upData && upData.success && upData.url) { imageUrl = upData.url; ok = true; }
