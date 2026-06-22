@@ -17386,7 +17386,7 @@ function makeCronogramaFilterFormula(year, tipo) {
         let imageUrl = '';
         if (pubImage) {
             Swal.fire({ title: 'Preparando la imagen…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
-            let ok = false;
+            let ok = false, upErr = '';
             try {
                 const up = await fetch('/.netlify/functions/upload-campaign-image', {
                     method: 'POST',
@@ -17395,15 +17395,17 @@ function makeCronogramaFilterFormula(year, tipo) {
                 });
                 const upData = await up.json().catch(() => ({}));
                 if (up.ok && upData && upData.success && upData.url) { imageUrl = upData.url; ok = true; }
+                else { upErr = (upData && (upData.detail || upData.error)) ? (upData.detail || upData.error) : `HTTP ${up.status}`; }
             } catch (e) {
                 console.error('❌ Error subiendo imagen de campaña:', e);
+                upErr = (e && e.message) ? e.message : 'fallo de red';
             }
             if (!ok) {
                 Swal.close();
                 const cont = await Swal.fire({
                     icon: 'warning',
                     title: 'No se pudo preparar la imagen',
-                    text: '¿Deseas enviar la publicidad sin la imagen?',
+                    html: `Detalle técnico:<br><code style="font-size:.8rem;color:#b91c1c;word-break:break-word;">${pubEscape(upErr)}</code><br><br>¿Deseas enviar la publicidad sin la imagen?`,
                     showCancelButton: true, confirmButtonText: 'Enviar sin imagen', cancelButtonText: 'Cancelar'
                 });
                 if (!cont.isConfirmed) {

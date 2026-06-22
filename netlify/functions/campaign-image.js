@@ -7,16 +7,27 @@
 // Salida: la imagen con su Content-Type (binario).
 // ============================================================================
 
-const { getStore } = require('@netlify/blobs');
-
 exports.handler = async (event) => {
   const id = (event.queryStringParameters && event.queryStringParameters.id) ? String(event.queryStringParameters.id) : '';
   if (!id || !/^[a-f0-9]{8,64}$/i.test(id)) {
     return { statusCode: 400, body: 'Solicitud inválida.' };
   }
 
+  let getStore;
+  try { ({ getStore } = require('@netlify/blobs')); }
+  catch (e) { return { statusCode: 500, body: 'Almacenamiento no disponible.' }; }
+
   try {
-    const store = getStore('campaign-images');
+    let store;
+    try {
+      store = getStore('campaign-images');
+    } catch (e) {
+      const siteID = process.env.NETLIFY_SITE_ID || process.env.SITE_ID || '';
+      const token = process.env.NETLIFY_BLOBS_TOKEN || process.env.NETLIFY_API_TOKEN || process.env.NETLIFY_AUTH_TOKEN || '';
+      if (!siteID || !token) return { statusCode: 500, body: 'Almacenamiento no disponible.' };
+      store = getStore({ name: 'campaign-images', siteID, token });
+    }
+
     const blob = await store.getWithMetadata(id, { type: 'arrayBuffer' });
     if (!blob || !blob.data) {
       return { statusCode: 404, body: 'Imagen no encontrada.' };
