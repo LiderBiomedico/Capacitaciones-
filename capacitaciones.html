@@ -17146,7 +17146,7 @@ function makeCronogramaFilterFormula(year, tipo) {
     // ===== Alojamiento de imagen (ImgBB) =====
     // Pega aquí tu clave gratuita de https://api.imgbb.com  (o define window.IMGBB_API_KEY).
     // La imagen se sube directamente desde el navegador, sin variables de entorno en Netlify.
-    const PUB_IMGBB_KEY = (window.IMGBB_API_KEY || (window.CONFIG && window.CONFIG.IMGBB_API_KEY) || 'TU_CLAVE_IMGBB_AQUI').trim();
+    const PUB_IMGBB_KEY = (window.IMGBB_API_KEY || (window.CONFIG && window.CONFIG.IMGBB_API_KEY) || 'b3333944faaf5183114f04e19962cc03').trim();
 
     async function pubUploadImage(base64) {
         if (!PUB_IMGBB_KEY || PUB_IMGBB_KEY === 'TU_CLAVE_IMGBB_AQUI') {
