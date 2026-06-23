@@ -17143,6 +17143,27 @@ function makeCronogramaFilterFormula(year, tipo) {
     const PUB_PERSONAL_TABLE = 'tbl5A7rayv5BbiYF1'; // "Personal HSLV" (por ID)
     const PUB_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+    // ===== Alojamiento de imagen (ImgBB) =====
+    // Pega aquí tu clave gratuita de https://api.imgbb.com  (o define window.IMGBB_API_KEY).
+    // La imagen se sube directamente desde el navegador, sin variables de entorno en Netlify.
+    const PUB_IMGBB_KEY = (window.IMGBB_API_KEY || (window.CONFIG && window.CONFIG.IMGBB_API_KEY) || 'TU_CLAVE_IMGBB_AQUI').trim();
+
+    async function pubUploadImage(base64) {
+        if (!PUB_IMGBB_KEY || PUB_IMGBB_KEY === 'TU_CLAVE_IMGBB_AQUI') {
+            throw new Error('Falta configurar la clave de ImgBB (PUB_IMGBB_KEY) en el código.');
+        }
+        const form = new FormData();
+        form.append('key', PUB_IMGBB_KEY);
+        form.append('image', base64);
+        const res = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: form });
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data && data.success && data.data) {
+            return data.data.url || (data.data.image && data.data.image.url) || data.data.display_url || '';
+        }
+        const m = (data && data.error && data.error.message) ? data.error.message : ('ImgBB HTTP ' + res.status);
+        throw new Error(m);
+    }
+
     let pubStaffCache = [];   // [{nombre, email, entidad, proceso}]
     let pubImage = null;      // { base64, type, name, dataUrl } o null
     let pubStaffLoaded = false;
@@ -17388,14 +17409,9 @@ function makeCronogramaFilterFormula(year, tipo) {
             Swal.fire({ title: 'Preparando la imagen…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             let ok = false, upErr = '';
             try {
-                const up = await fetch('/.netlify/functions/upload-campaign-image', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ base64: pubImage.base64 })
-                });
-                const upData = await up.json().catch(() => ({}));
-                if (up.ok && upData && upData.success && upData.url) { imageUrl = upData.url; ok = true; console.log('🖼️ Imagen alojada en:', imageUrl); }
-                else { upErr = (upData && (upData.detail || upData.error)) ? (upData.detail || upData.error) : `HTTP ${up.status}`; }
+                imageUrl = await pubUploadImage(pubImage.base64);
+                if (imageUrl) { ok = true; console.log('🖼️ Imagen alojada en:', imageUrl); }
+                else upErr = 'No se obtuvo la URL de la imagen.';
             } catch (e) {
                 console.error('❌ Error subiendo imagen de campaña:', e);
                 upErr = (e && e.message) ? e.message : 'fallo de red';
