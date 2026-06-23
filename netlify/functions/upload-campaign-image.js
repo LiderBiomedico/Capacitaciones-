@@ -24,9 +24,19 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers: CORS, body: JSON.stringify({ success: false, error: 'Método no permitido.' }) };
   }
 
-  const apiKey = (process.env.IMGBB_API_KEY || process.env.IMGBB_KEY || '').trim();
+  // Búsqueda tolerante del nombre de la variable (por si hubo un typo al crearla)
+  const CANDIDATES = ['IMGBB_API_KEY', 'IMGBB_KEY', 'IMGBB_APIKEY', 'IMG_BB_API_KEY', 'IMGBBAPIKEY', 'IMGBB', 'IMGBB_TOKEN'];
+  let apiKey = '';
+  for (const n of CANDIDATES) {
+    const v = process.env[n];
+    if (v && String(v).trim()) { apiKey = String(v).trim(); break; }
+  }
   if (!apiKey) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ success: false, error: 'Falta IMGBB_API_KEY en el servidor. Crea una clave gratuita en imgbb.com y agrégala en Netlify.' }) };
+    const similar = Object.keys(process.env).filter(k => /imgbb|img_?bb/i.test(k));
+    const hint = similar.length
+      ? ('Se detectaron variables con nombre parecido: ' + similar.join(', ') + '. El nombre debe ser EXACTAMENTE IMGBB_API_KEY.')
+      : 'No se detectó ninguna variable IMGBB. Verifica: (1) nombre exacto IMGBB_API_KEY, (2) que aplique a "Functions"/todos los scopes, y (3) que volviste a desplegar con "Clear cache and deploy site" DESPUÉS de crearla.';
+    return { statusCode: 500, headers: CORS, body: JSON.stringify({ success: false, error: 'Falta IMGBB_API_KEY en el servidor.', detail: hint }) };
   }
 
   let body = {};
