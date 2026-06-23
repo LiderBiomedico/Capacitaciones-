@@ -33,7 +33,7 @@ function esc(s) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-function buildHtml({ nombre, email, title, message, videoUrl, imageUrl }) {
+function buildHtml({ nombre, title, message, videoUrl, imageUrl }) {
   const saludo = nombre ? `Hola ${esc(nombre)},` : 'Hola,';
   const titleHtml = title
     ? `<h2 style="margin:0 0 12px;color:#6d28d9;font-size:21px;line-height:1.3;">${esc(title)}</h2>` : '';
@@ -41,8 +41,6 @@ function buildHtml({ nombre, email, title, message, videoUrl, imageUrl }) {
     ? `<p style="margin:0 0 16px;color:#334155;font-size:15px;line-height:1.6;">${esc(message).replace(/\n/g, '<br>')}</p>` : '';
   const imgHtml = imageUrl
     ? `<div style="margin:6px 0 18px;"><img src="${esc(imageUrl)}" alt="${esc(title || 'Campaña')}" width="504" style="display:block;width:100%;max-width:504px;height:auto;border-radius:12px;border:1px solid #ede9fe;"></div>` : '';
-  const destinoHtml = email
-    ? `<p style="margin:0 0 14px;color:#64748b;font-size:12px;"><strong>Correo destino:</strong> ${esc(email)}</p>` : '';
   const videoHtml = videoUrl
     ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:6px 0 8px;"><tr><td style="border-radius:10px;background:#7c3aed;">
          <a href="${esc(videoUrl)}" style="display:inline-block;padding:13px 26px;color:#fff;font-size:15px;font-weight:700;text-decoration:none;">&#9654;&nbsp; Ver el video</a>
@@ -61,7 +59,6 @@ function buildHtml({ nombre, email, title, message, videoUrl, imageUrl }) {
           <p style="margin:0 0 14px;color:#0f172a;font-size:16px;">${saludo}</p>
           ${titleHtml}
           ${msgHtml}
-          ${destinoHtml}
           ${imgHtml}
           ${videoHtml}
         </td></tr>
@@ -129,7 +126,7 @@ exports.handler = async (event) => {
   async function sendBatch(batch) {
     const payload = batch.map(r => ({
       from, to: [r.email], subject,
-      html: buildHtml({ nombre: r.nombre, email: r.email, title, message, videoUrl, imageUrl })
+      html: buildHtml({ nombre: r.nombre, title, message, videoUrl, imageUrl })
     }));
     const reqBody = JSON.stringify(payload);
     for (let attempt = 0; attempt < 2; attempt++) {
