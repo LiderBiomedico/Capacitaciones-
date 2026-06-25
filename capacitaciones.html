@@ -9037,11 +9037,15 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 // Mapa cédula -> datos del personal (para enriquecer el detalle de participantes)
                 const personalByCedula = {};
+                const personalByName = {};
+                const normName = (s) => String(s || '')
+                    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                    .replace(/\s+/g, ' ').trim().toUpperCase();
                 allPersonal.forEach(r => {
                     const f = r.fields || {};
                     const ced = String(f['CEDULA'] ?? f['Cédula'] ?? f['Cedula'] ?? '').replace(/\D/g, '');
-                    if (!ced) return;
-                    personalByCedula[ced] = {
+                    const info = {
+                        cedula: ced,
                         nombre: f['NOMBRE'] || f['Nombre'] || '',
                         email: f['EMAIL'] || f['Email'] || f['Correo'] || '',
                         celular: f['CONTACTO'] || f['Celular'] || f['Teléfono'] || f['Telefono'] || '',
@@ -9051,6 +9055,12 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         cargo: f['CARGO'] || f['Cargo'] || '',
                         area: f['AREA'] || f['Área'] || f['Area'] || ''
                     };
+                    if (ced) personalByCedula[ced] = info;
+                    const nk = normName(info.nombre);
+                    // Indexar por nombre (preferir el registro que tenga cédula si hay colisión)
+                    if (nk && (!personalByName[nk] || (!personalByName[nk].cedula && ced))) {
+                        personalByName[nk] = info;
+                    }
                 });
 
                 // Mapa: sessionId → trainingId (para resolver vínculos indirectos)
@@ -9286,22 +9296,30 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 const participantsDetail = partsScoped.map(p => {
                     const f = p.fields || {};
-                    const cedRaw = f['Usuario ID'] ?? f['Cédula'] ?? f['Cedula'] ?? f['Documento'] ?? f['Identificación'] ?? '';
-                    const ced = String(cedRaw).replace(/\D/g, '');
-                    const info = personalByCedula[ced] || {};
+                    const cedRaw = f['CEDULA'] ?? f['Cédula'] ?? f['Cedula'] ?? f['Usuario ID'] ?? f['CC'] ?? f['Documento'] ?? f['Identificación'] ?? f['Identificacion'] ?? f['No. Cédula'] ?? f['Número de Cédula'] ?? f['Numero de Cedula'] ?? '';
+                    let ced = String(cedRaw).replace(/\D/g, '');
+                    const nombre = f['Nombre Completo'] || f['Nombre'] || '';
+                    // Cruce con Personal HSLV: por cédula y, si falla, por nombre normalizado
+                    let info = (ced && personalByCedula[ced]) ? personalByCedula[ced] : null;
+                    if (!info) {
+                        const byName = personalByName[normName(nombre)];
+                        if (byName) info = byName;
+                    }
+                    info = info || {};
+                    if (!ced && info.cedula) ced = info.cedula; // recuperar cédula desde Personal HSLV
                     const pre = parseFloat(f['Pretest Score'] || f['Pre-test Score'] || 0) || 0;
                     const post = parseFloat(f['Post-test Score'] || f['Posttest Score'] || 0) || 0;
                     const fecha = (getPartDate(p) || '').slice(0, 10);
                     const capacitacion = (p._trainingId && trainingTitleById[p._trainingId]) ? trainingTitleById[p._trainingId] : '';
                     return {
                         cedula: ced || String(cedRaw || ''),
-                        nombre: f['Nombre Completo'] || f['Nombre'] || info.nombre || '',
-                        entidad: info.entidad || f['Entidad'] || '',
-                        proceso: info.proceso || f['Proceso'] || f['Departamento'] || f['Servicio'] || '',
-                        perfil: info.perfil || f['Perfil'] || '',
-                        cargo: info.cargo || f['Profesión Texto'] || f['Profesión'] || f['Cargo'] || '',
-                        correo: info.email || f['Email'] || f['Correo'] || '',
-                        celular: info.celular || f['Contacto'] || f['Celular'] || '',
+                        nombre: nombre || info.nombre || '',
+                        entidad: f['Entidad'] || info.entidad || '',
+                        proceso: f['Proceso'] || f['Departamento'] || f['Servicio'] || info.proceso || info.area || '',
+                        perfil: f['Perfil'] || info.perfil || '',
+                        cargo: f['Profesión Texto'] || f['Profesión'] || f['Cargo'] || info.cargo || '',
+                        correo: f['Email'] || f['Correo'] || info.email || '',
+                        celular: f['Contacto'] || f['Celular'] || info.celular || '',
                         capacitacion,
                         fecha,
                         pretest: pre,
@@ -9313,7 +9331,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 // ── Estadística de Cursos Virtuales del trimestre ──
                 let virtualStats = { kpis: { coursesCount: 0, participations: 0, uniqueParticipants: 0, approved: 0, failed: 0, passRate: 0, avgPercent: 0, avgGrade: 0 }, courses: [], participants: [] };
                 try {
-                    virtualStats = await buildQuarterlyVirtualStats(dateStart, dateEnd, personalByCedula);
+                    virtualStats = await buildQuarterlyVirtualStats(dateStart, dateEnd, personalByCedula, personalByName);
                 } catch (vErr) {
                     console.warn('⚠️ No se pudo construir la estadística de cursos virtuales del trimestre:', vErr);
                 }
@@ -9363,7 +9381,11 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         // por participante (cédula), toma el último resumen de cada uno y filtra
         // por la fecha de la evaluación dentro del trimestre. Enriquece los datos
         // institucionales/contacto cruzando con Personal HSLV (personalByCedula).
-        async function buildQuarterlyVirtualStats(dateStart, dateEnd, personalByCedula) {
+        async function buildQuarterlyVirtualStats(dateStart, dateEnd, personalByCedula, personalByName) {
+            personalByName = personalByName || {};
+            const normName = (s) => String(s || '')
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/\s+/g, ' ').trim().toUpperCase();
             const emptyKpis = { coursesCount: 0, participations: 0, uniqueParticipants: 0, approved: 0, failed: 0, passRate: 0, avgPercent: 0, avgGrade: 0 };
 
             // Asegurar que la lista de cursos virtuales esté cargada (para resolver títulos por ID)
@@ -9471,7 +9493,10 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     };
 
                     const ced = String(cedula).replace(/\D/g, '');
-                    const info = personalByCedula[ced] || {};
+                    const nombreResp = fieldFrom([VIRTUAL_RESP_FIELD_PARTICIPANT, 'Participante']);
+                    let info = (ced && personalByCedula[ced]) ? personalByCedula[ced] : null;
+                    if (!info && nombreResp) info = personalByName[normName(nombreResp)] || null;
+                    info = info || {};
 
                     courseParts.push({
                         cedula: ced || String(cedula || ''),
