@@ -3802,6 +3802,120 @@
                         </div>
                     </div>
 
+                    <!-- Estadística de Cursos Virtuales (Trimestre) -->
+                    <div id="qVirtualSection" class="card" style="margin-bottom: 1.5rem;">
+                        <h3><i class="fas fa-video" style="color:#7c3aed;"></i> Estadística de Cursos Virtuales del Trimestre</h3>
+                        <p style="margin:0.25rem 0 0.5rem; color:#475569; font-weight:500;">
+                            Evaluaciones de cursos virtuales completadas dentro del trimestre. Incluye aprobación, nota promedio y el detalle completo por participante.
+                        </p>
+                        <div id="qvEmptyNote" style="display:none; background:#fff7ed; border:1px solid #fdba74; color:#9a3412; padding:10px 14px; border-radius:8px; margin-bottom:12px; font-weight:600;">
+                            <i class="fas fa-info-circle"></i> No se registraron evaluaciones de cursos virtuales en el periodo seleccionado.
+                        </div>
+
+                        <!-- KPIs virtuales -->
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 0.85rem; margin-top: 0.5rem;">
+                            <div style="text-align:center; padding:0.9rem; background: linear-gradient(135deg,#7c3aed 0%,#5b21b6 100%); border-radius:10px;">
+                                <div style="color:#fff; font-weight:600; font-size:0.88rem;">Cursos con actividad</div>
+                                <div id="qvCourses" style="color:#fff; font-size:1.8rem; font-weight:800;">0</div>
+                            </div>
+                            <div style="text-align:center; padding:0.9rem; background: linear-gradient(135deg,#2563eb 0%,#1d4ed8 100%); border-radius:10px;">
+                                <div style="color:#fff; font-weight:600; font-size:0.88rem;">Evaluaciones</div>
+                                <div id="qvParticipations" style="color:#fff; font-size:1.8rem; font-weight:800;">0</div>
+                            </div>
+                            <div style="text-align:center; padding:0.9rem; background: linear-gradient(135deg,#0ea5e9 0%,#0284c7 100%); border-radius:10px;">
+                                <div style="color:#fff; font-weight:600; font-size:0.88rem;">Participantes únicos</div>
+                                <div id="qvUnique" style="color:#fff; font-size:1.8rem; font-weight:800;">0</div>
+                            </div>
+                            <div style="text-align:center; padding:0.9rem; background: linear-gradient(135deg,#16a34a 0%,#15803d 100%); border-radius:10px;">
+                                <div style="color:#fff; font-weight:600; font-size:0.88rem;">Aprobados</div>
+                                <div id="qvApproved" style="color:#fff; font-size:1.8rem; font-weight:800;">0</div>
+                            </div>
+                            <div style="text-align:center; padding:0.9rem; background: linear-gradient(135deg,#dc2626 0%,#991b1b 100%); border-radius:10px;">
+                                <div style="color:#fff; font-weight:600; font-size:0.88rem;">Reprobados</div>
+                                <div id="qvFailed" style="color:#fff; font-size:1.8rem; font-weight:800;">0</div>
+                            </div>
+                            <div style="text-align:center; padding:0.9rem; background: linear-gradient(135deg,#111827 0%,#374151 100%); border-radius:10px;">
+                                <div style="color:#fff; font-weight:600; font-size:0.88rem;">Aprobación</div>
+                                <div id="qvPassRate" style="color:#fff; font-size:1.8rem; font-weight:800;">0%</div>
+                            </div>
+                            <div style="text-align:center; padding:0.9rem; background: linear-gradient(135deg,#e65100 0%,#bf360c 100%); border-radius:10px;">
+                                <div style="color:#fff; font-weight:600; font-size:0.88rem;">Nota promedio</div>
+                                <div id="qvAvgGrade" style="color:#fff; font-size:1.6rem; font-weight:800;">0.0 / 5.0</div>
+                                <div id="qvAvgPercent" style="color:#ffe; font-weight:600; font-size:0.85rem;">0%</div>
+                            </div>
+                        </div>
+
+                        <!-- Gráficas virtuales -->
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.25rem; margin-top: 1.1rem;">
+                            <div style="background:#fff; border-radius: 10px; padding: 0.75rem; border: 1px solid rgba(15,23,42,0.08);">
+                                <div style="font-weight:700; color:#111827; margin-bottom:0.5rem;">Aprobados vs Reprobados</div>
+                                <canvas id="qvChartStatus"></canvas>
+                            </div>
+                            <div style="background:#fff; border-radius: 10px; padding: 0.75rem; border: 1px solid rgba(15,23,42,0.08);">
+                                <div style="font-weight:700; color:#111827; margin-bottom:0.5rem;">Participantes por Curso Virtual (Top 10)</div>
+                                <canvas id="qvChartByCourse"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Resumen por curso -->
+                        <div style="margin-top:1.1rem; border:1px solid rgba(15,23,42,0.08); border-radius:10px; overflow:hidden;">
+                            <div style="background:#f8fafc; padding:0.75rem; font-weight:800; color:#111827;">Resumen por Curso Virtual</div>
+                            <div style="overflow:auto;">
+                                <table style="width:100%; border-collapse:collapse;">
+                                    <thead>
+                                        <tr style="background:#e5e7eb;">
+                                            <th style="padding:10px; text-align:left;">Curso Virtual</th>
+                                            <th style="padding:10px; text-align:center;">Participantes</th>
+                                            <th style="padding:10px; text-align:center;">Aprobados</th>
+                                            <th style="padding:10px; text-align:center;">Reprobados</th>
+                                            <th style="padding:10px; text-align:center;">% Aprob.</th>
+                                            <th style="padding:10px; text-align:center;">Prom. %</th>
+                                            <th style="padding:10px; text-align:center;">Nota Prom.</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="qvCoursesTbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Detalle de participantes virtuales -->
+                        <div style="margin-top:1.1rem;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; margin-bottom:0.6rem;">
+                                <div style="font-weight:800; color:#0f172a;">
+                                    <i class="fas fa-users" style="color:#7c3aed;"></i> Detalle de participantes (cursos virtuales)
+                                    <span style="color:#64748b; font-weight:600; font-size:0.85rem;">(<span id="qvPartCount">0</span>)</span>
+                                </div>
+                                <input id="qvPartSearch" type="text" oninput="filterQuarterlyVirtualParticipants()" placeholder="Buscar por nombre, cédula, curso, estado…"
+                                    style="padding:0.5rem 0.75rem; border:1.5px solid #e2e8f0; border-radius:10px; font-size:0.88rem; min-width:260px;">
+                            </div>
+                            <div style="overflow-x:auto; border:1px solid rgba(15,23,42,0.08); border-radius:10px;">
+                                <table style="width:100%; border-collapse:collapse; font-size:0.82rem;">
+                                    <thead>
+                                        <tr style="background:#f8fafc; color:#64748b; text-align:left;">
+                                            <th style="padding:8px;">Cédula</th>
+                                            <th style="padding:8px;">Nombre</th>
+                                            <th style="padding:8px;">Entidad</th>
+                                            <th style="padding:8px;">Proceso/Servicio</th>
+                                            <th style="padding:8px;">Perfil</th>
+                                            <th style="padding:8px;">Cargo</th>
+                                            <th style="padding:8px;">Correo</th>
+                                            <th style="padding:8px;">Celular</th>
+                                            <th style="padding:8px;">Curso Virtual</th>
+                                            <th style="padding:8px;">Fecha</th>
+                                            <th style="padding:8px; text-align:center;">Correctas</th>
+                                            <th style="padding:8px; text-align:center;">Total</th>
+                                            <th style="padding:8px; text-align:center;">%</th>
+                                            <th style="padding:8px; text-align:center;">Nota</th>
+                                            <th style="padding:8px; text-align:center;">Estado</th>
+                                            <th style="padding:8px; text-align:center;">Intentos</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="qvPartTbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Observaciones automáticas -->
                     <div class="card" style="background:#f8fafc; border: 2px dashed #cbd5e1;">
                         <h3><i class="fas fa-lightbulb"></i> Hallazgos Automáticos y Recomendaciones</h3>
@@ -8816,7 +8930,9 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             byDept: null,
             byCargo: null,
             byProfession: null,
-            trainingsByMonth: null
+            trainingsByMonth: null,
+            virtualStatus: null,
+            virtualByCourse: null
         };
 
         function initQuarterlyReportDefaults() {
@@ -9194,6 +9310,14 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     };
                 }).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
 
+                // ── Estadística de Cursos Virtuales del trimestre ──
+                let virtualStats = { kpis: { coursesCount: 0, participations: 0, uniqueParticipants: 0, approved: 0, failed: 0, passRate: 0, avgPercent: 0, avgGrade: 0 }, courses: [], participants: [] };
+                try {
+                    virtualStats = await buildQuarterlyVirtualStats(dateStart, dateEnd, personalByCedula);
+                } catch (vErr) {
+                    console.warn('⚠️ No se pudo construir la estadística de cursos virtuales del trimestre:', vErr);
+                }
+
                 const data = {
                     success: true,
                     period: { year, quarter, label: `T${quarter} (${qLabels[quarter]}) ${year}`, startDate: dateStart, endDate: dateEnd },
@@ -9211,6 +9335,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     topTrainingsByParticipants: topByParts,
                     distributions: { byDept, byCargo: byCargoArr, byProfession: byProfessionArr, trainingsByMonth },
                     participants: participantsDetail,
+                    virtual: virtualStats,
                     insights: []
                 };
 
@@ -9229,6 +9354,184 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 if (loading) loading.style.display = 'none';
                 Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Error al generar el reporte' });
             }
+        }
+
+        // ==========================================
+        // ESTADÍSTICA DE CURSOS VIRTUALES (TRIMESTRE)
+        // ==========================================
+        // Descarga las respuestas de cursos virtuales, las agrupa por curso y
+        // por participante (cédula), toma el último resumen de cada uno y filtra
+        // por la fecha de la evaluación dentro del trimestre. Enriquece los datos
+        // institucionales/contacto cruzando con Personal HSLV (personalByCedula).
+        async function buildQuarterlyVirtualStats(dateStart, dateEnd, personalByCedula) {
+            const emptyKpis = { coursesCount: 0, participations: 0, uniqueParticipants: 0, approved: 0, failed: 0, passRate: 0, avgPercent: 0, avgGrade: 0 };
+
+            // Asegurar que la lista de cursos virtuales esté cargada (para resolver títulos por ID)
+            try {
+                if (typeof loadVirtualCoursesFromAirtable === 'function' && (!Array.isArray(virtualCourses) || !virtualCourses.length)) {
+                    await loadVirtualCoursesFromAirtable(false);
+                }
+            } catch (e) { /* continuar con lo disponible */ }
+
+            // Descargar TODAS las respuestas de cursos virtuales (una sola vez)
+            const allResp = [];
+            try {
+                let offset = null, pages = 0;
+                do {
+                    const params = new URLSearchParams();
+                    params.set('pageSize', '100');
+                    if (offset) params.set('offset', offset);
+                    const resp = await virtualCourseProxy({
+                        method: 'GET',
+                        path: `${airtableTablePath(VIRTUAL_RESPONSES_TABLE)}?${params.toString()}`,
+                        body: null
+                    });
+                    (Array.isArray(resp.records) ? resp.records : []).forEach(r => allResp.push(r));
+                    offset = resp.offset || null;
+                    pages++;
+                } while (offset && pages < 40);
+            } catch (e) {
+                console.warn('⚠️ No se pudieron descargar respuestas de cursos virtuales:', e);
+                return { kpis: { ...emptyKpis }, courses: [], participants: [] };
+            }
+
+            // Título por Curso ID (desde la lista de cursos virtuales)
+            const courseTitleById = {};
+            (Array.isArray(virtualCourses) ? virtualCourses : []).forEach(c => {
+                if (c && c.id) courseTitleById[String(c.id)] = c.title || 'Curso virtual';
+            });
+
+            // Agrupar respuestas por curso (clave: Curso ID, o título en minúsculas si falta el ID)
+            const byCourse = new Map();
+            allResp.forEach(rec => {
+                const f = rec.fields || {};
+                const cid = virtualRespValue(f, [VIRTUAL_RESP_FIELD_COURSE_ID, 'Curso ID']);
+                const ctitle = virtualRespValue(f, [VIRTUAL_RESP_FIELD_COURSE, 'Curso Virtual']);
+                const key = cid ? ('id:' + cid) : ('title:' + ctitle.toLowerCase());
+                if (!byCourse.has(key)) {
+                    byCourse.set(key, { id: cid || '', title: courseTitleById[cid] || ctitle || 'Curso virtual', records: [] });
+                }
+                const group = byCourse.get(key);
+                if ((!group.title || group.title === 'Curso virtual') && (courseTitleById[cid] || ctitle)) {
+                    group.title = courseTitleById[cid] || ctitle || group.title;
+                }
+                group.records.push(rec);
+            });
+
+            const courses = [];
+            const participantsAll = [];
+
+            byCourse.forEach(group => {
+                // Agrupar por cédula dentro del curso
+                const byCedula = new Map();
+                group.records.forEach(rec => {
+                    const f = rec.fields || {};
+                    const cedula = virtualRespValue(f, [VIRTUAL_RESP_FIELD_CEDULA, 'Cédula', 'Cedula']) || '(sin cédula)';
+                    if (!byCedula.has(cedula)) byCedula.set(cedula, []);
+                    byCedula.get(cedula).push(f);
+                });
+
+                const courseParts = [];
+                byCedula.forEach((rows, cedula) => {
+                    const dateOf = (f) => new Date(virtualRespValue(f, [VIRTUAL_RESP_FIELD_DATE, 'Fecha Respuesta']) || 0).getTime();
+                    const sorted = [...rows].sort((a, b) => dateOf(a) - dateOf(b));
+                    const summaries = sorted.filter(isVirtualSummaryRow);
+                    const checkpoints = sorted.filter(f => !isVirtualSummaryRow(f));
+                    const lastSummary = summaries.length ? summaries[summaries.length - 1] : null;
+                    const anyRow = lastSummary || sorted[sorted.length - 1] || {};
+
+                    // Fecha de la evaluación (preferir resumen final) y filtro por trimestre
+                    const rawDate = virtualRespValue(anyRow, [VIRTUAL_RESP_FIELD_DATE, 'Fecha Respuesta']);
+                    const fecha = (rawDate || '').slice(0, 10);
+                    if (!fecha || fecha < dateStart || fecha > dateEnd) return;
+
+                    let correct, total, percent, statusRaw;
+                    if (lastSummary) {
+                        correct = Number(virtualRespValue(lastSummary, [VIRTUAL_RESP_FIELD_CORRECT_COUNT, 'Correctas']) || 0);
+                        total = Number(virtualRespValue(lastSummary, [VIRTUAL_RESP_FIELD_TOTAL, 'Total Checkpoints']) || 0);
+                        percent = Number(virtualRespValue(lastSummary, [VIRTUAL_RESP_FIELD_PERCENT, 'Porcentaje']) || 0);
+                        statusRaw = virtualRespValue(lastSummary, [VIRTUAL_RESP_FIELD_TYPE, 'Tipo Registro']);
+                    } else {
+                        correct = checkpoints.filter(f => virtualRespValue(f, [VIRTUAL_RESP_FIELD_RESULT, 'Resultado']).toLowerCase() === 'correcta').length;
+                        total = checkpoints.reduce((m, f) => Math.max(m, Number(virtualRespValue(f, [VIRTUAL_RESP_FIELD_TOTAL, 'Total Checkpoints']) || 0)), 0) || checkpoints.length;
+                        percent = total ? Math.round((correct / total) * 100) : 0;
+                        statusRaw = '';
+                    }
+
+                    let passed;
+                    const sl = (statusRaw || '').toLowerCase();
+                    if (sl.startsWith('aprob')) passed = true;
+                    else if (sl.startsWith('reprob')) passed = false;
+                    else passed = percent >= VIRTUAL_PASS_PERCENT;
+
+                    const fieldFrom = (keys) => {
+                        if (lastSummary && virtualRespValue(lastSummary, keys)) return virtualRespValue(lastSummary, keys);
+                        for (const f of sorted) { const v = virtualRespValue(f, keys); if (v) return v; }
+                        return '';
+                    };
+
+                    const ced = String(cedula).replace(/\D/g, '');
+                    const info = personalByCedula[ced] || {};
+
+                    courseParts.push({
+                        cedula: ced || String(cedula || ''),
+                        nombre: fieldFrom([VIRTUAL_RESP_FIELD_PARTICIPANT, 'Participante']) || info.nombre || '',
+                        entidad: fieldFrom([VIRTUAL_RESP_FIELD_ENTITY, 'Entidad']) || info.entidad || '',
+                        proceso: fieldFrom([VIRTUAL_RESP_FIELD_PROCESS, 'Proceso']) || info.proceso || '',
+                        perfil: fieldFrom([VIRTUAL_RESP_FIELD_PROFILE, 'Perfil']) || info.perfil || '',
+                        cargo: fieldFrom([VIRTUAL_RESP_FIELD_CARGO, 'Cargo']) || info.cargo || '',
+                        correo: info.email || '',
+                        celular: info.celular || '',
+                        curso: group.title,
+                        fecha,
+                        correctas: correct,
+                        total,
+                        porcentaje: Math.round(percent),
+                        nota: virtualPercentToGrade(percent),
+                        aprobado: passed,
+                        estado: passed ? 'Aprobado' : 'Reprobado',
+                        intentos: summaries.length || 1
+                    });
+                });
+
+                if (!courseParts.length) return;
+
+                const tp = courseParts.length;
+                const approved = courseParts.filter(p => p.aprobado).length;
+                const failed = tp - approved;
+                const passRate = tp ? Math.round((approved / tp) * 100) : 0;
+                const avgPercent = tp ? Math.round(courseParts.reduce((s, p) => s + p.porcentaje, 0) / tp) : 0;
+                const avgGrade = virtualPercentToGrade(avgPercent);
+
+                courses.push({ id: group.id, title: group.title, participants: tp, approved, failed, passRate, avgPercent, avgGrade });
+                courseParts.forEach(p => participantsAll.push(p));
+            });
+
+            courses.sort((a, b) => b.participants - a.participants || String(a.title).localeCompare(String(b.title), 'es'));
+            participantsAll.sort((a, b) => String(a.curso).localeCompare(String(b.curso), 'es') || String(a.nombre).localeCompare(String(b.nombre), 'es'));
+
+            const totalParticipations = participantsAll.length;
+            const uniqueSet = new Set(participantsAll.map(p => p.cedula));
+            const approvedG = participantsAll.filter(p => p.aprobado).length;
+            const failedG = totalParticipations - approvedG;
+            const passRateG = totalParticipations ? Math.round((approvedG / totalParticipations) * 100) : 0;
+            const avgPercentG = totalParticipations ? Math.round(participantsAll.reduce((s, p) => s + p.porcentaje, 0) / totalParticipations) : 0;
+            const avgGradeG = virtualPercentToGrade(avgPercentG);
+
+            return {
+                kpis: {
+                    coursesCount: courses.length,
+                    participations: totalParticipations,
+                    uniqueParticipants: uniqueSet.size,
+                    approved: approvedG,
+                    failed: failedG,
+                    passRate: passRateG,
+                    avgPercent: avgPercentG,
+                    avgGrade: avgGradeG
+                },
+                courses,
+                participants: participantsAll
+            };
         }
 
         // ==========================================
@@ -9421,6 +9724,40 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 insights.push(`📋 Recomendaciones para el próximo trimestre: ${recomendaciones.join('; ')}.`);
             }
 
+            // ── 13. CURSOS VIRTUALES ──
+            const v = data.virtual || {};
+            const vk = v.kpis || {};
+            if ((vk.participations || 0) > 0) {
+                insights.push(
+                    `📊 En modalidad virtual se registraron ${vk.participations} evaluación(es) de ${vk.coursesCount} curso(s) virtual(es), con ${vk.uniqueParticipants} participante(s) único(s).`
+                );
+                if (vk.passRate >= 80) {
+                    insights.push(
+                        `✅ La tasa de aprobación de los cursos virtuales fue del ${vk.passRate}% (nota promedio ${vk.avgGrade}/5.0), reflejando una buena asimilación del contenido en autoaprendizaje.`
+                    );
+                } else if (vk.passRate >= 60) {
+                    insights.push(
+                        `⚠️ La tasa de aprobación de los cursos virtuales fue del ${vk.passRate}% (nota promedio ${vk.avgGrade}/5.0). Es aceptable, pero conviene reforzar los temas con más respuestas incorrectas.`
+                    );
+                } else {
+                    insights.push(
+                        `🔴 Solo el ${vk.passRate}% de los participantes aprobó los cursos virtuales (nota promedio ${vk.avgGrade}/5.0). Se recomienda un plan de refuerzo y re-evaluación.`
+                    );
+                }
+                if ((vk.failed || 0) > 0) {
+                    insights.push(
+                        `📋 ${vk.failed} participante(s) no aprobaron su curso virtual y deben repetir la evaluación para alcanzar la competencia requerida (≥${VIRTUAL_PASS_PERCENT}%).`
+                    );
+                }
+                const vCourses = Array.isArray(v.courses) ? v.courses : [];
+                if (vCourses.length > 1) {
+                    const bestV = [...vCourses].sort((a, b) => b.avgPercent - a.avgPercent)[0];
+                    const worstV = [...vCourses].sort((a, b) => a.avgPercent - b.avgPercent)[0];
+                    if (bestV) insights.push(`📊 El curso virtual con mejor desempeño fue "${bestV.title}" (promedio ${bestV.avgPercent}%, ${bestV.participants} participantes).`);
+                    if (worstV && worstV.avgPercent < 80) insights.push(`⚠️ El curso virtual con menor desempeño fue "${worstV.title}" (promedio ${worstV.avgPercent}%). Conviene revisar su contenido y evaluación.`);
+                }
+            }
+
             return insights;
         }
 
@@ -9449,11 +9786,13 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             fillQuarterlyTopTrainings(data.topTrainingsByParticipants || []);
             fillQuarterlyByDept(data.distributions?.byDept || []);
             fillQuarterlyTrainingsList(data.trainings || []);
+            fillQuarterlyVirtual(data.virtual || { kpis: {}, courses: [], participants: [] });
             fillQuarterlyInsights(data.insights || []);
             fillQuarterlyParticipants(data.participants || []);
 
             // Charts
             renderQuarterlyCharts(data);
+            renderQuarterlyVirtualCharts(data.virtual || {});
         }
 
         function setText(id, value) {
@@ -9546,6 +9885,165 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 [r.cedula, r.nombre, r.entidad, r.proceso, r.perfil, r.cargo, r.correo, r.capacitacion]
                     .some(v => String(v || '').toLowerCase().includes(q)));
             renderQuarterlyParticipantsRows(filtered);
+        }
+
+        // ── Estadística de Cursos Virtuales del trimestre ──
+        function fillQuarterlyVirtual(virtual) {
+            const v = virtual || {};
+            const k = v.kpis || {};
+
+            // KPIs
+            setText('qvCourses', safeNumber(k.coursesCount));
+            setText('qvParticipations', safeNumber(k.participations));
+            setText('qvUnique', safeNumber(k.uniqueParticipants));
+            setText('qvApproved', safeNumber(k.approved));
+            setText('qvFailed', safeNumber(k.failed));
+            setText('qvPassRate', `${safeNumber(k.passRate)}%`);
+            setText('qvAvgGrade', `${(safeNumber(k.avgPercent) / 20).toFixed(1)} / 5.0`);
+            setText('qvAvgPercent', `${safeNumber(k.avgPercent)}%`);
+
+            // Aviso si no hay actividad virtual
+            const emptyNote = document.getElementById('qvEmptyNote');
+            const hasData = safeNumber(k.participations) > 0;
+            if (emptyNote) emptyNote.style.display = hasData ? 'none' : 'block';
+
+            // Tabla por curso
+            const cTbody = document.getElementById('qvCoursesTbody');
+            if (cTbody) {
+                const courses = v.courses || [];
+                if (!courses.length) {
+                    cTbody.innerHTML = `<tr><td colspan="7" style="padding:12px; text-align:center; color:#64748b;">Sin cursos virtuales con evaluaciones en el periodo.</td></tr>`;
+                } else {
+                    cTbody.innerHTML = courses.map(c => {
+                        const prColor = safeNumber(c.passRate) >= 80 ? '#15803d' : (safeNumber(c.passRate) >= 60 ? '#b45309' : '#b91c1c');
+                        return `<tr style="border-top:1px solid #eef2f7;">
+                            <td style="padding:9px; font-weight:700; color:#111827;">${escapeHtml(c.title || 'Curso virtual')}</td>
+                            <td style="padding:9px; text-align:center; font-weight:800;">${safeNumber(c.participants)}</td>
+                            <td style="padding:9px; text-align:center; color:#15803d; font-weight:700;">${safeNumber(c.approved)}</td>
+                            <td style="padding:9px; text-align:center; color:#b91c1c; font-weight:700;">${safeNumber(c.failed)}</td>
+                            <td style="padding:9px; text-align:center; font-weight:800; color:${prColor};">${safeNumber(c.passRate)}%</td>
+                            <td style="padding:9px; text-align:center;">${safeNumber(c.avgPercent)}%</td>
+                            <td style="padding:9px; text-align:center; font-weight:800;">${safeNumber(c.avgGrade)} / 5.0</td>
+                        </tr>`;
+                    }).join('');
+                }
+            }
+
+            // Detalle de participantes virtuales
+            renderQuarterlyVirtualParticipantsRows(v.participants || []);
+        }
+
+        function renderQuarterlyVirtualParticipantsRows(list) {
+            const tbody = document.getElementById('qvPartTbody');
+            const count = document.getElementById('qvPartCount');
+            if (!tbody) return;
+            if (count) count.textContent = String(list.length);
+            if (!list.length) {
+                tbody.innerHTML = `<tr><td colspan="16" style="padding:14px; text-align:center; color:#64748b;">Sin participantes de cursos virtuales en el periodo seleccionado.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = list.map(r => {
+                const aprobado = !!r.aprobado;
+                const estadoColor = aprobado ? '#15803d' : '#b91c1c';
+                const estadoBg = aprobado ? '#dcfce7' : '#fee2e2';
+                return `<tr style="border-top:1px solid #eef2f7;">
+                    <td style="padding:7px; white-space:nowrap;">${escapeHtml(r.cedula || '')}</td>
+                    <td style="padding:7px; font-weight:700; color:#111827;">${escapeHtml(r.nombre || '')}</td>
+                    <td style="padding:7px;">${escapeHtml(r.entidad || '')}</td>
+                    <td style="padding:7px;">${escapeHtml(r.proceso || '')}</td>
+                    <td style="padding:7px;">${escapeHtml(r.perfil || '')}</td>
+                    <td style="padding:7px;">${escapeHtml(r.cargo || '')}</td>
+                    <td style="padding:7px;">${escapeHtml(r.correo || '')}</td>
+                    <td style="padding:7px; white-space:nowrap;">${escapeHtml(r.celular || '')}</td>
+                    <td style="padding:7px;">${escapeHtml(r.curso || '')}</td>
+                    <td style="padding:7px; white-space:nowrap;">${escapeHtml(r.fecha || '')}</td>
+                    <td style="padding:7px; text-align:center;">${safeNumber(r.correctas)}</td>
+                    <td style="padding:7px; text-align:center;">${safeNumber(r.total)}</td>
+                    <td style="padding:7px; text-align:center; font-weight:700;">${safeNumber(r.porcentaje)}%</td>
+                    <td style="padding:7px; text-align:center; font-weight:800;">${safeNumber(r.nota)}</td>
+                    <td style="padding:7px; text-align:center;"><span style="display:inline-block; padding:2px 8px; border-radius:999px; font-weight:800; font-size:0.75rem; color:${estadoColor}; background:${estadoBg};">${escapeHtml(r.estado || '')}</span></td>
+                    <td style="padding:7px; text-align:center;">${safeNumber(r.intentos)}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function filterQuarterlyVirtualParticipants() {
+            const q = (document.getElementById('qvPartSearch')?.value || '').toLowerCase().trim();
+            const all = (currentQuarterlyReportData && currentQuarterlyReportData.virtual && currentQuarterlyReportData.virtual.participants) || [];
+            if (!q) { renderQuarterlyVirtualParticipantsRows(all); return; }
+            const filtered = all.filter(r =>
+                [r.cedula, r.nombre, r.entidad, r.proceso, r.perfil, r.cargo, r.correo, r.curso, r.estado]
+                    .some(v => String(v || '').toLowerCase().includes(q)));
+            renderQuarterlyVirtualParticipantsRows(filtered);
+        }
+
+        function renderQuarterlyVirtualCharts(virtual) {
+            if (typeof Chart === 'undefined') return;
+            const v = virtual || {};
+            const k = v.kpis || {};
+
+            // Doughnut: Aprobados vs Reprobados
+            const ctxStatus = document.getElementById('qvChartStatus');
+            if (ctxStatus) {
+                const approved = safeNumber(k.approved);
+                const failed = safeNumber(k.failed);
+                if (approved + failed > 0) {
+                    quarterlyCharts.virtualStatus = new Chart(ctxStatus, {
+                        type: 'doughnut',
+                        data: {
+                            labels: ['Aprobados', 'Reprobados'],
+                            datasets: [{
+                                data: [approved, failed],
+                                backgroundColor: ['rgba(22,163,74,0.85)', 'rgba(220,38,38,0.85)'],
+                                borderWidth: 2,
+                                borderColor: '#fff'
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            plugins: {
+                                legend: { position: 'bottom', labels: { font: { size: 12 }, boxWidth: 14 } },
+                                tooltip: {
+                                    callbacks: {
+                                        label: ctx => {
+                                            const tot = approved + failed;
+                                            const pct = tot > 0 ? Math.round(ctx.parsed / tot * 100) : 0;
+                                            return ` ${ctx.label}: ${ctx.parsed} (${pct}%)`;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            // Bar: Participantes por curso virtual
+            const ctxCourse = document.getElementById('qvChartByCourse');
+            if (ctxCourse) {
+                const courses = [...(v.courses || [])].sort((a, b) => safeNumber(b.participants) - safeNumber(a.participants)).slice(0, 10);
+                if (courses.length) {
+                    quarterlyCharts.virtualByCourse = new Chart(ctxCourse, {
+                        type: 'bar',
+                        data: {
+                            labels: courses.map(c => c.title || 'Curso virtual'),
+                            datasets: [{
+                                label: 'Participantes',
+                                data: courses.map(c => safeNumber(c.participants)),
+                                backgroundColor: 'rgba(124,58,237,0.8)',
+                                borderWidth: 1,
+                                borderColor: 'rgba(0,0,0,0.1)'
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            plugins: { legend: { display: false } },
+                            scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { ticks: { font: { size: 11 } } } }
+                        }
+                    });
+                }
+            }
         }
 
         function fillQuarterlyTopTrainings(items) {
@@ -9801,6 +10299,36 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 ]);
             });
 
+            // Cursos Virtuales — KPIs y resumen por curso
+            const vData = currentQuarterlyReportData.virtual || {};
+            const vk = vData.kpis || {};
+            rows.push([]);
+            rows.push(['CURSOS VIRTUALES (TRIMESTRE)']);
+            rows.push(['Cursos con actividad', safeNumber(vk.coursesCount), 'Evaluaciones', safeNumber(vk.participations), 'Participantes únicos', safeNumber(vk.uniqueParticipants)]);
+            rows.push(['Aprobados', safeNumber(vk.approved), 'Reprobados', safeNumber(vk.failed), 'Aprobación %', safeNumber(vk.passRate), 'Nota prom.', safeNumber(vk.avgGrade)]);
+            rows.push([]);
+            rows.push(['RESUMEN POR CURSO VIRTUAL']);
+            rows.push(['Curso Virtual', 'Participantes', 'Aprobados', 'Reprobados', 'Aprobación %', 'Promedio %', 'Nota Prom.']);
+            (vData.courses || []).forEach(c => {
+                rows.push([
+                    c.title || '', safeNumber(c.participants), safeNumber(c.approved), safeNumber(c.failed),
+                    safeNumber(c.passRate), safeNumber(c.avgPercent), safeNumber(c.avgGrade)
+                ]);
+            });
+
+            // Detalle de participantes de cursos virtuales
+            rows.push([]);
+            rows.push(['DETALLE DE PARTICIPANTES - CURSOS VIRTUALES']);
+            rows.push(['Cédula', 'Nombre', 'Entidad', 'Proceso/Servicio', 'Perfil', 'Cargo', 'Correo', 'Celular', 'Curso Virtual', 'Fecha', 'Correctas', 'Total', '%', 'Nota', 'Estado', 'Intentos']);
+            (vData.participants || []).forEach(r => {
+                rows.push([
+                    r.cedula || '', r.nombre || '', r.entidad || '', r.proceso || '', r.perfil || '',
+                    r.cargo || '', r.correo || '', r.celular || '', r.curso || '', r.fecha || '',
+                    safeNumber(r.correctas), safeNumber(r.total), safeNumber(r.porcentaje), safeNumber(r.nota),
+                    r.estado || '', safeNumber(r.intentos)
+                ]);
+            });
+
             const csv = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
             const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
@@ -9844,6 +10372,12 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const byCargo = [...(data.distributions?.byCargo || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count));
             const byProf = [...(data.distributions?.byProfession || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count));
             const byMonth = [...(data.distributions?.trainingsByMonth || [])].sort((a, b) => safeNumber(a.month) - safeNumber(b.month));
+
+            // Datos de cursos virtuales
+            const vData = data.virtual || {};
+            const vk = vData.kpis || {};
+            const vCourses = [...(vData.courses || [])].sort((a, b) => safeNumber(b.participants) - safeNumber(a.participants));
+            const vParts = vData.participants || [];
 
             const escape = (s) => escapeHtml(String(s ?? ''));
 
@@ -10087,6 +10621,80 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                                 <td class="center">${safeNumber(r.mejora)}</td>
                             </tr>
                         `).join('')}
+
+                        <tr><td class="sec" colspan="13">10) Cursos virtuales - Indicadores (trimestre)</td></tr>
+                        <tr>
+                            <td class="k" colspan="2">Cursos con actividad</td><td class="v" colspan="2">${safeNumber(vk.coursesCount)}</td>
+                            <td class="k" colspan="2">Evaluaciones</td><td class="v" colspan="2">${safeNumber(vk.participations)}</td>
+                            <td class="k" colspan="3">Participantes únicos</td><td class="v" colspan="2">${safeNumber(vk.uniqueParticipants)}</td>
+                        </tr>
+                        <tr>
+                            <td class="k" colspan="2">Aprobados</td><td class="v" colspan="2">${safeNumber(vk.approved)}</td>
+                            <td class="k" colspan="2">Reprobados</td><td class="v" colspan="2">${safeNumber(vk.failed)}</td>
+                            <td class="k" colspan="3">Aprobación / Nota prom.</td><td class="v" colspan="2">${safeNumber(vk.passRate)}% (${safeNumber(vk.avgGrade)}/5.0)</td>
+                        </tr>
+
+                        <tr><td class="sec" colspan="13">11) Resumen por curso virtual (ordenado desc.)</td></tr>
+                        <tr class="tblhead">
+                            <th colspan="5">Curso Virtual</th>
+                            <th class="center">Particip.</th>
+                            <th class="center">Aprob.</th>
+                            <th class="center">Reprob.</th>
+                            <th class="center" colspan="2">Aprobación %</th>
+                            <th class="center">Prom. %</th>
+                            <th class="center" colspan="2">Nota Prom.</th>
+                        </tr>
+                        ${(vCourses.length ? vCourses : []).map(c => `
+                            <tr>
+                                <td colspan="5">${escape(c.title || '')}</td>
+                                <td class="center">${safeNumber(c.participants)}</td>
+                                <td class="center">${safeNumber(c.approved)}</td>
+                                <td class="center">${safeNumber(c.failed)}</td>
+                                <td class="center" colspan="2">${safeNumber(c.passRate)}%</td>
+                                <td class="center">${safeNumber(c.avgPercent)}%</td>
+                                <td class="center" colspan="2">${safeNumber(c.avgGrade)}/5.0</td>
+                            </tr>
+                        `).join('') || `<tr><td colspan="13" class="muted">Sin cursos virtuales con evaluaciones en el periodo.</td></tr>`}
+
+                        <tr><td class="sec" colspan="16">12) Detalle de participantes - cursos virtuales</td></tr>
+                        <tr class="tblhead">
+                            <th>Cédula</th>
+                            <th>Nombre</th>
+                            <th>Entidad</th>
+                            <th>Proceso/Servicio</th>
+                            <th>Perfil</th>
+                            <th>Cargo</th>
+                            <th>Correo</th>
+                            <th>Celular</th>
+                            <th>Curso Virtual</th>
+                            <th class="nowrap">Fecha</th>
+                            <th class="center">Correctas</th>
+                            <th class="center">Total</th>
+                            <th class="center">%</th>
+                            <th class="center">Nota</th>
+                            <th class="center">Estado</th>
+                            <th class="center">Intentos</th>
+                        </tr>
+                        ${(vParts.length ? vParts : []).map(r => `
+                            <tr>
+                                <td class="nowrap">${escape(r.cedula || '')}</td>
+                                <td>${escape(r.nombre || '')}</td>
+                                <td>${escape(r.entidad || '')}</td>
+                                <td>${escape(r.proceso || '')}</td>
+                                <td>${escape(r.perfil || '')}</td>
+                                <td>${escape(r.cargo || '')}</td>
+                                <td>${escape(r.correo || '')}</td>
+                                <td class="nowrap">${escape(r.celular || '')}</td>
+                                <td>${escape(r.curso || '')}</td>
+                                <td class="nowrap">${escape(r.fecha || '')}</td>
+                                <td class="center">${safeNumber(r.correctas)}</td>
+                                <td class="center">${safeNumber(r.total)}</td>
+                                <td class="center">${safeNumber(r.porcentaje)}</td>
+                                <td class="center">${safeNumber(r.nota)}</td>
+                                <td class="center">${escape(r.estado || '')}</td>
+                                <td class="center">${safeNumber(r.intentos)}</td>
+                            </tr>
+                        `).join('') || `<tr><td colspan="16" class="muted">Sin participantes de cursos virtuales en el periodo.</td></tr>`}
 
                         <tr class="no-border"><td colspan="8" class="small muted" style="text-align:center; padding-top: 10px;">
                             Documento generado automáticamente por el Sistema de Capacitaciones - Hospital Susana López de Valencia E.S.E.
@@ -10589,6 +11197,100 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 }
 
                 // ═══════════════════════════════════════════════════════════
+                // SECCIÓN 6: CURSOS VIRTUALES (TRIMESTRE)
+                // ═══════════════════════════════════════════════════════════
+                const vData = data.virtual || {};
+                const vk = vData.kpis || {};
+                const vCourses = vData.courses || [];
+                const vParts = vData.participants || [];
+
+                if (typeof doc.autoTable === 'function') {
+                    doc.addPage();
+                    yPos = margin;
+                    doc.setFillColor(124, 58, 237);
+                    doc.rect(margin, yPos, pageWidth - 2 * margin, 7, 'F');
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(255);
+                    doc.text('6. ESTADÍSTICA DE CURSOS VIRTUALES', margin + 3, yPos + 5);
+                    yPos += 11;
+
+                    // KPIs virtuales en formato de tabla compacta
+                    doc.autoTable({
+                        startY: yPos,
+                        body: [
+                            ['Cursos con actividad', String(safeNumber(vk.coursesCount)), 'Evaluaciones', String(safeNumber(vk.participations)), 'Participantes únicos', String(safeNumber(vk.uniqueParticipants))],
+                            ['Aprobados', String(safeNumber(vk.approved)), 'Reprobados', String(safeNumber(vk.failed)), 'Aprobación / Nota', `${safeNumber(vk.passRate)}% (${safeNumber(vk.avgGrade)}/5.0)`]
+                        ],
+                        styles: { fontSize: 8, cellPadding: 2 },
+                        columnStyles: {
+                            0: { fontStyle: 'bold', fillColor: [243, 244, 246] },
+                            2: { fontStyle: 'bold', fillColor: [243, 244, 246] },
+                            4: { fontStyle: 'bold', fillColor: [243, 244, 246] }
+                        },
+                        margin: { left: margin, right: margin }
+                    });
+                    yPos = doc.lastAutoTable.finalY + 6;
+
+                    // Resumen por curso virtual
+                    doc.setFontSize(9);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setTextColor(60);
+                    doc.text('Resumen por curso virtual', margin, yPos);
+                    yPos += 3;
+                    doc.autoTable({
+                        startY: yPos,
+                        head: [['Curso Virtual', 'Particip.', 'Aprob.', 'Reprob.', '% Aprob.', 'Prom. %', 'Nota']],
+                        body: (vCourses.length ? vCourses : [{ title: 'Sin cursos virtuales con evaluaciones en el periodo', participants: '', approved: '', failed: '', passRate: '', avgPercent: '', avgGrade: '' }]).map(c => [
+                            c.title || '',
+                            c.participants === '' ? '' : String(safeNumber(c.participants)),
+                            c.approved === '' ? '' : String(safeNumber(c.approved)),
+                            c.failed === '' ? '' : String(safeNumber(c.failed)),
+                            c.passRate === '' ? '' : `${safeNumber(c.passRate)}%`,
+                            c.avgPercent === '' ? '' : `${safeNumber(c.avgPercent)}%`,
+                            c.avgGrade === '' ? '' : `${safeNumber(c.avgGrade)}/5.0`
+                        ]),
+                        styles: { fontSize: 7, cellPadding: 1.4, overflow: 'linebreak' },
+                        headStyles: { fillColor: [124, 58, 237], textColor: 255, fontSize: 7.2 },
+                        columnStyles: {
+                            0: { cellWidth: 60 }, 1: { cellWidth: 18, halign: 'center' }, 2: { cellWidth: 18, halign: 'center' },
+                            3: { cellWidth: 18, halign: 'center' }, 4: { cellWidth: 20, halign: 'center' },
+                            5: { cellWidth: 18, halign: 'center' }, 6: { cellWidth: 18, halign: 'center' }
+                        },
+                        margin: { left: margin, right: margin }
+                    });
+                    yPos = doc.lastAutoTable.finalY + 8;
+
+                    // Detalle de participantes de cursos virtuales
+                    if (vParts.length) {
+                        doc.setFontSize(9);
+                        doc.setFont('helvetica', 'bold');
+                        doc.setTextColor(60);
+                        doc.text('Detalle de participantes (cursos virtuales)', margin, yPos);
+                        yPos += 3;
+                        doc.autoTable({
+                            startY: yPos,
+                            head: [['Cédula', 'Nombre', 'Proceso/Servicio', 'Cargo', 'Correo', 'Curso Virtual', '%', 'Nota', 'Estado']],
+                            body: vParts.map(r => [
+                                r.cedula || '', r.nombre || '', r.proceso || '', r.cargo || '',
+                                r.correo || '', r.curso || '',
+                                `${safeNumber(r.porcentaje)}%`, `${safeNumber(r.nota)}`, r.estado || ''
+                            ]),
+                            styles: { fontSize: 6.5, cellPadding: 1.2, overflow: 'linebreak' },
+                            headStyles: { fillColor: [124, 58, 237], textColor: 255, fontSize: 6.8 },
+                            columnStyles: {
+                                0: { cellWidth: 18 }, 1: { cellWidth: 30 }, 2: { cellWidth: 26 },
+                                3: { cellWidth: 24 }, 4: { cellWidth: 34 }, 5: { cellWidth: 26 },
+                                6: { cellWidth: 10, halign: 'center' }, 7: { cellWidth: 10, halign: 'center' },
+                                8: { cellWidth: 14, halign: 'center' }
+                            },
+                            margin: { left: margin, right: margin }
+                        });
+                        yPos = doc.lastAutoTable.finalY + 8;
+                    }
+                }
+
+                // ═══════════════════════════════════════════════════════════
                 // PIE DE PÁGINA
                 // ═══════════════════════════════════════════════════════════
                 const totalPages = doc.internal.getNumberOfPages();
@@ -10987,6 +11689,24 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                                 const state = t.finalizada ? 'Finalizada' : (t.activa ? 'Activa' : 'Inactiva');
                                 return `<tr><td>${escapeHtml(t.dateLabel||'')}</td><td>${escapeHtml(t.title||'')}</td><td>${escapeHtml(t.department||'')}</td><td>${state}</td><td style="text-align:center;">${safeNumber(t.participations)}</td><td style="text-align:center;">${safeNumber(t.adherenceRate)}%</td></tr>`;
                             }).join('')}
+                        </tbody>
+                    </table>
+
+                    <div style="margin-top:16px;"><strong>Cursos virtuales del trimestre</strong></div>
+                    <div class="kpi">
+                        <div class="card"><div class="v">${safeNumber((d.virtual&&d.virtual.kpis&&d.virtual.kpis.participations)||0)}</div><div>Evaluaciones</div></div>
+                        <div class="card"><div class="v">${safeNumber((d.virtual&&d.virtual.kpis&&d.virtual.kpis.approved)||0)}</div><div>Aprobados</div></div>
+                        <div class="card"><div class="v">${safeNumber((d.virtual&&d.virtual.kpis&&d.virtual.kpis.failed)||0)}</div><div>Reprobados</div></div>
+                        <div class="card"><div class="v">${safeNumber((d.virtual&&d.virtual.kpis&&d.virtual.kpis.passRate)||0)}%</div><div>Aprobación</div></div>
+                    </div>
+                    <table>
+                        <thead><tr>
+                            <th>Curso Virtual</th><th>Participantes</th><th>Aprobados</th><th>Reprobados</th><th>% Aprob.</th><th>Nota Prom.</th>
+                        </tr></thead>
+                        <tbody>
+                            ${(((d.virtual&&d.virtual.courses)||[]).length ? (d.virtual.courses) : []).map(c =>
+                                `<tr><td>${escapeHtml(c.title||'')}</td><td style="text-align:center;">${safeNumber(c.participants)}</td><td style="text-align:center;">${safeNumber(c.approved)}</td><td style="text-align:center;">${safeNumber(c.failed)}</td><td style="text-align:center;">${safeNumber(c.passRate)}%</td><td style="text-align:center;">${safeNumber(c.avgGrade)}/5.0</td></tr>`
+                            ).join('') || `<tr><td colspan="6" style="text-align:center; color:#64748b;">Sin cursos virtuales con evaluaciones en el periodo.</td></tr>`}
                         </tbody>
                     </table>
 
