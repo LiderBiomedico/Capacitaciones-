@@ -3741,6 +3741,96 @@
                         </div>
                     </div>
 
+                    <!-- Cobertura del personal (Personal HSLV vs participaciones) -->
+                    <div class="card" style="margin-bottom: 1.5rem;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
+                            <h3 style="margin:0;"><i class="fas fa-user-check"></i> Cobertura de Capacitación (Personal HSLV)</h3>
+                            <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap;">
+                                <label style="font-weight:600; color:#4b5563;">Agrupar por</label>
+                                <select id="qCoverageGroupBy" onchange="renderQuarterlyCoverage()" style="padding:0.45rem 0.6rem; border:1px solid #d1d5db; border-radius:6px;">
+                                    <option value="byCargo">Cargo</option>
+                                    <option value="byProceso">Proceso / Área</option>
+                                    <option value="byEntidad">Entidad</option>
+                                </select>
+                            </div>
+                        </div>
+                        <p style="color:#6b7280; margin:0.5rem 0 1rem;">
+                            Compara la nómina completa registrada en Airtable contra quienes realizaron capacitación
+                            (presencial o virtual) dentro del trimestre seleccionado.
+                        </p>
+
+                        <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap:1rem;">
+                            <div style="text-align:center; padding:1rem; background: linear-gradient(135deg, #0f172a 0%, #334155 100%); border-radius:8px;">
+                                <div style="color:#fff; font-weight:600; font-size:0.95rem;">Personal en base</div>
+                                <div id="qCovTotal" style="color:#fff; font-size:2rem; font-weight:800; margin-top:0.25rem;">0</div>
+                            </div>
+                            <div style="text-align:center; padding:1rem; background: linear-gradient(135deg, #166534 0%, #22c55e 100%); border-radius:8px;">
+                                <div style="color:#fff; font-weight:600; font-size:0.95rem;">Se capacitaron</div>
+                                <div id="qCovAttended" style="color:#fff; font-size:2rem; font-weight:800; margin-top:0.25rem;">0</div>
+                            </div>
+                            <div style="text-align:center; padding:1rem; background: linear-gradient(135deg, #991b1b 0%, #ef4444 100%); border-radius:8px;">
+                                <div style="color:#fff; font-weight:600; font-size:0.95rem;">Sin capacitar</div>
+                                <div id="qCovMissing" style="color:#fff; font-size:2rem; font-weight:800; margin-top:0.25rem;">0</div>
+                            </div>
+                            <div style="text-align:center; padding:1rem; background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); border-radius:8px;">
+                                <div style="color:#fff; font-weight:600; font-size:0.95rem;">Cobertura</div>
+                                <div id="qCovRate" style="color:#fff; font-size:2rem; font-weight:800; margin-top:0.25rem;">0%</div>
+                                <div id="qCovExtern" style="color:#e5e7eb; font-weight:600; font-size:0.8rem;"></div>
+                            </div>
+                        </div>
+
+                        <div style="background:#fff; border-radius:10px; padding:0.75rem; border:1px solid rgba(15,23,42,0.08); margin-top:1.25rem;">
+                            <div style="font-weight:700; color:#111827; margin-bottom:0.5rem;">Capacitados vs. pendientes (Top 12)</div>
+                            <canvas id="qChartCoverage"></canvas>
+                        </div>
+
+                        <div style="margin-top:1.25rem; border:1px solid rgba(15,23,42,0.08); border-radius:10px; overflow:hidden;">
+                            <div style="background:#f8fafc; padding:0.75rem; font-weight:800; color:#111827;">Detalle de cobertura</div>
+                            <div style="overflow:auto; max-height:340px;">
+                                <table style="width:100%; border-collapse:collapse;">
+                                    <thead>
+                                        <tr style="background:#e5e7eb;">
+                                            <th style="padding:10px; text-align:left;">Grupo</th>
+                                            <th style="padding:10px; text-align:center;">En base</th>
+                                            <th style="padding:10px; text-align:center;">Capacitados</th>
+                                            <th style="padding:10px; text-align:center;">Sin capacitar</th>
+                                            <th style="padding:10px; text-align:center;">Cobertura</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="qCoverageTbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:1.25rem; border:1px solid rgba(15,23,42,0.08); border-radius:10px; overflow:hidden;">
+                            <div style="background:#fef2f2; padding:0.75rem; display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
+                                <span style="font-weight:800; color:#991b1b;">Personal sin capacitación en el trimestre (<span id="qNonAttendeesCount">0</span>)</span>
+                                <div style="display:flex; gap:0.5rem; flex-wrap:wrap;">
+                                    <input id="qNonAttendeesFilter" type="text" placeholder="Buscar por nombre, cédula, proceso o cargo..." oninput="renderQuarterlyNonAttendees()" style="padding:0.45rem 0.6rem; border:1px solid #d1d5db; border-radius:6px; min-width:280px;">
+                                    <button class="btn btn-info" onclick="exportQuarterlyNonAttendeesCSV()" style="padding:0.45rem 0.75rem;">
+                                        <i class="fas fa-file-csv"></i> CSV
+                                    </button>
+                                </div>
+                            </div>
+                            <div style="overflow:auto; max-height:420px;">
+                                <table style="width:100%; border-collapse:collapse;">
+                                    <thead>
+                                        <tr style="background:#e5e7eb;">
+                                            <th style="padding:10px; text-align:left;">Cédula</th>
+                                            <th style="padding:10px; text-align:left;">Nombre</th>
+                                            <th style="padding:10px; text-align:left;">Entidad</th>
+                                            <th style="padding:10px; text-align:left;">Proceso</th>
+                                            <th style="padding:10px; text-align:left;">Cargo</th>
+                                            <th style="padding:10px; text-align:left;">Correo</th>
+                                            <th style="padding:10px; text-align:left;">Celular</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="qNonAttendeesTbody"></tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Tablas -->
                     <div class="card" style="margin-bottom: 1.5rem;">
                         <div style="display:flex; justify-content: space-between; align-items:center; gap:1rem; flex-wrap:wrap;">
@@ -8488,14 +8578,32 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             try {
                 console.log('📊 Cargando estadísticas del dashboard...');
 
-                // Obtener capacitaciones y participaciones en paralelo
-                const [trainingsRes, participationsRes] = await Promise.all([
+                // Obtener capacitaciones, participaciones y nómina en paralelo
+                const [trainingsRes, participationsRes, personalRes] = await Promise.all([
                     airtableFetchAll('/Capacitaciones'),
-                    airtableFetchAll('/Participaciones')
+                    airtableFetchAll('/Participaciones'),
+                    airtableFetchAll('/tbl5A7rayv5BbiYF1').catch(() => []) // Personal HSLV (por ID)
                 ]);
 
                 const trainings = trainingsRes || [];
                 const participations = participationsRes || [];
+                const personal = personalRes || [];
+
+                // Índices de la nómina para completar profesión/cargo/servicio faltantes
+                const dashPersonalByCed = {};
+                const dashPersonalByName = {};
+                personal.forEach(rec => {
+                    const f = rec.fields || {};
+                    const info = {
+                        cargo: f['CARGO'] || f['Cargo'] || '',
+                        perfil: f['PERFIL'] || f['Perfil'] || '',
+                        proceso: f['PROCESO'] || f['Proceso'] || f['AREA'] || f['Área'] || f['Area'] || ''
+                    };
+                    const c = qPersonalCedula(f);
+                    if (c) dashPersonalByCed[c] = info;
+                    const n = qNormKey(f['NOMBRE'] || f['Nombre'] || '');
+                    if (n && !dashPersonalByName[n]) dashPersonalByName[n] = info;
+                });
 
                 const totalTrainings = trainings.length;
                 const totalParticipants = participations.length;
@@ -8506,14 +8614,27 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const byDept = {};
 
                 const byProf = {};
+                const dashDeptG = qLabelGrouper();
+                const dashProfG = qLabelGrouper();
                 participations.forEach(p => {
                     const f = p.fields || {};
                     const pre  = parseFloat(f['Pretest Score']  || f['Pre-test Score']  || 0);
                     const post = parseFloat(f['Post-test Score'] || f['Posttest Score'] || 0);
                     const fecha = (f['Fecha de Inicio'] || f['Fecha Inicio'] || f['Fecha'] || p.createdTime || '').slice(0, 10);
-                    const dept = f['Departamento'] || f['Servicio'] || 'Sin servicio';
-                    const prof = f['Profesión Texto'] || f['Profesion Texto'] || f['Profesión'] || f['Profesion'] || f['Cargo'] || 'Sin especificar';
                     const completadoPost = !!(f['Completado Posttest'] || f['Completado Post-Test']);
+
+                    // Completar desde Personal HSLV cuando la participación no trae el dato
+                    const cedP = String(f['CEDULA'] ?? f['Cédula'] ?? f['Cedula'] ?? f['Usuario ID'] ?? f['CC'] ?? '').replace(/\D/g, '');
+                    const nomP = qNormKey(f['Nombre Completo'] || f['Nombre'] || '');
+                    const infoP = dashPersonalByCed[cedP] || dashPersonalByName[nomP] || {};
+
+                    const deptRaw = f['Departamento'] || f['Servicio'] || infoP.proceso || 'Sin servicio';
+                    const profRaw = f['Profesión Texto'] || f['Profesion Texto'] || f['Profesión'] || f['Profesion']
+                                  || f['Cargo'] || infoP.cargo || infoP.perfil || 'Sin especificar';
+
+                    // Claves normalizadas: evita que "Asistencial" y "asistencial" se cuenten aparte
+                    const dept = dashDeptG.key(deptRaw, 'Sin servicio');
+                    const prof = dashProfG.key(profRaw, 'Sin especificar');
 
                     if (pre > 0) { sumPre += pre; countPre++; }
                     if (post > 0) { sumPost += post; countPost++; }
@@ -8549,7 +8670,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 if (participationsChart) {
                     const profValues = profEntries.map(e => e[1]);
-                    participationsChart.data.labels = profEntries.map(e => e[0]);
+                    participationsChart.data.labels = profEntries.map(e => dashProfG.label(e[0]));
                     participationsChart.data.datasets[0].data = profValues;
                     participationsChart.data.datasets[0].label = 'Participantes';
                     participationsChart.options.scales.x.suggestedMax = calcularEscalaGrafica(profValues, 20);
@@ -8560,7 +8681,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const deptEntries = Object.entries(byDept).sort((a, b) => b[1] - a[1]).slice(0, 5);
                 if (departmentChart) {
                     const deptValues = deptEntries.map(e => e[1]);
-                    departmentChart.data.labels = deptEntries.map(e => e[0]);
+                    departmentChart.data.labels = deptEntries.map(e => dashDeptG.label(e[0]));
                     departmentChart.data.datasets[0].data = deptValues;
                     departmentChart.options.scales.y.max = calcularEscalaGrafica(deptValues, 100);
                     departmentChart.update();
@@ -8931,6 +9052,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             byCargo: null,
             byProfession: null,
             trainingsByMonth: null,
+            coverage: null,
             virtualStatus: null,
             virtualByCourse: null
         };
@@ -9175,19 +9297,32 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const byCargoMap = {};
                 const byProfessionMap = {};
 
+                // Agrupadores: unifican variantes de mayúsculas/acentos del mismo valor
+                const qDeptG = qLabelGrouper();
+                const qCargoG = qLabelGrouper();
+                const qProfG = qLabelGrouper();
+
                 partsScoped.forEach(p => {
                     const f = p.fields || {};
                     const pre = parseFloat(f['Pretest Score'] || f['Pre-test Score'] || 0);
                     const post = parseFloat(f['Post-test Score'] || f['Posttest Score'] || 0);
                     const nombre = f['Nombre Completo'] || f['Nombre'] || '';
-                    const dept = f['Departamento'] || f['Servicio'] || 'Sin servicio';
                     const completadoPost = !!(f['Completado Posttest'] || f['Completado Post-Test']);
-                    // Profesión viene del campo 'Profesión' (single select en Airtable)
-                    const profesion = f['Profesión Texto'] || f['Profesion Texto'] || f['Profesión'] || f['Profesion'] || f['Cargo'] || 'Sin especificar';
-                    // Cargo: campo propio; si no viene en la participación se resuelve contra Personal HSLV
+
+                    // Cruce con Personal HSLV para completar los campos que la participación no trae
                     const cedPart = String(f['CEDULA'] ?? f['Cédula'] ?? f['Cedula'] ?? f['Usuario ID'] ?? f['CC'] ?? f['Documento'] ?? '').replace(/\D/g, '');
                     const infoPart = (cedPart && personalByCedula[cedPart]) || personalByName[normName(nombre)] || {};
-                    const cargo = f['Cargo'] || f['CARGO'] || infoPart.cargo || infoPart.perfil || 'Sin especificar';
+
+                    const deptRaw = f['Departamento'] || f['Servicio'] || infoPart.proceso || infoPart.area || 'Sin servicio';
+                    // Profesión viene del campo 'Profesión' (single select en Airtable)
+                    const profesionRaw = f['Profesión Texto'] || f['Profesion Texto'] || f['Profesión'] || f['Profesion']
+                                       || infoPart.perfil || infoPart.cargo || 'Sin especificar';
+                    // Cargo: campo propio; si no viene en la participación se resuelve contra Personal HSLV
+                    const cargoRaw = f['Cargo'] || f['CARGO'] || infoPart.cargo || infoPart.perfil || 'Sin especificar';
+
+                    const dept = qDeptG.key(deptRaw, 'Sin servicio');
+                    const profesion = qProfG.key(profesionRaw, 'Sin especificar');
+                    const cargo = qCargoG.key(cargoRaw, 'Sin especificar');
 
                     if (pre > 0) { sumPre += pre; countPre++; }
                     if (post > 0) { sumPost += post; countPost++; }
@@ -9205,12 +9340,12 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     byCargoMap[cargo] = (byCargoMap[cargo] || 0) + 1;
                 });
 
-                // Convertir mapas a arrays ordenados [{name, count}]
+                // Convertir mapas a arrays ordenados [{name, count}] con etiqueta legible
                 const byProfessionArr = Object.entries(byProfessionMap)
-                    .map(([name, count]) => ({ name, count }))
+                    .map(([key, count]) => ({ name: qProfG.label(key), count }))
                     .sort((a, b) => b.count - a.count);
                 const byCargoArr = Object.entries(byCargoMap)
-                    .map(([name, count]) => ({ name, count }))
+                    .map(([key, count]) => ({ name: qCargoG.label(key), count }))
                     .sort((a, b) => b.count - a.count);
 
                 const totalParts = partsScoped.length;
@@ -9260,19 +9395,22 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     .map(t => ({ title: t.title, count: t.participationsCount, participations: t.participationsCount, department: t.department, adherenceRate: t.adherenceRate }));
 
                 // Distribución por departamento
-                // Calcular únicos por departamento
+                // Calcular únicos por departamento (usando la misma clave normalizada)
                 const uniqueByDeptMap = {};
                 partsScoped.forEach(p => {
                     const f = p.fields || {};
-                    const dept = f['Departamento'] || f['Servicio'] || 'Sin servicio';
-                    const nombre = (f['Nombre Completo'] || f['Nombre'] || '').toLowerCase().trim();
+                    const nombre = qNormKey(f['Nombre Completo'] || f['Nombre'] || '');
+                    const cedP = String(f['CEDULA'] ?? f['Cédula'] ?? f['Cedula'] ?? f['Usuario ID'] ?? f['CC'] ?? '').replace(/\D/g, '');
+                    const infoP = (cedP && personalByCedula[cedP]) || personalByName[nombre] || {};
+                    const deptRaw = f['Departamento'] || f['Servicio'] || infoP.proceso || infoP.area || 'Sin servicio';
+                    const dept = qDeptG.key(deptRaw, 'Sin servicio');
                     if (!uniqueByDeptMap[dept]) uniqueByDeptMap[dept] = new Set();
                     if (nombre) uniqueByDeptMap[dept].add(nombre);
                 });
 
                 const byDept = Object.values(byDeptMap).sort((a, b) => b.count - a.count).slice(0, 10).map(d => ({
-                    name: d.dept,
-                    dept: d.dept,
+                    name: qDeptG.label(d.dept),
+                    dept: qDeptG.label(d.dept),
                     count: d.count,
                     unique: uniqueByDeptMap[d.dept] ? uniqueByDeptMap[d.dept].size : 0,
                     avgPretestScore: d.nPre > 0 ? Math.round(d.sumPre / d.nPre) : 0,
@@ -9342,8 +9480,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 const data = {
                     success: true,
-                    period: { year, quarter, label: `T${quarter} (${qLabels[quarter]}) ${year}`, startDate: dateStart, endDate: dateEnd },
-                    kpis: {
+                    period: { year, quarter, label: `T${quarter} (${qLabels[quarter]}) ${year}`, startDate: dateStart, endDate: dateEnd },                    kpis: {
                         trainingsCount: trimTrainings.length,
                         participationsCount: totalParts,
                         uniqueParticipants: uniqueNames.size,
@@ -9358,6 +9495,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     distributions: { byDept, byCargo: byCargoArr, byProfession: byProfessionArr, trainingsByMonth },
                     participants: participantsDetail,
                     virtual: virtualStats,
+                    coverage: buildQuarterlyCoverage(allPersonal, participantsDetail, virtualStats.participants || []),
                     insights: []
                 };
 
@@ -9568,6 +9706,158 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         }
 
         // ==========================================
+        // COBERTURA DE CAPACITACIÓN (Personal HSLV vs participaciones)
+        // ==========================================
+        // Cruza la nómina completa de Personal HSLV contra quienes efectivamente
+        // participaron (presencial + cursos virtuales) en el periodo, para responder
+        // "de los N médicos que hay en la base, cuántos se capacitaron y quiénes no".
+
+        function qNormKey(s) {
+            return String(s || '')
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .toUpperCase();
+        }
+
+        // Agrupa variantes de un mismo valor ("Asistencial" / "asistencial" / "ASISTENCIAL")
+        // bajo una sola clave, y muestra la variante escrita con más frecuencia.
+        function qLabelGrouper() {
+            const variantsByKey = new Map();
+            return {
+                key(value, fallback = 'Sin especificar') {
+                    const raw = String(value || '').trim() || fallback;
+                    const k = qNormKey(raw) || qNormKey(fallback);
+                    if (!variantsByKey.has(k)) variantsByKey.set(k, new Map());
+                    const variants = variantsByKey.get(k);
+                    variants.set(raw, (variants.get(raw) || 0) + 1);
+                    return k;
+                },
+                label(k) {
+                    const variants = variantsByKey.get(k);
+                    if (!variants) return k;
+                    let best = k, bestN = -1;
+                    variants.forEach((n, v) => { if (n > bestN) { bestN = n; best = v; } });
+                    return best;
+                }
+            };
+        }
+
+        function qPersonalCedula(f) {
+            return String(f['CEDULA'] ?? f['Cédula'] ?? f['Cedula'] ?? f['CC'] ?? f['Documento'] ?? '').replace(/\D/g, '');
+        }
+
+        function buildQuarterlyCoverage(allPersonal, participantsDetail, virtualParticipants) {
+            // 1) Conjunto de quienes SÍ participaron (por cédula y por nombre normalizado)
+            const attendedCed = new Set();
+            const attendedName = new Set();
+            const registerAttendee = (ced, nombre) => {
+                const c = String(ced || '').replace(/\D/g, '');
+                if (c) attendedCed.add(c);
+                const n = qNormKey(nombre);
+                if (n) attendedName.add(n);
+            };
+            (participantsDetail || []).forEach(r => registerAttendee(r.cedula, r.nombre));
+            (virtualParticipants || []).forEach(r => registerAttendee(r.cedula, r.nombre));
+
+            // 2) Recorrer la nómina completa y clasificar
+            const cargoG = qLabelGrouper();
+            const procesoG = qLabelGrouper();
+            const entidadG = qLabelGrouper();
+            const byCargo = {}, byProceso = {}, byEntidad = {};
+
+            const bump = (bucket, key, attended) => {
+                if (!bucket[key]) bucket[key] = { total: 0, asistieron: 0 };
+                bucket[key].total++;
+                if (attended) bucket[key].asistieron++;
+            };
+
+            const nonAttendees = [];
+            const rosterCed = new Set();
+            const rosterName = new Set();
+            let asistieron = 0;
+
+            (allPersonal || []).forEach(rec => {
+                const f = rec.fields || {};
+                const ced = qPersonalCedula(f);
+                const nombre = f['NOMBRE'] || f['Nombre'] || '';
+                const nombreKey = qNormKey(nombre);
+                const cargo = f['CARGO'] || f['Cargo'] || f['PERFIL'] || f['Perfil'] || 'Sin especificar';
+                const proceso = f['PROCESO'] || f['Proceso'] || f['AREA'] || f['Área'] || f['Area'] || 'Sin proceso';
+                const entidad = f['ENTIDAD'] || f['Entidad'] || 'Sin entidad';
+
+                if (ced) rosterCed.add(ced);
+                if (nombreKey) rosterName.add(nombreKey);
+
+                const attended = (!!ced && attendedCed.has(ced)) || (!!nombreKey && attendedName.has(nombreKey));
+                if (attended) asistieron++;
+
+                bump(byCargo, cargoG.key(cargo), attended);
+                bump(byProceso, procesoG.key(proceso, 'Sin proceso'), attended);
+                bump(byEntidad, entidadG.key(entidad, 'Sin entidad'), attended);
+
+                if (!attended) {
+                    nonAttendees.push({
+                        cedula: ced,
+                        nombre: String(nombre).trim(),
+                        entidad: String(entidad).trim(),
+                        proceso: String(proceso).trim(),
+                        perfil: String(f['PERFIL'] || f['Perfil'] || '').trim(),
+                        cargo: String(cargo).trim(),
+                        correo: String(f['EMAIL'] || f['Email'] || f['Correo'] || '').trim(),
+                        celular: String(f['CONTACTO'] || f['Celular'] || f['Teléfono'] || f['Telefono'] || '').trim()
+                    });
+                }
+            });
+
+            // 3) Participantes que NO figuran en Personal HSLV (nómina desactualizada)
+            const seenExt = new Set();
+            const externos = [];
+            [...(participantsDetail || []), ...(virtualParticipants || [])].forEach(r => {
+                const c = String(r.cedula || '').replace(/\D/g, '');
+                const n = qNormKey(r.nombre);
+                if ((c && rosterCed.has(c)) || (n && rosterName.has(n))) return;
+                const dedupe = c || n;
+                if (!dedupe || seenExt.has(dedupe)) return;
+                seenExt.add(dedupe);
+                externos.push({
+                    cedula: r.cedula || '',
+                    nombre: r.nombre || '',
+                    proceso: r.proceso || '',
+                    cargo: r.cargo || ''
+                });
+            });
+
+            const toArr = (bucket, grouper) => Object.entries(bucket)
+                .map(([k, v]) => ({
+                    name: grouper.label(k),
+                    total: v.total,
+                    asistieron: v.asistieron,
+                    noAsistieron: v.total - v.asistieron,
+                    cobertura: v.total > 0 ? Math.round((v.asistieron / v.total) * 100) : 0
+                }))
+                .sort((a, b) => b.total - a.total);
+
+            nonAttendees.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+
+            const totalPersonal = (allPersonal || []).length;
+            return {
+                totals: {
+                    personal: totalPersonal,
+                    asistieron,
+                    noAsistieron: totalPersonal - asistieron,
+                    cobertura: totalPersonal > 0 ? Math.round((asistieron / totalPersonal) * 100) : 0,
+                    externos: externos.length
+                },
+                byCargo: toArr(byCargo, cargoG),
+                byProceso: toArr(byProceso, procesoG),
+                byEntidad: toArr(byEntidad, entidadG),
+                nonAttendees,
+                externos
+            };
+        }
+
+        // ==========================================
         // GENERADOR DE HALLAZGOS AUTOMÁTICOS
         // ==========================================
 
@@ -9579,7 +9869,35 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const byCargo = data.distributions?.byCargo || [];
             const byProfession = data.distributions?.byProfession || [];
             const trainingsByMonth = data.distributions?.trainingsByMonth || [];
+            const cov = data.coverage || null;
             const p = data.period || {};
+
+            // ── COBERTURA DEL PERSONAL ──
+            if (cov && safeNumber(cov.totals?.personal) > 0) {
+                const t = cov.totals;
+                insights.push(
+                    `👥 De ${t.personal} colaboradores registrados en Personal HSLV, ${t.asistieron} realizaron al menos una capacitación en el trimestre (cobertura del ${t.cobertura}%). Quedan ${t.noAsistieron} sin capacitación registrada.`
+                );
+                if (safeNumber(t.cobertura) < 50) {
+                    insights.push(
+                        `⚠️ La cobertura del ${t.cobertura}% está por debajo de la mitad de la nómina. Se recomienda priorizar convocatorias dirigidas al listado de personal sin capacitar.`
+                    );
+                }
+                const criticos = (cov.byCargo || []).filter(c => safeNumber(c.total) >= 5 && safeNumber(c.cobertura) < 50).slice(0, 4);
+                if (criticos.length) {
+                    const txt = criticos.map(c => `${c.name} (${c.cobertura}% de ${c.total})`).join(', ');
+                    insights.push(`⚠️ Cargos con cobertura crítica: ${txt}. Estos grupos concentran el mayor riesgo de incumplimiento del plan de capacitación.`);
+                }
+                const fuertes = (cov.byCargo || []).filter(c => safeNumber(c.total) >= 5 && safeNumber(c.cobertura) >= 90).slice(0, 3);
+                if (fuertes.length) {
+                    insights.push(`✅ Cargos con cobertura sobresaliente: ${fuertes.map(c => `${c.name} (${c.cobertura}%)`).join(', ')}.`);
+                }
+                if (safeNumber(t.externos) > 0) {
+                    insights.push(
+                        `ℹ️ ${t.externos} participante(s) del trimestre no figuran en Personal HSLV. Conviene revisar y actualizar la nómina para que la cobertura sea exacta.`
+                    );
+                }
+            }
 
             // Si no hay datos mínimos, salir
             if (k.participationsCount === 0 && trainings.length === 0) return insights;
@@ -9821,6 +10139,10 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             fillQuarterlyTrainingsList(data.trainings || []);
             fillQuarterlyVirtual(data.virtual || { kpis: {}, courses: [], participants: [] });
             fillQuarterlyInsights(data.insights || []);
+
+            // Cobertura del personal
+            renderQuarterlyCoverage();
+            renderQuarterlyNonAttendees();
             fillQuarterlyParticipants(data.participants || []);
 
             // Charts
@@ -10303,6 +10625,168 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             });
         }
 
+        // ── Render de la sección de cobertura ──
+
+        function renderQuarterlyCoverage() {
+            const cov = currentQuarterlyReportData?.coverage;
+            const tbody = document.getElementById('qCoverageTbody');
+            if (!cov) return;
+
+            const t = cov.totals || {};
+            setText('qCovTotal', safeNumber(t.personal));
+            setText('qCovAttended', safeNumber(t.asistieron));
+            setText('qCovMissing', safeNumber(t.noAsistieron));
+            setText('qCovRate', `${safeNumber(t.cobertura)}%`);
+            setText('qCovExtern', safeNumber(t.externos) > 0
+                ? `${safeNumber(t.externos)} participante(s) fuera de la nómina`
+                : '');
+
+            const groupBy = document.getElementById('qCoverageGroupBy')?.value || 'byCargo';
+            const rows = cov[groupBy] || [];
+
+            if (tbody) {
+                tbody.innerHTML = '';
+                if (!rows.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="padding:12px; color:#6b7280;">Sin datos de personal para agrupar.</td></tr>';
+                } else {
+                    rows.forEach(r => {
+                        const pctVal = safeNumber(r.cobertura);
+                        const color = pctVal >= 80 ? '#166534' : (pctVal >= 50 ? '#b45309' : '#991b1b');
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td style="padding:10px; border-top:1px solid #e5e7eb;">${escapeHtml(r.name || '')}</td>
+                            <td style="padding:10px; text-align:center; border-top:1px solid #e5e7eb;">${safeNumber(r.total)}</td>
+                            <td style="padding:10px; text-align:center; border-top:1px solid #e5e7eb; color:#166534; font-weight:700;">${safeNumber(r.asistieron)}</td>
+                            <td style="padding:10px; text-align:center; border-top:1px solid #e5e7eb; color:#991b1b; font-weight:700;">${safeNumber(r.noAsistieron)}</td>
+                            <td style="padding:10px; text-align:center; border-top:1px solid #e5e7eb; color:${color}; font-weight:800;">${pctVal}%</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            }
+
+            renderQuarterlyCoverageChart(rows);
+        }
+
+        function renderQuarterlyCoverageChart(rows) {
+            if (typeof Chart === 'undefined') return;
+            const ctx = document.getElementById('qChartCoverage');
+            if (!ctx) return;
+
+            const top = [...(rows || [])].slice(0, 12);
+            if (quarterlyCharts.coverage && typeof quarterlyCharts.coverage.destroy === 'function') {
+                quarterlyCharts.coverage.destroy();
+            }
+
+            quarterlyCharts.coverage = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: top.map(r => r.name || 'Sin dato'),
+                    datasets: [
+                        {
+                            label: 'Capacitados',
+                            data: top.map(r => safeNumber(r.asistieron)),
+                            backgroundColor: 'rgba(34,197,94,0.85)',
+                            borderColor: 'rgba(22,101,52,1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'Sin capacitar',
+                            data: top.map(r => safeNumber(r.noAsistieron)),
+                            backgroundColor: 'rgba(239,68,68,0.85)',
+                            borderColor: 'rgba(153,27,27,1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                afterBody: (items) => {
+                                    const r = top[items[0].dataIndex];
+                                    return r ? `Cobertura: ${safeNumber(r.cobertura)}% de ${safeNumber(r.total)}` : '';
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
+                        y: { stacked: true, ticks: { font: { size: 11 } } }
+                    }
+                }
+            });
+
+            requestAnimationFrame(() => {
+                try { quarterlyCharts.coverage.resize(); } catch (e) { /* noop */ }
+            });
+        }
+
+        function quarterlyFilteredNonAttendees() {
+            const list = currentQuarterlyReportData?.coverage?.nonAttendees || [];
+            const q = qNormKey(document.getElementById('qNonAttendeesFilter')?.value || '');
+            if (!q) return list;
+            return list.filter(r => qNormKey(
+                `${r.cedula} ${r.nombre} ${r.entidad} ${r.proceso} ${r.perfil} ${r.cargo} ${r.correo}`
+            ).includes(q));
+        }
+
+        function renderQuarterlyNonAttendees() {
+            const tbody = document.getElementById('qNonAttendeesTbody');
+            if (!tbody) return;
+
+            const rows = quarterlyFilteredNonAttendees();
+            setText('qNonAttendeesCount', rows.length);
+            tbody.innerHTML = '';
+
+            if (!rows.length) {
+                tbody.innerHTML = '<tr><td colspan="7" style="padding:12px; color:#6b7280;">Sin registros que coincidan.</td></tr>';
+                return;
+            }
+
+            // Se limita el DOM a 500 filas; el CSV exporta el listado completo.
+            const MAX_DOM_ROWS = 500;
+            rows.slice(0, MAX_DOM_ROWS).forEach(r => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td style="padding:10px; border-top:1px solid #e5e7eb; white-space:nowrap;">${escapeHtml(r.cedula || '')}</td>
+                    <td style="padding:10px; border-top:1px solid #e5e7eb;">${escapeHtml(r.nombre || '')}</td>
+                    <td style="padding:10px; border-top:1px solid #e5e7eb;">${escapeHtml(r.entidad || '')}</td>
+                    <td style="padding:10px; border-top:1px solid #e5e7eb;">${escapeHtml(r.proceso || '')}</td>
+                    <td style="padding:10px; border-top:1px solid #e5e7eb;">${escapeHtml(r.cargo || '')}</td>
+                    <td style="padding:10px; border-top:1px solid #e5e7eb;">${escapeHtml(r.correo || '')}</td>
+                    <td style="padding:10px; border-top:1px solid #e5e7eb; white-space:nowrap;">${escapeHtml(r.celular || '')}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            if (rows.length > MAX_DOM_ROWS) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td colspan="7" style="padding:10px; background:#fffbeb; color:#92400e; font-weight:600;">
+                    Mostrando ${MAX_DOM_ROWS} de ${rows.length} registros. Descarga el CSV para ver el listado completo.
+                </td>`;
+                tbody.appendChild(tr);
+            }
+        }
+
+        function exportQuarterlyNonAttendeesCSV() {
+            const rows = quarterlyFilteredNonAttendees();
+            if (!rows.length) {
+                Swal.fire({ icon: 'info', title: 'Sin registros', text: 'No hay personal sin capacitar para exportar.' });
+                return;
+            }
+            const p = currentQuarterlyReportData?.period || {};
+            const out = [['Cédula', 'Nombre', 'Entidad', 'Proceso', 'Perfil', 'Cargo', 'Correo', 'Celular']];
+            rows.forEach(r => out.push([r.cedula, r.nombre, r.entidad, r.proceso, r.perfil, r.cargo, r.correo, r.celular]));
+
+            const csv = '\uFEFF' + out.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            downloadBlobAs(blob, `Sin_Capacitar_T${p.quarter || ''}_${p.year || ''}.csv`);
+        }
+
         function exportQuarterlyReportCSV() {
             if (!currentQuarterlyReportData) return;
             const p = currentQuarterlyReportData.period || {};
@@ -10455,11 +10939,13 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 vCourses: [...(vData.courses || [])].sort((a, b) => safeNumber(b.participants) - safeNumber(a.participants)),
                 vParts: vData.participants || [],
                 insights: (data.insights && data.insights.length) ? data.insights : ['Sin hallazgos automáticos (no hay datos suficientes).'],
+                coverage: data.coverage || { totals: {}, byCargo: [], byProceso: [], byEntidad: [], nonAttendees: [], externos: [] },
                 charts: [
                     { id: 'qChartParticipantsByDept', title: 'Participaciones por Servicio (Top 10)' },
                     { id: 'qChartTrainingsByMonth',   title: 'Capacitaciones por mes (trimestre)' },
                     { id: 'qChartByCargo',            title: 'Distribución por Cargo' },
-                    { id: 'qChartByProfession',       title: 'Distribución por Profesión' }
+                    { id: 'qChartByProfession',       title: 'Distribución por Profesión' },
+                    { id: 'qChartCoverage',           title: 'Cobertura: capacitados vs. pendientes' }
                 ].map(c => ({ ...c, png: quarterlyCanvasPng(c.id) }))
             };
         }
@@ -10783,6 +11269,93 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 applyPercent(s9, [13], 2);
             }
 
+            // ── Hoja: Cobertura del personal ──
+            const cov = m.coverage || {};
+            const covTotals = cov.totals || {};
+            const sCov = wb.addWorksheet('Cobertura');
+
+            const covTitle = sCov.addRow(['COBERTURA DE CAPACITACIÓN — PERSONAL HSLV']);
+            sCov.mergeCells(`A${covTitle.number}:E${covTitle.number}`);
+            covTitle.getCell(1).fill = TITLE_FILL;
+            covTitle.getCell(1).font = { bold: true, size: 13, color: { argb: 'FFFFFFFF' } };
+            covTitle.height = 24;
+
+            [
+                ['Personal registrado en la base', safeNumber(covTotals.personal), false],
+                ['Realizaron capacitación', safeNumber(covTotals.asistieron), false],
+                ['Sin capacitación en el trimestre', safeNumber(covTotals.noAsistieron), false],
+                ['Cobertura', pct(covTotals.cobertura), true],
+                ['Participantes fuera de la nómina', safeNumber(covTotals.externos), false]
+            ].forEach(([key, val, isPct]) => {
+                const r = sCov.addRow([key, val]);
+                r.getCell(1).fill = KEY_FILL;
+                r.getCell(1).font = { bold: true };
+                r.getCell(1).border = BORDER;
+                r.getCell(2).border = BORDER;
+                r.getCell(2).font = { bold: true };
+                r.getCell(2).alignment = { horizontal: 'right' };
+                if (isPct) r.getCell(2).numFmt = '0%';
+            });
+            sCov.addRow([]);
+
+            const covBlock = (titulo, rows) => {
+                const h = sCov.addRow([titulo]);
+                sCov.mergeCells(`A${h.number}:E${h.number}`);
+                h.getCell(1).fill = HEADER_FILL;
+                h.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+                const hr = sCov.addRow(['Grupo', 'En base', 'Capacitados', 'Sin capacitar', 'Cobertura']);
+                hr.eachCell(cell => {
+                    cell.font = { bold: true };
+                    cell.fill = KEY_FILL;
+                    cell.border = BORDER;
+                    cell.alignment = { horizontal: 'center' };
+                });
+                (rows || []).forEach(r => {
+                    const row = sCov.addRow([
+                        r.name || '',
+                        safeNumber(r.total),
+                        safeNumber(r.asistieron),
+                        safeNumber(r.noAsistieron),
+                        pct(r.cobertura)
+                    ]);
+                    row.eachCell(cell => { cell.border = BORDER; });
+                    row.getCell(5).numFmt = '0%';
+                });
+                sCov.addRow([]);
+            };
+
+            covBlock('POR CARGO', cov.byCargo);
+            covBlock('POR PROCESO / ÁREA', cov.byProceso);
+            covBlock('POR ENTIDAD', cov.byEntidad);
+
+            sCov.getColumn(1).width = 44;
+            sCov.getColumn(2).width = 12;
+            sCov.getColumn(3).width = 14;
+            sCov.getColumn(4).width = 15;
+            sCov.getColumn(5).width = 12;
+
+            // ── Hoja: personal sin capacitar ──
+            const sMiss = wb.addWorksheet('Sin Capacitar');
+            addTable(sMiss,
+                ['Cédula', 'Nombre', 'Entidad', 'Proceso', 'Perfil', 'Cargo', 'Correo', 'Celular'],
+                (cov.nonAttendees || []).map(r => [
+                    r.cedula || '', r.nombre || '', r.entidad || '', r.proceso || '',
+                    r.perfil || '', r.cargo || '', r.correo || '', r.celular || ''
+                ]),
+                [14, 34, 20, 28, 20, 28, 32, 14]
+            );
+
+            // ── Hoja: participantes fuera de la nómina ──
+            if ((cov.externos || []).length) {
+                const sExt = wb.addWorksheet('Fuera de Nómina');
+                addTable(sExt,
+                    ['Cédula', 'Nombre', 'Proceso', 'Cargo'],
+                    cov.externos.map(r => [r.cedula || '', r.nombre || '', r.proceso || '', r.cargo || '']),
+                    [16, 34, 28, 28]
+                );
+            }
+
             // ── Hoja 10: Hallazgos ──
             const s10 = wb.addWorksheet('Hallazgos');
             addTable(s10, ['#', 'Hallazgo / Recomendación'],
@@ -10875,6 +11448,39 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         r.correo || '', r.celular || '', r.curso || '', r.fecha || '',
                         safeNumber(r.correctas), safeNumber(r.total), safeNumber(r.porcentaje), safeNumber(r.nota), r.estado || '', safeNumber(r.intentos)
                     ])
+                ]);
+            }
+
+            const cov = m.coverage || {};
+            const ct = cov.totals || {};
+            const covRows = (titulo, rows) => [
+                [titulo],
+                ['Grupo', 'En base', 'Capacitados', 'Sin capacitar', 'Cobertura %'],
+                ...(rows || []).map(r => [r.name || '', safeNumber(r.total), safeNumber(r.asistieron), safeNumber(r.noAsistieron), safeNumber(r.cobertura)]),
+                []
+            ];
+            add('Cobertura', [
+                ['COBERTURA DE CAPACITACIÓN — PERSONAL HSLV'],
+                ['Personal registrado en la base', safeNumber(ct.personal)],
+                ['Realizaron capacitación', safeNumber(ct.asistieron)],
+                ['Sin capacitación en el trimestre', safeNumber(ct.noAsistieron)],
+                ['Cobertura %', safeNumber(ct.cobertura)],
+                ['Participantes fuera de la nómina', safeNumber(ct.externos)],
+                [],
+                ...covRows('POR CARGO', cov.byCargo),
+                ...covRows('POR PROCESO / ÁREA', cov.byProceso),
+                ...covRows('POR ENTIDAD', cov.byEntidad)
+            ]);
+
+            add('Sin Capacitar', [
+                ['Cédula', 'Nombre', 'Entidad', 'Proceso', 'Perfil', 'Cargo', 'Correo', 'Celular'],
+                ...(cov.nonAttendees || []).map(r => [r.cedula || '', r.nombre || '', r.entidad || '', r.proceso || '', r.perfil || '', r.cargo || '', r.correo || '', r.celular || ''])
+            ]);
+
+            if ((cov.externos || []).length) {
+                add('Fuera de Nómina', [
+                    ['Cédula', 'Nombre', 'Proceso', 'Cargo'],
+                    ...cov.externos.map(r => [r.cedula || '', r.nombre || '', r.proceso || '', r.cargo || ''])
                 ]);
             }
 
