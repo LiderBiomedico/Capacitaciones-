@@ -9184,6 +9184,10 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     const completadoPost = !!(f['Completado Posttest'] || f['Completado Post-Test']);
                     // Profesión viene del campo 'Profesión' (single select en Airtable)
                     const profesion = f['Profesión Texto'] || f['Profesion Texto'] || f['Profesión'] || f['Profesion'] || f['Cargo'] || 'Sin especificar';
+                    // Cargo: campo propio; si no viene en la participación se resuelve contra Personal HSLV
+                    const cedPart = String(f['CEDULA'] ?? f['Cédula'] ?? f['Cedula'] ?? f['Usuario ID'] ?? f['CC'] ?? f['Documento'] ?? '').replace(/\D/g, '');
+                    const infoPart = (cedPart && personalByCedula[cedPart]) || personalByName[normName(nombre)] || {};
+                    const cargo = f['Cargo'] || f['CARGO'] || infoPart.cargo || infoPart.perfil || 'Sin especificar';
 
                     if (pre > 0) { sumPre += pre; countPre++; }
                     if (post > 0) { sumPost += post; countPost++; }
@@ -9197,8 +9201,8 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                     // Distribución por profesión
                     byProfessionMap[profesion] = (byProfessionMap[profesion] || 0) + 1;
-                    // Cargo = misma profesión (en este sistema son el mismo campo)
-                    byCargoMap[profesion] = (byCargoMap[profesion] || 0) + 1;
+                    // Distribución por cargo (campo independiente de la profesión)
+                    byCargoMap[cargo] = (byCargoMap[cargo] || 0) + 1;
                 });
 
                 // Convertir mapas a arrays ordenados [{name, count}]
@@ -9361,10 +9365,14 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 data.insights = generateQuarterlyInsights(data);
 
                 currentQuarterlyReportData = data;
-                renderQuarterlyReport(data);
 
+                // IMPORTANTE: el contenedor debe ser visible ANTES de instanciar los charts.
+                // Chart.js mide el canvas al construirlo; si está en display:none queda en 0x0
+                // y tanto la gráfica como su captura (toDataURL) salen en blanco.
                 if (loading) loading.style.display = 'none';
                 if (container) container.style.display = 'block';
+
+                renderQuarterlyReport(data);
                 setQuarterlyActionButtonsEnabled(true);
 
             } catch (err) {
@@ -10283,6 +10291,16 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
                 });
             }
+
+            // Reajustar tras el layout: garantiza dimensiones reales antes de exportar
+            requestAnimationFrame(() => {
+                Object.keys(quarterlyCharts).forEach(key => {
+                    const ch = quarterlyCharts[key];
+                    if (ch && typeof ch.resize === 'function') {
+                        try { ch.resize(); } catch (e) { /* noop */ }
+                    }
+                });
+            });
         }
 
         function exportQuarterlyReportCSV() {
@@ -10367,387 +10385,515 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         }
 
         
-        function exportQuarterlyReportExcel() {
-            if (!currentQuarterlyReportData) return;
+        // ═══════════════════════════════════════════════════════════════
+        // EXPORTACIÓN EXCEL - REPORTE TRIMESTRAL (.xlsx nativo)
+        // ═══════════════════════════════════════════════════════════════
+        // Antes se generaba HTML con extensión .xls: Excel mostraba la alerta
+        // "El formato y la extensión no coinciden" y las gráficas incrustadas
+        // como data-URI aparecían rotas ("No se pudo mostrar la imagen vinculada").
+        // Ahora se construye un .xlsx real con ExcelJS (imágenes PNG embebidas)
+        // y, si el CDN no está disponible, se cae a xlsx-js-style sin imágenes.
 
-            const data = currentQuarterlyReportData;
-            const p = data.period || {};
-            const k = data.kpis || {};
-            const generatedAt = new Date().toLocaleString('es-CO');
+        const EXCELJS_CDN = 'https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
 
-            // Intentar capturar imágenes de las gráficas (Chart.js canvas)
-            const getCanvasDataUrl = (id) => {
-                try {
-                    const c = document.getElementById(id);
-                    if (!c || typeof c.toDataURL !== 'function') return '';
-                    return c.toDataURL('image/png', 1.0) || '';
-                } catch (e) {
-                    return '';
-                }
-            };
-
-            const imgDept = getCanvasDataUrl('qChartParticipantsByDept');
-            const imgCargo = getCanvasDataUrl('qChartByCargo');
-            const imgProf  = getCanvasDataUrl('qChartByProfession');
-            const imgMonth = getCanvasDataUrl('qChartTrainingsByMonth');
-
-            // Datos ordenados
-            const trainings = [...(data.trainings || [])].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-            const byDept = [...(data.distributions?.byDept || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count));
-            const byCargo = [...(data.distributions?.byCargo || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count));
-            const byProf = [...(data.distributions?.byProfession || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count));
-            const byMonth = [...(data.distributions?.trainingsByMonth || [])].sort((a, b) => safeNumber(a.month) - safeNumber(b.month));
-
-            // Datos de cursos virtuales
-            const vData = data.virtual || {};
-            const vk = vData.kpis || {};
-            const vCourses = [...(vData.courses || [])].sort((a, b) => safeNumber(b.participants) - safeNumber(a.participants));
-            const vParts = vData.participants || [];
-
-            const escape = (s) => escapeHtml(String(s ?? ''));
-
-            const periodLabel = p.label || (p.quarter && p.year ? `T${p.quarter} ${p.year}` : 'Reporte Trimestral');
-            const filename = `Reporte_Trimestral_${(periodLabel || '').replace(/[^\w]+/g, '_')}.xls`;
-
-            // Nota: este export usa HTML+Excel para permitir incluir imágenes de las gráficas.
-            const html = `
-                <html xmlns:o="urn:schemas-microsoft-com:office:office"
-                      xmlns:x="urn:schemas-microsoft-com:office:excel"
-                      xmlns="http://www.w3.org/TR/REC-html40">
-                <head>
-                    <meta charset="utf-8"/>
-                    <!--[if gte mso 9]>
-                    <xml>
-                        <x:ExcelWorkbook>
-                            <x:ExcelWorksheets>
-                                <x:ExcelWorksheet>
-                                    <x:Name>Reporte</x:Name>
-                                    <x:WorksheetOptions>
-                                        <x:DisplayGridlines/>
-                                    </x:WorksheetOptions>
-                                </x:ExcelWorksheet>
-                            </x:ExcelWorksheets>
-                        </x:ExcelWorkbook>
-                    </xml>
-                    <![endif]-->
-                    <style>
-                        body { font-family: Arial, sans-serif; color:#111827; }
-                        table { border-collapse: collapse; width: 100%; }
-                        th, td { border: 1px solid #111827; padding: 6px 8px; font-size: 10pt; vertical-align: top; }
-                        .title { background: #0f172a; color: #ffffff; font-weight: 900; font-size: 14pt; text-align:center; }
-                        .subtitle { background: #e2e8f0; font-weight: 800; text-align:center; }
-                        .sec { background: #16a34a; color:#ffffff; font-weight: 900; text-align:left; }
-                        .k { background:#f1f5f9; font-weight: 800; width: 34%; }
-                        .v { font-weight: 800; width: 66%; }
-                        .muted { color:#334155; }
-                        .center { text-align:center; }
-                        .right { text-align:right; }
-                        .nowrap { white-space:nowrap; }
-                        .small { font-size: 9pt; }
-                        .imgwrap { text-align:center; border:1px solid #e2e8f0; padding:10px; }
-                        .no-border td { border:none; }
-                        .tblhead th { background:#f8fafc; font-weight:900; }
-                
-
-        /* FIX móvil 2026-05-31: el flujo por QR no debe cancelar el ingreso ni devolver al campus */
-        body.hslv-participant-flow { background:#fff !important; overflow-x:hidden !important; }
-        .swal2-popup.hslv-virtual-login .swal2-actions,
-        .swal2-popup.hslv-virtual-register .swal2-actions { gap: .65rem !important; }
-        .swal2-popup.hslv-virtual-login .swal2-confirm,
-        .swal2-popup.hslv-virtual-register .swal2-confirm,
-        .swal2-popup.hslv-virtual-login .swal2-cancel,
-        .swal2-popup.hslv-virtual-register .swal2-cancel { min-height:44px !important; border-radius:10px !important; font-weight:800 !important; }
-
-        /* Bloqueo visual del botón de pantalla completa en reproductores HTML5 */
-        #virtualCourseVideo::-webkit-media-controls-fullscreen-button,
-        #virtualCourseVideo::-webkit-media-controls-toggle-closed-captions-button { display:none !important; }
-        #virtualCourseVideo::-webkit-media-controls-enclosure { overflow:hidden !important; }
-        #virtualYoutubePlayer iframe { max-width:100% !important; }
-
-        @media (max-width: 900px) {
-            .swal2-popup.hslv-virtual-login,
-            .swal2-popup.hslv-virtual-register {
-                width: calc(100vw - 20px) !important;
-                max-width: calc(100vw - 20px) !important;
-                max-height: 94dvh !important;
-                overflow-y: auto !important;
-                padding: .95rem !important;
-            }
-            .swal2-popup.hslv-virtual-login .swal2-title,
-            .swal2-popup.hslv-virtual-register .swal2-title { font-size:1.2rem !important; }
-            .swal2-popup.hslv-virtual-login .swal2-html-container,
-            .swal2-popup.hslv-virtual-register .swal2-html-container { max-height:none !important; }
-            .virtual-login-helper { font-size:.95rem !important; }
-            #virtualCedulaInput, .virtual-auto-field, .virtual-register-field { min-height:44px !important; font-size:.95rem !important; }
-            .virtual-field-group { margin-bottom:.55rem !important; }
-            #virtualCoursePlayerModal { overflow:auto !important; }
-            .virtual-player-fullscreen { min-height:100dvh !important; }
-            #virtualVideoWrapper { min-height: 190px !important; }
-            .virtual-answer-option { min-height:44px !important; }
+        function ensureExcelJS() {
+            if (window.ExcelJS) return Promise.resolve(window.ExcelJS);
+            if (window.__excelJsLoading) return window.__excelJsLoading;
+            window.__excelJsLoading = new Promise((resolve, reject) => {
+                const s = document.createElement('script');
+                s.src = EXCELJS_CDN;
+                s.async = true;
+                s.onload = () => window.ExcelJS ? resolve(window.ExcelJS) : reject(new Error('ExcelJS no expuso window.ExcelJS'));
+                s.onerror = () => reject(new Error('No se pudo cargar ExcelJS desde el CDN'));
+                document.head.appendChild(s);
+            });
+            return window.__excelJsLoading;
         }
 
-    </style>
-                </head>
-                <body>
-                    <table>
-                        <tr><td class="title" colspan="8">REPORTE TRIMESTRAL - ${escape(periodLabel)}</td></tr>
-                        <tr><td class="subtitle" colspan="8">Hospital Susana López de Valencia E.S.E. | Rango: ${escape((p.startDate||'') + ' a ' + (p.endDate||''))} | Generado: ${escape(generatedAt)}</td></tr>
+        // Captura un canvas de Chart.js como PNG base64 sobre fondo blanco
+        // (los canvas de Chart.js son transparentes y en Excel se ven "sucios").
+        function quarterlyCanvasPng(id) {
+            try {
+                const c = document.getElementById(id);
+                if (!c || typeof c.toDataURL !== 'function') return '';
+                if (!c.width || !c.height) return '';
+                const off = document.createElement('canvas');
+                off.width = c.width;
+                off.height = c.height;
+                const ctx = off.getContext('2d');
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, off.width, off.height);
+                ctx.drawImage(c, 0, 0);
+                return off.toDataURL('image/png', 1.0) || '';
+            } catch (e) {
+                console.warn('No se pudo capturar el canvas', id, e);
+                return '';
+            }
+        }
 
-                        <tr><td class="sec" colspan="8">1) Indicadores clave (KPI)</td></tr>
-                        <tr>
-                            <td class="k">Capacitaciones (trimestre)</td><td class="v">${safeNumber(k.trainingsCount)}</td>
-                            <td class="k">Participaciones</td><td class="v">${safeNumber(k.participationsCount)}</td>
-                            <td class="k">Participantes únicos</td><td class="v">${safeNumber(k.uniqueParticipants)}</td>
-                            <td class="k">Adherencia (Post-test)</td><td class="v">${safeNumber(k.adherenceRate)}%</td>
-                        </tr>
-                        <tr>
-                            <td class="k">Promedio Pre-test</td><td class="v">${safeNumber(k.avgPretestScore)}% (${(safeNumber(k.avgPretestScore)/20).toFixed(1)}/5.0)</td>
-                            <td class="k">Promedio Post-test</td><td class="v">${safeNumber(k.avgPostestScore)}% (${(safeNumber(k.avgPostestScore)/20).toFixed(1)}/5.0)</td>
-                            <td class="k">Mejora promedio</td><td class="v">${safeNumber(k.avgImprovement) >= 0 ? '+' : ''}${safeNumber(k.avgImprovement)}%</td>
-                            <td class="k">Aprobación Post-test (≥60%)</td><td class="v">${safeNumber(k.passRatePostest)}%</td>
-                        </tr>
+        function buildQuarterlyExcelModel() {
+            const data = currentQuarterlyReportData || {};
+            const p = data.period || {};
+            const k = data.kpis || {};
+            const vData = data.virtual || {};
+            const vk = vData.kpis || {};
 
-                        <tr><td class="sec" colspan="8">2) Gráficas (capturadas del dashboard)</td></tr>
-                        <tr class="no-border"><td colspan="8" class="small muted">
-                            Si tu Excel no muestra imágenes embebidas, los datos de cada gráfica están incluidos en las tablas del reporte (secciones 3 a 6).
-                        </td></tr>
-                        <tr>
-                            <td colspan="4" class="imgwrap">
-                                <div style="font-weight:900; margin-bottom:6px;">Participaciones por Servicio (Top 10)</div>
-                                ${imgDept ? `<img src="${imgDept}" width="520" />` : `<div class="muted">Gráfica no disponible</div>`}
-                            </td>
-                            <td colspan="4" class="imgwrap">
-                                <div style="font-weight:900; margin-bottom:6px;">Capacitaciones por mes (trimestre)</div>
-                                ${imgMonth ? `<img src="${imgMonth}" width="520" />` : `<div class="muted">Gráfica no disponible</div>`}
-                            </td>
-                        </tr>
-                        <tr>
-                            <td colspan="4" class="imgwrap">
-                                <div style="font-weight:900; margin-bottom:6px;">Distribución por Cargo</div>
-                                ${imgCargo ? `<img src="${imgCargo}" width="520" />` : `<div class="muted">Gráfica no disponible</div>`}
-                            </td>
-                            <td colspan="4" class="imgwrap">
-                                <div style="font-weight:900; margin-bottom:6px;">Distribución por Profesión</div>
-                                ${imgProf ? `<img src="${imgProf}" width="520" />` : `<div class="muted">Gráfica no disponible</div>`}
-                            </td>
-                        </tr>
+            const periodLabel = p.label || (p.quarter && p.year ? `T${p.quarter} ${p.year}` : 'Reporte Trimestral');
 
-                        <tr><td class="sec" colspan="8">3) Capacitaciones del trimestre (ordenadas por fecha)</td></tr>
-                        <tr class="tblhead">
-                            <th class="nowrap">Fecha</th>
-                            <th>Capacitación</th>
-                            <th>Departamento</th>
-                            <th class="center">Estado</th>
-                            <th class="center">Participaciones</th>
-                            <th class="center">Adherencia %</th>
-                            <th class="center">Post prom. %</th>
-                            <th class="center">Aprobación post %</th>
-                        </tr>
-                        ${trainings.map(t => {
-                            const state = t.finalizada ? 'Finalizada' : (t.activa ? 'Activa' : 'Inactiva');
-                            return `
-                                <tr>
-                                    <td class="nowrap">${escape(t.dateLabel || '')}</td>
-                                    <td>${escape(t.title || '')}</td>
-                                    <td>${escape(t.department || '')}</td>
-                                    <td class="center">${state}</td>
-                                    <td class="center">${safeNumber(t.participations)}</td>
-                                    <td class="center">${safeNumber(t.adherenceRate)}%</td>
-                                    <td class="center">${safeNumber(t.avgPostestScore)}%</td>
-                                    <td class="center">${safeNumber(t.passRatePostest)}%</td>
-                                </tr>
-                            `;
-                        }).join('')}
+            return {
+                periodLabel,
+                rangeLabel: `${p.startDate || ''} a ${p.endDate || ''}`,
+                generatedAt: new Date().toLocaleString('es-CO'),
+                kpis: k,
+                vk,
+                trainings: [...(data.trainings || [])].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0)),
+                byDept: [...(data.distributions?.byDept || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count)),
+                byCargo: [...(data.distributions?.byCargo || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count)),
+                byProf: [...(data.distributions?.byProfession || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count)),
+                byMonth: [...(data.distributions?.trainingsByMonth || [])].sort((a, b) => safeNumber(a.month) - safeNumber(b.month)),
+                participants: data.participants || [],
+                vCourses: [...(vData.courses || [])].sort((a, b) => safeNumber(b.participants) - safeNumber(a.participants)),
+                vParts: vData.participants || [],
+                insights: (data.insights && data.insights.length) ? data.insights : ['Sin hallazgos automáticos (no hay datos suficientes).'],
+                charts: [
+                    { id: 'qChartParticipantsByDept', title: 'Participaciones por Servicio (Top 10)' },
+                    { id: 'qChartTrainingsByMonth',   title: 'Capacitaciones por mes (trimestre)' },
+                    { id: 'qChartByCargo',            title: 'Distribución por Cargo' },
+                    { id: 'qChartByProfession',       title: 'Distribución por Profesión' }
+                ].map(c => ({ ...c, png: quarterlyCanvasPng(c.id) }))
+            };
+        }
 
-                        <tr><td class="sec" colspan="8">4) Participaciones por Departamento/Servicio (ordenado desc.)</td></tr>
-                        <tr class="tblhead">
-                            <th colspan="5">Departamento/Servicio</th>
-                            <th class="center" colspan="2">Participaciones</th>
-                            <th class="center">Únicos</th>
-                        </tr>
-                        ${byDept.map(d => `
-                            <tr>
-                                <td colspan="5">${escape(d.name || '')}</td>
-                                <td class="center" colspan="2">${safeNumber(d.count)}</td>
-                                <td class="center">${safeNumber(d.unique)}</td>
-                            </tr>
-                        `).join('')}
+        async function exportQuarterlyReportExcel() {
+            if (!currentQuarterlyReportData) {
+                Swal.fire({ icon: 'warning', title: 'Sin datos', text: 'Primero genera el reporte trimestral' });
+                return;
+            }
 
-                        <tr><td class="sec" colspan="8">5) Distribución por Cargo (ordenado desc.)</td></tr>
-                        <tr class="tblhead">
-                            <th colspan="6">Cargo</th>
-                            <th class="center" colspan="2">Cantidad</th>
-                        </tr>
-                        ${byCargo.map(x => `
-                            <tr>
-                                <td colspan="6">${escape(x.name || '')}</td>
-                                <td class="center" colspan="2">${safeNumber(x.count)}</td>
-                            </tr>
-                        `).join('')}
+            const m = buildQuarterlyExcelModel();
+            const filename = `Reporte_Trimestral_${(m.periodLabel || '').replace(/[^\w]+/g, '_')}.xlsx`;
 
-                        <tr><td class="sec" colspan="8">6) Distribución por Profesión (ordenado desc.)</td></tr>
-                        <tr class="tblhead">
-                            <th colspan="6">Profesión</th>
-                            <th class="center" colspan="2">Cantidad</th>
-                        </tr>
-                        ${byProf.map(x => `
-                            <tr>
-                                <td colspan="6">${escape(x.name || '')}</td>
-                                <td class="center" colspan="2">${safeNumber(x.count)}</td>
-                            </tr>
-                        `).join('')}
+            Swal.fire({
+                title: 'Generando Excel...',
+                text: 'Construyendo hojas y gráficas',
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
 
-                        <tr><td class="sec" colspan="8">7) Capacitaciones por mes (datos fuente)</td></tr>
-                        <tr class="tblhead">
-                            <th colspan="6">Mes</th>
-                            <th class="center" colspan="2">Capacitaciones</th>
-                        </tr>
-                        ${byMonth.map(m => `
-                            <tr>
-                                <td colspan="6">${escape(m.label || m.month || '')}</td>
-                                <td class="center" colspan="2">${safeNumber(m.count)}</td>
-                            </tr>
-                        `).join('')}
+            try {
+                let ExcelJS = null;
+                try {
+                    ExcelJS = await ensureExcelJS();
+                } catch (cdnErr) {
+                    console.warn('⚠️ ExcelJS no disponible, se usará el respaldo sin gráficas:', cdnErr);
+                }
 
-                        <tr><td class="sec" colspan="8">8) Hallazgos y recomendaciones automáticas</td></tr>
-                        ${(data.insights && data.insights.length ? data.insights : ['Sin hallazgos automáticos (no hay datos suficientes).'])
-                            .map(s => `<tr><td colspan="8">${escape(s)}</td></tr>`).join('')}
+                if (ExcelJS) {
+                    await buildQuarterlyXlsxWithExcelJS(ExcelJS, m, filename);
+                    Swal.close();
+                    Swal.fire({
+                        icon: 'success',
+                        title: '¡Exportado!',
+                        text: 'Excel generado con tablas y gráficas embebidas.',
+                        timer: 2400,
+                        showConfirmButton: false
+                    });
+                } else {
+                    buildQuarterlyXlsxWithSheetJS(m, filename);
+                    Swal.close();
+                    Swal.fire({
+                        icon: 'info',
+                        title: 'Exportado sin gráficas',
+                        text: 'No se pudo cargar la librería de imágenes; el Excel incluye todas las tablas de datos.',
+                        timer: 3200,
+                        showConfirmButton: false
+                    });
+                }
+            } catch (err) {
+                console.error('❌ Error exportando Excel:', err);
+                Swal.close();
+                Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'No se pudo generar el Excel' });
+            }
+        }
 
-                        <tr><td class="sec" colspan="13">9) Detalle de participantes</td></tr>
-                        <tr class="tblhead">
-                            <th>Cédula</th>
-                            <th>Nombre</th>
-                            <th>Entidad</th>
-                            <th>Proceso/Servicio</th>
-                            <th>Perfil</th>
-                            <th>Cargo</th>
-                            <th>Correo</th>
-                            <th>Celular</th>
-                            <th>Capacitación</th>
-                            <th class="nowrap">Fecha</th>
-                            <th class="center">Pre %</th>
-                            <th class="center">Post %</th>
-                            <th class="center">Mejora %</th>
-                        </tr>
-                        ${(data.participants || []).map(r => `
-                            <tr>
-                                <td class="nowrap">${escape(r.cedula || '')}</td>
-                                <td>${escape(r.nombre || '')}</td>
-                                <td>${escape(r.entidad || '')}</td>
-                                <td>${escape(r.proceso || '')}</td>
-                                <td>${escape(r.perfil || '')}</td>
-                                <td>${escape(r.cargo || '')}</td>
-                                <td>${escape(r.correo || '')}</td>
-                                <td class="nowrap">${escape(r.celular || '')}</td>
-                                <td>${escape(r.capacitacion || '')}</td>
-                                <td class="nowrap">${escape(r.fecha || '')}</td>
-                                <td class="center">${safeNumber(r.pretest)}</td>
-                                <td class="center">${safeNumber(r.postest)}</td>
-                                <td class="center">${safeNumber(r.mejora)}</td>
-                            </tr>
-                        `).join('')}
+        // ── Construcción con ExcelJS (.xlsx real, imágenes embebidas) ──
+        async function buildQuarterlyXlsxWithExcelJS(ExcelJS, m, filename) {
+            const wb = new ExcelJS.Workbook();
+            wb.creator = 'Sistema de Capacitaciones HSLV';
+            wb.created = new Date();
 
-                        <tr><td class="sec" colspan="13">10) Cursos virtuales - Indicadores (trimestre)</td></tr>
-                        <tr>
-                            <td class="k" colspan="2">Cursos con actividad</td><td class="v" colspan="2">${safeNumber(vk.coursesCount)}</td>
-                            <td class="k" colspan="2">Evaluaciones</td><td class="v" colspan="2">${safeNumber(vk.participations)}</td>
-                            <td class="k" colspan="3">Participantes únicos</td><td class="v" colspan="2">${safeNumber(vk.uniqueParticipants)}</td>
-                        </tr>
-                        <tr>
-                            <td class="k" colspan="2">Aprobados</td><td class="v" colspan="2">${safeNumber(vk.approved)}</td>
-                            <td class="k" colspan="2">Reprobados</td><td class="v" colspan="2">${safeNumber(vk.failed)}</td>
-                            <td class="k" colspan="3">Aprobación / Nota prom.</td><td class="v" colspan="2">${safeNumber(vk.passRate)}% (${safeNumber(vk.avgGrade)}/5.0)</td>
-                        </tr>
+            const HEADER_FILL = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF16A34A' } };
+            const TITLE_FILL  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF0F172A' } };
+            const KEY_FILL    = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+            const THIN = { style: 'thin', color: { argb: 'FFCBD5E1' } };
+            const BORDER = { top: THIN, left: THIN, bottom: THIN, right: THIN };
 
-                        <tr><td class="sec" colspan="13">11) Resumen por curso virtual (ordenado desc.)</td></tr>
-                        <tr class="tblhead">
-                            <th colspan="5">Curso Virtual</th>
-                            <th class="center">Particip.</th>
-                            <th class="center">Aprob.</th>
-                            <th class="center">Reprob.</th>
-                            <th class="center" colspan="2">Aprobación %</th>
-                            <th class="center">Prom. %</th>
-                            <th class="center" colspan="2">Nota Prom.</th>
-                        </tr>
-                        ${(vCourses.length ? vCourses : []).map(c => `
-                            <tr>
-                                <td colspan="5">${escape(c.title || '')}</td>
-                                <td class="center">${safeNumber(c.participants)}</td>
-                                <td class="center">${safeNumber(c.approved)}</td>
-                                <td class="center">${safeNumber(c.failed)}</td>
-                                <td class="center" colspan="2">${safeNumber(c.passRate)}%</td>
-                                <td class="center">${safeNumber(c.avgPercent)}%</td>
-                                <td class="center" colspan="2">${safeNumber(c.avgGrade)}/5.0</td>
-                            </tr>
-                        `).join('') || `<tr><td colspan="13" class="muted">Sin cursos virtuales con evaluaciones en el periodo.</td></tr>`}
+            const styleHeaderRow = (row) => {
+                row.eachCell(cell => {
+                    cell.fill = HEADER_FILL;
+                    cell.font = { bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+                    cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+                    cell.border = BORDER;
+                });
+                row.height = 22;
+            };
 
-                        <tr><td class="sec" colspan="16">12) Detalle de participantes - cursos virtuales</td></tr>
-                        <tr class="tblhead">
-                            <th>Cédula</th>
-                            <th>Nombre</th>
-                            <th>Entidad</th>
-                            <th>Proceso/Servicio</th>
-                            <th>Perfil</th>
-                            <th>Cargo</th>
-                            <th>Correo</th>
-                            <th>Celular</th>
-                            <th>Curso Virtual</th>
-                            <th class="nowrap">Fecha</th>
-                            <th class="center">Correctas</th>
-                            <th class="center">Total</th>
-                            <th class="center">%</th>
-                            <th class="center">Nota</th>
-                            <th class="center">Estado</th>
-                            <th class="center">Intentos</th>
-                        </tr>
-                        ${(vParts.length ? vParts : []).map(r => `
-                            <tr>
-                                <td class="nowrap">${escape(r.cedula || '')}</td>
-                                <td>${escape(r.nombre || '')}</td>
-                                <td>${escape(r.entidad || '')}</td>
-                                <td>${escape(r.proceso || '')}</td>
-                                <td>${escape(r.perfil || '')}</td>
-                                <td>${escape(r.cargo || '')}</td>
-                                <td>${escape(r.correo || '')}</td>
-                                <td class="nowrap">${escape(r.celular || '')}</td>
-                                <td>${escape(r.curso || '')}</td>
-                                <td class="nowrap">${escape(r.fecha || '')}</td>
-                                <td class="center">${safeNumber(r.correctas)}</td>
-                                <td class="center">${safeNumber(r.total)}</td>
-                                <td class="center">${safeNumber(r.porcentaje)}</td>
-                                <td class="center">${safeNumber(r.nota)}</td>
-                                <td class="center">${escape(r.estado || '')}</td>
-                                <td class="center">${safeNumber(r.intentos)}</td>
-                            </tr>
-                        `).join('') || `<tr><td colspan="16" class="muted">Sin participantes de cursos virtuales en el periodo.</td></tr>`}
+            const addTable = (ws, headers, rows, widths) => {
+                const hr = ws.addRow(headers);
+                styleHeaderRow(hr);
+                rows.forEach(r => {
+                    const row = ws.addRow(r);
+                    row.eachCell(cell => { cell.border = BORDER; });
+                });
+                if (widths) ws.columns.forEach((col, i) => { col.width = widths[i] || 16; });
+                ws.views = [{ state: 'frozen', ySplit: hr.number }];
+                ws.autoFilter = {
+                    from: { row: hr.number, column: 1 },
+                    to: { row: hr.number, column: headers.length }
+                };
+            };
 
-                        <tr class="no-border"><td colspan="8" class="small muted" style="text-align:center; padding-top: 10px;">
-                            Documento generado automáticamente por el Sistema de Capacitaciones - Hospital Susana López de Valencia E.S.E.
-                        </td></tr>
-                    </table>
-                
+            const pct = (v) => safeNumber(v) / 100;
+            const applyPercent = (ws, colIndexes, startRow) => {
+                ws.eachRow((row, n) => {
+                    if (n < startRow) return;
+                    colIndexes.forEach(ci => { row.getCell(ci).numFmt = '0%'; });
+                });
+            };
 
-</body>
-                </html>
-            `;
+            // ── Hoja 1: Resumen + gráficas ──
+            const s1 = wb.addWorksheet('Resumen', { views: [{ showGridLines: false }] });
+            s1.mergeCells('A1:F1');
+            const t1 = s1.getCell('A1');
+            t1.value = `REPORTE TRIMESTRAL - ${m.periodLabel}`;
+            t1.fill = TITLE_FILL;
+            t1.font = { bold: true, size: 16, color: { argb: 'FFFFFFFF' } };
+            t1.alignment = { horizontal: 'center', vertical: 'middle' };
+            s1.getRow(1).height = 30;
 
-            const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8;' });
-            const link = document.createElement('a');
+            s1.mergeCells('A2:F2');
+            const t2 = s1.getCell('A2');
+            t2.value = `Hospital Susana López de Valencia E.S.E.  |  Rango: ${m.rangeLabel}  |  Generado: ${m.generatedAt}`;
+            t2.font = { size: 10, color: { argb: 'FF334155' } };
+            t2.alignment = { horizontal: 'center' };
+
+            s1.addRow([]);
+            const kpiPairs = [
+                ['Capacitaciones (trimestre)', safeNumber(m.kpis.trainingsCount)],
+                ['Participaciones', safeNumber(m.kpis.participationsCount)],
+                ['Participantes únicos', safeNumber(m.kpis.uniqueParticipants)],
+                ['Adherencia post-test', pct(m.kpis.adherenceRate)],
+                ['Promedio pre-test', pct(m.kpis.avgPretestScore)],
+                ['Promedio post-test', pct(m.kpis.avgPostestScore)],
+                ['Mejora promedio', pct(m.kpis.avgImprovement)],
+                ['Aprobación post-test (≥60%)', pct(m.kpis.passRatePostest)]
+            ];
+            const kpiHeader = s1.addRow(['INDICADORES CLAVE (PRESENCIAL)', '']);
+            s1.mergeCells(`A${kpiHeader.number}:B${kpiHeader.number}`);
+            kpiHeader.getCell(1).fill = HEADER_FILL;
+            kpiHeader.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+
+            kpiPairs.forEach(([key, val], i) => {
+                const r = s1.addRow([key, val]);
+                r.getCell(1).fill = KEY_FILL;
+                r.getCell(1).font = { bold: true };
+                r.getCell(1).border = BORDER;
+                r.getCell(2).border = BORDER;
+                r.getCell(2).font = { bold: true };
+                if (i >= 3) r.getCell(2).numFmt = '0%';
+                r.getCell(2).alignment = { horizontal: 'right' };
+            });
+
+            if (safeNumber(m.vk.coursesCount) > 0 || safeNumber(m.vk.participations) > 0) {
+                s1.addRow([]);
+                const vHeader = s1.addRow(['INDICADORES CLAVE (CURSOS VIRTUALES)', '']);
+                s1.mergeCells(`A${vHeader.number}:B${vHeader.number}`);
+                vHeader.getCell(1).fill = HEADER_FILL;
+                vHeader.getCell(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+                const vPairs = [
+                    ['Cursos con actividad', safeNumber(m.vk.coursesCount), false],
+                    ['Participaciones', safeNumber(m.vk.participations), false],
+                    ['Participantes únicos', safeNumber(m.vk.uniqueParticipants), false],
+                    ['Aprobados', safeNumber(m.vk.approved), false],
+                    ['Reprobados', safeNumber(m.vk.failed), false],
+                    ['Tasa de aprobación', pct(m.vk.passRate), true],
+                    ['Promedio de acierto', pct(m.vk.avgPercent), true],
+                    ['Nota promedio (0-5)', safeNumber(m.vk.avgGrade), false]
+                ];
+                vPairs.forEach(([key, val, isPct]) => {
+                    const r = s1.addRow([key, val]);
+                    r.getCell(1).fill = KEY_FILL;
+                    r.getCell(1).font = { bold: true };
+                    r.getCell(1).border = BORDER;
+                    r.getCell(2).border = BORDER;
+                    r.getCell(2).font = { bold: true };
+                    if (isPct) r.getCell(2).numFmt = '0%';
+                    r.getCell(2).alignment = { horizontal: 'right' };
+                });
+            }
+
+            s1.getColumn(1).width = 34;
+            s1.getColumn(2).width = 18;
+            s1.getColumn(3).width = 4;
+
+            // Gráficas embebidas como imágenes PNG reales
+            const charts = m.charts.filter(c => c.png);
+            if (charts.length) {
+                let anchorRow = 3;
+                charts.forEach((c, idx) => {
+                    const col = idx % 2 === 0 ? 3 : 11;      // columnas D y L
+                    if (idx % 2 === 0 && idx > 0) anchorRow += 22;
+
+                    const label = s1.getCell(anchorRow, col + 1);
+                    label.value = c.title;
+                    label.font = { bold: true, size: 11, color: { argb: 'FF0F172A' } };
+
+                    const imgId = wb.addImage({ base64: c.png, extension: 'png' });
+                    s1.addImage(imgId, {
+                        tl: { col: col, row: anchorRow },
+                        ext: { width: 480, height: 260 },
+                        editAs: 'oneCell'
+                    });
+                });
+            } else {
+                const warn = s1.getCell('D3');
+                warn.value = 'Gráficas no disponibles: genera el reporte y espera a que se dibujen antes de exportar.';
+                warn.font = { italic: true, color: { argb: 'FF991B1B' } };
+            }
+
+            // ── Hoja 2: Capacitaciones ──
+            const s2 = wb.addWorksheet('Capacitaciones');
+            addTable(s2,
+                ['Fecha', 'Capacitación', 'Departamento', 'Estado', 'Participaciones', 'Adherencia', 'Pre prom.', 'Post prom.', 'Mejora', 'Aprobación post'],
+                m.trainings.map(t => [
+                    t.dateLabel || '',
+                    t.title || '',
+                    t.department || '',
+                    t.finalizada ? 'Finalizada' : (t.activa ? 'Activa' : 'Inactiva'),
+                    safeNumber(t.participations || t.participationsCount),
+                    pct(t.adherenceRate),
+                    pct(t.avgPretestScore),
+                    pct(t.avgPostestScore),
+                    pct(t.avgImprovement),
+                    pct(t.passRatePostest)
+                ]),
+                [16, 52, 24, 13, 15, 13, 12, 12, 11, 16]
+            );
+            applyPercent(s2, [6, 7, 8, 9, 10], 2);
+
+            // ── Hoja 3: Por servicio ──
+            const s3 = wb.addWorksheet('Por Servicio');
+            addTable(s3,
+                ['Departamento / Servicio', 'Participaciones', 'Participantes únicos', 'Pre prom.', 'Post prom.'],
+                m.byDept.map(d => [
+                    d.name || d.dept || '',
+                    safeNumber(d.count),
+                    safeNumber(d.unique),
+                    pct(d.avgPretestScore),
+                    pct(d.avgPostestScore)
+                ]),
+                [40, 16, 21, 12, 12]
+            );
+            applyPercent(s3, [4, 5], 2);
+
+            // ── Hoja 4: Por cargo ──
+            const s4 = wb.addWorksheet('Por Cargo');
+            addTable(s4, ['Cargo', 'Participaciones'],
+                m.byCargo.map(x => [x.name || '', safeNumber(x.count)]), [42, 16]);
+
+            // ── Hoja 5: Por profesión ──
+            const s5 = wb.addWorksheet('Por Profesión');
+            addTable(s5, ['Profesión', 'Participaciones'],
+                m.byProf.map(x => [x.name || '', safeNumber(x.count)]), [42, 16]);
+
+            // ── Hoja 6: Por mes ──
+            const s6 = wb.addWorksheet('Por Mes');
+            addTable(s6, ['Mes', 'Capacitaciones'],
+                m.byMonth.map(x => [x.label || x.month || '', safeNumber(x.count)]), [18, 16]);
+
+            // ── Hoja 7: Participantes presenciales ──
+            if (m.participants.length) {
+                const s7 = wb.addWorksheet('Participantes');
+                addTable(s7,
+                    ['Cédula', 'Nombre', 'Entidad', 'Proceso / Servicio', 'Perfil', 'Cargo', 'Correo', 'Celular', 'Capacitación', 'Fecha', 'Pre', 'Post', 'Mejora'],
+                    m.participants.map(r => [
+                        r.cedula || '',
+                        r.nombre || '',
+                        r.entidad || '',
+                        r.proceso || '',
+                        r.perfil || '',
+                        r.cargo || '',
+                        r.correo || '',
+                        r.celular || '',
+                        r.capacitacion || '',
+                        r.fecha || '',
+                        pct(r.pretest),
+                        pct(r.postest),
+                        pct(r.mejora)
+                    ]),
+                    [14, 32, 18, 26, 18, 24, 30, 14, 40, 12, 9, 9, 10]
+                );
+                applyPercent(s7, [11, 12, 13], 2);
+            }
+
+            // ── Hoja 8: Cursos virtuales ──
+            if (m.vCourses.length) {
+                const s8 = wb.addWorksheet('Cursos Virtuales');
+                addTable(s8,
+                    ['Curso', 'Participantes', 'Aprobados', 'Reprobados', 'Tasa aprobación', 'Acierto prom.', 'Nota prom.'],
+                    m.vCourses.map(c => [
+                        c.title || '',
+                        safeNumber(c.participants),
+                        safeNumber(c.approved),
+                        safeNumber(c.failed),
+                        pct(c.passRate),
+                        pct(c.avgPercent),
+                        safeNumber(c.avgGrade)
+                    ]),
+                    [46, 15, 13, 13, 16, 15, 12]
+                );
+                applyPercent(s8, [5, 6], 2);
+            }
+
+            // ── Hoja 9: Participantes virtuales ──
+            if (m.vParts.length) {
+                const s9 = wb.addWorksheet('Participantes Virtuales');
+                addTable(s9,
+                    ['Cédula', 'Nombre', 'Entidad', 'Proceso', 'Perfil', 'Cargo', 'Correo', 'Celular', 'Curso', 'Fecha', 'Correctas', 'Total', 'Acierto', 'Nota', 'Estado', 'Intentos'],
+                    m.vParts.map(r => [
+                        r.cedula || '',
+                        r.nombre || '',
+                        r.entidad || '',
+                        r.proceso || '',
+                        r.perfil || '',
+                        r.cargo || '',
+                        r.correo || '',
+                        r.celular || '',
+                        r.curso || '',
+                        r.fecha || '',
+                        safeNumber(r.correctas),
+                        safeNumber(r.total),
+                        pct(r.porcentaje),
+                        safeNumber(r.nota),
+                        r.estado || '',
+                        safeNumber(r.intentos)
+                    ]),
+                    [14, 32, 18, 24, 18, 24, 30, 14, 40, 12, 11, 9, 11, 9, 13, 10]
+                );
+                applyPercent(s9, [13], 2);
+            }
+
+            // ── Hoja 10: Hallazgos ──
+            const s10 = wb.addWorksheet('Hallazgos');
+            addTable(s10, ['#', 'Hallazgo / Recomendación'],
+                m.insights.map((s, i) => [i + 1, String(s)]), [6, 130]);
+            s10.eachRow((row, n) => { if (n > 1) row.getCell(2).alignment = { wrapText: true, vertical: 'top' }; });
+
+            const buffer = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            downloadBlobAs(blob, filename);
+        }
+
+        // ── Respaldo con xlsx-js-style (sin imágenes, mismo contenido tabular) ──
+        function buildQuarterlyXlsxWithSheetJS(m, filename) {
+            if (typeof XLSX === 'undefined') throw new Error('No hay librería de Excel disponible');
+
+            const wb = XLSX.utils.book_new();
+            const add = (name, aoa) => {
+                const ws = XLSX.utils.aoa_to_sheet(aoa);
+                XLSX.utils.book_append_sheet(wb, ws, name.slice(0, 31));
+            };
+
+            add('Resumen', [
+                [`REPORTE TRIMESTRAL - ${m.periodLabel}`],
+                [`Hospital Susana López de Valencia E.S.E. | Rango: ${m.rangeLabel} | Generado: ${m.generatedAt}`],
+                [],
+                ['INDICADORES CLAVE (PRESENCIAL)'],
+                ['Capacitaciones (trimestre)', safeNumber(m.kpis.trainingsCount)],
+                ['Participaciones', safeNumber(m.kpis.participationsCount)],
+                ['Participantes únicos', safeNumber(m.kpis.uniqueParticipants)],
+                ['Adherencia post-test %', safeNumber(m.kpis.adherenceRate)],
+                ['Promedio pre-test %', safeNumber(m.kpis.avgPretestScore)],
+                ['Promedio post-test %', safeNumber(m.kpis.avgPostestScore)],
+                ['Mejora promedio %', safeNumber(m.kpis.avgImprovement)],
+                ['Aprobación post-test %', safeNumber(m.kpis.passRatePostest)],
+                [],
+                ['INDICADORES CLAVE (CURSOS VIRTUALES)'],
+                ['Cursos con actividad', safeNumber(m.vk.coursesCount)],
+                ['Participaciones', safeNumber(m.vk.participations)],
+                ['Participantes únicos', safeNumber(m.vk.uniqueParticipants)],
+                ['Aprobados', safeNumber(m.vk.approved)],
+                ['Reprobados', safeNumber(m.vk.failed)],
+                ['Tasa de aprobación %', safeNumber(m.vk.passRate)],
+                ['Promedio de acierto %', safeNumber(m.vk.avgPercent)],
+                ['Nota promedio (0-5)', safeNumber(m.vk.avgGrade)]
+            ]);
+
+            add('Capacitaciones', [
+                ['Fecha', 'Capacitación', 'Departamento', 'Estado', 'Participaciones', 'Adherencia %', 'Pre prom. %', 'Post prom. %', 'Mejora %', 'Aprobación post %'],
+                ...m.trainings.map(t => [
+                    t.dateLabel || '', t.title || '', t.department || '',
+                    t.finalizada ? 'Finalizada' : (t.activa ? 'Activa' : 'Inactiva'),
+                    safeNumber(t.participations || t.participationsCount),
+                    safeNumber(t.adherenceRate), safeNumber(t.avgPretestScore),
+                    safeNumber(t.avgPostestScore), safeNumber(t.avgImprovement), safeNumber(t.passRatePostest)
+                ])
+            ]);
+
+            add('Por Servicio', [
+                ['Departamento / Servicio', 'Participaciones', 'Participantes únicos', 'Pre prom. %', 'Post prom. %'],
+                ...m.byDept.map(d => [d.name || d.dept || '', safeNumber(d.count), safeNumber(d.unique), safeNumber(d.avgPretestScore), safeNumber(d.avgPostestScore)])
+            ]);
+
+            add('Por Cargo', [['Cargo', 'Participaciones'], ...m.byCargo.map(x => [x.name || '', safeNumber(x.count)])]);
+            add('Por Profesión', [['Profesión', 'Participaciones'], ...m.byProf.map(x => [x.name || '', safeNumber(x.count)])]);
+            add('Por Mes', [['Mes', 'Capacitaciones'], ...m.byMonth.map(x => [x.label || x.month || '', safeNumber(x.count)])]);
+
+            if (m.participants.length) {
+                add('Participantes', [
+                    ['Cédula', 'Nombre', 'Entidad', 'Proceso / Servicio', 'Perfil', 'Cargo', 'Correo', 'Celular', 'Capacitación', 'Fecha', 'Pre %', 'Post %', 'Mejora %'],
+                    ...m.participants.map(r => [
+                        r.cedula || '', r.nombre || '', r.entidad || '', r.proceso || '', r.perfil || '', r.cargo || '',
+                        r.correo || '', r.celular || '', r.capacitacion || '', r.fecha || '',
+                        safeNumber(r.pretest), safeNumber(r.postest), safeNumber(r.mejora)
+                    ])
+                ]);
+            }
+
+            if (m.vCourses.length) {
+                add('Cursos Virtuales', [
+                    ['Curso', 'Participantes', 'Aprobados', 'Reprobados', 'Tasa aprobación %', 'Acierto prom. %', 'Nota prom.'],
+                    ...m.vCourses.map(c => [c.title || '', safeNumber(c.participants), safeNumber(c.approved), safeNumber(c.failed), safeNumber(c.passRate), safeNumber(c.avgPercent), safeNumber(c.avgGrade)])
+                ]);
+            }
+
+            if (m.vParts.length) {
+                add('Participantes Virtuales', [
+                    ['Cédula', 'Nombre', 'Entidad', 'Proceso', 'Perfil', 'Cargo', 'Correo', 'Celular', 'Curso', 'Fecha', 'Correctas', 'Total', 'Acierto %', 'Nota', 'Estado', 'Intentos'],
+                    ...m.vParts.map(r => [
+                        r.cedula || '', r.nombre || '', r.entidad || '', r.proceso || '', r.perfil || '', r.cargo || '',
+                        r.correo || '', r.celular || '', r.curso || '', r.fecha || '',
+                        safeNumber(r.correctas), safeNumber(r.total), safeNumber(r.porcentaje), safeNumber(r.nota), r.estado || '', safeNumber(r.intentos)
+                    ])
+                ]);
+            }
+
+            add('Hallazgos', [['#', 'Hallazgo / Recomendación'], ...m.insights.map((s, i) => [i + 1, String(s)])]);
+
+            const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+            downloadBlobAs(blob, filename);
+        }
+
+        function downloadBlobAs(blob, filename) {
             const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
             link.href = url;
             link.download = filename;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-
-            Swal.fire({
-                icon: 'success',
-                title: '¡Exportado!',
-                text: 'Se descargó el Excel con tablas ordenadas y gráficas.',
-                timer: 2200,
-                showConfirmButton: false
-            });
+            setTimeout(() => URL.revokeObjectURL(url), 1500);
         }
 
         // ═══════════════════════════════════════════════════════════════
