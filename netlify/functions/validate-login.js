@@ -117,7 +117,11 @@ exports.handler = async (event) => {
     modulos = ALL_MODULE_TABS.slice();
   } else {
     const etiquetas = Array.isArray(f['Módulos Permitidos']) ? f['Módulos Permitidos'] : [];
-    modulos = etiquetas.map((et) => MODULE_TAB_MAP[et]).filter(Boolean);
+    modulos = etiquetas.reduce((tabs, etiqueta) => {
+      const tab = MODULE_TAB_MAP[etiqueta];
+      if (tab) tabs.push(tab);
+      return tabs;
+    }, []);
   }
   if (!modulos.length) return fail(403, 'Tu cuenta no tiene módulos asignados. Contacta al administrador.');
 

@@ -107,12 +107,16 @@ exports.handler = async (event) => {
   }
 
   const seen = new Set();
-  recipients = recipients
-    .map(r => ({ email: String((r && r.email) || '').trim().toLowerCase(), nombre: String((r && r.nombre) || '').trim() }))
-    .filter(r => {
-      if (!EMAIL_RE.test(r.email) || seen.has(r.email)) return false;
-      seen.add(r.email); return true;
-    });
+  recipients = recipients.reduce((validRecipients, recipient) => {
+    const normalized = {
+      email: String((recipient && recipient.email) || '').trim().toLowerCase(),
+      nombre: String((recipient && recipient.nombre) || '').trim()
+    };
+    if (!EMAIL_RE.test(normalized.email) || seen.has(normalized.email)) return validRecipients;
+    seen.add(normalized.email);
+    validRecipients.push(normalized);
+    return validRecipients;
+  }, []);
 
   if (!recipients.length) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ success: false, error: 'No hay destinatarios con correo válido.' }) };
@@ -136,8 +140,8 @@ exports.handler = async (event) => {
           headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
           body: reqBody
         });
-        const txt = await res.text();
         if (res.ok) { sent += batch.length; return; }
+        const txt = await res.text().catch(() => '');
         if (res.status === 429 && attempt === 0) { await new Promise(r => setTimeout(r, 1200)); continue; }
         failed += batch.length;
         let m = `HTTP ${res.status}`;

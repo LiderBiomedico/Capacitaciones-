@@ -59,17 +59,23 @@ exports.handler = async (event) => {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: form.toString()
     });
-    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({}));
+      const detail = (errorData && errorData.error && errorData.error.message)
+        ? errorData.error.message
+        : `HTTP ${res.status}`;
+      return { statusCode: 502, headers: CORS, body: JSON.stringify({ success: false, error: 'ImgBB rechazó la imagen.', detail }) };
+    }
 
-    if (res.ok && data && data.success && data.data) {
+    const data = await res.json().catch(() => ({}));
+    if (data && data.success && data.data) {
       // url directa de la imagen (permanente)
       const url = data.data.url || (data.data.image && data.data.image.url) || data.data.display_url || '';
       if (url) return { statusCode: 200, headers: CORS, body: JSON.stringify({ success: true, url }) };
       return { statusCode: 502, headers: CORS, body: JSON.stringify({ success: false, error: 'ImgBB no devolvió una URL.', detail: JSON.stringify(data).slice(0, 300) }) };
     }
 
-    const detail = (data && data.error && data.error.message) ? data.error.message : `HTTP ${res.status}`;
-    return { statusCode: 502, headers: CORS, body: JSON.stringify({ success: false, error: 'ImgBB rechazó la imagen.', detail }) };
+    return { statusCode: 502, headers: CORS, body: JSON.stringify({ success: false, error: 'ImgBB devolvió una respuesta incompleta.', detail: JSON.stringify(data).slice(0, 300) }) };
   } catch (e) {
     console.error('Error subiendo imagen a ImgBB:', e);
     return { statusCode: 500, headers: CORS, body: JSON.stringify({ success: false, error: 'No se pudo subir la imagen.', detail: String((e && e.message) || e) }) };

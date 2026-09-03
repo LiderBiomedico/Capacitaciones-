@@ -106,12 +106,16 @@ exports.handler = async (event) => {
 
   // Normalizar y validar destinatarios (deduplicar por correo)
   const seen = new Set();
-  recipients = recipients
-    .map(r => ({ email: String((r && r.email) || '').trim().toLowerCase(), nombre: String((r && r.nombre) || '').trim() }))
-    .filter(r => {
-      if (!EMAIL_RE.test(r.email) || seen.has(r.email)) return false;
-      seen.add(r.email); return true;
-    });
+  recipients = recipients.reduce((validRecipients, recipient) => {
+    const normalized = {
+      email: String((recipient && recipient.email) || '').trim().toLowerCase(),
+      nombre: String((recipient && recipient.nombre) || '').trim()
+    };
+    if (!EMAIL_RE.test(normalized.email) || seen.has(normalized.email)) return validRecipients;
+    seen.add(normalized.email);
+    validRecipients.push(normalized);
+    return validRecipients;
+  }, []);
 
   if (!recipients.length) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ success: false, error: 'No hay destinatarios con correo válido.' }) };
@@ -122,7 +126,9 @@ exports.handler = async (event) => {
 
   // Resend permite hasta 100 mensajes por lote (/emails/batch).
   const batches = chunk(recipients, 100);
-  for (const batch of batches) {
+  async function sendBatchesSequentially(index = 0) {
+    if (index >= batches.length) return;
+    const batch = batches[index];
     const payload = batch.map(r => ({
       from,
       to: [r.email],
@@ -135,10 +141,10 @@ exports.handler = async (event) => {
         headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      const txt = await res.text();
       if (res.ok) {
         sent += batch.length;
       } else {
+        const txt = await res.text().catch(() => '');
         failed += batch.length;
         let msg = `HTTP ${res.status}`;
         try { const j = JSON.parse(txt); msg = (j && (j.message || j.error)) ? (j.message || j.error) : msg; } catch (e) {}
@@ -150,7 +156,9 @@ exports.handler = async (event) => {
       batch.forEach(r => errors.push({ email: r.email, error: 'fallo de red' }));
       console.error('Resend fetch error', e);
     }
+    return sendBatchesSequentially(index + 1);
   }
+  await sendBatchesSequentially();
 
   return {
     statusCode: 200,

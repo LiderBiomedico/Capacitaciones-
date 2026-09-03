@@ -5,7 +5,9 @@
   "main": "capacitaciones.html",
   "scripts": {
     "dev": "netlify dev",
-    "deploy": "netlify deploy --prod"
+    "deploy": "netlify deploy --prod",
+    "check": "node scripts/verify-project.js",
+    "test": "npm run check"
   },
   "dependencies": {
     "node-fetch": "^2.6.7"

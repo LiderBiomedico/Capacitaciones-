@@ -3435,7 +3435,7 @@
             </section>
 
             <!-- Modal para mostrar QR generado -->
-            <div id="qrModal" class="modal" style="display: none;">
+            <div id="qrGenerationModal" class="modal" style="display: none;">
                 <div class="modal-content" style="max-width: 500px; padding: 2rem; text-align: center;">
                     <h3 style="margin-bottom: 1.5rem;">
                         <i class="fas fa-qrcode"></i> Código QR Generado
@@ -4693,7 +4693,7 @@
                         </div>
                         <div class="um-field">
                             <label for="umPass">Contraseña</label>
-                            <input id="umPass" type="text" placeholder="Contraseña">
+                            <input id="umPass" type="password" autocomplete="new-password" placeholder="Contraseña">
                             <small id="umPassHint" style="display:none; color:#64748b;">Déjala en blanco para no cambiarla.</small>
                         </div>
                         <div class="um-field um-col-2">
@@ -4891,6 +4891,39 @@
 
         const COMPLETED_TRAININGS_STORAGE_KEY = 'HSLV_COMPLETED_TRAININGS_V1';
 
+        /**
+         * Lee una respuesta JSON únicamente después de validar el estado HTTP.
+         * Conserva el mensaje enviado por las funciones de Netlify para que la
+         * interfaz pueda mostrar un diagnóstico útil al usuario.
+         */
+        async function readJsonResponse(response, fallbackMessage = 'Error del servidor') {
+            if (!response.ok) {
+                const errorText = await response.text().catch(() => '');
+                let errorData = {};
+                try { errorData = errorText ? JSON.parse(errorText) : {}; } catch { errorData = {}; }
+                const message = errorData.error || errorData.message || errorText || `${fallbackMessage} (HTTP ${response.status})`;
+                const error = new Error(message);
+                error.status = response.status;
+                error.data = errorData;
+                throw error;
+            }
+
+            const responseText = await response.text();
+            if (!responseText) return {};
+            try {
+                return JSON.parse(responseText);
+            } catch {
+                throw new Error('El servidor devolvió una respuesta JSON inválida.');
+            }
+        }
+
+        // Ejecuta operaciones que deben respetar el orden o los límites de la API.
+        async function runSequentially(items, task, index = 0) {
+            if (index >= items.length) return;
+            await task(items[index], index);
+            return runSequentially(items, task, index + 1);
+        }
+
 
         function getQuestionExamType(fields = {}) {
             return String(fields['Tipo Examen'] || fields['Tipo'] || fields['tipo'] || fields['Type'] || '')
@@ -5036,7 +5069,7 @@
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ method: 'GET', path: '/Capacitaciones' })
                 });
-                const allData = await allResponse.json();
+                const allData = await readJsonResponse(allResponse, 'No se pudo consultar las capacitaciones');
                 if (!allData.success || !allData.records) throw new Error('No se pudo conectar con Airtable');
                 const training = allData.records.find(r => {
                     const c = (r.fields['Código de Acceso'] || r.fields['Código Acceso'] || '').toUpperCase().trim();
@@ -5195,9 +5228,10 @@
             if (!participantManualFieldConfig.length) participantManualFieldConfig = buildPersonalRegistrationFieldConfig();
             const prefill = {};
             const cedulaValue = (document.getElementById('participantCedula')?.value || '').trim();
+            const cedulaAliases = new Set(['cedula','cédula','cc','documento','identificacion','identificación','no. cedula','numero de cedula']);
             participantManualFieldConfig.forEach(field => {
                 const norm = normStr(field.key);
-                if (['cedula','cédula','cedula','cc','documento','identificacion','identificación','no. cedula','numero de cedula'].includes(norm)) {
+                if (cedulaAliases.has(norm)) {
                     prefill[field.key] = cedulaValue;
                 }
             });
@@ -5830,10 +5864,11 @@
                 let correctAnswers = 0;
                 let totalAnswered = 0;
                 const answersToSave = [];
+                const questionsById = new Map(allQuestionRecords.map(question => [question.id, question]));
                 
                 for (const [questionId, userAnswer] of Object.entries(pretestAnswers)) {
                     // Buscar la pregunta en los registros
-                    const question = allQuestionRecords.find(q => q.id === questionId);
+                    const question = questionsById.get(questionId);
                     
                     if (question) {
                         totalAnswered++;
@@ -5960,8 +5995,8 @@
                 
                 const participationId = participationResult.id;
                 
-                // Guardar cada respuesta en la tabla Respuestas
-                for (const answer of answersToSave) {
+                // Guardar las respuestas independientes en paralelo.
+                await Promise.all(answersToSave.map(async (answer) => {
                     try {
                         const answerData = {
                             fields: {
@@ -5973,7 +6008,7 @@
                             }
                         };
                         
-                        await fetch('/.netlify/functions/airtable-proxy', {
+                        const answerResponse = await fetch('/.netlify/functions/airtable-proxy', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -5982,6 +6017,7 @@
                                 body: answerData
                             })
                         });
+                        await readJsonResponse(answerResponse, 'No se pudo guardar una respuesta del pretest');
                         
                         console.log(`✅ Respuesta guardada para pregunta: ${answer.questionId}`);
                         
@@ -5989,7 +6025,7 @@
                         console.warn(`⚠️ No se pudo guardar respuesta individual:`, answerError);
                         // Continuar con las demás respuestas aunque una falle
                     }
-                }
+                }));
                 
                 // ==========================================
                 // PASO 6: Mostrar resultado al usuario
@@ -6321,9 +6357,10 @@
                 let correctAnswers = 0;
                 let totalAnswered = 0;
                 const answersToSave = [];
+                const questionsById = new Map(allQuestionRecords.map(question => [question.id, question]));
                 
                 for (const [questionId, userAnswer] of Object.entries(postestAnswers)) {
-                    const question = allQuestionRecords.find(q => q.id === questionId);
+                    const question = questionsById.get(questionId);
                     
                     if (question) {
                         totalAnswered++;
@@ -6428,7 +6465,7 @@
                 // PASO 4: Guardar respuestas individuales
                 // ==========================================
                 
-                for (const answer of answersToSave) {
+                await Promise.all(answersToSave.map(async (answer) => {
                     try {
                         const answerData = {
                             fields: {
@@ -6440,7 +6477,7 @@
                             }
                         };
                         
-                        await fetch('/.netlify/functions/airtable-proxy', {
+                        const answerResponse = await fetch('/.netlify/functions/airtable-proxy', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -6449,13 +6486,14 @@
                                 body: answerData
                             })
                         });
+                        await readJsonResponse(answerResponse, 'No se pudo guardar una respuesta del postest');
                         
                         console.log(`✅ Respuesta guardada para pregunta: ${answer.questionId}`);
                         
                     } catch (answerError) {
                         console.warn(`⚠️ No se pudo guardar respuesta individual:`, answerError);
                     }
-                }
+                }));
                 
                 // ==========================================
                 // PASO 5: Mostrar resultado al usuario
@@ -6595,8 +6633,8 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ password })
             });
-            const data = await res.json().catch(() => ({}));
-            if (!res.ok || !data.success) {
+            const data = await readJsonResponse(res, 'No se pudo validar la contraseña');
+            if (!data.success) {
                 const msg = data?.error || 'Contraseña incorrecta';
                 throw new Error(msg);
             }
@@ -6653,12 +6691,12 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ usuario: user, contrasena: pass })
                 });
-                data = await res.json().catch(() => ({}));
+                data = await readJsonResponse(res, 'No se pudo validar el usuario');
             } catch (e) {
-                return { ok: false, error: 'No se pudo conectar con el servidor. Intenta de nuevo.' };
+                return { ok: false, error: e.message || 'No se pudo conectar con el servidor. Intenta de nuevo.' };
             }
 
-            if (!res.ok || !data || data.success !== true) {
+            if (!data || data.success !== true) {
                 return { ok: false, error: (data && data.error) ? data.error : 'Usuario o contraseña incorrectos.' };
             }
 
@@ -6883,7 +6921,8 @@
             document.getElementById('umPass').placeholder = editing ? 'Dejar en blanco para no cambiar' : 'Contraseña';
 
             const allowed = Array.isArray(f['Módulos Permitidos']) ? f['Módulos Permitidos'] : [];
-            document.querySelectorAll('#umModules input').forEach(i => { i.checked = allowed.includes(i.value); });
+            const allowedModules = new Set(allowed);
+            document.querySelectorAll('#umModules input').forEach(i => { i.checked = allowedModules.has(i.value); });
 
             onUserLevelChange();
             document.getElementById('userModal').classList.add('show');
@@ -7030,31 +7069,40 @@
 
                 let all = [];
                 let offset = '';
+                let pageCount = 0;
                 // Paginar (Personal HSLV puede tener cientos de registros)
-                for (let i = 0; i < 30; i++) {
+                do {
                     const p = new URLSearchParams(params);
                     if (offset) p.set('offset', offset);
                     const data = await airtableProxyRequest({ method: 'GET', path: `/${SEND_PERSONAL_TABLE}?${p.toString()}` });
                     const recs = (data && data.records) ? data.records : [];
                     all = all.concat(recs);
                     offset = data && data.offset ? data.offset : '';
-                    if (!offset) break;
-                }
+                    pageCount++;
+                } while (offset && pageCount < 30);
 
-                sendStaffCache = all.map(r => {
+                sendStaffCache = all.reduce((staff, r) => {
                     const f = r.fields || {};
-                    return {
+                    const person = {
                         nombre: String(f['NOMBRE'] || '').trim(),
                         email: String(f['EMAIL'] || '').trim().toLowerCase(),
                         entidad: String(f['ENTIDAD'] || '').trim(),
                         proceso: String(f['PROCESO'] || '').trim(),
                         cedula: normDoc(f['CEDULA'] ?? f['Cédula'] ?? f['Cedula'] ?? '')
                     };
-                }).filter(p => SEND_EMAIL_RE.test(p.email));
+                    if (SEND_EMAIL_RE.test(person.email)) staff.push(person);
+                    return staff;
+                }, []);
 
                 // Poblar filtros con valores únicos
-                const entidades = [...new Set(sendStaffCache.map(p => p.entidad).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
-                const procesos = [...new Set(sendStaffCache.map(p => p.proceso).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+                const entidades = Array.from(sendStaffCache.reduce((set, person) => {
+                    if (person.entidad) set.add(person.entidad);
+                    return set;
+                }, new Set())).sort((a, b) => a.localeCompare(b, 'es'));
+                const procesos = Array.from(sendStaffCache.reduce((set, person) => {
+                    if (person.proceso) set.add(person.proceso);
+                    return set;
+                }, new Set())).sort((a, b) => a.localeCompare(b, 'es'));
                 const selE = document.getElementById('scFiltroEntidad');
                 const selP = document.getElementById('scFiltroProceso');
                 if (selE) selE.innerHTML = '<option value="">Todas</option>' + entidades.map(v => `<option value="${umEscape(v)}">${umEscape(v)}</option>`).join('');
@@ -7107,14 +7155,22 @@
             // Correos adicionales (manuales): se agregan salvo cuando se pide "solo realizados"
             if (audience !== 'realizados') {
                 const extra = String(document.getElementById('scExtra')?.value || '')
-                    .split(/[,;\s]+/).map(s => s.trim().toLowerCase()).filter(s => SEND_EMAIL_RE.test(s));
+                    .split(/[,;\s]+/).reduce((emails, value) => {
+                        const email = value.trim().toLowerCase();
+                        if (SEND_EMAIL_RE.test(email)) emails.push(email);
+                        return emails;
+                    }, []);
                 extra.forEach(em => list.push({ nombre: '', email: em, entidad: '', proceso: '', cedula: '' }));
             }
 
             // Deduplicar por correo
             const seen = new Set();
-            return list.filter(p => { if (seen.has(p.email)) return false; seen.add(p.email); return true; })
-                .map(p => ({ email: p.email, nombre: p.nombre }));
+            return list.reduce((recipients, person) => {
+                if (seen.has(person.email)) return recipients;
+                seen.add(person.email);
+                recipients.push({ email: person.email, nombre: person.nombre });
+                return recipients;
+            }, []);
         }
 
         function updateSendRecipients() {
@@ -7178,10 +7234,10 @@
                         recipients
                     })
                 });
-                const data = await res.json().catch(() => ({}));
+                const data = await readJsonResponse(res, 'No se pudieron enviar los correos');
                 Swal.close();
 
-                if (res.ok && data && data.sent > 0) {
+                if (data && data.sent > 0) {
                     closeSendCourseModal();
                     Swal.fire({
                         icon: data.failed ? 'warning' : 'success',
@@ -7197,7 +7253,7 @@
             } catch (e) {
                 Swal.close();
                 console.error('❌ Error enviando correos:', e);
-                if (err) { err.textContent = 'Error de conexión al enviar.'; err.classList.add('show'); }
+                if (err) { err.textContent = e.message || 'Error de conexión al enviar.'; err.classList.add('show'); }
                 document.getElementById('sendCourseModal').classList.add('show');
             } finally {
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar'; }
@@ -7322,7 +7378,7 @@
                     })
                 });
 
-                const trainingData = await trainingResponse.json();
+                const trainingData = await readJsonResponse(trainingResponse, 'No se pudo obtener una capacitación');
 
                 if (!trainingData.success || !trainingData.records || trainingData.records.length === 0) {
                     throw new Error('No hay capacitaciones disponibles en el sistema');
@@ -7341,7 +7397,7 @@
                     })
                 });
 
-                const createData = await createResponse.json();
+                const createData = await readJsonResponse(createResponse, 'No se pudo crear la sesión');
 
                 console.log(`📝 Respuesta del servidor:`, createData);
 
@@ -7800,9 +7856,11 @@ function getSelectedStaff() {
   // Busca checkboxes marcados dentro del contenedor de personal
   const checks = document.querySelectorAll('#trainingStaffContainer input.trainingStaff:checked');
   // Devuelve un array de valores limpios
-  return Array.from(checks)
-    .map(cb => (cb.value || '').trim())
-    .filter(Boolean);
+  return Array.from(checks).reduce((staff, checkbox) => {
+    const value = (checkbox.value || '').trim();
+    if (value) staff.push(value);
+    return staff;
+  }, []);
 }
 
         async function saveTraining() {
@@ -7851,19 +7909,11 @@ function getSelectedStaff() {
 
     console.log('✅ Capacitación guardada con ID:', trainingResult.id);
 
-    // PASO 2: Guardar preguntas del pretest
-    const pretestSaved = await saveQuestionsToAirtable(
-        pretestQuestions, 
-        trainingResult.id, 
-        'pretest'
-    );
-
-    // PASO 3: Guardar preguntas del postest
-    const postestSaved = await saveQuestionsToAirtable(
-        postestQuestions, 
-        trainingResult.id, 
-        'postest'
-    );
+    // PASOS 2 Y 3: pretest y postest son independientes entre sí.
+    const [pretestSaved, postestSaved] = await Promise.all([
+        saveQuestionsToAirtable(pretestQuestions, trainingResult.id, 'pretest'),
+        saveQuestionsToAirtable(postestQuestions, trainingResult.id, 'postest')
+    ]);
 
     // Respaldo local
     const trainings = JSON.parse(localStorage.getItem('trainings') || '[]');
@@ -7973,8 +8023,8 @@ async function uploadQuestionAttachment(recordId, fieldName, imageFile) {
         })
     });
 
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.success) {
+    const data = await readJsonResponse(response, 'No fue posible subir la imagen a Airtable');
+    if (!data.success) {
         throw new Error(data.error || 'No fue posible subir la imagen a Airtable');
     }
     return data;
@@ -7990,8 +8040,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             return true;
         }
 
-        for (let i = 0; i < questions.length; i++) {
-            const q = questions[i];
+        await Promise.all(questions.map(async (q, i) => {
             const recordPayload = {
                 fields: {
                     "Capacitación": [trainingRecordId],
@@ -8027,7 +8076,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     throw new Error(`La pregunta ${i + 1} se creó, pero la imagen no pudo cargarse: ${uploadErr.message}`);
                 }
             }
-        }
+        }));
 
         console.log(`✅ ${questions.length} preguntas de ${type} guardadas exitosamente`);
         return true;
@@ -8096,7 +8145,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             
             const message = `🏥 *Acceso a Capacitación*\nHospital Susana López de Valencia\n\n*Código:* ${code}\n*Link:* ${link}`;
             const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-            window.open(whatsappUrl, '_blank');
+            window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
         }
 
         function downloadQR() {
@@ -8406,7 +8455,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     })
                 });
                 
-                const questionsData = await questionsResponse.json();
+                const questionsData = await readJsonResponse(questionsResponse, 'No se pudieron cargar las preguntas');
                 console.log('📋 Preguntas:', questionsData);
                 const allQuestions = questionsData.success ? (questionsData.records || []) : [];
                 const pretestQs = allQuestions.filter(q => (q.fields['Tipo']||'').toLowerCase().includes('pre'));
@@ -8498,6 +8547,10 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const qrModal = document.getElementById('qrModal');
             if (event.target === qrModal) {
                 closeModal();
+            }
+            const qrGenerationModal = document.getElementById('qrGenerationModal');
+            if (event.target === qrGenerationModal) {
+                closeQRModal();
             }
         };
         
@@ -8662,7 +8715,11 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     .sort((a, b) => b[1] - a[1])
                     .slice(0, 10);
                 const calcularEscalaGrafica = (values, minimum = 100) => {
-                    const nums = (values || []).map(Number).filter(v => Number.isFinite(v));
+                    const nums = (values || []).reduce((result, value) => {
+                        const number = Number(value);
+                        if (Number.isFinite(number)) result.push(number);
+                        return result;
+                    }, []);
                     const maxValue = nums.length ? Math.max(...nums) : minimum;
                     const margin = Math.max(10, Math.ceil(maxValue * 0.15));
                     return Math.ceil((Math.max(minimum, maxValue + margin)) / 10) * 10;
@@ -8848,7 +8905,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 };
                 
                 // Mostrar modal
-                document.getElementById('qrModal').style.display = 'flex';
+                document.getElementById('qrGenerationModal').style.display = 'flex';
                 
                 Swal.fire({
                     icon: 'success',
@@ -8872,7 +8929,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
          * Cierra el modal del QR
          */
         function closeQRModal() {
-            document.getElementById('qrModal').style.display = 'none';
+            document.getElementById('qrGenerationModal').style.display = 'none';
         }
         
         /**
@@ -8935,7 +8992,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
          */
         function testQRCode() {
             if (window.currentQRData) {
-                window.open(window.currentQRData.url, '_blank');
+                window.open(window.currentQRData.url, '_blank', 'noopener,noreferrer');
             }
         }
 
@@ -8992,7 +9049,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     })
                 });
                 
-                const data = await response.json();
+                const data = await readJsonResponse(response, 'No se pudieron obtener las capacitaciones');
                 
                 if (!data.success || !data.records) {
                     throw new Error('No se pudieron obtener las capacitaciones');
@@ -9096,7 +9153,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         }
 
         function topNWithOthers(items, n = 10) {
-            const sorted = [...(items || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count));
+            const sorted = (items || []).toSorted((a, b) => safeNumber(b.count) - safeNumber(a.count));
             const top = sorted.slice(0, n);
             const rest = sorted.slice(n);
             const others = rest.reduce((acc, x) => acc + safeNumber(x.count), 0);
@@ -9391,7 +9448,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 });
 
                 // Top capacitaciones por participaciones
-                const topByParts = [...trainingsWithStats].sort((a, b) => b.participationsCount - a.participationsCount).slice(0, 5)
+                const topByParts = trainingsWithStats.toSorted((a, b) => b.participationsCount - a.participationsCount).slice(0, 5)
                     .map(t => ({ title: t.title, count: t.participationsCount, participations: t.participationsCount, department: t.department, adherenceRate: t.adherenceRate }));
 
                 // Distribución por departamento
@@ -9602,7 +9659,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const courseParts = [];
                 byCedula.forEach((rows, cedula) => {
                     const dateOf = (f) => new Date(virtualRespValue(f, [VIRTUAL_RESP_FIELD_DATE, 'Fecha Respuesta']) || 0).getTime();
-                    const sorted = [...rows].sort((a, b) => dateOf(a) - dateOf(b));
+                    const sorted = rows.toSorted((a, b) => dateOf(a) - dateOf(b));
                     const summaries = sorted.filter(isVirtualSummaryRow);
                     const checkpoints = sorted.filter(f => !isVirtualSummaryRow(f));
                     const lastSummary = summaries.length ? summaries[summaries.length - 1] : null;
@@ -10102,8 +10159,8 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 }
                 const vCourses = Array.isArray(v.courses) ? v.courses : [];
                 if (vCourses.length > 1) {
-                    const bestV = [...vCourses].sort((a, b) => b.avgPercent - a.avgPercent)[0];
-                    const worstV = [...vCourses].sort((a, b) => a.avgPercent - b.avgPercent)[0];
+                    const bestV = vCourses.toSorted((a, b) => b.avgPercent - a.avgPercent)[0];
+                    const worstV = vCourses.toSorted((a, b) => a.avgPercent - b.avgPercent)[0];
                     if (bestV) insights.push(`📊 El curso virtual con mejor desempeño fue "${bestV.title}" (promedio ${bestV.avgPercent}%, ${bestV.participants} participantes).`);
                     if (worstV && worstV.avgPercent < 80) insights.push(`⚠️ El curso virtual con menor desempeño fue "${worstV.title}" (promedio ${worstV.avgPercent}%). Conviene revisar su contenido y evaluación.`);
                 }
@@ -10376,7 +10433,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             // Bar: Participantes por curso virtual
             const ctxCourse = document.getElementById('qvChartByCourse');
             if (ctxCourse) {
-                const courses = [...(v.courses || [])].sort((a, b) => safeNumber(b.participants) - safeNumber(a.participants)).slice(0, 10);
+                const courses = (v.courses || []).toSorted((a, b) => safeNumber(b.participants) - safeNumber(a.participants)).slice(0, 10);
                 if (courses.length) {
                     quarterlyCharts.virtualByCourse = new Chart(ctxCourse, {
                         type: 'bar',
@@ -10428,7 +10485,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const tbody = document.getElementById('qByDeptTbody');
             if (!tbody) return;
             tbody.innerHTML = '';
-            const sorted = [...(items || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count));
+            const sorted = (items || []).toSorted((a, b) => safeNumber(b.count) - safeNumber(a.count));
             if (sorted.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="3" style="padding:12px; text-align:center; color:#64748b;">Sin datos</td></tr>`;
                 return;
@@ -10448,7 +10505,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const tbody = document.getElementById('qTrainingsListTbody');
             if (!tbody) return;
             tbody.innerHTML = '';
-            const sorted = [...(items || [])].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+            const sorted = (items || []).toSorted((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
             if (sorted.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="6" style="padding:12px; text-align:center; color:#64748b;">No hay capacitaciones en el trimestre</td></tr>`;
                 return;
@@ -10509,7 +10566,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const byProfession = topNWithOthers(data.distributions?.byProfession || [], 10);
 
             // By dept (Top 10)
-            const deptTop = [...byDept].sort((a,b) => safeNumber(b.count) - safeNumber(a.count)).slice(0, 10);
+            const deptTop = byDept.toSorted((a,b) => safeNumber(b.count) - safeNumber(a.count)).slice(0, 10);
             const deptLabels = deptTop.map(x => x.name || 'Sin dato');
             const deptValues = deptTop.map(x => safeNumber(x.count));
 
@@ -10731,7 +10788,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             if (!q) return list;
             return list.filter(r => qNormKey(
                 `${r.cedula} ${r.nombre} ${r.entidad} ${r.proceso} ${r.perfil} ${r.cargo} ${r.correo}`
-            ).includes(q));
+            ).indexOf(q) !== -1);
         }
 
         function renderQuarterlyNonAttendees() {
@@ -10930,13 +10987,13 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 generatedAt: new Date().toLocaleString('es-CO'),
                 kpis: k,
                 vk,
-                trainings: [...(data.trainings || [])].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0)),
-                byDept: [...(data.distributions?.byDept || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count)),
-                byCargo: [...(data.distributions?.byCargo || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count)),
-                byProf: [...(data.distributions?.byProfession || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count)),
-                byMonth: [...(data.distributions?.trainingsByMonth || [])].sort((a, b) => safeNumber(a.month) - safeNumber(b.month)),
+                trainings: (data.trainings || []).toSorted((a, b) => new Date(a.date || 0) - new Date(b.date || 0)),
+                byDept: (data.distributions?.byDept || []).toSorted((a, b) => safeNumber(b.count) - safeNumber(a.count)),
+                byCargo: (data.distributions?.byCargo || []).toSorted((a, b) => safeNumber(b.count) - safeNumber(a.count)),
+                byProf: (data.distributions?.byProfession || []).toSorted((a, b) => safeNumber(b.count) - safeNumber(a.count)),
+                byMonth: (data.distributions?.trainingsByMonth || []).toSorted((a, b) => safeNumber(a.month) - safeNumber(b.month)),
                 participants: data.participants || [],
-                vCourses: [...(vData.courses || [])].sort((a, b) => safeNumber(b.participants) - safeNumber(a.participants)),
+                vCourses: (vData.courses || []).toSorted((a, b) => safeNumber(b.participants) - safeNumber(a.participants)),
                 vParts: vData.participants || [],
                 insights: (data.insights && data.insights.length) ? data.insights : ['Sin hallazgos automáticos (no hay datos suficientes).'],
                 coverage: data.coverage || { totals: {}, byCargo: [], byProceso: [], byEntidad: [], nonAttendees: [], externos: [] },
@@ -11638,7 +11695,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 doc.text('2. CAPACITACIONES DEL TRIMESTRE', margin + 3, yPos + 5);
                 yPos += 12;
 
-                const trainings = [...(data.trainings || [])].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+                const trainings = (data.trainings || []).toSorted((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
                 
                 const trainingsTableData = trainings.map(t => {
                     const state = t.finalizada ? 'Finalizada' : (t.activa ? 'Activa' : 'Inactiva');
@@ -11691,7 +11748,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 doc.text('3. DISTRIBUCIÓN POR DEPARTAMENTO/SERVICIO', margin + 3, yPos + 5);
                 yPos += 12;
 
-                const byDept = [...(data.distributions?.byDept || [])].sort((a, b) => safeNumber(b.count) - safeNumber(a.count)).slice(0, 10);
+                const byDept = (data.distributions?.byDept || []).toSorted((a, b) => safeNumber(b.count) - safeNumber(a.count)).slice(0, 10);
                 
                 const deptTableData = byDept.map(d => [
                     d.name || '',
@@ -12626,13 +12683,17 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         }
 
         function detectarCampo(cols, candidatos) {
+            const normalizedCols = (cols || []).map(col => ({ col, normalized: normStr(col) }));
+            const exactByNormalizedName = new Map(normalizedCols.map(item => [item.normalized, item.col]));
             for (const cand of candidatos) {
-                const match = cols.find(c => normStr(c) === normStr(cand));
+                const match = exactByNormalizedName.get(normStr(cand));
                 if (match) return match;
             }
             for (const cand of candidatos) {
-                const match = cols.find(c => normStr(c).includes(normStr(cand)));
-                if (match) return match;
+                const normalizedCandidate = normStr(cand);
+                for (const item of normalizedCols) {
+                    if (item.normalized.indexOf(normalizedCandidate) !== -1) return item.col;
+                }
             }
             return null;
         }
@@ -12715,12 +12776,12 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 }
 
                 return participations
-                    .filter(partMatches)
-                    .map(p => {
+                    .reduce((history, p) => {
+                        if (!partMatches(p)) return history;
                         const trainingId = resolveTrainingId(p);
                         const training = trainingId ? trainingMap[trainingId] : null;
                         const f = p.fields || {};
-                        return {
+                        history.push({
                             titulo: getTrainingTitle(training),
                             fecha: fmtDate(getTrainingDate(training, p)),
                             pretest: partPre && f[partPre] !== undefined && f[partPre] !== null && f[partPre] !== '' ? `${f[partPre]}%` : '—',
@@ -12728,8 +12789,9 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                             rawFecha: getTrainingDate(training, p) || '',
                             trainingId: trainingId || '',
                             participationId: p.id
-                        };
-                    })
+                        });
+                        return history;
+                    }, [])
                     .sort((a, b) => String(b.rawFecha).localeCompare(String(a.rawFecha)));
             } catch (err) {
                 console.warn('No se pudo cargar historial de capacitaciones del personal:', err);
@@ -13292,7 +13354,7 @@ async function airtableProxyRequest(payload) {
         .trim()
         .toLowerCase();
 
-    let current = JSON.parse(JSON.stringify(payload || {}));
+    let current = structuredClone(payload || {});
 
     const removeProblematicFieldVariant = (msg) => {
         if (!msg) return false;
@@ -13358,11 +13420,15 @@ async function airtableProxyRequest(payload) {
             body: JSON.stringify(current)
         });
 
+        if (res.ok) {
+            const successText = await res.text();
+            try { return successText ? JSON.parse(successText) : {}; }
+            catch { throw new Error('El servidor devolvió una respuesta JSON inválida.'); }
+        }
+
         const rawText = await res.text();
         let data = null;
         try { data = rawText ? JSON.parse(rawText) : {}; } catch { data = { raw: rawText }; }
-
-        if (res.ok) return data;
 
         const msg = (data && (data.error || data.message)) ? (data.error || data.message) : rawText;
 
@@ -13659,7 +13725,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             if (empty) empty.style.display = 'none';
             if (container) container.style.display = 'block';
 
-            const sorted = [...manualScheduleData].sort((a,b) => new Date(`${a.dateISO}T${a.time}:00`) - new Date(`${b.dateISO}T${b.time}:00`));
+            const sorted = manualScheduleData.toSorted((a,b) => new Date(`${a.dateISO}T${a.time}:00`) - new Date(`${b.dateISO}T${b.time}:00`));
 
             tbody.innerHTML = '';
             sorted.forEach((r, i) => {
@@ -13873,28 +13939,29 @@ function makeCronogramaFilterFormula(year, tipo) {
                 })
             });
 
-            const data = await response.json();
-            if (!response.ok || !data || data.success !== true || !Array.isArray(data.records)) {
-                const msg = (data && (data.error || data.message)) ? (data.error || data.message) : `HTTP ${response.status}`;
+            const data = await readJsonResponse(response, 'No se pudieron obtener las capacitaciones del cronograma');
+            if (!data || data.success !== true || !Array.isArray(data.records)) {
+                const msg = (data && (data.error || data.message)) ? (data.error || data.message) : 'Respuesta incompleta del servidor';
                 throw new Error(msg);
             }
 
             // Filtrar activas y no finalizadas (si existen los campos)
             const trainings = data.records
-                .filter(r => {
+                .reduce((result, r) => {
                     const f = r.fields || {};
                     const activa = f['Activa'] !== false; // por defecto true
                     const finalizada = f['Finalizada'] === true; // por defecto false
                     const estado = String(f['Estado'] || '').toLowerCase();
                     const estadoFinal = estado.includes('final') || estado.includes('complet');
-                    return activa && !finalizada && !estadoFinal;
-                })
-                .map(r => ({
+                    if (!activa || finalizada || estadoFinal) return result;
+                    result.push({
                     id: r.id,
                     title: (r.fields && (r.fields['Título'] || r.fields['Titulo'])) || 'Sin título',
                     department: (r.fields && (r.fields['ProcesoAtencion'] || r.fields['Departamento'])) || 'General',
                     duration: (r.fields && r.fields['Duración']) || (r.fields && r.fields['Duracion']) || ''
-                }));
+                    });
+                    return result;
+                }, []);
 
             // Ordenar por título para un resultado estable
             trainings.sort((a, b) => a.title.localeCompare(b.title, 'es'));
@@ -14107,15 +14174,16 @@ function makeCronogramaFilterFormula(year, tipo) {
 
                 const ids = (existing.records || []).map(r => r.id);
                 // 2) Eliminar en lotes de 10
-                for (let i = 0; i < ids.length; i += 10) {
-                    const batch = ids.slice(i, i + 10);
+                const deleteBatches = [];
+                for (let i = 0; i < ids.length; i += 10) deleteBatches.push(ids.slice(i, i + 10));
+                await runSequentially(deleteBatches, async (batch) => {
                     const delParams = new URLSearchParams();
                     batch.forEach(id => delParams.append('records[]', id));
                     await airtableProxyRequest({
                         method: 'DELETE',
                         path: `/${CRONOGRAMA_TABLE}?${delParams.toString()}`
                     });
-                }
+                });
 
                 // 3) Crear nuevos generados en lotes de 10
                 const recordsToCreate = annualScheduleData.map(it => ({
@@ -14133,14 +14201,15 @@ function makeCronogramaFilterFormula(year, tipo) {
                     }
                 }));
 
-                for (let i = 0; i < recordsToCreate.length; i += 10) {
-                    const batch = recordsToCreate.slice(i, i + 10);
+                const createBatches = [];
+                for (let i = 0; i < recordsToCreate.length; i += 10) createBatches.push(recordsToCreate.slice(i, i + 10));
+                await runSequentially(createBatches, async (batch) => {
                     await airtableProxyRequest({
                         method: 'POST',
                         path: `/${CRONOGRAMA_TABLE}`,
                         body: { records: batch }
                     });
-                }
+                });
 
                 Swal.close();
                 await loadScheduleFromAirtable(year, false);
@@ -14394,10 +14463,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                     const pdfSelect  = document.getElementById('pdfSessionSelect');
                     if (pdfSelect) {
                         pdfSelect.innerHTML = '<option value="">-- Selecciona la sesión --</option>';
-                        const sesionesVinculadas = allSesiones.filter(s => {
-                            const cap = s.fields?.['Capacitaciones'] || s.fields?.['Capacitación'] || s.fields?.['Capacitacion'] || [];
-                            return (Array.isArray(cap) ? cap : []).includes(trainingId);
-                        });
+                        const sesionesVinculadas = allSesiones.filter(s => sessionIds.has(s.id));
                         // Ordenar por fecha descendente (más reciente primero)
                         sesionesVinculadas.sort((a, b) =>
                             (b.fields?.['Fecha Inicio'] || '').localeCompare(a.fields?.['Fecha Inicio'] || '')
@@ -14422,9 +14488,6 @@ function makeCronogramaFilterFormula(year, tipo) {
                 } catch(e) {
                     console.warn('⚠️ No se pudo consultar Sesiones:', e.message);
                 }
-
-                const sessionIdsArr = Array.from(sessionIds);
-                const sessionCodigosArr = Array.from(sessionCodigos);
 
                 // ── Paso 3: Obtener TODAS las participaciones ────────────────────────────────
                 const partRes = await airtableFetchAll('/Participaciones');
@@ -14458,11 +14521,11 @@ function makeCronogramaFilterFormula(year, tipo) {
                     if (linked.includes(trainingId)) return true;
 
                     // E2: linked contiene el ID de una sesión de esta capacitación
-                    if (sessionIdsArr.length > 0 && linked.some(id => sessionIds.has(id))) return true;
+                    if (sessionIds.size > 0 && linked.some(id => sessionIds.has(id))) return true;
 
                     // E3: campo 'Código Acceso' (texto) coincide con código de sesión o capacitación
                     const pCod = (f['Código Acceso'] || f['Código de Acceso'] || '').toString().toUpperCase().trim();
-                    if (pCod && sessionCodigosArr.length > 0 && sessionCodigosArr.includes(pCod)) return true;
+                    if (pCod && sessionCodigos.has(pCod)) return true;
 
                     return false;
                 });
@@ -14804,9 +14867,9 @@ function makeCronogramaFilterFormula(year, tipo) {
                     })
                 });
 
-                const data = await response.json().catch(() => ({}));
+                const data = await readJsonResponse(response, 'No se pudo guardar el PDF');
 
-                if (!response.ok || !data.success) {
+                if (!data.success) {
                     // Mostrar campos disponibles en el error para diagnóstico
                     let errMsg = data.error || `Error del servidor (${response.status})`;
                     if (data.sessionFields && data.sessionFields.length > 0) {
@@ -14998,7 +15061,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                     })
                 });
                 
-                const data = await response.json();
+                const data = await readJsonResponse(response, 'No se pudo finalizar la capacitación');
                 
                 if (!data.success) {
                     throw new Error(data.error || 'Error al finalizar');
@@ -15059,7 +15122,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                     })
                 });
                 
-                const data = await response.json();
+                const data = await readJsonResponse(response, 'No se pudo reactivar la capacitación');
                 
                 if (!data.success) {
                     throw new Error(data.error || 'Error al reactivar');
@@ -15128,6 +15191,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            URL.revokeObjectURL(url);
             
             Swal.fire({
                 icon: 'success',
@@ -15456,6 +15520,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            URL.revokeObjectURL(url);
             
             Swal.fire({
                 icon: 'success',
@@ -15697,11 +15762,9 @@ function makeCronogramaFilterFormula(year, tipo) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             });
-            const text = await res.text();
-            let data = {};
-            try { data = text ? JSON.parse(text) : {}; } catch { data = { raw: text }; }
-            if (!res.ok || data.success === false) {
-                throw new Error(data.error || data.message || text || `Error HTTP ${res.status}`);
+            const data = await readJsonResponse(res, 'No se pudo completar la operación del curso virtual');
+            if (data.success === false) {
+                throw new Error(data.error || data.message || 'La operación del curso virtual no fue exitosa.');
             }
             return data;
         }
@@ -15842,8 +15905,11 @@ function makeCronogramaFilterFormula(year, tipo) {
                 });
                 const records = Array.isArray(data.records) ? data.records : [];
                 virtualCourses = records
-                    .map(parseVirtualCourseRecord)
-                    .filter(c => String(c.status || c.estado || 'Activo').toLowerCase() !== 'inactivo')
+                    .reduce((courses, record) => {
+                        const course = parseVirtualCourseRecord(record);
+                        if (String(course.status || course.estado || 'Activo').toLowerCase() !== 'inactivo') courses.push(course);
+                        return courses;
+                    }, [])
                     .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
                 virtualCoursesLoaded = true;
                 saveVirtualCoursesStorage();
@@ -16342,7 +16408,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             const participants = [];
             byCedula.forEach((rows, cedula) => {
                 const dateOf = (f) => new Date(virtualRespValue(f, [VIRTUAL_RESP_FIELD_DATE, 'Fecha Respuesta']) || 0).getTime();
-                const sorted = [...rows].sort((a, b) => dateOf(a) - dateOf(b));
+                const sorted = rows.toSorted((a, b) => dateOf(a) - dateOf(b));
                 const summaries = sorted.filter(isVirtualSummaryRow);
                 const checkpoints = sorted.filter(f => !isVirtualSummaryRow(f));
                 const lastSummary = summaries.length ? summaries[summaries.length - 1] : null;
@@ -16820,7 +16886,10 @@ function makeCronogramaFilterFormula(year, tipo) {
                 ['profile', 'Perfil'],
                 ['cargo', 'Cargo']
             ];
-            return required.filter(([key]) => !String(person[key] || '').trim()).map(([, label]) => label);
+            return required.reduce((missing, [key, label]) => {
+                if (!String(person[key] || '').trim()) missing.push(label);
+                return missing;
+            }, []);
         }
 
         function getFirstEmptyVirtualRegistrationField() {
@@ -17533,7 +17602,11 @@ function makeCronogramaFilterFormula(year, tipo) {
                 if (typeof value === 'string') return value.replace(/\s+/g, ' ').trim();
                 if (typeof value === 'number' || typeof value === 'boolean') return String(value).trim();
                 if (Array.isArray(value)) {
-                    return value.map(cleanText).filter(Boolean).join(' ').trim();
+                    return value.reduce((parts, item) => {
+                        const text = cleanText(item);
+                        if (text) parts.push(text);
+                        return parts;
+                    }, []).join(' ').trim();
                 }
                 if (typeof value === 'object') {
                     const preferred = value.text ?? value.Text ?? value.value ?? value.Value ?? value.label ?? value.Label ?? value.nombre ?? value.Nombre ?? value.opcion ?? value.Opcion ?? value.opción ?? value['Opción'] ?? value.respuesta ?? value.Respuesta ?? value.answer ?? value.Answer ?? value.title ?? value.Title;
@@ -17603,7 +17676,11 @@ function makeCronogramaFilterFormula(year, tipo) {
                     found = true;
                 }
                 if (!found) {
-                    const parts = t.split(/\s*(?:\||;|\n|\r)\s*/).map(x => x.trim()).filter(Boolean);
+                    const parts = t.split(/\s*(?:\||;|\n|\r)\s*/).reduce((result, item) => {
+                        const text = item.trim();
+                        if (text) result.push(text);
+                        return result;
+                    }, []);
                     if (parts.length >= 2 && parts.length <= 4) {
                         parts.forEach((part, idx) => addOption(String.fromCharCode(65 + idx), part));
                         found = true;
@@ -17671,7 +17748,10 @@ function makeCronogramaFilterFormula(year, tipo) {
                 if (m) addOption(m[1], v);
             });
 
-            const options = ['A','B','C','D'].filter(k => optionsMap[k]).map(k => [k, optionsMap[k]]);
+            const options = ['A','B','C','D'].reduce((result, key) => {
+                if (optionsMap[key]) result.push([key, optionsMap[key]]);
+                return result;
+            }, []);
             if (!options.length) {
                 console.warn('Checkpoint sin opciones visibles. Datos recibidos:', checkpoint);
             }
@@ -18452,8 +18532,8 @@ function makeCronogramaFilterFormula(year, tipo) {
     async function extProxy(payload){
         if (typeof virtualCourseProxy === 'function') return virtualCourseProxy(payload);
         const res = await fetch('/.netlify/functions/airtable-proxy', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload) });
-        const text = await res.text(); let data={}; try{ data=text?JSON.parse(text):{}; }catch{ data={raw:text}; }
-        if(!res.ok || data.success===false) throw new Error(data.error || data.message || text || `Error HTTP ${res.status}`);
+        const data = await readJsonResponse(res, 'No se pudo completar la operación del curso de extensión');
+        if(data.success===false) throw new Error(data.error || data.message || 'La operación del curso de extensión no fue exitosa.');
         return data;
     }
     function parseExtRecord(record){
@@ -18469,7 +18549,11 @@ function makeCronogramaFilterFormula(year, tipo) {
         try{
             const data = await extProxy({ method:'GET', path: extPath(EXT_TABLE) });
             const records = Array.isArray(data.records) ? data.records : (Array.isArray(data?.data?.records) ? data.data.records : []);
-            window.extensionCourses = records.map(parseExtRecord).filter(Boolean);
+            window.extensionCourses = records.reduce((courses, record) => {
+                const course = parseExtRecord(record);
+                if (course) courses.push(course);
+                return courses;
+            }, []);
             extSaveStorage();
         }catch(err){
             window.extensionCourses = extGetStorage();
@@ -18534,16 +18618,33 @@ function makeCronogramaFilterFormula(year, tipo) {
         const teacherName=(document.getElementById('extensionTeacherName')?.value||'').trim();
         if(!title) throw new Error('Ingresa el nombre del curso de extensión.');
         if(!teacherName) throw new Error('Ingresa el nombre del docente.');
-        const diplomas=[...document.querySelectorAll('#extensionDiplomasContainer .extension-item')].map(el=>({title:el.querySelector('.ext-diploma-title')?.value?.trim()||'', institution:el.querySelector('.ext-diploma-institution')?.value?.trim()||'', year:el.querySelector('.ext-diploma-year')?.value?.trim()||'', url:el.querySelector('.ext-diploma-url')?.value?.trim()||''})).filter(x=>x.title||x.url);
-        const pdfs=[...document.querySelectorAll('#extensionPdfsContainer .extension-item')].map(el=>({title:el.querySelector('.ext-pdf-title')?.value?.trim()||'PDF del curso', url:el.querySelector('.ext-pdf-url')?.value?.trim()||''})).filter(x=>x.url);
-        const videos=[...document.querySelectorAll('#extensionVideosContainer .extension-item')].map(el=>({title:el.querySelector('.ext-video-title')?.value?.trim()||'Video del curso', url:el.querySelector('.ext-video-url')?.value?.trim()||''})).filter(x=>x.url);
-        const tests=[...document.querySelectorAll('#extensionTestsContainer .ext-test-card')].map((el,idx)=>{
+        const diplomas=[...document.querySelectorAll('#extensionDiplomasContainer .extension-item')].reduce((result, el) => {
+            const diploma = {title:el.querySelector('.ext-diploma-title')?.value?.trim()||'', institution:el.querySelector('.ext-diploma-institution')?.value?.trim()||'', year:el.querySelector('.ext-diploma-year')?.value?.trim()||'', url:el.querySelector('.ext-diploma-url')?.value?.trim()||''};
+            if (diploma.title || diploma.url) result.push(diploma);
+            return result;
+        }, []);
+        const pdfs=[...document.querySelectorAll('#extensionPdfsContainer .extension-item')].reduce((result, el) => {
+            const pdf = {title:el.querySelector('.ext-pdf-title')?.value?.trim()||'PDF del curso', url:el.querySelector('.ext-pdf-url')?.value?.trim()||''};
+            if (pdf.url) result.push(pdf);
+            return result;
+        }, []);
+        const videos=[...document.querySelectorAll('#extensionVideosContainer .extension-item')].reduce((result, el) => {
+            const video = {title:el.querySelector('.ext-video-title')?.value?.trim()||'Video del curso', url:el.querySelector('.ext-video-url')?.value?.trim()||''};
+            if (video.url) result.push(video);
+            return result;
+        }, []);
+        const tests=[...document.querySelectorAll('#extensionTestsContainer .ext-test-card')].reduce((result, el, idx) => {
             const testTitle=el.querySelector('.ext-test-title')?.value?.trim()||`Test ${idx+1}`;
             const attempts=Math.max(1, Number(el.querySelector('.ext-test-attempts')?.value||1));
             const image=el.querySelector('.ext-test-image')?.value?.trim()||'';
-            const questions=[...el.querySelectorAll('.ext-question-card')].map((q,qidx)=>({id:uid('question'), text:q.querySelector('.ext-q-text')?.value?.trim()||'', image:q.querySelector('.ext-q-image')?.value?.trim()||'', options:{A:q.querySelector('.ext-q-a')?.value?.trim()||'', B:q.querySelector('.ext-q-b')?.value?.trim()||'', C:q.querySelector('.ext-q-c')?.value?.trim()||'', D:q.querySelector('.ext-q-d')?.value?.trim()||''}, correct:q.querySelector('.ext-q-correct')?.value||'A'})).filter(q=>q.text && q.options.A && q.options.B);
-            return {id:uid('test'), title:testTitle, attempts, image, questions};
-        }).filter(t=>t.questions.length);
+            const questions=[...el.querySelectorAll('.ext-question-card')].reduce((items, q) => {
+                const question = {id:uid('question'), text:q.querySelector('.ext-q-text')?.value?.trim()||'', image:q.querySelector('.ext-q-image')?.value?.trim()||'', options:{A:q.querySelector('.ext-q-a')?.value?.trim()||'', B:q.querySelector('.ext-q-b')?.value?.trim()||'', C:q.querySelector('.ext-q-c')?.value?.trim()||'', D:q.querySelector('.ext-q-d')?.value?.trim()||''}, correct:q.querySelector('.ext-q-correct')?.value||'A'};
+                if (question.text && question.options.A && question.options.B) items.push(question);
+                return items;
+            }, []);
+            if (questions.length) result.push({id:uid('test'), title:testTitle, attempts, image, questions});
+            return result;
+        }, []);
         return { id:uid('extension'), createdAt:new Date().toISOString(), title, category:(document.getElementById('extensionCourseCategory')?.value||'').trim(), audience:(document.getElementById('extensionCourseAudience')?.value||'').trim(), duration:(document.getElementById('extensionCourseDuration')?.value||'').trim(), mode:document.getElementById('extensionCourseMode')?.value||'Virtual', status:document.getElementById('extensionCourseStatus')?.value||'Activo', description:(document.getElementById('extensionCourseDescription')?.value||'').trim(), teacher:{name:teacherName, role:(document.getElementById('extensionTeacherRole')?.value||'').trim(), email:(document.getElementById('extensionTeacherEmail')?.value||'').trim(), phone:(document.getElementById('extensionTeacherPhone')?.value||'').trim(), photo:(document.getElementById('extensionTeacherPhoto')?.value||'').trim(), bio:(document.getElementById('extensionTeacherBio')?.value||'').trim(), diplomas}, resources:{pdfs,videos}, forumPrompt:(document.getElementById('extensionForumPrompt')?.value||'Preséntese e indique qué espera aprender en este curso.').trim(), tests };
     }
 
@@ -18564,7 +18665,10 @@ function makeCronogramaFilterFormula(year, tipo) {
         if(loadRemote){ cont.innerHTML='<div style="padding:1rem;border:1px dashed #cbd5e1;border-radius:12px;color:#64748b;text-align:center;font-weight:700;"><i class="fas fa-spinner fa-spin"></i> Cargando cursos de extensión...</div>'; await loadExtensionCoursesFromAirtable(true); }
         else if(!window.extensionCourses.length) window.extensionCourses=extGetStorage();
         const courses=window.extensionCourses;
-        const teachers=new Set(courses.map(c=>c.teacher?.name).filter(Boolean));
+        const teachers=courses.reduce((result, course) => {
+            if (course.teacher?.name) result.add(course.teacher.name);
+            return result;
+        }, new Set());
         const resources=courses.reduce((a,c)=>a+(c.resources?.pdfs?.length||0)+(c.resources?.videos?.length||0),0);
         const tests=courses.reduce((a,c)=>a+(c.tests?.length||0),0);
         const set=(id,v)=>{const el=document.getElementById(id); if(el) el.textContent=v;}; set('extensionTeachersCount',teachers.size); set('extensionCoursesCount',courses.length); set('extensionResourcesCount',resources); set('extensionTestsCount',tests);
@@ -18574,9 +18678,9 @@ function makeCronogramaFilterFormula(year, tipo) {
 
     window.viewExtensionCourse = function(id){
         const c=window.extensionCourses.find(x=>x.id===id); if(!c) return;
-        const pdfs=(c.resources?.pdfs||[]).map(r=>`<li><a href="${extEscape(r.url)}" target="_blank">${extEscape(r.title||'PDF')}</a></li>`).join('') || '<li>Sin PDF</li>';
-        const videos=(c.resources?.videos||[]).map(r=>`<li><a href="${extEscape(r.url)}" target="_blank">${extEscape(r.title||'Video')}</a></li>`).join('') || '<li>Sin videos</li>';
-        const diplomas=(c.teacher?.diplomas||[]).map(d=>`<li>${extEscape(d.title||'Diploma')} ${d.institution?`- ${extEscape(d.institution)}`:''} ${d.year?`(${extEscape(d.year)})`:''} ${d.url?`<a href="${extEscape(d.url)}" target="_blank">ver soporte</a>`:''}</li>`).join('') || '<li>Sin diplomas registrados</li>';
+        const pdfs=(c.resources?.pdfs||[]).map(r=>`<li><a href="${extEscape(r.url)}" target="_blank" rel="noopener noreferrer">${extEscape(r.title||'PDF')}</a></li>`).join('') || '<li>Sin PDF</li>';
+        const videos=(c.resources?.videos||[]).map(r=>`<li><a href="${extEscape(r.url)}" target="_blank" rel="noopener noreferrer">${extEscape(r.title||'Video')}</a></li>`).join('') || '<li>Sin videos</li>';
+        const diplomas=(c.teacher?.diplomas||[]).map(d=>`<li>${extEscape(d.title||'Diploma')} ${d.institution?`- ${extEscape(d.institution)}`:''} ${d.year?`(${extEscape(d.year)})`:''} ${d.url?`<a href="${extEscape(d.url)}" target="_blank" rel="noopener noreferrer">ver soporte</a>`:''}</li>`).join('') || '<li>Sin diplomas registrados</li>';
         const tests=(c.tests||[]).map(t=>`<button class="btn btn-secondary" style="margin:.25rem;" onclick="startExtensionTest('${c.id}','${t.id}')"><i class="fas fa-clipboard-check"></i> ${extEscape(t.title)} (${t.attempts} intentos)</button>`).join('') || '<p>Sin test configurados.</p>';
         Swal.fire({title:extEscape(c.title), width:900, html:`<div style="text-align:left;line-height:1.55;"><h4>Docente</h4><p><strong>${extEscape(c.teacher?.name||'')}</strong><br>${extEscape(c.teacher?.role||'')}<br>${extEscape(c.teacher?.bio||'')}</p><h4>Diplomas y cursos</h4><ul>${diplomas}</ul><h4>Recursos PDF</h4><ul>${pdfs}</ul><h4>Videos</h4><ul>${videos}</ul><h4>Foro de presentación</h4><p>${extEscape(c.forumPrompt||'Preséntese en el foro.')}</p><button class="btn btn-primary" style="background:#0f766e;border-color:#0f766e;" onclick="openExtensionForum('${c.id}')"><i class="fas fa-comments"></i> Abrir foro</button><h4 style="margin-top:1rem;">Test disponibles</h4>${tests}</div>`, showConfirmButton:true, confirmButtonText:'Cerrar'});
     };
@@ -18596,7 +18700,13 @@ function makeCronogramaFilterFormula(year, tipo) {
         if(!who.isConfirmed) return;
         const attemptKey=`extensionAttempts_${courseId}_${testId}_${who.value.doc}`; const used=Number(localStorage.getItem(attemptKey)||0);
         if(used >= Number(t.attempts||1)){ Swal.fire({icon:'warning',title:'Intentos agotados',text:`Este participante ya utilizó los ${t.attempts} intento(s) permitidos.`}); return; }
-        const qHtml=(t.questions||[]).map((q,i)=>`<div style="text-align:left;border:1px solid #e2e8f0;border-radius:12px;padding:.75rem;margin:.6rem 0;background:#fff;"><strong>${i+1}. ${extEscape(q.text)}</strong>${q.image?`<br><img src="${extEscape(q.image)}" style="max-width:100%;max-height:180px;border-radius:10px;margin:.5rem 0;">`:''}${['A','B','C','D'].filter(k=>q.options?.[k]).map(k=>`<label style="display:block;margin:.35rem 0;"><input type="radio" name="q${i}" value="${k}"> <strong>${k}.</strong> ${extEscape(q.options[k])}</label>`).join('')}</div>`).join('');
+        const qHtml=(t.questions||[]).map((q,i)=>{
+            const optionsHtml=['A','B','C','D'].reduce((html, key) => {
+                if (!q.options?.[key]) return html;
+                return html + `<label style="display:block;margin:.35rem 0;"><input type="radio" name="q${i}" value="${key}"> <strong>${key}.</strong> ${extEscape(q.options[key])}</label>`;
+            }, '');
+            return `<div style="text-align:left;border:1px solid #e2e8f0;border-radius:12px;padding:.75rem;margin:.6rem 0;background:#fff;"><strong>${i+1}. ${extEscape(q.text)}</strong>${q.image?`<br><img src="${extEscape(q.image)}" style="max-width:100%;max-height:180px;border-radius:10px;margin:.5rem 0;">`:''}${optionsHtml}</div>`;
+        }).join('');
         const res=await Swal.fire({title:extEscape(t.title), width:860, html:`<div>${t.image?`<img src="${extEscape(t.image)}" style="max-width:100%;max-height:190px;border-radius:12px;margin-bottom:.5rem;">`:''}<p>Intento ${used+1} de ${t.attempts}</p>${qHtml}</div>`,showCancelButton:true,confirmButtonText:'Enviar respuestas',cancelButtonText:'Cancelar',preConfirm:()=>{const answers={}; for(let i=0;i<t.questions.length;i++){ const checked=document.querySelector(`input[name="q${i}"]:checked`); if(!checked){Swal.showValidationMessage(`Responde la pregunta ${i+1}.`); return false;} answers[i]=checked.value;} return answers; }});
         if(!res.isConfirmed) return;
         let correct=0; t.questions.forEach((q,i)=>{ if(res.value[i]===q.correct) correct++; });
@@ -18640,25 +18750,15 @@ function makeCronogramaFilterFormula(year, tipo) {
     const PUB_PERSONAL_TABLE = 'tbl5A7rayv5BbiYF1'; // "Personal HSLV" (por ID)
     const PUB_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    // ===== Alojamiento de imagen (ImgBB) =====
-    // Pega aquí tu clave gratuita de https://api.imgbb.com  (o define window.IMGBB_API_KEY).
-    // La imagen se sube directamente desde el navegador, sin variables de entorno en Netlify.
-    const PUB_IMGBB_KEY = (window.IMGBB_API_KEY || (window.CONFIG && window.CONFIG.IMGBB_API_KEY) || 'b3333944faaf5183114f04e19962cc03').trim();
-
     async function pubUploadImage(base64) {
-        if (!PUB_IMGBB_KEY || PUB_IMGBB_KEY === 'TU_CLAVE_IMGBB_AQUI') {
-            throw new Error('Falta configurar la clave de ImgBB (PUB_IMGBB_KEY) en el código.');
-        }
-        const form = new FormData();
-        form.append('key', PUB_IMGBB_KEY);
-        form.append('image', base64);
-        const res = await fetch('https://api.imgbb.com/1/upload', { method: 'POST', body: form });
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data && data.success && data.data) {
-            return data.data.url || (data.data.image && data.data.image.url) || data.data.display_url || '';
-        }
-        const m = (data && data.error && data.error.message) ? data.error.message : ('ImgBB HTTP ' + res.status);
-        throw new Error(m);
+        const res = await fetch('/.netlify/functions/upload-campaign-image', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ base64 })
+        });
+        const data = await readJsonResponse(res, 'No se pudo alojar la imagen');
+        if (!data.success || !data.url) throw new Error(data.error || 'El servidor no devolvió la URL de la imagen.');
+        return data.url;
     }
 
     let pubStaffCache = [];   // [{nombre, email, entidad, proceso}]
@@ -18683,28 +18783,37 @@ function makeCronogramaFilterFormula(year, tipo) {
 
             let all = [];
             let offset = '';
-            for (let i = 0; i < 30; i++) {
+            let pageCount = 0;
+            do {
                 const p = new URLSearchParams(base);
                 if (offset) p.set('offset', offset);
                 const data = await airtableProxyRequest({ method: 'GET', path: `/${PUB_PERSONAL_TABLE}?${p.toString()}` });
                 const recs = (data && data.records) ? data.records : [];
                 all = all.concat(recs);
                 offset = data && data.offset ? data.offset : '';
-                if (!offset) break;
-            }
+                pageCount++;
+            } while (offset && pageCount < 30);
 
-            pubStaffCache = all.map(r => {
+            pubStaffCache = all.reduce((staff, r) => {
                 const f = r.fields || {};
-                return {
+                const person = {
                     nombre: String(f['NOMBRE'] || '').trim(),
                     email: String(f['EMAIL'] || '').trim().toLowerCase(),
                     entidad: String(f['ENTIDAD'] || '').trim(),
                     proceso: String(f['PROCESO'] || '').trim()
                 };
-            }).filter(p => PUB_EMAIL_RE.test(p.email));
+                if (PUB_EMAIL_RE.test(person.email)) staff.push(person);
+                return staff;
+            }, []);
 
-            const entidades = [...new Set(pubStaffCache.map(p => p.entidad).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
-            const procesos = [...new Set(pubStaffCache.map(p => p.proceso).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es'));
+            const entidades = Array.from(pubStaffCache.reduce((set, person) => {
+                if (person.entidad) set.add(person.entidad);
+                return set;
+            }, new Set())).sort((a, b) => a.localeCompare(b, 'es'));
+            const procesos = Array.from(pubStaffCache.reduce((set, person) => {
+                if (person.proceso) set.add(person.proceso);
+                return set;
+            }, new Set())).sort((a, b) => a.localeCompare(b, 'es'));
             const selE = document.getElementById('pubFiltroEntidad');
             const selP = document.getElementById('pubFiltroProceso');
             if (selE) selE.innerHTML = '<option value="">Todas</option>' + entidades.map(v => `<option value="${pubEscape(v)}">${pubEscape(v)}</option>`).join('');
@@ -18727,12 +18836,20 @@ function makeCronogramaFilterFormula(year, tipo) {
             (!entidad || p.entidad === entidad) && (!proceso || p.proceso === proceso));
 
         const extra = String(document.getElementById('pubExtra')?.value || '')
-            .split(/[,;\s]+/).map(s => s.trim().toLowerCase()).filter(s => PUB_EMAIL_RE.test(s));
+            .split(/[,;\s]+/).reduce((emails, value) => {
+                const email = value.trim().toLowerCase();
+                if (PUB_EMAIL_RE.test(email)) emails.push(email);
+                return emails;
+            }, []);
         extra.forEach(em => list.push({ nombre: '', email: em, entidad: '', proceso: '' }));
 
         const seen = new Set();
-        return list.filter(p => { if (seen.has(p.email)) return false; seen.add(p.email); return true; })
-            .map(p => ({ email: p.email, nombre: p.nombre }));
+        return list.reduce((recipients, person) => {
+            if (seen.has(person.email)) return recipients;
+            seen.add(person.email);
+            recipients.push({ email: person.email, nombre: person.nombre });
+            return recipients;
+        }, []);
     }
 
     function pubUpdateRecipients() {
@@ -18949,15 +19066,15 @@ function makeCronogramaFilterFormula(year, tipo) {
             didOpen: () => Swal.showLoading()
         });
 
-        for (const ch of chunks) {
+        await runSequentially(chunks, async (ch) => {
             try {
                 const res = await fetch('/.netlify/functions/send-campaign-email', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ ...payloadBase, recipients: ch })
                 });
-                const data = await res.json().catch(() => ({}));
-                if (res.ok && data) {
+                const data = await readJsonResponse(res, 'No se pudo enviar una tanda de publicidad');
+                if (data) {
                     totalSent += Number(data.sent || 0);
                     totalFailed += Number(data.failed || 0);
                     // Error global de la tanda (p. ej. falta RESEND_API_KEY): nada enviado
@@ -18965,9 +19082,6 @@ function makeCronogramaFilterFormula(year, tipo) {
                         totalFailed += ch.length;
                         if (!globalError) globalError = data.error;
                     }
-                } else {
-                    totalFailed += ch.length;
-                    if (!globalError && data && data.error) globalError = data.error;
                 }
             } catch (e) {
                 console.error('❌ Error enviando tanda de publicidad:', e);
@@ -18976,7 +19090,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             processed += ch.length;
             const prog = document.getElementById('pubProg');
             if (prog) prog.textContent = String(processed);
-        }
+        });
 
         Swal.close();
         if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar publicidad'; }
