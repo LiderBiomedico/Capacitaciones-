@@ -3414,6 +3414,9 @@
                         <div>
                             <h2 id="virtualPlayerTitle" style="margin:0 0 0.35rem 0; color:#111827;">Curso virtual</h2>
                             <p id="virtualPlayerSubtitle" style="margin:0; color:#64748b; font-weight:500;">Reproduce el contenido y responde las preguntas en los puntos de control.</p>
+                            <p id="virtualSurveyNotice" style="margin:0.45rem 0 0 0; color:#166534; font-size:0.82rem; font-weight:800;">
+                                <i class="fas fa-face-smile"></i> Al finalizar responderás una encuesta de satisfacción de 5 preguntas.
+                            </p>
                         </div>
                         <div id="virtualPlayerProgress" style="display:flex; gap:0.5rem; flex-wrap:wrap;"></div>
                     </div>
@@ -16574,6 +16577,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                             <div style="display:flex; gap:0.5rem; flex-wrap:wrap; margin-top:0.6rem;">
                                 <span style="background:#eff6ff; color:#1d4ed8; padding:0.3rem 0.7rem; border-radius:999px; font-size:0.82rem; font-weight:700;">${course.modules.length} módulo(s)</span>
                                 <span style="background:#ecfdf5; color:#047857; padding:0.3rem 0.7rem; border-radius:999px; font-size:0.82rem; font-weight:700;">${course.modules.reduce((acc,m)=>acc+(m.checkpoints?.length||0),0)} checkpoint(s)</span>
+                                <span style="background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:0.3rem 0.7rem; border-radius:999px; font-size:0.82rem; font-weight:800;"><i class="fas fa-face-smile"></i> Encuesta al finalizar</span>
                                 <span style="background:#fef9c3; color:#854d0e; padding:0.3rem 0.7rem; border-radius:999px; font-size:0.82rem; font-weight:800; letter-spacing:1px;"><i class="fas fa-key"></i> ${escapeHtml(course.accessCode || '')}</span>
                             </div>
                         </div>
@@ -16611,6 +16615,8 @@ function makeCronogramaFilterFormula(year, tipo) {
             virtualSatisfactionAsked = false;
             document.getElementById('virtualPlayerTitle').textContent = course.title;
             document.getElementById('virtualPlayerSubtitle').textContent = `${course.description || 'Curso virtual interactivo con preguntas durante el video.'} • Participante: ${participant.name}`;
+            const surveyNotice = document.getElementById('virtualSurveyNotice');
+            if (surveyNotice) surveyNotice.innerHTML = '<i class="fas fa-face-smile"></i> Al finalizar responderás la encuesta institucional de satisfacción.';
             document.getElementById('virtualCoursePlayerModal').style.display = 'flex';
             renderVirtualModuleList();
             loadVirtualModule(0);
@@ -19530,6 +19536,18 @@ function makeCronogramaFilterFormula(year, tipo) {
                 { v: 5, t: 'Totalmente de acuerdo' }
             ];
 
+            function satItemsForContext(ctx = {}) {
+                if (String(ctx.modalidad || '').trim().toLowerCase() !== 'virtual') return SAT_ITEMS;
+
+                return [
+                    { key: 'Contenido', label: 'Contenido', text: 'Los temas del curso virtual fueron claros, pertinentes y acordes con mis necesidades de capacitación.' },
+                    { key: 'Metodologia', label: 'Metodología virtual', text: 'Los videos, materiales y preguntas de control facilitaron mi aprendizaje.' },
+                    { key: 'Facilitador', label: 'Explicación del tema', text: 'Las explicaciones presentadas en el curso demostraron dominio del tema y fueron fáciles de comprender.' },
+                    { key: 'Utilidad', label: 'Utilidad práctica', text: 'Lo aprendido es aplicable a mis funciones y mejora la seguridad en el uso de la tecnología biomédica.' },
+                    { key: 'Logistica', label: 'Experiencia digital', text: 'El acceso, la navegación, la reproducción de los videos y los recursos digitales funcionaron adecuadamente.' }
+                ];
+            }
+
             window.SAT_TABLE_ID = SAT_TABLE;
             window.SAT_ITEMS_DEF = SAT_ITEMS;
             window.SAT_THRESHOLD = SAT_THRESHOLD;
@@ -19568,8 +19586,10 @@ function makeCronogramaFilterFormula(year, tipo) {
             window.satComputeScore = satComputeScore;
 
             // Construye el HTML del formulario para el modal.
-            function satBuildFormHtml() {
-                const rows = SAT_ITEMS.map((item, idx) => {
+            function satBuildFormHtml(ctx = {}) {
+                const formItems = satItemsForContext(ctx);
+                const isVirtual = String(ctx.modalidad || '').trim().toLowerCase() === 'virtual';
+                const rows = formItems.map((item, idx) => {
                     const opts = SAT_SCALE.map(s => `
                         <label class="sat-opt" title="${satEscape(s.t)}">
                             <input type="radio" name="sat_${item.key}" value="${s.v}">
@@ -19613,6 +19633,10 @@ function makeCronogramaFilterFormula(year, tipo) {
                         @media (max-width:520px) { .sat-scale { padding-left:0; } .sat-opt { min-width:44px; } }
                     </style>
                     <div class="sat-wrap">
+                        ${isVirtual ? `
+                            <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:0.65rem 0.8rem; margin-bottom:0.75rem; color:#1e3a8a; font-size:0.84rem;">
+                                <i class="fas fa-laptop-medical"></i> Curso virtual: <strong>${satEscape(ctx.capacitacion || 'Curso virtual')}</strong>
+                            </div>` : ''}
                         <div class="sat-legend">
                             Marca la opción que mejor refleje tu grado de acuerdo con cada afirmación.<br>
                             <strong>1</strong> = Totalmente en desacuerdo · <strong>2</strong> = En desacuerdo ·
@@ -19699,12 +19723,14 @@ function makeCronogramaFilterFormula(year, tipo) {
             window.openSatisfactionSurvey = async function (ctx) {
                 ctx = ctx || {};
                 try {
+                    const isVirtual = String(ctx.modalidad || '').trim().toLowerCase() === 'virtual';
+                    const formItems = satItemsForContext(ctx);
                     const result = await Swal.fire({
-                        title: 'Encuesta de satisfacción',
-                        html: satBuildFormHtml(),
+                        title: isVirtual ? 'Encuesta de satisfacción del curso virtual' : 'Encuesta de satisfacción',
+                        html: satBuildFormHtml(ctx),
                         width: 720,
-                        showCancelButton: true,
-                        confirmButtonText: 'Enviar encuesta',
+                        showCancelButton: !isVirtual,
+                        confirmButtonText: isVirtual ? 'Enviar encuesta y finalizar' : 'Enviar encuesta',
                         cancelButtonText: 'Omitir',
                         confirmButtonColor: '#2E7D32',
                         cancelButtonColor: '#9ca3af',
@@ -19713,7 +19739,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                         focusConfirm: false,
                         preConfirm: () => {
                             const { answers, comentarios } = satReadForm();
-                            const missing = SAT_ITEMS.filter(it => !answers[it.key]);
+                            const missing = formItems.filter(it => !answers[it.key]);
                             if (missing.length) {
                                 Swal.showValidationMessage(
                                     `Responde los ${missing.length} ítem(s) pendiente(s): ${missing.map(m => m.label).join(', ')}`
