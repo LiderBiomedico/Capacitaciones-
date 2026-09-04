@@ -3449,6 +3449,11 @@
                     <div id="qrCodeContainer" style="background: white; padding: 1.5rem; border-radius: 8px; border: 2px solid #e0e0e0; margin-bottom: 1.5rem; display: flex; justify-content: center;">
                         <div id="qrCode"></div>
                     </div>
+
+                    <div style="background:#eef7ea; border:1px solid #b9d9ae; border-radius:8px; padding:0.85rem; margin-bottom:1rem;">
+                        <span style="color:#355f2c; font-weight:700;">Código de acceso:</span>
+                        <strong id="qrAccessCodeDisplay" style="display:block; color:#1f2937; font-size:1.5rem; letter-spacing:0.12em; margin-top:0.25rem;"></strong>
+                    </div>
                     
                     <!-- URL para compartir -->
                     <div style="margin-bottom: 1.5rem;">
@@ -3473,7 +3478,7 @@
                             <li>Colócalo en el hospital (carteles, pasillos)</li>
                             <li>O comparte el enlace por WhatsApp/Email</li>
                             <li>Cuando alguien lo escanee, se abrirá automáticamente</li>
-                            <li>✅ La sesión se creará automáticamente en Airtable</li>
+                            <li>El participante ingresará directamente al acceso de esta capacitación</li>
                         </ol>
                     </div>
                     
@@ -4771,30 +4776,6 @@
             <p>&copy; 2026 Hospital Susana López de Valencia</p>
             <p>Desarrollado con ❤️ por Ing. Paul Eduardo Muñoz Rodriguez</p>
         </footer>
-    </div>
-
-    <!-- QR Modal -->
-    <div id="qrModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
-            <h2>📱 Código QR de Acceso</h2>
-            <div id="qrcode" class="qr-container"></div>
-            <div class="access-info">
-                <p><strong>Código:</strong> <span id="modalAccessCode"></span></p>
-                <p><strong>Link:</strong> <span id="modalAccessLink"></span></p>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-primary" onclick="copyLink()">
-                    <i class="fas fa-copy"></i> Copiar
-                </button>
-                <button class="btn btn-success" onclick="shareWhatsApp()">
-                    <i class="fab fa-whatsapp"></i> WhatsApp
-                </button>
-                <button class="btn btn-info" onclick="downloadQR()">
-                    <i class="fas fa-download"></i> Descargar
-                </button>
-            </div>
-        </div>
     </div>
 
     <!-- Modal de Registro de Participante -->
@@ -7535,6 +7516,12 @@
             if (tabName === 'schedule' && typeof initScheduleTab === 'function') {
                 initScheduleTab();
             }
+
+            // Refrescar la lista al abrir Gestionar para mostrar registros nuevos
+            // creados desde esta u otra sesión.
+            if (tabName === 'manage' && typeof loadTrainings === 'function') {
+                loadTrainings();
+            }
         }
 
         // ==================== FUNCIONES DE PREGUNTAS ====================
@@ -7991,12 +7978,14 @@ function getSelectedStaff() {
         cancelButtonText: 'Cerrar'
     }).then((result) => {
         if (result.isConfirmed) {
-            showQRCode(accessCode, title);
+            showTrainingQR(accessCode, title);
         }
     });
 
-    if (typeof renderTrainingsList === 'function') {
-        renderTrainingsList();
+    // Volver a consultar Airtable para incorporar inmediatamente el registro
+    // recién creado en la pestaña "Gestionar".
+    if (typeof loadTrainings === 'function') {
+        loadTrainings();
     }
 }
 
@@ -8137,70 +8126,6 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 code += chars.charAt(Math.floor(Math.random() * chars.length));
             }
             return code;
-        }
-
-        function showQRCode(accessCode, title) {
-            const qrContainer = document.getElementById('qrCode');
-            if (!qrContainer) return;
-            qrContainer.innerHTML = '';
-            const accessUrl = (window.location.origin + window.location.pathname) + '?code=' + accessCode;
-            new QRCode(qrContainer, { text: accessUrl, width: 300, height: 300, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
-            const qrUrlInput = document.getElementById('qrUrl');
-            if (qrUrlInput) qrUrlInput.value = accessUrl;
-            window.currentQRData = { url: accessUrl, code: accessCode, title: title || '' };
-            document.getElementById('qrModal').style.display = 'flex';
-        }
-
-        function closeModal() {
-            document.getElementById('qrModal').style.display = 'none';
-        }
-
-        function copyLink() {
-            const link = document.getElementById('modalAccessLink').textContent;
-            const code = document.getElementById('modalAccessCode').textContent;
-            
-            const text = `🏥 Acceso a Capacitación\n\nCódigo: ${code}\nLink: ${link}\n\nHospital Susana López de Valencia`;
-            
-            navigator.clipboard.writeText(text).then(() => {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Copiado',
-                    text: 'Link copiado al portapapeles',
-                    timer: 2000,
-                    showConfirmButton: false
-                });
-            });
-        }
-
-        function shareWhatsApp() {
-            const code = document.getElementById('modalAccessCode').textContent;
-            const link = document.getElementById('modalAccessLink').textContent;
-            
-            const message = `🏥 *Acceso a Capacitación*\nHospital Susana López de Valencia\n\n*Código:* ${code}\n*Link:* ${link}`;
-            const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
-            window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
-        }
-
-        function downloadQR() {
-            const canvas = document.querySelector('#qrcode canvas');
-            if (canvas) {
-                canvas.toBlob(blob => {
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    const code = document.getElementById('modalAccessCode').textContent;
-                    link.download = `QR-${code}.png`;
-                    link.href = url;
-                    link.click();
-                    URL.revokeObjectURL(url);
-                    
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Descargado',
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
-                });
-            }
         }
 
         function resetForm() {
@@ -8345,31 +8270,25 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 document.getElementById('trainingsEmpty').style.display = 'none';
                 document.getElementById('trainingsGrid').innerHTML = '';
                 
-                const response = await fetch('/.netlify/functions/airtable-proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        method: 'GET',
-                        path: '/Capacitaciones',
-                        body: null
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Error HTTP: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                console.log('✅ Respuesta de Airtable:', data);
+                // Airtable entrega máximo 100 registros por página. Cargar todas
+                // las páginas evita que una capacitación nueva quede fuera de la lista.
+                const records = await airtableFetchAll('/Capacitaciones?pageSize=100');
+                console.log(`✅ ${records.length} capacitaciones recibidas de Airtable`);
                 
                 // Ocultar loading
                 document.getElementById('trainingsLoading').style.display = 'none';
                 
-                if (data.success && data.records && data.records.length > 0) {
-                    allTrainings = data.records;
+                if (records.length > 0) {
+                    allTrainings = records.sort((a, b) => {
+                        const dateA = new Date(a.createdTime || a.fields?.['Fecha Creación'] || 0).getTime();
+                        const dateB = new Date(b.createdTime || b.fields?.['Fecha Creación'] || 0).getTime();
+                        return dateB - dateA;
+                    });
                     renderTrainingsList();
                     updateDashboardStats();
                 } else {
+                    allTrainings = [];
+                    document.getElementById('trainingsGrid').innerHTML = '';
                     document.getElementById('trainingsEmpty').style.display = 'block';
                 }
                 
@@ -8390,12 +8309,15 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         // Renderizar lista de capacitaciones
         function renderTrainingsList() {
             const grid = document.getElementById('trainingsGrid');
+            if (!grid) return;
             grid.innerHTML = '';
             
             if (allTrainings.length === 0) {
                 document.getElementById('trainingsEmpty').style.display = 'block';
                 return;
             }
+
+            document.getElementById('trainingsEmpty').style.display = 'none';
             
             allTrainings.forEach(training => {
                 const fields = training.fields;
@@ -8453,7 +8375,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         <button class="btn-action btn-view" onclick="viewTrainingDetails('${id}')">
                             <i class="fas fa-eye"></i> Ver
                         </button>
-                        <button class="btn-action btn-qr" onclick="showTrainingQR('${accessCode}', '${title}')">
+                        <button class="btn-action btn-qr" onclick="showTrainingQRById('${id}')">
                             <i class="fas fa-qrcode"></i> QR
                         </button>
                         <button class="btn-action btn-delete" onclick="deleteTraining('${id}', '${title}')">
@@ -8462,6 +8384,21 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     </div>
                 </div>
             `;
+        }
+
+        // Resolver los datos desde el registro evita que comillas o caracteres
+        // especiales del título rompan el botón QR.
+        function showTrainingQRById(trainingId) {
+            const training = allTrainings.find(item => item.id === trainingId);
+            if (!training) {
+                Swal.fire({ icon: 'error', title: 'Error', text: 'No se encontró la capacitación seleccionada' });
+                return;
+            }
+
+            const fields = training.fields || {};
+            const accessCode = fields['Código de Acceso'] || fields['Código Acceso'] || '';
+            const title = fields['Título'] || 'Capacitación';
+            return showTrainingQR(accessCode, title);
         }
         
         // Ver detalles de capacitación
@@ -8577,20 +8514,11 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             if (event.target === detailsModal) {
                 closeDetailsModal();
             }
-            const qrModal = document.getElementById('qrModal');
-            if (event.target === qrModal) {
-                closeModal();
-            }
             const qrGenerationModal = document.getElementById('qrGenerationModal');
             if (event.target === qrGenerationModal) {
                 closeQRModal();
             }
         };
-        
-        // Mostrar QR de capacitación específica
-        function showTrainingQR(accessCode, title) {
-            showQRCode(accessCode, title);
-        }
         
         // Eliminar capacitación
         async function deleteTraining(trainingId, title) {
@@ -8907,14 +8835,18 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 // Generar código único si es necesario
                 const finalCode = accessCode && accessCode.trim() ? accessCode : generateAccessCode();
                 
-                // Construir URL con parámetros
-                const baseUrl = window.location.origin + window.location.pathname;
-                const qrUrl = `${baseUrl}?code=${finalCode}&auto=true`;
+                // Construir una URL limpia para esta capacitación. El flujo
+                // normal valida el código y abre el registro correcto.
+                const qrAccessUrl = new URL(window.location.origin + window.location.pathname);
+                qrAccessUrl.searchParams.set('code', finalCode);
+                const qrUrl = qrAccessUrl.toString();
                 
                 console.log(`🔗 URL QR: ${qrUrl}`);
                 
                 // Limpiar contenedor anterior
                 const qrContainer = document.getElementById('qrCode');
+                if (!qrContainer) throw new Error('No se encontró el contenedor del QR');
+                if (typeof QRCode !== 'function') throw new Error('La librería de códigos QR no está disponible');
                 qrContainer.innerHTML = '';
                 
                 // Generar QR usando QRCode.js
@@ -8928,7 +8860,10 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 });
                 
                 // Llenar la URL en el campo de texto
-                document.getElementById('qrUrl').value = qrUrl;
+                const qrUrlInput = document.getElementById('qrUrl');
+                const qrCodeDisplay = document.getElementById('qrAccessCodeDisplay');
+                if (qrUrlInput) qrUrlInput.value = qrUrl;
+                if (qrCodeDisplay) qrCodeDisplay.textContent = finalCode;
                 
                 // Guardar datos para descargar después
                 window.currentQRData = {
@@ -8988,27 +8923,51 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         function downloadQRCode() {
             try {
                 const qrContainer = document.getElementById('qrCode');
-                const qrImage = qrContainer.querySelector('img');
-                
-                if (!qrImage) {
-                    throw new Error('No se encontró la imagen del QR');
+                const qrCanvas = qrContainer?.querySelector('canvas');
+                const qrImage = qrContainer?.querySelector('img');
+                const qrData = window.currentQRData || {};
+                const safeTitle = String(qrData.title || 'capacitacion')
+                    .normalize('NFD')
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/[^a-zA-Z0-9_-]+/g, '-')
+                    .replace(/^-+|-+$/g, '') || 'capacitacion';
+                const fileName = `QR-${qrData.code || 'ACCESO'}-${safeTitle}.png`;
+
+                const triggerDownload = (url, revokeAfter = false) => {
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = fileName;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    if (revokeAfter) setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Descargado',
+                        text: 'El código QR ha sido descargado',
+                        timer: 1500,
+                        showConfirmButton: false
+                    });
+                };
+
+                if (qrCanvas) {
+                    qrCanvas.toBlob((blob) => {
+                        if (!blob) {
+                            Swal.fire({ icon: 'error', title: 'Error', text: 'No se pudo preparar la imagen del QR' });
+                            return;
+                        }
+                        triggerDownload(URL.createObjectURL(blob), true);
+                    }, 'image/png');
+                    return;
                 }
-                
-                // Crear elemento de descarga
-                const link = document.createElement('a');
-                link.href = qrImage.src;
-                link.download = `QR-${window.currentQRData.code}-${window.currentQRData.title.replace(/\s+/g, '-')}.png`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Descargado',
-                    text: 'El código QR ha sido descargado',
-                    timer: 1500,
-                    showConfirmButton: false
-                });
+
+                if (qrImage?.src) {
+                    triggerDownload(qrImage.src);
+                    return;
+                }
+
+                throw new Error('No se encontró la imagen del QR');
                 
             } catch (error) {
                 console.error('❌ Error descargando QR:', error);
