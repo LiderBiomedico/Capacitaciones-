@@ -2768,6 +2768,54 @@
             user-select: none !important;
         }
 
+        /* El bloqueo anterior solo corresponde al reproductor virtual. En el
+           pretest y postest abiertos por QR, el participante debe poder marcar
+           opciones y enviar la evaluación. */
+        body.hslv-participant-flow:not(.hslv-virtual-course-active) .container {
+            filter: none !important;
+            opacity: 1 !important;
+            pointer-events: auto !important;
+            user-select: auto !important;
+        }
+
+        .exam-answer-option {
+            display: flex !important;
+            align-items: flex-start !important;
+            padding: 0.75rem !important;
+            background: #ffffff !important;
+            border: 2px solid #e0e0e0 !important;
+            border-radius: 8px !important;
+            cursor: pointer !important;
+            pointer-events: auto !important;
+            user-select: none !important;
+            transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease !important;
+        }
+
+        .exam-answer-option:hover,
+        .exam-answer-option:focus-within {
+            border-color: var(--primary) !important;
+            background: #f1faf5 !important;
+        }
+
+        .exam-answer-option.selected {
+            border-color: var(--primary) !important;
+            background: #e8f5e9 !important;
+            box-shadow: 0 0 0 3px rgba(46, 125, 50, 0.12) !important;
+        }
+
+        .exam-answer-option input[type="radio"] {
+            appearance: auto !important;
+            -webkit-appearance: radio !important;
+            width: 20px !important;
+            height: 20px !important;
+            margin: 2px 0 0 0 !important;
+            opacity: 1 !important;
+            cursor: pointer !important;
+            pointer-events: auto !important;
+            accent-color: var(--primary) !important;
+            flex: 0 0 20px !important;
+        }
+
         @media (max-width: 900px) { .extension-builder-grid,.extension-resource-grid { grid-template-columns:1fr; } }
 
 </style>
@@ -5715,6 +5763,22 @@
             }
         }
         
+        function selectExamAnswer(examType, questionRecordId, input) {
+            if (!input) return;
+
+            input.checked = true;
+            const answers = examType === 'postest' ? postestAnswers : pretestAnswers;
+            answers[questionRecordId] = input.value;
+
+            const optionLabel = input.closest('.exam-answer-option');
+            const optionsGroup = input.closest('.exam-answer-options');
+            if (optionsGroup) {
+                optionsGroup.querySelectorAll('.exam-answer-option').forEach(label => {
+                    label.classList.toggle('selected', label === optionLabel);
+                });
+            }
+        }
+
         function displayPretestQuestions(questions) {
             const container = document.getElementById('pretestQuestionsContainer');
             container.innerHTML = '';
@@ -5767,13 +5831,14 @@
                         
                         ${renderQuestionImageHtml(questionImageUrl, `Imagen pregunta ${questionNumber}`)}
                         
-                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <div class="exam-answer-options" style="display: flex; flex-direction: column; gap: 0.75rem;">
                             ${options.length > 0 ? options.map(option => `
-                                <label style="display: flex; align-items: flex-start; padding: 0.75rem; background: white; border-radius: 6px; cursor: pointer; transition: all 0.3s; border: 2px solid #e0e0e0; hover: border-color: var(--primary);">
+                                <label class="exam-answer-option" for="${questionId}-${option.letter}">
                                     <input type="radio" 
+                                           id="${questionId}-${option.letter}"
                                            name="${questionId}" 
                                            value="${option.letter}" 
-                                           onchange="pretestAnswers['${question.id}'] = this.value"
+                                           onchange="selectExamAnswer('pretest', '${question.id}', this)"
                                            style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); margin-top: 2px; flex-shrink: 0;">
                                     <span style="margin-left: 0.75rem; flex: 1;">
                                         <strong style="color: var(--primary);">${option.letter})</strong> <span style="color: #1a1a1a;">${option.text}</span>
@@ -5790,7 +5855,7 @@
         
         async function submitPretest() {
             const answers = Object.keys(pretestAnswers).length;
-            const questionCards = document.querySelectorAll('.question-card');
+            const questionCards = document.querySelectorAll('#pretestSection .question-card');
             const totalQuestions = questionCards.length;
             
             // Validar que se hayan respondido todas las preguntas
@@ -6281,13 +6346,14 @@
                         
                         ${renderQuestionImageHtml(questionImageUrl, `Imagen pregunta ${questionNumber}`)}
                         
-                        <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                        <div class="exam-answer-options" style="display: flex; flex-direction: column; gap: 0.75rem;">
                             ${options.length > 0 ? options.map(option => `
-                                <label style="display: flex; align-items: flex-start; padding: 0.75rem; background: white; border-radius: 6px; cursor: pointer; transition: all 0.3s; border: 2px solid #e0e0e0; hover: border-color: var(--primary);">
+                                <label class="exam-answer-option" for="${questionId}-${option.letter}">
                                     <input type="radio" 
+                                           id="${questionId}-${option.letter}"
                                            name="${questionId}" 
                                            value="${option.letter}" 
-                                           onchange="postestAnswers['${question.id}'] = this.value"
+                                           onchange="selectExamAnswer('postest', '${question.id}', this)"
                                            style="width: 20px; height: 20px; cursor: pointer; accent-color: var(--primary); margin-top: 2px; flex-shrink: 0;">
                                     <span style="margin-left: 0.75rem; flex: 1;">
                                         <strong style="color: var(--primary);">${option.letter})</strong> <span style="color: #1a1a1a;">${option.text}</span>
@@ -7356,6 +7422,7 @@
             }
 
             if (code) {
+                document.body.classList.remove('hslv-virtual-course-active');
                 setTimeout(() => {
                     // Si tiene parámetro auto=true, intentar crear sesión automáticamente
                     if (auto === 'true') {
@@ -17387,6 +17454,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             const target = String(code || '').trim().toUpperCase();
             if (!target) return;
             document.body.classList.add('hslv-participant-flow');
+            document.body.classList.add('hslv-virtual-course-active');
             Swal.fire({ title: 'Cargando curso virtual...', text: 'Por favor espera', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             try {
                 if (!virtualCoursesLoaded || !virtualCourses.length) {
@@ -18253,6 +18321,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             virtualUrlOpeningInProgress = true;
             virtualDirectAccessMode = true;
             document.body.classList.add('hslv-participant-flow');
+            document.body.classList.add('hslv-virtual-course-active');
             if (Swal && typeof Swal.close === 'function') { try { Swal.close(); } catch(e) {} }
             Swal.fire({
                 title: 'Cargando curso virtual',
