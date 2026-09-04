@@ -4460,7 +4460,7 @@
                                 onblur="this.style.borderColor='#d1d5db'"
                             />
                         </div>
-                        <button class="btn btn-primary" onclick="buscarPersonalHSLV()" style="height:42px; padding:0 1.4rem; white-space:nowrap;">
+                        <button id="btnBuscarPersonal" class="btn btn-primary" onclick="buscarPersonalHSLV()" style="height:42px; padding:0 1.4rem; white-space:nowrap;">
                             <i class="fas fa-search"></i> Buscar
                         </button>
                         <button class="btn btn-secondary" onclick="limpiarBusquedaPersonal()" style="height:42px; padding:0 1rem; white-space:nowrap;">
@@ -13108,23 +13108,36 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 return;
             }
 
-            if (!personalDbLoaded || personalData.length === 0) {
-                await recargarListaBD();
+            // Feedback inmediato: bloquea el botón y muestra el spinner ANTES de cargar la tabla.
+            // Evita que el usuario tenga que oprimir "Buscar" varias veces mientras se cargan los ~1749 registros.
+            const btnBuscarPersonal = document.getElementById('btnBuscarPersonal');
+            const btnBuscarHtmlOrig = btnBuscarPersonal ? btnBuscarPersonal.innerHTML : '';
+            if (btnBuscarPersonal) {
+                btnBuscarPersonal.disabled = true;
+                btnBuscarPersonal.style.opacity = '0.7';
+                btnBuscarPersonal.style.cursor = 'progress';
+                btnBuscarPersonal.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Buscando...';
             }
 
-            if (!personalDbLoaded || personalData.length === 0) {
-                Swal.fire({ icon: 'warning', title: 'Sin datos', text: 'No fue posible cargar la tabla de personal desde Airtable.', confirmButtonColor: 'var(--primary)' });
-                return;
-            }
-
-            document.getElementById('personalLoading').style.display = 'block';
+            document.getElementById('personalInicial').style.display = 'none';
             document.getElementById('personalResultado').style.display = 'none';
             document.getElementById('personalNoEncontrado').style.display = 'none';
-            document.getElementById('personalInicial').style.display = 'none';
-
-            await new Promise(r => setTimeout(r, 120));
+            document.getElementById('personalLoading').style.display = 'block';
 
             try {
+                // Carga única y deduplicada: varias búsquedas simultáneas comparten la misma promesa,
+                // así un clic repetido no dispara descargas completas en paralelo de la tabla.
+                if (!personalDbLoaded || personalData.length === 0) {
+                    await ensurePersonalDbLoaded(false);
+                }
+
+                if (!personalDbLoaded || personalData.length === 0) {
+                    document.getElementById('personalLoading').style.display = 'none';
+                    document.getElementById('personalInicial').style.display = 'block';
+                    Swal.fire({ icon: 'warning', title: 'Sin datos', text: 'No fue posible cargar la tabla de personal desde Airtable.', confirmButtonColor: 'var(--primary)' });
+                    return;
+                }
+
                 const sample = personalData.find(r => Object.keys(r || {}).length > 1) || personalData[0] || {};
                 const cols = Object.keys(sample).filter(c => c !== 'id');
 
@@ -13229,6 +13242,13 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 document.getElementById('personalLoading').style.display = 'none';
                 document.getElementById('personalInicial').style.display = 'block';
                 Swal.fire({ icon: 'error', title: 'Error al buscar', text: err.message || 'Ocurrió un error en la búsqueda.', confirmButtonColor: 'var(--primary)' });
+            } finally {
+                if (btnBuscarPersonal) {
+                    btnBuscarPersonal.disabled = false;
+                    btnBuscarPersonal.style.opacity = '';
+                    btnBuscarPersonal.style.cursor = '';
+                    btnBuscarPersonal.innerHTML = btnBuscarHtmlOrig || '<i class="fas fa-search"></i> Buscar';
+                }
             }
         }
 
