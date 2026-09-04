@@ -3715,6 +3715,23 @@
                                 <div id="qPassRate" style="color:#fff; font-size:2rem; font-weight:800; margin-top:0.25rem;">0%</div>
                                 <div style="color:#e5e7eb; font-weight:600;">≥ 3.0 / 5.0 (60%)</div>
                             </div>
+                            <div style="text-align:center; padding:1rem; background: linear-gradient(135deg, #7e22ce 0%, #a855f7 100%); border-radius: 8px;">
+                                <div style="color:#fff; font-weight:600; font-size:0.95rem;">Satisfacción (GTB-CAP-04)</div>
+                                <div id="qSatisfactionRate" style="color:#fff; font-size:2rem; font-weight:800; margin-top:0.25rem;">0%</div>
+                                <div id="qSatisfactionNote" style="color:#e5e7eb; font-weight:600;">Meta ≥ 90%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Indicador de satisfacción (SLV-SR-03-FT04) -->
+                    <div class="card" style="margin-bottom: 1.5rem;">
+                        <h3><i class="fas fa-face-smile"></i> Satisfacción con el Programa de Capacitación</h3>
+                        <p style="color:#6b7280; font-size:0.86rem; margin:0.25rem 0 0 0;">
+                            Indicador <strong>GTB-CAP-04</strong> · Ficha técnica SLV-SR-03-FT04 · Instrumento SLV-SR-03-F07 ·
+                            Nivel 1 del modelo de Kirkpatrick (Reacción). Participante satisfecho = promedio ≥ 4,0/5,0 en los cinco ítems.
+                        </p>
+                        <div id="qSatisfactionBody" style="margin-top:1rem;">
+                            <p style="color:#6b7280;">Sin encuestas registradas en el período.</p>
                         </div>
                     </div>
 
@@ -6543,11 +6560,27 @@
                             </p>
                         </div>
                     `,
-                    confirmButtonText: 'Capacitación terminada',
+                    confirmButtonText: 'Continuar a la encuesta',
                     confirmButtonColor: '#2E7D32',
                     allowOutsideClick: false,
                     allowEscapeKey: false
-                }).then(() => {
+                }).then(async () => {
+                    // Encuesta de satisfacción (SLV-SR-03-F07) inmediatamente después del post-test.
+                    // Nunca bloquea el cierre de la capacitación: openSatisfactionSurvey siempre resuelve.
+                    if (typeof openSatisfactionSurvey === 'function') {
+                        await openSatisfactionSurvey({
+                            modalidad: 'Presencial',
+                            capacitacion: currentTrainingRecord?.fields?.['Título'] || currentTrainingRecord?.fields?.['Titulo'] || '',
+                            capacitacionId: currentTrainingRecord?.id || '',
+                            cedula: currentParticipantData?.cedula || '',
+                            nombre: currentParticipantData?.name || '',
+                            entidad: currentParticipantData?.entity || '',
+                            proceso: currentParticipantData?.process || '',
+                            perfil: currentParticipantData?.profile || '',
+                            cargo: currentParticipantData?.cargo || currentParticipantData?.profession || ''
+                        });
+                    }
+
                     markTrainingCompleted(currentAccessCode, currentParticipantData?.name, {
                         participationId: currentParticipationId,
                         trainingId: currentTrainingRecord?.id || null
@@ -9535,6 +9568,17 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     console.warn('⚠️ No se pudo construir la estadística de cursos virtuales del trimestre:', vErr);
                 }
 
+                // ── Indicador de satisfacción del trimestre (GTB-CAP-04) ──
+                let satisfactionStats = null;
+                try {
+                    if (typeof fetchSatisfactionRecords === 'function' && typeof buildSatisfactionStats === 'function') {
+                        const satRecords = await fetchSatisfactionRecords(true);
+                        satisfactionStats = buildSatisfactionStats(satRecords, dateStart, dateEnd);
+                    }
+                } catch (sErr) {
+                    console.warn('⚠️ No se pudo construir el indicador de satisfacción del trimestre:', sErr);
+                }
+
                 const data = {
                     success: true,
                     period: { year, quarter, label: `T${quarter} (${qLabels[quarter]}) ${year}`, startDate: dateStart, endDate: dateEnd },                    kpis: {
@@ -9545,13 +9589,17 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         avgPretestScore: avgPre,
                         avgPostestScore: avgPost,
                         avgImprovement,
-                        passRatePostest: passRate
+                        passRatePostest: passRate,
+                        satisfactionRate: satisfactionStats ? satisfactionStats.satisfactionRate : 0,
+                        satisfactionSurveys: satisfactionStats ? satisfactionStats.completeSurveys : 0,
+                        satisfactionAvg: satisfactionStats ? satisfactionStats.avgOverall : 0
                     },
                     trainings: trainingsWithStats,
                     topTrainingsByParticipants: topByParts,
                     distributions: { byDept, byCargo: byCargoArr, byProfession: byProfessionArr, trainingsByMonth },
                     participants: participantsDetail,
                     virtual: virtualStats,
+                    satisfaction: satisfactionStats,
                     coverage: buildQuarterlyCoverage(allPersonal, participantsDetail, virtualStats.participants || []),
                     insights: []
                 };
@@ -10166,6 +10214,15 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 }
             }
 
+            // ── 14. SATISFACCIÓN (INDICADOR GTB-CAP-04) ──
+            try {
+                if (typeof buildSatisfactionInsights === 'function') {
+                    buildSatisfactionInsights(data.satisfaction).forEach(t => insights.push(t));
+                }
+            } catch (e) {
+                console.warn('⚠️ No se pudieron generar los hallazgos de satisfacción:', e);
+            }
+
             return insights;
         }
 
@@ -10183,6 +10240,10 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             setText('qAvgPost', `${safeNumber(k.avgPostestScore)}%`);
             setText('qAvgImprovement', `${safeNumber(k.avgImprovement) >= 0 ? '+' : ''}${safeNumber(k.avgImprovement)}%`);
             setText('qPassRate', `${safeNumber(k.passRatePostest)}%`);
+            setText('qSatisfactionRate', `${safeNumber(k.satisfactionRate)}%`);
+            setText('qSatisfactionNote', safeNumber(k.satisfactionSurveys)
+                ? `${safeNumber(k.satisfactionSurveys)} encuesta(s) · Meta ≥ 90%`
+                : 'Sin encuestas · Meta ≥ 90%');
             setText('qAvgPreNote', `${(safeNumber(k.avgPretestScore) / 20).toFixed(1)} / 5.0`);
             setText('qAvgPostNote', `${(safeNumber(k.avgPostestScore) / 20).toFixed(1)} / 5.0`);
 
@@ -10195,6 +10256,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             fillQuarterlyByDept(data.distributions?.byDept || []);
             fillQuarterlyTrainingsList(data.trainings || []);
             fillQuarterlyVirtual(data.virtual || { kpis: {}, courses: [], participants: [] });
+            fillQuarterlySatisfaction(data.satisfaction);
             fillQuarterlyInsights(data.insights || []);
 
             // Cobertura del personal
@@ -10526,6 +10588,120 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 `;
                 tbody.appendChild(tr);
             });
+        }
+
+        // Pinta la sección del indicador de satisfacción (GTB-CAP-04) en el reporte trimestral.
+        function fillQuarterlySatisfaction(s) {
+            const box = document.getElementById('qSatisfactionBody');
+            if (!box) return;
+
+            const esc = (v) => String(v === undefined || v === null ? '' : v)
+                .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+            if (!s || !s.completeSurveys) {
+                box.innerHTML = `
+                    <div style="background:#f8fafc; border-left:4px solid #94a3b8; border-radius:8px; padding:1rem 1.1rem; color:#475569;">
+                        <strong>Sin encuestas diligenciadas en el período.</strong><br>
+                        <span style="font-size:0.88rem;">El indicador se calculará automáticamente cuando los participantes respondan la encuesta de satisfacción al finalizar el post-test.</span>
+                    </div>`;
+                return;
+            }
+
+            const meta = safeNumber(s.target || 90);
+            const rate = safeNumber(s.satisfactionRate);
+            const cumple = rate >= meta;
+            const colorRate = cumple ? '#047857' : (rate >= 80 ? '#b45309' : '#b91c1c');
+            const bgRate = cumple ? '#ecfdf5' : (rate >= 80 ? '#fffbeb' : '#fef2f2');
+            const adherencia = s.totalSurveys ? Math.round((s.completeSurveys / s.totalSurveys) * 100) : 0;
+
+            // Tarjetas resumen del indicador
+            const resumen = `
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:0.85rem; margin-bottom:1.1rem;">
+                    <div style="background:${bgRate}; border:1px solid ${colorRate}33; border-radius:10px; padding:0.85rem; text-align:center;">
+                        <div style="font-size:1.9rem; font-weight:900; color:${colorRate};">${rate}%</div>
+                        <div style="font-size:0.75rem; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Participantes satisfechos</div>
+                        <div style="font-size:0.78rem; color:${colorRate}; font-weight:700; margin-top:0.2rem;">${cumple ? '✓ Cumple meta' : `✗ Meta ≥ ${meta}%`}</div>
+                    </div>
+                    <div style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:0.85rem; text-align:center;">
+                        <div style="font-size:1.9rem; font-weight:900; color:#111827;">${safeNumber(s.avgOverall).toFixed(2)}</div>
+                        <div style="font-size:0.75rem; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Promedio global / 5.0</div>
+                    </div>
+                    <div style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:0.85rem; text-align:center;">
+                        <div style="font-size:1.9rem; font-weight:900; color:#111827;">${safeNumber(s.satisfiedCount)}/${safeNumber(s.completeSurveys)}</div>
+                        <div style="font-size:0.75rem; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Numerador / Denominador</div>
+                    </div>
+                    <div style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:0.85rem; text-align:center;">
+                        <div style="font-size:1.9rem; font-weight:900; color:#111827;">${adherencia}%</div>
+                        <div style="font-size:0.75rem; color:#64748b; font-weight:700; text-transform:uppercase; letter-spacing:0.4px;">Adherencia a la encuesta</div>
+                        <div style="font-size:0.78rem; color:#64748b; margin-top:0.2rem;">${safeNumber(s.incompleteSurveys)} incompleta(s)</div>
+                    </div>
+                </div>`;
+
+            // Barras por dimensión (sobre 5.0)
+            const dims = (s.byDimension || []).map(d => {
+                const avg = safeNumber(d.avg);
+                const pct = Math.max(0, Math.min(100, (avg / 5) * 100));
+                const c = avg >= 4 ? '#16a34a' : (avg >= 3 ? '#f59e0b' : '#dc2626');
+                return `
+                    <div style="margin-bottom:0.65rem;">
+                        <div style="display:flex; justify-content:space-between; font-size:0.86rem; margin-bottom:0.25rem;">
+                            <span style="font-weight:700; color:#111827;">${esc(d.label)}</span>
+                            <span style="font-weight:800; color:${c};">${avg.toFixed(2)} / 5.0</span>
+                        </div>
+                        <div style="background:#e5e7eb; border-radius:999px; height:9px; overflow:hidden;">
+                            <div style="width:${pct}%; height:100%; background:${c}; border-radius:999px;"></div>
+                        </div>
+                    </div>`;
+            }).join('');
+
+            // Desglose por capacitación
+            const filas = (s.byTraining || []).slice(0, 15).map((t, i) => {
+                const c = t.rate >= meta ? '#047857' : (t.rate >= 80 ? '#b45309' : '#b91c1c');
+                return `
+                    <tr style="border-bottom:1px solid #eef2f7;">
+                        <td style="padding:0.45rem 0.6rem; color:#64748b;">${i + 1}</td>
+                        <td style="padding:0.45rem 0.6rem; font-weight:600; color:#111827;">${esc(t.name)}</td>
+                        <td style="padding:0.45rem 0.6rem; color:#334155;">${esc(t.modalidad)}</td>
+                        <td style="padding:0.45rem 0.6rem; text-align:center; color:#111827;">${safeNumber(t.surveys)}</td>
+                        <td style="padding:0.45rem 0.6rem; text-align:center; color:#111827;">${safeNumber(t.avg).toFixed(2)}</td>
+                        <td style="padding:0.45rem 0.6rem; text-align:center; font-weight:800; color:${c};">${safeNumber(t.rate)}%</td>
+                    </tr>`;
+            }).join('');
+
+            const tabla = filas ? `
+                <div style="overflow-x:auto; margin-top:1rem;">
+                    <div style="font-weight:700; color:#111827; margin-bottom:0.5rem;">Satisfacción por capacitación</div>
+                    <table style="width:100%; border-collapse:collapse; font-size:0.87rem;">
+                        <thead>
+                            <tr style="background:#f8fafc; border-bottom:2px solid #e2e8f0;">
+                                <th style="padding:0.5rem 0.6rem; text-align:left; color:#475569;">#</th>
+                                <th style="padding:0.5rem 0.6rem; text-align:left; color:#475569;">Capacitación</th>
+                                <th style="padding:0.5rem 0.6rem; text-align:left; color:#475569;">Modalidad</th>
+                                <th style="padding:0.5rem 0.6rem; text-align:center; color:#475569;">Encuestas</th>
+                                <th style="padding:0.5rem 0.6rem; text-align:center; color:#475569;">Promedio</th>
+                                <th style="padding:0.5rem 0.6rem; text-align:center; color:#475569;">% Satisfechos</th>
+                            </tr>
+                        </thead>
+                        <tbody>${filas}</tbody>
+                    </table>
+                </div>` : '';
+
+            const nCom = (s.comments || []).length;
+            const comentarios = nCom ? `
+                <div style="margin-top:1rem; background:#eff6ff; border-left:4px solid #3b82f6; border-radius:8px; padding:0.75rem 0.95rem;">
+                    <strong style="color:#1d4ed8;">${nCom} comentario(s) recibido(s)</strong>
+                    <span style="color:#334155; font-size:0.87rem;"> — se exportan completos en la hoja <em>Comentarios Satisfacción</em> del Excel.</span>
+                </div>` : '';
+
+            box.innerHTML = `
+                ${resumen}
+                <div style="background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:0.95rem 1.1rem;">
+                    <div style="font-weight:700; color:#111827; margin-bottom:0.75rem;">Calificación por dimensión</div>
+                    ${dims}
+                </div>
+                ${tabla}
+                ${comentarios}`;
         }
 
         function fillQuarterlyInsights(items) {
@@ -10997,6 +11173,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 vParts: vData.participants || [],
                 insights: (data.insights && data.insights.length) ? data.insights : ['Sin hallazgos automáticos (no hay datos suficientes).'],
                 coverage: data.coverage || { totals: {}, byCargo: [], byProceso: [], byEntidad: [], nonAttendees: [], externos: [] },
+                satisfaction: data.satisfaction || null,
                 charts: [
                     { id: 'qChartParticipantsByDept', title: 'Participaciones por Servicio (Top 10)' },
                     { id: 'qChartTrainingsByMonth',   title: 'Capacitaciones por mes (trimestre)' },
@@ -11414,6 +11591,98 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             }
 
             // ── Hoja 10: Hallazgos ──
+            // ── Hoja: Satisfacción (indicador GTB-CAP-04) ──
+            const sat = m.satisfaction;
+            if (sat && safeNumber(sat.completeSurveys) > 0) {
+                const sSat = wb.addWorksheet('Satisfacción');
+
+                sSat.mergeCells('A1:F1');
+                const satTitle = sSat.getCell('A1');
+                satTitle.value = `SATISFACCIÓN CON EL PROGRAMA DE CAPACITACIÓN — ${m.periodLabel}`;
+                satTitle.fill = TITLE_FILL;
+                satTitle.font = { bold: true, size: 14, color: { argb: 'FFFFFFFF' } };
+                satTitle.alignment = { horizontal: 'center', vertical: 'middle' };
+                sSat.getRow(1).height = 26;
+
+                sSat.addRow([]);
+                sSat.addRow(['Indicador', 'Porcentaje de participantes satisfechos con el programa de capacitación']);
+                sSat.addRow(['Código', 'GTB-CAP-04']);
+                sSat.addRow(['Ficha técnica', 'SLV-SR-03-FT04']);
+                sSat.addRow(['Instrumento', 'SLV-SR-03-F07 — Encuesta Likert de 5 puntos']);
+                sSat.addRow(['Tipo', 'Resultado — Nivel 1 de Kirkpatrick (Reacción / Satisfacción)']);
+                sSat.addRow(['Definición', 'Participantes con promedio ≥ 4,0/5,0 sobre el total de encuestas completas del período']);
+                sSat.addRow(['Meta institucional', `≥ ${safeNumber(sat.target || 90)} %`]);
+                sSat.addRow([]);
+
+                const satKpiHeader = sSat.addRow(['Métrica', 'Valor']);
+                styleHeaderRow(satKpiHeader);
+                const adherenciaSat = safeNumber(sat.totalSurveys)
+                    ? Math.round((safeNumber(sat.completeSurveys) / safeNumber(sat.totalSurveys)) * 100)
+                    : 0;
+                [
+                    ['Numerador (participantes satisfechos)', safeNumber(sat.satisfiedCount)],
+                    ['Denominador (encuestas completas)', safeNumber(sat.completeSurveys)],
+                    ['RESULTADO DEL INDICADOR', `${safeNumber(sat.satisfactionRate)} %`],
+                    ['Cumplimiento de la meta', sat.meetsTarget ? 'CUMPLE' : 'NO CUMPLE'],
+                    ['Calificación promedio global (0-5)', safeNumber(sat.avgOverall)],
+                    ['Encuestas diligenciadas (total)', safeNumber(sat.totalSurveys)],
+                    ['Encuestas incompletas (excluidas)', safeNumber(sat.incompleteSurveys)],
+                    ['Adherencia a la encuesta', `${adherenciaSat} %`],
+                    ['Encuestas de capacitación presencial', safeNumber(sat.byModalidad?.Presencial)],
+                    ['Encuestas de curso virtual', safeNumber(sat.byModalidad?.Virtual)]
+                ].forEach(r => {
+                    const row = sSat.addRow(r);
+                    row.eachCell(cell => { cell.border = BORDER; });
+                    if (r[0] === 'RESULTADO DEL INDICADOR') row.font = { bold: true, size: 12 };
+                });
+
+                sSat.addRow([]);
+                const dimHeader = sSat.addRow(['Dimensión evaluada', 'Promedio (0-5)', 'Respuestas']);
+                styleHeaderRow(dimHeader);
+                (sat.byDimension || []).forEach(d => {
+                    const row = sSat.addRow([d.label || d.key || '', safeNumber(d.avg), safeNumber(d.n)]);
+                    row.eachCell(cell => { cell.border = BORDER; });
+                });
+
+                sSat.addRow([]);
+                const capHeader = sSat.addRow(['Capacitación', 'Modalidad', 'Encuestas', 'Satisfechos', 'Promedio (0-5)', '% Satisfechos']);
+                styleHeaderRow(capHeader);
+                (sat.byTraining || []).forEach(t => {
+                    const row = sSat.addRow([
+                        t.name || '',
+                        t.modalidad || '',
+                        safeNumber(t.surveys),
+                        safeNumber(t.satisfied),
+                        safeNumber(t.avg),
+                        pct(t.rate)
+                    ]);
+                    row.eachCell(cell => { cell.border = BORDER; });
+                    row.getCell(6).numFmt = '0%';
+                });
+
+                sSat.columns.forEach((col, i) => { col.width = [46, 18, 14, 14, 16, 15][i] || 18; });
+
+                // ── Hoja aparte: comentarios completos de los participantes ──
+                const comentarios = sat.comments || [];
+                if (comentarios.length) {
+                    const sCom = wb.addWorksheet('Comentarios Satisfacción');
+                    addTable(sCom,
+                        ['#', 'Fecha', 'Capacitación', 'Promedio (0-5)', 'Comentario y sugerencia de mejora'],
+                        comentarios.map((c, i) => [
+                            i + 1,
+                            c.fecha ? String(c.fecha).slice(0, 10) : '',
+                            c.capacitacion || '',
+                            safeNumber(c.promedio),
+                            c.texto || ''
+                        ]),
+                        [6, 13, 40, 16, 110]
+                    );
+                    // El comentario es texto libre y suele ser largo: ajuste de línea y filas altas.
+                    sCom.getColumn(5).alignment = { wrapText: true, vertical: 'top' };
+                    sCom.eachRow((row, n) => { if (n > 1) row.height = 42; });
+                }
+            }
+
             const s10 = wb.addWorksheet('Hallazgos');
             addTable(s10, ['#', 'Hallazgo / Recomendación'],
                 m.insights.map((s, i) => [i + 1, String(s)]), [6, 130]);
@@ -11456,8 +11725,34 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 ['Reprobados', safeNumber(m.vk.failed)],
                 ['Tasa de aprobación %', safeNumber(m.vk.passRate)],
                 ['Promedio de acierto %', safeNumber(m.vk.avgPercent)],
-                ['Nota promedio (0-5)', safeNumber(m.vk.avgGrade)]
+                ['Nota promedio (0-5)', safeNumber(m.vk.avgGrade)],
+                [],
+                ['SATISFACCIÓN — INDICADOR GTB-CAP-04 (SLV-SR-03-FT04)'],
+                ['Participantes satisfechos %', safeNumber(m.kpis.satisfactionRate)],
+                ['Meta institucional %', safeNumber(m.satisfaction?.target || 90)],
+                ['Cumplimiento', m.satisfaction ? (m.satisfaction.meetsTarget ? 'CUMPLE' : 'NO CUMPLE') : 'Sin datos'],
+                ['Numerador (satisfechos)', safeNumber(m.satisfaction?.satisfiedCount)],
+                ['Denominador (encuestas completas)', safeNumber(m.kpis.satisfactionSurveys)],
+                ['Calificación promedio (0-5)', safeNumber(m.kpis.satisfactionAvg)],
+                ['Encuestas incompletas (excluidas)', safeNumber(m.satisfaction?.incompleteSurveys)]
             ]);
+
+            if (m.satisfaction && safeNumber(m.satisfaction.completeSurveys) > 0) {
+                add('Satisfacción por Dimensión', [
+                    ['Dimensión evaluada', 'Promedio (0-5)', 'Respuestas'],
+                    ...(m.satisfaction.byDimension || []).map(d => [d.label || d.key || '', safeNumber(d.avg), safeNumber(d.n)])
+                ]);
+
+                if ((m.satisfaction.byTraining || []).length) {
+                    add('Satisfacción por Capacitación', [
+                        ['Capacitación', 'Modalidad', 'Encuestas', 'Satisfechos', 'Promedio (0-5)', '% Satisfechos'],
+                        ...m.satisfaction.byTraining.map(t => [
+                            t.name || '', t.modalidad || '', safeNumber(t.surveys),
+                            safeNumber(t.satisfied), safeNumber(t.avg), safeNumber(t.rate)
+                        ])
+                    ]);
+                }
+            }
 
             add('Capacitaciones', [
                 ['Fecha', 'Capacitación', 'Departamento', 'Estado', 'Participaciones', 'Adherencia %', 'Pre prom. %', 'Post prom. %', 'Mejora %', 'Aprobación post %'],
@@ -15657,6 +15952,9 @@ function makeCronogramaFilterFormula(year, tipo) {
         let currentVirtualParticipant = null;
         let currentVirtualResults = [];
         let virtualFinalSummarySaved = false;
+        // Evita que la encuesta de satisfacción se muestre dos veces en un mismo curso virtual
+        // (por ejemplo si el resultado final se dispara y luego se cierra el reproductor).
+        let virtualSatisfactionAsked = false;
 
         // ===== Estado del reproductor de YouTube para cursos virtuales =====
         let virtualYTPlayer = null;          // instancia del reproductor de YouTube
@@ -16284,6 +16582,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             currentVirtualCheckpointKey = null;
             currentVirtualResults = [];
             virtualFinalSummarySaved = false;
+            virtualSatisfactionAsked = false;
             document.getElementById('virtualPlayerTitle').textContent = course.title;
             document.getElementById('virtualPlayerSubtitle').textContent = `${course.description || 'Curso virtual interactivo con preguntas durante el video.'} • Participante: ${participant.name}`;
             document.getElementById('virtualCoursePlayerModal').style.display = 'flex';
@@ -17586,6 +17885,24 @@ function makeCronogramaFilterFormula(year, tipo) {
                 console.warn('No se pudo guardar el resumen final del curso virtual:', err);
             }
 
+            // Encuesta de satisfacción (SLV-SR-03-F07) al cerrar el curso virtual.
+            // Se aplica una sola vez y nunca interrumpe el resultado final.
+            if (!virtualSatisfactionAsked && typeof openSatisfactionSurvey === 'function') {
+                virtualSatisfactionAsked = true;
+                const vp = currentVirtualParticipant || {};
+                await openSatisfactionSurvey({
+                    modalidad: 'Virtual',
+                    capacitacion: currentVirtualCourse?.title || '',
+                    capacitacionId: currentVirtualCourse?.id || '',
+                    cedula: vp.cedula || '',
+                    nombre: vp.name || '',
+                    entidad: vp.entity || '',
+                    proceso: vp.process || '',
+                    perfil: vp.profile || '',
+                    cargo: vp.cargo || ''
+                });
+            }
+
             renderVirtualCourseFinalResultInline(result, passed, unanswered);
         }
 
@@ -17953,6 +18270,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             currentVirtualParticipant = null;
             currentVirtualResults = [];
             virtualFinalSummarySaved = false;
+            virtualSatisfactionAsked = false;
             if (virtualDirectAccessMode) {
                 document.body.classList.add('hslv-participant-flow');
                 Swal.fire({ icon: 'success', title: 'Curso finalizado', text: 'La capacitación ha sido cerrada. Puedes cerrar esta pestaña.', allowOutsideClick: false, allowEscapeKey: false, showConfirmButton: false });
@@ -19151,6 +19469,457 @@ function makeCronogramaFilterFormula(year, tipo) {
         return r;
     };
 })();
+
+
+        // ==================== ENCUESTA DE SATISFACCIÓN (SLV-SR-03-F07) ====================
+        // Instrumento tipo Likert de 5 puntos que se aplica inmediatamente después del
+        // post-test (presencial) y al finalizar un curso virtual. Alimenta el indicador
+        // "Porcentaje de participantes satisfechos con el programa de capacitación"
+        // (ficha técnica SLV-SR-03-FT04, código GTB-CAP-04).
+        //
+        // Regla del indicador: un participante está SATISFECHO cuando el promedio
+        // aritmético de los cinco ítems es >= 4,0/5,0. Las encuestas incompletas
+        // (menos de 5 ítems) se excluyen del denominador y se reportan como no respuesta.
+        (function () {
+            const SAT_TABLE = 'tbl60XZO5ClCvDPQS'; // ID de la tabla "Encuestas Satisfaccion"
+            const SAT_THRESHOLD = 4.0;             // Promedio mínimo para clasificar como satisfecho
+            const SAT_TARGET = 90;                 // Meta institucional del indicador (%)
+
+            // Las cinco dimensiones de la ficha SLV-SR-03-F07, en orden.
+            const SAT_ITEMS = [
+                { key: 'Contenido',   label: 'Contenido',        text: 'Los temas tratados fueron claros, pertinentes y acordes con el equipo biomédico o proceso presentado.' },
+                { key: 'Metodologia', label: 'Metodología',      text: 'La forma en que se desarrolló la capacitación (demostración práctica, material de apoyo, duración) facilitó mi aprendizaje.' },
+                { key: 'Facilitador', label: 'Facilitador',      text: 'El facilitador demostró dominio del tema y resolvió las inquietudes de manera adecuada.' },
+                { key: 'Utilidad',    label: 'Utilidad práctica', text: 'Lo aprendido es aplicable a mis funciones y mejora la seguridad en el uso de la tecnología biomédica.' },
+                { key: 'Logistica',   label: 'Logística',        text: 'El horario, el espacio y los recursos utilizados fueron adecuados para el desarrollo de la actividad.' }
+            ];
+
+            const SAT_SCALE = [
+                { v: 1, t: 'Totalmente en desacuerdo' },
+                { v: 2, t: 'En desacuerdo' },
+                { v: 3, t: 'Ni de acuerdo ni en desacuerdo' },
+                { v: 4, t: 'De acuerdo' },
+                { v: 5, t: 'Totalmente de acuerdo' }
+            ];
+
+            window.SAT_TABLE_ID = SAT_TABLE;
+            window.SAT_ITEMS_DEF = SAT_ITEMS;
+            window.SAT_THRESHOLD = SAT_THRESHOLD;
+            window.SAT_TARGET = SAT_TARGET;
+
+            function satEscape(value) {
+                return String(value === undefined || value === null ? '' : value)
+                    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+            }
+
+            // Etiqueta de trimestre (T1..T4) a partir de una fecha.
+            function satQuarterLabel(date) {
+                const d = date instanceof Date ? date : new Date(date);
+                if (isNaN(d.getTime())) return '';
+                return `T${Math.floor(d.getMonth() / 3) + 1}-${d.getFullYear()}`;
+            }
+            window.satQuarterLabel = satQuarterLabel;
+
+            // Calcula promedio, completitud y clasificación de satisfacción de una respuesta.
+            function satComputeScore(answers) {
+                const values = SAT_ITEMS
+                    .map(it => Number(answers && answers[it.key]))
+                    .filter(n => Number.isFinite(n) && n >= 1 && n <= 5);
+                const answered = values.length;
+                const promedio = answered ? values.reduce((a, b) => a + b, 0) / answered : 0;
+                const completa = answered === SAT_ITEMS.length;
+                return {
+                    answered,
+                    completa,
+                    promedio: Math.round(promedio * 100) / 100,
+                    // Solo una encuesta completa puede clasificarse como satisfecha.
+                    satisfecho: completa && promedio >= SAT_THRESHOLD
+                };
+            }
+            window.satComputeScore = satComputeScore;
+
+            // Construye el HTML del formulario para el modal.
+            function satBuildFormHtml() {
+                const rows = SAT_ITEMS.map((item, idx) => {
+                    const opts = SAT_SCALE.map(s => `
+                        <label class="sat-opt" title="${satEscape(s.t)}">
+                            <input type="radio" name="sat_${item.key}" value="${s.v}">
+                            <span>${s.v}</span>
+                        </label>`).join('');
+                    return `
+                        <div class="sat-row">
+                            <div class="sat-q">
+                                <span class="sat-num">${idx + 1}</span>
+                                <div>
+                                    <div class="sat-dim">${satEscape(item.label)}</div>
+                                    <div class="sat-text">${satEscape(item.text)}</div>
+                                </div>
+                            </div>
+                            <div class="sat-scale">${opts}</div>
+                        </div>`;
+                }).join('');
+
+                return `
+                    <style>
+                        .sat-wrap { text-align:left; font-size:0.93rem; }
+                        .sat-legend { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px;
+                            padding:0.6rem 0.8rem; margin-bottom:0.9rem; color:#166534; font-size:0.82rem; line-height:1.45; }
+                        .sat-row { border:1px solid #e5e7eb; border-radius:10px; padding:0.7rem 0.85rem; margin-bottom:0.6rem; background:#fff; }
+                        .sat-q { display:flex; gap:0.6rem; align-items:flex-start; margin-bottom:0.55rem; }
+                        .sat-num { flex:0 0 auto; width:24px; height:24px; border-radius:50%; background:#2E7D32; color:#fff;
+                            font-weight:800; font-size:0.8rem; display:flex; align-items:center; justify-content:center; }
+                        .sat-dim { font-weight:800; color:#111827; font-size:0.9rem; }
+                        .sat-text { color:#4b5563; font-size:0.82rem; line-height:1.4; margin-top:0.15rem; }
+                        .sat-scale { display:flex; gap:0.4rem; flex-wrap:wrap; padding-left:2.1rem; }
+                        .sat-opt { flex:1; min-width:52px; display:flex; flex-direction:column; align-items:center; gap:0.2rem;
+                            border:1.5px solid #d1d5db; border-radius:8px; padding:0.4rem 0.2rem; cursor:pointer;
+                            font-weight:700; color:#374151; transition:all .15s; background:#fafafa; }
+                        .sat-opt:hover { border-color:#2E7D32; background:#f0fdf4; }
+                        .sat-opt input { accent-color:#2E7D32; cursor:pointer; margin:0; }
+                        .sat-opt:has(input:checked) { border-color:#2E7D32; background:#dcfce7; color:#166534; box-shadow:0 0 0 2px rgba(46,125,50,.15); }
+                        .sat-comment { width:100%; border:1.5px solid #d1d5db; border-radius:8px; padding:0.55rem 0.7rem;
+                            font-family:inherit; font-size:0.88rem; resize:vertical; min-height:64px; outline:none; }
+                        .sat-comment:focus { border-color:#2E7D32; }
+                        .sat-note { color:#6b7280; font-size:0.78rem; margin-top:0.5rem; line-height:1.45; }
+                        @media (max-width:520px) { .sat-scale { padding-left:0; } .sat-opt { min-width:44px; } }
+                    </style>
+                    <div class="sat-wrap">
+                        <div class="sat-legend">
+                            Marca la opción que mejor refleje tu grado de acuerdo con cada afirmación.<br>
+                            <strong>1</strong> = Totalmente en desacuerdo · <strong>2</strong> = En desacuerdo ·
+                            <strong>3</strong> = Ni de acuerdo ni en desacuerdo · <strong>4</strong> = De acuerdo ·
+                            <strong>5</strong> = Totalmente de acuerdo
+                        </div>
+                        ${rows}
+                        <div style="margin-top:0.8rem;">
+                            <label style="font-weight:800; color:#111827; display:block; margin-bottom:0.35rem; font-size:0.88rem;">
+                                Comentarios y sugerencias de mejora (opcional)
+                            </label>
+                            <textarea id="satComentarios" class="sat-comment" placeholder="Escribe aquí tus observaciones..."></textarea>
+                        </div>
+                        <p class="sat-note">
+                            Esta encuesta se usa con fines estadísticos y su diligenciamiento toma menos de un minuto.
+                            Los resultados alimentan el indicador institucional de satisfacción del programa de capacitaciones
+                            (SLV-SR-03-FT04) y el plan de mejoramiento.
+                        </p>
+                    </div>`;
+            }
+            window.satBuildFormHtml = satBuildFormHtml;
+
+            // Lee las respuestas marcadas en el modal.
+            function satReadForm() {
+                const answers = {};
+                SAT_ITEMS.forEach(item => {
+                    const checked = document.querySelector(`input[name="sat_${item.key}"]:checked`);
+                    if (checked) answers[item.key] = Number(checked.value);
+                });
+                const comentarios = (document.getElementById('satComentarios')?.value || '').trim();
+                return { answers, comentarios };
+            }
+
+            // Guarda la encuesta en Airtable. Nunca lanza: la encuesta no debe bloquear
+            // el cierre de la capacitación si Airtable falla.
+            async function satSaveRecord(ctx, answers, comentarios) {
+                const score = satComputeScore(answers);
+                const now = new Date();
+                const capName = String(ctx.capacitacion || '').trim();
+                const ced = String(ctx.cedula || '').trim();
+
+                const fields = {
+                    'Registro': `${capName || 'Capacitación'} · ${ced || 's/c'} · ${now.toISOString().slice(0, 10)}`,
+                    'Fecha': now.toISOString(),
+                    'Modalidad': ctx.modalidad === 'Virtual' ? 'Virtual' : 'Presencial',
+                    'Capacitacion': capName,
+                    'Capacitacion ID': String(ctx.capacitacionId || ''),
+                    'Cedula': ced,
+                    'Nombre': String(ctx.nombre || '').trim(),
+                    'Contenido': answers.Contenido ?? null,
+                    'Metodologia': answers.Metodologia ?? null,
+                    'Facilitador': answers.Facilitador ?? null,
+                    'Utilidad': answers.Utilidad ?? null,
+                    'Logistica': answers.Logistica ?? null,
+                    'Promedio': score.promedio,
+                    'Satisfecho': score.satisfecho,
+                    'Items Respondidos': score.answered,
+                    'Completa': score.completa,
+                    'Comentarios': comentarios || '',
+                    'Trimestre': satQuarterLabel(now),
+                    'Anio': now.getFullYear()
+                };
+
+                // Datos institucionales: solo se envían si tienen valor.
+                const inst = { 'Entidad': ctx.entidad, 'Proceso': ctx.proceso, 'Perfil': ctx.perfil, 'Cargo': ctx.cargo };
+                Object.entries(inst).forEach(([k, v]) => {
+                    const val = String(v || '').trim();
+                    if (val) fields[k] = val;
+                });
+
+                // Quitar los ítems no contestados para no enviar null a Airtable.
+                Object.keys(fields).forEach(k => { if (fields[k] === null) delete fields[k]; });
+
+                await airtableProxyRequest({
+                    method: 'POST',
+                    path: `/${SAT_TABLE}`,
+                    body: { fields }
+                });
+                return score;
+            }
+
+            // Muestra la encuesta. Resuelve siempre (guardada, omitida o fallida)
+            // para no interrumpir el cierre de la capacitación.
+            window.openSatisfactionSurvey = async function (ctx) {
+                ctx = ctx || {};
+                try {
+                    const result = await Swal.fire({
+                        title: 'Encuesta de satisfacción',
+                        html: satBuildFormHtml(),
+                        width: 720,
+                        showCancelButton: true,
+                        confirmButtonText: 'Enviar encuesta',
+                        cancelButtonText: 'Omitir',
+                        confirmButtonColor: '#2E7D32',
+                        cancelButtonColor: '#9ca3af',
+                        allowOutsideClick: false,
+                        allowEscapeKey: false,
+                        focusConfirm: false,
+                        preConfirm: () => {
+                            const { answers, comentarios } = satReadForm();
+                            const missing = SAT_ITEMS.filter(it => !answers[it.key]);
+                            if (missing.length) {
+                                Swal.showValidationMessage(
+                                    `Responde los ${missing.length} ítem(s) pendiente(s): ${missing.map(m => m.label).join(', ')}`
+                                );
+                                return false;
+                            }
+                            return { answers, comentarios };
+                        }
+                    });
+
+                    if (!result.isConfirmed || !result.value) {
+                        console.log('ℹ️ Encuesta de satisfacción omitida por el participante.');
+                        return { saved: false, skipped: true };
+                    }
+
+                    Swal.fire({
+                        title: 'Guardando encuesta...',
+                        allowOutsideClick: false,
+                        didOpen: () => Swal.showLoading()
+                    });
+
+                    const score = await satSaveRecord(ctx, result.value.answers, result.value.comentarios);
+                    Swal.close();
+
+                    await Swal.fire({
+                        icon: 'success',
+                        title: '¡Gracias por tu respuesta!',
+                        html: `
+                            <p style="margin:0.25rem 0 0.75rem 0; color:#374151;">
+                                Tu valoración promedio fue
+                                <strong style="color:#2E7D32; font-size:1.15rem;">${score.promedio.toFixed(1)} / 5.0</strong>
+                            </p>
+                            <p style="margin:0; color:#6b7280; font-size:0.88rem;">
+                                Tu opinión alimenta el plan de mejoramiento del programa institucional de capacitaciones.
+                            </p>`,
+                        confirmButtonText: 'Continuar',
+                        confirmButtonColor: '#2E7D32',
+                        allowOutsideClick: false
+                    });
+
+                    return { saved: true, skipped: false, score };
+                } catch (err) {
+                    console.warn('⚠️ No se pudo guardar la encuesta de satisfacción:', err);
+                    try { Swal.close(); } catch (e) { /* noop */ }
+                    await Swal.fire({
+                        icon: 'warning',
+                        title: 'No se pudo registrar la encuesta',
+                        text: 'Tu evaluación sí quedó guardada. Puedes continuar sin problema.',
+                        confirmButtonText: 'Continuar',
+                        confirmButtonColor: '#2E7D32'
+                    });
+                    return { saved: false, skipped: false, error: err };
+                }
+            };
+
+            // ── Consulta y agregación para los reportes ──
+
+            let satRecordsCache = null;
+
+            window.fetchSatisfactionRecords = async function (forceReload = false) {
+                if (!forceReload && Array.isArray(satRecordsCache)) return satRecordsCache;
+                try {
+                    const records = await airtableFetchAll(`/${SAT_TABLE}`);
+                    satRecordsCache = Array.isArray(records) ? records : [];
+                } catch (err) {
+                    console.warn('⚠️ No se pudieron cargar las encuestas de satisfacción:', err);
+                    satRecordsCache = [];
+                }
+                return satRecordsCache;
+            };
+
+            // Consolidación por agregación ponderada: se suman numeradores y denominadores
+            // de todas las capacitaciones del período (NO se promedian porcentajes),
+            // conforme a la metodología de la ficha técnica SLV-SR-03-FT04.
+            window.buildSatisfactionStats = function (records, dateStart, dateEnd) {
+                const empty = {
+                    totalSurveys: 0, completeSurveys: 0, incompleteSurveys: 0,
+                    satisfiedCount: 0, satisfactionRate: 0, avgOverall: 0,
+                    target: SAT_TARGET, meetsTarget: false,
+                    byDimension: SAT_ITEMS.map(i => ({ key: i.key, label: i.label, avg: 0, n: 0 })),
+                    byTraining: [], byModalidad: { Presencial: 0, Virtual: 0 }, comments: []
+                };
+                if (!Array.isArray(records) || !records.length) return empty;
+
+                const start = dateStart ? new Date(`${dateStart}T00:00:00`) : null;
+                const end = dateEnd ? new Date(`${dateEnd}T23:59:59`) : null;
+
+                const scoped = records.filter(r => {
+                    const raw = r?.fields?.['Fecha'];
+                    if (!raw) return false;
+                    const d = new Date(raw);
+                    if (isNaN(d.getTime())) return false;
+                    if (start && d < start) return false;
+                    if (end && d > end) return false;
+                    return true;
+                });
+
+                if (!scoped.length) return empty;
+
+                const dimSums = {};
+                const dimCounts = {};
+                SAT_ITEMS.forEach(i => { dimSums[i.key] = 0; dimCounts[i.key] = 0; });
+
+                const trainingMap = {};
+                const byModalidad = { Presencial: 0, Virtual: 0 };
+                const comments = [];
+                let completeSurveys = 0;
+                let satisfiedCount = 0;
+                let sumPromedios = 0;
+
+                scoped.forEach(r => {
+                    const f = r.fields || {};
+                    const answers = {};
+                    SAT_ITEMS.forEach(i => {
+                        const v = Number(f[i.key]);
+                        if (Number.isFinite(v) && v >= 1 && v <= 5) answers[i.key] = v;
+                    });
+                    const score = satComputeScore(answers);
+
+                    const modalidad = f['Modalidad'] === 'Virtual' ? 'Virtual' : 'Presencial';
+                    byModalidad[modalidad] = (byModalidad[modalidad] || 0) + 1;
+
+                    const comentario = String(f['Comentarios'] || '').trim();
+                    if (comentario) {
+                        comments.push({
+                            texto: comentario,
+                            capacitacion: String(f['Capacitacion'] || '').trim(),
+                            promedio: score.promedio,
+                            fecha: f['Fecha'] || ''
+                        });
+                    }
+
+                    // Las encuestas incompletas se excluyen del denominador del indicador.
+                    if (!score.completa) return;
+
+                    completeSurveys++;
+                    sumPromedios += score.promedio;
+                    if (score.satisfecho) satisfiedCount++;
+
+                    SAT_ITEMS.forEach(i => {
+                        if (answers[i.key]) { dimSums[i.key] += answers[i.key]; dimCounts[i.key]++; }
+                    });
+
+                    const cap = String(f['Capacitacion'] || 'Sin especificar').trim() || 'Sin especificar';
+                    if (!trainingMap[cap]) trainingMap[cap] = { name: cap, n: 0, satisfied: 0, sum: 0, modalidad };
+                    trainingMap[cap].n++;
+                    trainingMap[cap].sum += score.promedio;
+                    if (score.satisfecho) trainingMap[cap].satisfied++;
+                });
+
+                const satisfactionRate = completeSurveys ? Math.round((satisfiedCount / completeSurveys) * 100) : 0;
+                const avgOverall = completeSurveys ? Math.round((sumPromedios / completeSurveys) * 100) / 100 : 0;
+
+                const byDimension = SAT_ITEMS.map(i => ({
+                    key: i.key,
+                    label: i.label,
+                    n: dimCounts[i.key],
+                    avg: dimCounts[i.key] ? Math.round((dimSums[i.key] / dimCounts[i.key]) * 100) / 100 : 0
+                }));
+
+                const byTraining = Object.values(trainingMap).map(t => ({
+                    name: t.name,
+                    modalidad: t.modalidad,
+                    surveys: t.n,
+                    satisfied: t.satisfied,
+                    rate: t.n ? Math.round((t.satisfied / t.n) * 100) : 0,
+                    avg: t.n ? Math.round((t.sum / t.n) * 100) / 100 : 0
+                })).sort((a, b) => b.surveys - a.surveys);
+
+                return {
+                    totalSurveys: scoped.length,
+                    completeSurveys,
+                    incompleteSurveys: scoped.length - completeSurveys,
+                    satisfiedCount,
+                    satisfactionRate,
+                    avgOverall,
+                    target: SAT_TARGET,
+                    meetsTarget: satisfactionRate >= SAT_TARGET,
+                    byDimension,
+                    byTraining,
+                    byModalidad,
+                    // Sin tope: los comentarios se exportan completos en su propia hoja de Excel.
+                    comments
+                };
+            };
+
+            // Hallazgos automáticos del indicador, con la interpretación de la ficha técnica.
+            window.buildSatisfactionInsights = function (s) {
+                const out = [];
+                if (!s || !s.completeSurveys) {
+                    out.push('ℹ️ Aún no hay encuestas de satisfacción diligenciadas en el período. El indicador GTB-CAP-04 se calculará cuando los participantes respondan el instrumento SLV-SR-03-F07 al finalizar el post-test.');
+                    return out;
+                }
+
+                if (s.satisfactionRate >= SAT_TARGET) {
+                    out.push(`✅ El ${s.satisfactionRate}% de los participantes se declaró satisfecho con el programa de capacitación (${s.satisfiedCount}/${s.completeSurveys}), cumpliendo la meta institucional (≥${SAT_TARGET}%). Indica alta aceptación del programa.`);
+                } else if (s.satisfactionRate >= 80) {
+                    out.push(`⚠️ La satisfacción fue del ${s.satisfactionRate}% (${s.satisfiedCount}/${s.completeSurveys}), por debajo de la meta institucional (≥${SAT_TARGET}%). Se requiere plan de mejoramiento sobre las dimensiones con menor puntaje.`);
+                } else {
+                    out.push(`🔴 La satisfacción fue del ${s.satisfactionRate}% (${s.satisfiedCount}/${s.completeSurveys}), muy por debajo de la meta (≥${SAT_TARGET}%). Se requiere revisión integral de metodología, contenido y logística del programa.`);
+                }
+
+                out.push(`📊 La calificación promedio global fue de ${s.avgOverall.toFixed(2)}/5.0 sobre ${s.completeSurveys} encuesta(s) completa(s).`);
+
+                const ordered = (s.byDimension || []).filter(d => d.n > 0).slice().sort((a, b) => a.avg - b.avg);
+                if (ordered.length) {
+                    const peor = ordered[0];
+                    const mejor = ordered[ordered.length - 1];
+                    // Si todas las dimensiones empatan no tiene sentido hablar de "mejor" y "peor".
+                    if (mejor.avg > peor.avg) {
+                        out.push(`🏅 La dimensión mejor evaluada fue "${mejor.label}" (${mejor.avg.toFixed(2)}/5.0) y la de menor puntaje "${peor.label}" (${peor.avg.toFixed(2)}/5.0).`);
+                    } else {
+                        out.push(`🏅 Las cinco dimensiones evaluadas obtuvieron una calificación homogénea de ${mejor.avg.toFixed(2)}/5.0.`);
+                    }
+                    if (peor.avg < SAT_THRESHOLD) {
+                        out.push(`📌 La dimensión "${peor.label}" quedó por debajo del umbral de satisfacción (4,0/5,0). Se recomienda priorizarla en el plan de mejoramiento del programa.`);
+                    }
+                }
+
+                if (s.incompleteSurveys > 0) {
+                    const tasa = s.totalSurveys ? Math.round((s.completeSurveys / s.totalSurveys) * 100) : 0;
+                    out.push(`📋 Se registraron ${s.incompleteSurveys} encuesta(s) incompleta(s), excluida(s) del denominador. La adherencia a la encuesta fue del ${tasa}%.`);
+                }
+
+                const bajos = (s.byTraining || []).filter(t => t.surveys >= 3 && t.rate < 80);
+                if (bajos.length) {
+                    out.push(`⚠️ Capacitaciones con satisfacción inferior al 80%: ${bajos.slice(0, 5).map(t => `${t.name} (${t.rate}%)`).join(', ')}.`);
+                }
+
+                out.push('🔎 El indicador mide percepción (Nivel 1 de Kirkpatrick), no aprendizaje ni transferencia al puesto de trabajo; debe analizarse junto con la adherencia y la aprobación del post-test.');
+                return out;
+            };
+        })();
+
 </script>
 
 </body>
