@@ -3478,9 +3478,12 @@
                     </div>
                     
                     <!-- Botones de acción -->
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.75rem;">
                         <button class="btn btn-primary" onclick="downloadQRCode()" style="margin: 0;">
                             <i class="fas fa-download"></i> Descargar
+                        </button>
+                        <button class="btn btn-success" onclick="shareWhatsApp()" style="margin: 0;">
+                            <i class="fab fa-whatsapp"></i> WhatsApp
                         </button>
                         <button class="btn btn-secondary" onclick="closeQRModal()" style="margin: 0;">
                             <i class="fas fa-times"></i> Cerrar
@@ -4756,29 +4759,7 @@
         </footer>
     </div>
 
-    <!-- QR Modal -->
-    <div id="qrModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
-            <h2>📱 Código QR de Acceso</h2>
-            <div id="qrcode" class="qr-container"></div>
-            <div class="access-info">
-                <p><strong>Código:</strong> <span id="modalAccessCode"></span></p>
-                <p><strong>Link:</strong> <span id="modalAccessLink"></span></p>
-            </div>
-            <div class="modal-actions">
-                <button class="btn btn-primary" onclick="copyLink()">
-                    <i class="fas fa-copy"></i> Copiar
-                </button>
-                <button class="btn btn-success" onclick="shareWhatsApp()">
-                    <i class="fab fa-whatsapp"></i> WhatsApp
-                </button>
-                <button class="btn btn-info" onclick="downloadQR()">
-                    <i class="fas fa-download"></i> Descargar
-                </button>
-            </div>
-        </div>
-    </div>
+    <!-- QR Modal legacy eliminado: se usa #qrGenerationModal -->
 
     <!-- Modal de Registro de Participante -->
     <div id="participantRegistrationModal" class="modal" style="display: none;">
@@ -8107,27 +8088,56 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         }
 
         function showQRCode(accessCode, title) {
-            const qrContainer = document.getElementById('qrCode');
-            if (!qrContainer) return;
-            qrContainer.innerHTML = '';
-            const accessUrl = (window.location.origin + window.location.pathname) + '?code=' + accessCode;
-            new QRCode(qrContainer, { text: accessUrl, width: 300, height: 300, colorDark: '#000000', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.H });
-            const qrUrlInput = document.getElementById('qrUrl');
-            if (qrUrlInput) qrUrlInput.value = accessUrl;
-            window.currentQRData = { url: accessUrl, code: accessCode, title: title || '' };
-            document.getElementById('qrModal').style.display = 'flex';
+            try {
+                if (typeof QRCode === 'undefined') {
+                    throw new Error('La librería QRCode.js no se cargó. Verifica tu conexión a internet.');
+                }
+
+                const qrContainer = document.getElementById('qrCode');
+                if (!qrContainer) {
+                    throw new Error('No se encontró el contenedor del QR (#qrCode)');
+                }
+                qrContainer.innerHTML = '';
+
+                const accessUrl = (window.location.origin + window.location.pathname) + '?code=' + accessCode;
+
+                new QRCode(qrContainer, {
+                    text: accessUrl,
+                    width: 300,
+                    height: 300,
+                    colorDark: '#000000',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.H
+                });
+
+                const qrUrlInput = document.getElementById('qrUrl');
+                if (qrUrlInput) qrUrlInput.value = accessUrl;
+
+                window.currentQRData = { url: accessUrl, code: accessCode, title: title || '' };
+
+                // ✅ Modal correcto: #qrGenerationModal (antes apuntaba a #qrModal, que ya no existe)
+                document.getElementById('qrGenerationModal').style.display = 'flex';
+
+            } catch (error) {
+                console.error('❌ Error generando QR:', error);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo generar el código QR: ' + error.message
+                });
+            }
         }
 
         function closeModal() {
-            document.getElementById('qrModal').style.display = 'none';
+            closeQRModal();
         }
 
         function copyLink() {
-            const link = document.getElementById('modalAccessLink').textContent;
-            const code = document.getElementById('modalAccessCode').textContent;
-            
-            const text = `🏥 Acceso a Capacitación\n\nCódigo: ${code}\nLink: ${link}\n\nHospital Susana López de Valencia`;
-            
+            const data = window.currentQRData;
+            if (!data) return;
+
+            const text = `🏥 Acceso a Capacitación\n\nCódigo: ${data.code}\nLink: ${data.url}\n\nHospital Susana López de Valencia`;
+
             navigator.clipboard.writeText(text).then(() => {
                 Swal.fire({
                     icon: 'success',
@@ -8140,34 +8150,16 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         }
 
         function shareWhatsApp() {
-            const code = document.getElementById('modalAccessCode').textContent;
-            const link = document.getElementById('modalAccessLink').textContent;
-            
-            const message = `🏥 *Acceso a Capacitación*\nHospital Susana López de Valencia\n\n*Código:* ${code}\n*Link:* ${link}`;
+            const data = window.currentQRData;
+            if (!data) return;
+
+            const message = `🏥 *Acceso a Capacitación*\nHospital Susana López de Valencia\n\n*Capacitación:* ${data.title || ''}\n*Código:* ${data.code}\n*Link:* ${data.url}`;
             const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(message)}`;
             window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
         }
 
         function downloadQR() {
-            const canvas = document.querySelector('#qrcode canvas');
-            if (canvas) {
-                canvas.toBlob(blob => {
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    const code = document.getElementById('modalAccessCode').textContent;
-                    link.download = `QR-${code}.png`;
-                    link.href = url;
-                    link.click();
-                    URL.revokeObjectURL(url);
-                    
-                    Swal.fire({
-                        icon: 'success',
-                        title: 'Descargado',
-                        timer: 2000,
-                        showConfirmButton: false
-                    });
-                });
-            }
+            downloadQRCode();
         }
 
         function resetForm() {
@@ -8543,10 +8535,6 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const detailsModal = document.getElementById('detailsModal');
             if (event.target === detailsModal) {
                 closeDetailsModal();
-            }
-            const qrModal = document.getElementById('qrModal');
-            if (event.target === qrModal) {
-                closeModal();
             }
             const qrGenerationModal = document.getElementById('qrGenerationModal');
             if (event.target === qrGenerationModal) {
@@ -8956,14 +8944,16 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             try {
                 const qrContainer = document.getElementById('qrCode');
                 const qrImage = qrContainer.querySelector('img');
-                
-                if (!qrImage) {
+                const qrCanvas = qrContainer.querySelector('canvas');
+                const dataUrl = (qrImage && qrImage.src) || (qrCanvas && qrCanvas.toDataURL('image/png'));
+
+                if (!dataUrl) {
                     throw new Error('No se encontró la imagen del QR');
                 }
                 
                 // Crear elemento de descarga
                 const link = document.createElement('a');
-                link.href = qrImage.src;
+                link.href = dataUrl;
                 link.download = `QR-${window.currentQRData.code}-${window.currentQRData.title.replace(/\s+/g, '-')}.png`;
                 document.body.appendChild(link);
                 link.click();
