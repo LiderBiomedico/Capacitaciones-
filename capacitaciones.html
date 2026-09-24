@@ -7947,6 +7947,28 @@ function getSelectedStaff() {
   }, []);
 }
 
+        // Detecta opciones del tipo "A y B son correctas" / "Todas las anteriores" cuya letra no es la marcada
+        function findSuspiciousAnswerKeys(questions, label) {
+            const out = [];
+            const norm = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/^\s*[a-d]\s*[\).:-]\s*/, '').trim();
+            (questions || []).forEach((q, i) => {
+                const marked = String(q.correctAnswer || '').toLowerCase();
+                ['a', 'b', 'c', 'd'].forEach(letter => {
+                    const t = norm(q.options?.[letter]);
+                    const combo = t.match(/\b([a-d])\s*(?:,|y|e)\s*([a-d])\b.*correct/) || t.match(/\bopciones?\s+([a-d])\s*(?:,|y|e)\s*([a-d])\b/);
+                    const todas = /todas\s+(las\s+)?(anteriores|opciones|son correctas)/.test(t);
+                    if (!combo && !todas) return;
+                    if (letter === marked) return;
+                    const incluidas = combo ? [combo[1], combo[2]] : ['a', 'b', 'c', 'd'].filter(l => l !== letter);
+                    if (incluidas.includes(marked)) {
+                        const qText = String(q.question || '').slice(0, 90);
+                        out.push(`<strong>${label} · Pregunta ${i + 1}:</strong> ${escapeHtml(qText)}<br><span style="color:#92400e;">Marcada: ${marked.toUpperCase()} · La opción ${letter.toUpperCase()} dice "${escapeHtml(q.options[letter])}"</span>`);
+                    }
+                });
+            });
+            return out;
+        }
+
         async function saveTraining() {
     const titleInput=document.getElementById('trainingTitle'),descInput=document.getElementById('trainingDescription'),dateInput=document.getElementById('trainingDate'),deptInput=document.getElementById('trainingDepartment'),durationInput=document.getElementById('trainingDuration'),expositorInput=document.getElementById('trainingExpositor'),referenteInput=document.getElementById('trainingReferente'),methodInput=document.getElementById('trainingMethodology'),placeInput=document.getElementById('trainingPlace'),eventDateInput=document.getElementById('trainingEventDate');
     const title=titleInput?titleInput.value.trim():'',description=descInput?descInput.value.trim():'',trainingDate=dateInput?dateInput.value:'',department=deptInput?deptInput.value:'',duration=durationInput?durationInput.value.trim():'',expositor=expositorInput?expositorInput.value.trim():'',referente=referenteInput?referenteInput.value.trim():'',methodology=methodInput?methodInput.value:'',place=placeInput?placeInput.value.trim():'',eventDate=eventDateInput?eventDateInput.value:'';
@@ -7963,6 +7985,29 @@ function getSelectedStaff() {
     const postestQuestions=collectQuestions('postest');
     if(postestQuestions===null)return;
     if(postestQuestions.length===0){Swal.fire({icon:'warning',title:'Sin Preguntas de Post-test',text:'Agrega al menos una pregunta al Post-test'});document.getElementById('postestQuestions').scrollIntoView({behavior:'smooth'});return;}
+
+    // Validación de clave de respuestas: si una opción dice "A y B son correctas", "B y C…",
+    // "Todas las anteriores", etc., y se marcó como correcta una sola de las opciones que ella
+    // incluye, el participante que responde bien queda calificado como incorrecto.
+    const suspiciousKeys = findSuspiciousAnswerKeys(pretestQuestions, 'Pre-test').concat(findSuspiciousAnswerKeys(postestQuestions, 'Post-test'));
+    if (suspiciousKeys.length) {
+        const check = await Swal.fire({
+            icon: 'warning',
+            title: 'Revisa la respuesta correcta',
+            html: `<div style="text-align:left; font-size:0.95rem;">
+                <p style="margin:0 0 0.6rem 0;">Estas preguntas tienen una opción combinada, pero la respuesta marcada es otra:</p>
+                <ul style="margin:0; padding-left:1.2rem;">${suspiciousKeys.map(w => `<li style="margin-bottom:0.4rem;">${w}</li>`).join('')}</ul>
+                <p style="margin:0.8rem 0 0 0;">Si el participante elige la opción combinada, el sistema la calificará como incorrecta.</p>
+            </div>`,
+            showCancelButton: true,
+            confirmButtonText: 'Guardar de todos modos',
+            cancelButtonText: 'Corregir',
+            confirmButtonColor: '#6b7280',
+            cancelButtonColor: '#2E7D32',
+            focusCancel: true
+        });
+        if (!check.isConfirmed) return;
+    }
 
     const accessCode = generateAccessCode();
     const createdAtISO = new Date().toISOString();
