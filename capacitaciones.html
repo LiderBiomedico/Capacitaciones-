@@ -5180,9 +5180,15 @@
             box.innerHTML = message;
         }
 
+        function getPersonalKnownColumns() {
+            // Airtable omite los campos vacíos: se unen las columnas de todos los registros
+            const set = new Set(PERSONAL_HSLV_KNOWN_COLUMNS);
+            (personalData || []).forEach(r => Object.keys(r || {}).forEach(k => { if (k !== 'id') set.add(k); }));
+            return Array.from(set);
+        }
+
         function buildPersonalRegistrationFieldConfig() {
-            const sample = personalData.find(r => Object.keys(r || {}).length > 1) || personalData[0] || {};
-            const cols = Object.keys(sample).filter(c => c !== 'id');
+            const cols = getPersonalKnownColumns();
             const used = new Set();
             const pick = (aliases) => {
                 const col = detectarCampo(cols, aliases);
@@ -5210,13 +5216,14 @@
             pushField(['CONTRATO', 'Contrato'], 'Contrato', 'text', true);
             pushField(['UBICACIÓN', 'Ubicacion', 'Ubicación', 'SEDE', 'Sede'], 'Ubicación', 'text', true);
 
-            const ignoredNorms = new Set(['name', 'notes', 'assignee', 'status', 'attachments', 'attachment summary']);
+            const ignoredNorms = new Set(['name', 'notes', 'assignee', 'status', 'attachments', 'attachment summary', 'capacitaciones realizadas']);
             cols.forEach(col => {
                 const norm = normStr(col);
                 if (used.has(col)) return;
                 if (ignoredNorms.has(norm)) return;
                 if (norm.startsWith('attachment')) return;
-                config.push({ key: col, label: col, type: 'text', required: false, extra: true });
+                const isNumeric = ['hijos'].includes(norm);
+                config.push({ key: col, label: col, type: isNumeric ? 'number' : 'text', required: false, extra: true });
             });
             return config;
         }
@@ -5312,9 +5319,6 @@
         }
 
         async function registrarNuevoParticipanteEnPersonalHSLV() {
-            if (!personalDbLoaded || personalData.length === 0) {
-                await recargarListaBD();
-            }
             if (!participantManualFieldConfig.length) participantManualFieldConfig = buildPersonalRegistrationFieldConfig();
             const values = getParticipantManualRegistrationValues();
             const missing = [];
@@ -5352,12 +5356,27 @@
                 return raw;
             };
 
+            const emailKey = detectarCampo(detectedKeys, ['EMAIL', 'Correo', 'Correo Electrónico', 'Correo electronico', 'E-mail']);
+            if (emailKey && values[emailKey] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values[emailKey])) {
+                throw new Error('El correo electrónico no es válido. Revísalo e inténtalo de nuevo.');
+            }
+            const requestedCed = cedulaKey ? normDoc(values[cedulaKey]) : '';
+            if (requestedCed && (await buscarRegistrosPersonalPorCedula(requestedCed, { force: true })).length) {
+                throw new Error(`La cédula ${requestedCed} ya está registrada en Personal HSLV. Vuelve a consultarla con el botón de cargar datos.`);
+            }
+
             const fields = {};
             Object.entries(values).forEach(([k, v]) => {
                 if (v === '') return;
                 let finalValue = v;
-                if (k === cedulaKey || k === contactoKey) {
-                    finalValue = normalizarNumero(v);
+                if (k === cedulaKey) {
+                    finalValue = normalizarNumero(v);           // CEDULA es campo Number
+                } else if (k === contactoKey) {
+                    finalValue = String(v).replace(/[^\d+]/g, ''); // CONTACTO es Phone number: requiere texto
+                } else if (normStr(k) === 'hijos') {
+                    const n = Number(String(v).replace(',', '.'));
+                    if (!Number.isFinite(n)) return;
+                    finalValue = n;
                 } else if (k === fechaNacimientoKey) {
                     finalValue = normalizarFechaAirtable(v);
                 } else if (k === nombreKey || k === generoKey) {
@@ -5367,6 +5386,7 @@
             });
 
             const sequentialNameInfo = (() => {
+                return null; // 'Name' es autonumérico en Personal HSLV: Airtable lo asigna solo
                 const nameKey = pickExistingFieldName(detectedKeys, ['Name']);
                 if (!nameKey) return null;
                 if (fields[nameKey] !== undefined && fields[nameKey] !== null && String(fields[nameKey]).trim() !== '') return null;
@@ -5389,8 +5409,8 @@
 
             const created = await airtableProxyRequest({
                 method: 'POST',
-                path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}`,
-                body: { fields }
+                path: `/${PERSONAL_HSLV_TABLE_ID}`,
+                body: { fields, typecast: true }
             });
 
             const createdFields = { ...(created.fields || {}) };
@@ -5402,8 +5422,8 @@
                 try {
                     const patched = await airtableProxyRequest({
                         method: 'PATCH',
-                        path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}/${encodeURIComponent(created.id)}`,
-                        body: { fields: patchFields }
+                        path: `/${PERSONAL_HSLV_TABLE_ID}/${encodeURIComponent(created.id)}`,
+                        body: { fields: patchFields, typecast: true }
                     });
                     Object.assign(createdFields, patched.fields || patchFields);
                 } catch (patchErr) {
@@ -5418,8 +5438,8 @@
                     try {
                         const patched = await airtableProxyRequest({
                             method: 'PATCH',
-                            path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}/${encodeURIComponent(created.id)}`,
-                            body: { fields: patchFields }
+                            path: `/${PERSONAL_HSLV_TABLE_ID}/${encodeURIComponent(created.id)}`,
+                            body: { fields: patchFields, typecast: true }
                         });
                         Object.assign(createdFields, patched.fields || patchFields);
                     } catch (patchErr) {
@@ -5429,9 +5449,11 @@
             }
 
             const row = { id: created.id, ...fields, ...createdFields };
-            personalData.unshift(row);
-            personalDbLoaded = true;
-            await recargarListaBD();
+            if (personalDbLoaded) personalData.unshift(row);
+            if (requestedCed) {
+                const { id: _rid, ...rowFields } = row;
+                personalCedulaCache.set(requestedCed.replace(/\D/g, ''), [{ id: created.id, fields: rowFields }]);
+            }
             return row;
         }
 
@@ -5528,31 +5550,11 @@
                     loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando';
                 }
 
-                await ensurePersonalDbLoaded(false);
-                if (!personalDbLoaded || personalData.length === 0) {
-                    throw new Error('No fue posible cargar la tabla Personal HSLV.');
-                }
-
-                const sample = personalData.find(r => Object.keys(r || {}).length > 1) || personalData[0] || {};
-                const cols = Object.keys(sample).filter(c => c !== 'id');
-                const colCedula    = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
-                const colNombre    = detectarCampo(cols, ['NOMBRE', 'Nombre Completo', 'Nombre', 'Nombres']);
-                const colEntidad   = detectarCampo(cols, ['ENTIDAD', 'Empresa']);
-                const colPerfil    = detectarCampo(cols, ['PERFIL', 'Perfil']);
-                const colCargo     = detectarCampo(cols, ['CARGO', 'Cargo', 'Profesión', 'Profesion']);
-                const colProceso   = detectarCampo(cols, ['PROCESO', 'Proceso']);
-                const colArea      = detectarCampo(cols, ['AREA', 'Área', 'Area', 'Servicio', 'Departamento']);
-                const colGenero    = detectarCampo(cols, ['GENERO', 'Género', 'Genero', 'Sexo']);
-                const colNacimiento= detectarCampo(cols, ['F.NACIMIENTO', 'Fecha Nacimiento', 'Nacimiento']);
-                const colEmail     = detectarCampo(cols, ['EMAIL', 'Correo', 'Correo Electrónico', 'Correo electronico', 'E-mail']);
-                const colContacto  = detectarCampo(cols, ['CONTACTO', 'Telefono', 'Teléfono', 'Celular']);
-                const colContrato  = detectarCampo(cols, ['CONTRATO', 'Contrato']);
-                const colUbicacion = detectarCampo(cols, ['UBICACIÓN', 'Ubicacion', 'Ubicación', 'SEDE', 'Sede']);
-
-                if (!colCedula) throw new Error('La tabla Personal HSLV no tiene un campo de cédula identificable.');
-
                 const cedulaBuscada = normDoc(cedula);
-                const row = personalData.find(r => normDoc(r[colCedula]) === cedulaBuscada);
+                const matches = await buscarRegistrosPersonalPorCedula(cedulaBuscada);
+                const rec = matches[0] || null;
+                const row = rec ? { id: rec.id, ...(rec.fields || {}) } : null;
+                const cols = row ? Object.keys(row).filter(c => c !== 'id') : [];
                 if (!row) {
                     clearParticipantFields();
                     currentParticipantData = {};
@@ -12801,6 +12803,41 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
 
         const PERSONAL_HSLV_TABLE = 'Personal HSLV';
+        // ID de la tabla: el nombre con espacio rompe el enrutamiento del proxy en escrituras (POST/PATCH)
+        const PERSONAL_HSLV_TABLE_ID = 'tbl5A7rayv5BbiYF1';
+        // Columnas reales de Personal HSLV (sirven para el formulario de registro sin descargar toda la tabla)
+        const PERSONAL_HSLV_KNOWN_COLUMNS = ['CEDULA', 'NOMBRE', 'GENERO', 'F.NACIMIENTO', 'HIJOS', 'EMAIL', 'CONTACTO', 'ENTIDAD', 'PERFIL', 'CARGO', 'PROCESO', 'AREA', 'CONTRATO', 'UBICACIÓN'];
+        const personalCedulaCache = new Map();
+
+        // Consulta UN colaborador por cédula con filterByFormula (1 solicitud a Airtable).
+        // Evita el error 429 que aparecía cuando muchos participantes escaneaban el QR a la vez
+        // y cada teléfono descargaba la tabla completa (~18 páginas).
+        async function buscarRegistrosPersonalPorCedula(cedula, { force = false } = {}) {
+            const digits = normDoc(cedula).replace(/\D/g, '');
+            if (!digits) return [];
+
+            if (!force && personalDbLoaded && personalData.length) {
+                const cols = getPersonalKnownColumns();
+                const colCed = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'No. Cédula', 'Número de Cédula', 'Documento']);
+                if (colCed) {
+                    return personalData
+                        .filter(r => normDoc(r[colCed]).replace(/\D/g, '') === digits)
+                        .map(r => { const { id, ...fields } = r; return { id, fields }; });
+                }
+            }
+
+            if (!force && personalCedulaCache.has(digits)) return personalCedulaCache.get(digits);
+
+            const query = new URLSearchParams({ pageSize: '10', maxRecords: '10' });
+            query.set('filterByFormula', `{CEDULA}&''='${digits}'`);
+            const res = await airtableProxyRequest({
+                method: 'GET',
+                path: `/${PERSONAL_HSLV_TABLE_ID}?${query.toString()}`
+            });
+            const records = Array.isArray(res?.records) ? res.records : [];
+            personalCedulaCache.set(digits, records);
+            return records;
+        }
         let personalData = [];
         let personalDbLoaded = false;
         let personalDbName = PERSONAL_HSLV_TABLE;
@@ -12835,7 +12872,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 const res = await airtableProxyRequest({
                     method: 'GET',
-                    path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}?${query.toString()}`
+                    path: `/${PERSONAL_HSLV_TABLE_ID}?${query.toString()}`
                 });
 
                 const records = Array.isArray(res?.records) ? res.records : [];
@@ -13606,7 +13643,7 @@ async function airtableProxyRequest(payload) {
         const message = String(msg);
 
         const matchUnknown = message.match(/Unknown field name/i);
-        const matchInvalid = message.match(/Field .([^.]+). cannot accept the provided value/i);
+        const matchInvalid = message.match(/Field\s+["'“]([^"'”]+)["'”]\s+cannot accept/i) || message.match(/Field .([^.]+). cannot accept the provided value/i);
         const matchSelect = message.match(/Insufficient permissions to create new select option/i);
 
         let problematicField = '';
@@ -13658,6 +13695,10 @@ async function airtableProxyRequest(payload) {
         return true;
     };
 
+    let rateLimitRetries = 0;
+    const MAX_RATE_LIMIT_RETRIES = 6;
+    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
     for (let attempt = 0; attempt < 10; attempt++) {
         const res = await fetch('/.netlify/functions/airtable-proxy', {
             method: 'POST',
@@ -13675,7 +13716,27 @@ async function airtableProxyRequest(payload) {
         let data = null;
         try { data = rawText ? JSON.parse(rawText) : {}; } catch { data = { raw: rawText }; }
 
-        const msg = (data && (data.error || data.message)) ? (data.error || data.message) : rawText;
+        const pickMsg = (v) => {
+            if (!v) return '';
+            if (typeof v === 'string') return v;
+            if (typeof v === 'object') return v.message || (v.error && pickMsg(v.error)) || v.type || JSON.stringify(v);
+            return String(v);
+        };
+        const msg = pickMsg(data && (data.error || data.message)) || rawText;
+
+        const isRateLimited = res.status === 429 || /\b429\b|rate.?limit|too many requests/i.test(String(msg || ''));
+        if (isRateLimited && rateLimitRetries < MAX_RATE_LIMIT_RETRIES) {
+            // Espera exponencial con variación aleatoria para que los teléfonos no reintenten al mismo tiempo
+            const wait = Math.min(1000 * Math.pow(2, rateLimitRetries), 16000) + Math.floor(Math.random() * 900);
+            rateLimitRetries++;
+            attempt--; // los reintentos por 429 no consumen los intentos de corrección de campos
+            console.warn(`⏳ Airtable 429: reintento ${rateLimitRetries}/${MAX_RATE_LIMIT_RETRIES} en ${wait} ms`);
+            await sleep(wait);
+            continue;
+        }
+        if (isRateLimited) {
+            throw new Error('El sistema está recibiendo muchas consultas al mismo tiempo. Espera unos segundos y presiona de nuevo "Cargar datos".');
+        }
 
         if (res.status === 422 && attempt < 9 && removeProblematicFieldVariant(msg)) {
             continue;
@@ -17065,10 +17126,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             const objetivo = normDoc(cedula);
             if (!objetivo) return '';
             try {
-                if (!virtualPersonalCache) {
-                    virtualPersonalCache = await obtenerTodosLosRegistrosPersonal();
-                }
-                const records = virtualPersonalCache || [];
+                const records = await buscarRegistrosPersonalPorCedula(objetivo);
                 if (!records.length) return '';
                 const cols = Object.keys(records[0].fields || {});
                 const colCedula = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
@@ -17103,7 +17161,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             const objetivo = normDoc(cedula);
             if (!objetivo) return null;
             try {
-                const records = await obtenerTodosLosRegistrosPersonal();
+                const records = await buscarRegistrosPersonalPorCedula(objetivo);
                 const cols = records.flatMap(r => Object.keys(r.fields || {}));
                 const colCedula = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
                 if (!colCedula) return null;
@@ -17313,8 +17371,7 @@ function makeCronogramaFilterFormula(year, tipo) {
 
             Swal.fire({ title: 'Registrando...', text: 'Guardando en Personal HSLV', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             try {
-                if (!virtualPersonalCache) virtualPersonalCache = await obtenerTodosLosRegistrosPersonal();
-                const cols = (virtualPersonalCache && virtualPersonalCache.length) ? Object.keys(virtualPersonalCache[0].fields || {}) : [];
+                const cols = PERSONAL_HSLV_KNOWN_COLUMNS.slice();
                 const colCedula = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']) || 'CEDULA';
                 const colNombre = detectarCampo(cols, ['NOMBRE', 'Nombre', 'Nombre Completo', 'Nombres']) || 'NOMBRE';
                 const colEntidad = detectarCampo(cols, ['ENTIDAD', 'Entidad', 'Empresa']) || 'ENTIDAD';
@@ -17334,12 +17391,13 @@ function makeCronogramaFilterFormula(year, tipo) {
                 const existingId = existingPerson?.id || '';
                 const created = await airtableProxyRequest({
                     method: existingId ? 'PATCH' : 'POST',
-                    path: existingId ? `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}/${existingId}` : `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}`,
-                    body: { fields }
+                    path: existingId ? `/${PERSONAL_HSLV_TABLE_ID}/${existingId}` : `/${PERSONAL_HSLV_TABLE_ID}`,
+                    body: { fields, typecast: true }
                 });
                 if (!created || (!created.id && !existingId)) throw new Error('Airtable no confirmó el registro.');
 
                 virtualPersonalCache = null;
+                personalCedulaCache.delete(String(cedula).replace(/\D/g, ''));
                 Swal.close();
                 await Swal.fire({ icon: 'success', title: existingId ? 'Datos actualizados' : 'Registro exitoso', text: 'Tus datos quedaron guardados en Personal HSLV.', timer: 1400, showConfirmButton: false });
                 return { name: nombre.toUpperCase(), entity: entidad, process: proceso, profile: perfil, cargo };
