@@ -76,7 +76,8 @@ function chunk(arr, size) {
   return out;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Formato que Resend acepta (la parte local no puede terminar en punto ni tener "..")
+const EMAIL_RE = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/;
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
@@ -127,30 +128,51 @@ exports.handler = async (event) => {
   let sent = 0, failed = 0;
   const errors = [];
 
-  async function sendBatch(batch) {
-    const payload = batch.map(r => ({
-      from, to: [r.email], subject,
-      html: buildHtml({ nombre: r.nombre, title, message, videoUrl, imageUrl })
-    }));
-    const reqBody = JSON.stringify(payload);
-    for (let attempt = 0; attempt < 2; attempt++) {
+  // Envía un lote de hasta 100 correos. Modo "permissive": si un correo es rechazado,
+  // Resend envía los demás y devuelve el error solo para ese índice (en modo estricto
+  // un único correo inválido tumbaba el lote completo).
+  async function sendBatch(batch, buildPayload) {
+    const reqBody = JSON.stringify(batch.map(buildPayload));
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const res = await fetch('https://api.resend.com/emails/batch', {
           method: 'POST',
-          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'x-batch-validation': 'permissive'
+          },
           body: reqBody
         });
-        if (res.ok) { sent += batch.length; return; }
         const txt = await res.text().catch(() => '');
-        if (res.status === 429 && attempt === 0) { await new Promise(r => setTimeout(r, 1200)); continue; }
+        let j = null;
+        try { j = txt ? JSON.parse(txt) : null; } catch (e) { j = null; }
+        if (res.ok) {
+          const rejected = (j && Array.isArray(j.errors)) ? j.errors : [];
+          const badIdx = new Set();
+          rejected.forEach((e) => {
+            const i = Number(e && e.index);
+            if (Number.isInteger(i) && batch[i] && !badIdx.has(i)) {
+              badIdx.add(i);
+              errors.push({ email: batch[i].email, error: (e && e.message) || 'Rechazado por Resend' });
+            }
+          });
+          failed += badIdx.size;
+          sent += batch.length - badIdx.size;
+          return;
+        }
+        const msg = (j && (j.message || j.error)) ? (j.message || j.error) : `HTTP ${res.status}`;
+        // 429 por velocidad: esperar y reintentar. Si es cuota diaria/mensual, reintentar no sirve.
+        if (res.status === 429 && attempt < 2 && !/quota/i.test(msg)) {
+          await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
+          continue;
+        }
         failed += batch.length;
-        let m = `HTTP ${res.status}`;
-        try { const j = JSON.parse(txt); m = (j && (j.message || j.error)) ? (j.message || j.error) : m; } catch (e) {}
-        batch.forEach(r => errors.push({ email: r.email, error: m }));
+        batch.forEach(r => errors.push({ email: r.email, error: msg }));
         console.error('Resend batch error', res.status, txt);
         return;
       } catch (e) {
-        if (attempt === 0) { await new Promise(r => setTimeout(r, 800)); continue; }
+        if (attempt < 2) { await new Promise(r => setTimeout(r, 800)); continue; }
         failed += batch.length;
         batch.forEach(r => errors.push({ email: r.email, error: 'fallo de red' }));
         console.error('Resend batch fetch error', e);
@@ -159,14 +181,19 @@ exports.handler = async (event) => {
     }
   }
 
+  const buildPayload = (r) => ({
+    from, to: [r.email], subject,
+    html: buildHtml({ nombre: r.nombre, title, message, videoUrl, imageUrl })
+  });
+
   const CONCURRENCY = 2;
   for (let i = 0; i < batches.length; i += CONCURRENCY) {
-    await Promise.all(batches.slice(i, i + CONCURRENCY).map(sendBatch));
+    await Promise.all(batches.slice(i, i + CONCURRENCY).map(b => sendBatch(b, buildPayload)));
   }
 
   return {
     statusCode: 200,
     headers: CORS,
-    body: JSON.stringify({ success: failed === 0, sent, failed, total: recipients.length, errors: errors.slice(0, 50) })
+    body: JSON.stringify({ success: failed === 0, sent, failed, total: recipients.length, errors: errors.slice(0, 200) })
   };
 };

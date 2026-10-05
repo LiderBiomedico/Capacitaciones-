@@ -4687,6 +4687,7 @@
                         <div style="margin-top:1rem; padding:.8rem 1rem; background:#f5f3ff; border:1px solid #ddd6fe; border-radius:10px; color:#5b21b6; font-size:.9rem;">
                             <i class="fas fa-paper-plane"></i> Se enviará a <strong id="pubCount">0</strong> colaborador(es) con correo registrado.
                             <span id="pubLoading" style="color:#7c3aed;"> Cargando personal…</span>
+                            <span id="pubAudit" class="hslv-audit"></span>
                         </div>
                         <div class="user-modal-error" id="pubError"></div>
 
@@ -4754,6 +4755,7 @@
                         <i class="fas fa-users"></i> Se enviará a <strong id="scCount">0</strong> persona(s) con correo registrado.
                         <span id="scCompletedNote" style="display:block; margin-top:.35rem; color:#6d28d9;"></span>
                         <span id="scLoading" style="color:#7c3aed;"> Cargando personal…</span>
+                        <span id="scAudit" class="hslv-audit"></span>
                     </div>
                     <div class="user-modal-error" id="scError"></div>
                 </div>
@@ -7113,7 +7115,6 @@
         let sendStaffCache = [];     // [{nombre, email, entidad, proceso, cedula}]
         let sendCurrentCourse = null;
         let sendCompletedCedulas = new Set(); // cédulas (normalizadas) que YA realizaron el curso actual
-        const SEND_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
         function buildVirtualCourseUrl(course) {
             const code = course.accessCode || (typeof deriveVirtualAccessCode === 'function' ? deriveVirtualAccessCode(course.id) : '');
@@ -7149,37 +7150,13 @@
         async function loadSendStaff() {
             const loading = document.getElementById('scLoading');
             if (loading) loading.style.display = 'inline';
+            const auditEl = document.getElementById('scAudit');
             try {
-                const params = new URLSearchParams();
-                ['NOMBRE', 'EMAIL', 'ENTIDAD', 'PROCESO', 'CEDULA'].forEach(f => params.append('fields[]', f));
-                params.set('pageSize', '100');
-
-                let all = [];
-                let offset = '';
-                let pageCount = 0;
-                // Paginar (Personal HSLV puede tener cientos de registros)
-                do {
-                    const p = new URLSearchParams(params);
-                    if (offset) p.set('offset', offset);
-                    const data = await airtableProxyRequest({ method: 'GET', path: `/${SEND_PERSONAL_TABLE}?${p.toString()}` });
-                    const recs = (data && data.records) ? data.records : [];
-                    all = all.concat(recs);
-                    offset = data && data.offset ? data.offset : '';
-                    pageCount++;
-                } while (offset && pageCount < 30);
-
-                sendStaffCache = all.reduce((staff, r) => {
-                    const f = r.fields || {};
-                    const person = {
-                        nombre: String(f['NOMBRE'] || '').trim(),
-                        email: String(f['EMAIL'] || '').trim().toLowerCase(),
-                        entidad: String(f['ENTIDAD'] || '').trim(),
-                        proceso: String(f['PROCESO'] || '').trim(),
-                        cedula: normDoc(f['CEDULA'] ?? f['Cédula'] ?? f['Cedula'] ?? '')
-                    };
-                    if (SEND_EMAIL_RE.test(person.email)) staff.push(person);
-                    return staff;
-                }, []);
+                // Lectura completa de Personal HSLV: una celda puede traer varios correos y
+                // los correos con formato inválido se reportan (no se envían para no tumbar el lote)
+                const { people, audit } = await window.hslvEmailTools.loadStaff();
+                sendStaffCache = people.map(p => ({ ...p, cedula: normDoc(p.cedula) }));
+                window.hslvEmailTools.renderAudit(auditEl, audit);
 
                 // Poblar filtros con valores únicos
                 const entidades = Array.from(sendStaffCache.reduce((set, person) => {
@@ -7200,6 +7177,7 @@
             } catch (e) {
                 console.error('❌ Error cargando personal para envío:', e);
                 sendStaffCache = [];
+                if (auditEl) auditEl.innerHTML = `<span class="warn">No se pudo leer Personal HSLV: ${umEscape(e.message || 'error')}</span>`;
             } finally {
                 if (loading) loading.style.display = 'none';
                 updateSendRecipients();
@@ -7244,7 +7222,7 @@
                 const extra = String(document.getElementById('scExtra')?.value || '')
                     .split(/[,;\s]+/).reduce((emails, value) => {
                         const email = value.trim().toLowerCase();
-                        if (SEND_EMAIL_RE.test(email)) emails.push(email);
+                        if (window.hslvEmailTools.isValidEmail(email)) emails.push(email);
                         return emails;
                     }, []);
                 extra.forEach(em => list.push({ nombre: '', email: em, entidad: '', proceso: '', cedula: '' }));
@@ -7304,47 +7282,52 @@
             });
             if (!confirm.isConfirmed) return;
 
+            // Se captura el contenido una sola vez: los reintentos usan exactamente el mismo correo
+            const basePayload = {
+                courseTitle: course.title || 'Curso virtual',
+                courseDescription: course.description || '',
+                courseUrl: buildVirtualCourseUrl(course),
+                subject: document.getElementById('scSubject')?.value || '',
+                intro: document.getElementById('scIntro')?.value || ''
+            };
+            await runCourseSend(basePayload, recipients);
+        }
+
+        async function runCourseSend(basePayload, recipients) {
+            const err = document.getElementById('scError');
             const btn = document.getElementById('scSendBtn');
             if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando…'; }
-            Swal.fire({ title: 'Enviando correos…', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            Swal.fire({
+                title: 'Enviando correos…',
+                html: `Progreso: <strong id="scProg">0</strong> / ${recipients.length}`,
+                allowOutsideClick: false,
+                didOpen: () => Swal.showLoading()
+            });
 
+            let result;
             try {
-                const res = await fetch('/.netlify/functions/send-course-email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        courseTitle: course.title || 'Curso virtual',
-                        courseDescription: course.description || '',
-                        courseUrl: buildVirtualCourseUrl(course),
-                        subject: document.getElementById('scSubject')?.value || '',
-                        intro: document.getElementById('scIntro')?.value || '',
-                        recipients
-                    })
+                result = await window.hslvEmailTools.sendInChunks({
+                    endpoint: '/.netlify/functions/send-course-email',
+                    basePayload,
+                    recipients,
+                    onProgress: (done) => { const el = document.getElementById('scProg'); if (el) el.textContent = String(done); }
                 });
-                const data = await readJsonResponse(res, 'No se pudieron enviar los correos');
-                Swal.close();
-
-                if (data && data.sent > 0) {
-                    closeSendCourseModal();
-                    Swal.fire({
-                        icon: data.failed ? 'warning' : 'success',
-                        title: data.failed ? 'Envío parcial' : 'Correos enviados',
-                        html: `Enviados: <strong>${data.sent}</strong> de <strong>${data.total}</strong>.` +
-                            (data.failed ? `<br>Fallaron: <strong>${data.failed}</strong>.` : '')
-                    });
-                } else {
-                    const msg = (data && data.error) ? data.error : 'No se pudieron enviar los correos.';
-                    if (err) { err.textContent = msg; err.classList.add('show'); }
-                    document.getElementById('sendCourseModal').classList.add('show');
-                }
-            } catch (e) {
-                Swal.close();
-                console.error('❌ Error enviando correos:', e);
-                if (err) { err.textContent = e.message || 'Error de conexión al enviar.'; err.classList.add('show'); }
-                document.getElementById('sendCourseModal').classList.add('show');
             } finally {
                 if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar'; }
             }
+            Swal.close();
+
+            if (result.sent > 0) {
+                closeSendCourseModal();
+            } else if (err) {
+                err.textContent = result.firstError || 'No se pudieron enviar los correos.';
+                err.classList.add('show');
+            }
+            await window.hslvEmailTools.showSendResult({
+                what: 'Invitación al curso',
+                result,
+                onRetry: (failedOnes) => runCourseSend(basePayload, failedOnes)
+            });
         }
 
         // Reemplaza el antiguo "enforceAdminPassword": muestra el login y resuelve al autenticar.
@@ -19016,11 +18999,240 @@ function makeCronogramaFilterFormula(year, tipo) {
 })();
 </script>
 
+<!-- ==========================================================
+     HERRAMIENTAS COMUNES DE CORREO (Publicidad + Cursos Virtuales)
+     - Lectura completa de Personal HSLV (paginada) y extracción de
+       correos (una celda puede traer varios correos).
+     - Validación estricta: un correo mal escrito no debe tumbar un
+       lote completo de 100 en Resend.
+     - Auditoría: quiénes no tienen correo o lo tienen inválido.
+     - Envío por tandas de 100 con reporte de fallidos y reintento.
+     ========================================================== -->
+<style id="hslvEmailToolsStyles">
+    /* Los diálogos (SweetAlert) deben quedar por encima de los modales propios de la app (z-index 99995) */
+    .swal2-container { z-index: 100000 !important; }
+    .hslv-audit { display:block; margin-top:.4rem; font-size:.84rem; color:#475569; }
+    .hslv-audit b { color:#0f172a; }
+    .hslv-audit .warn { color:#b45309; font-weight:700; }
+    .hslv-audit button { border:0; background:none; padding:0; margin-left:.25rem; color:#6d28d9; font-weight:700; text-decoration:underline; cursor:pointer; font:inherit; }
+    .hslv-audit-table { width:100%; border-collapse:collapse; font-size:.8rem; text-align:left; }
+    .hslv-audit-table th, .hslv-audit-table td { padding:.35rem .5rem; border-bottom:1px solid #eef2f7; }
+    .hslv-audit-table th { background:#f8fafc; position:sticky; top:0; }
+    .hslv-audit-scroll { max-height:230px; overflow:auto; border:1px solid #e5e7eb; border-radius:8px; margin-bottom:.75rem; }
+    .hslv-audit-h { text-align:left; font-weight:800; color:#0f172a; margin:.6rem 0 .35rem; font-size:.92rem; }
+    .hslv-audit-note { text-align:left; font-size:.82rem; color:#64748b; margin:.35rem 0; }
+</style>
+<script>
+(function () {
+    'use strict';
+
+    const PERSONAL_TABLE = 'tbl5A7rayv5BbiYF1'; // "Personal HSLV" (por ID)
+    // Formato que Resend acepta. La parte local no puede empezar/terminar en punto ni tener ".."
+    const STRICT_RE = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/;
+
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    const fmt = (n) => Number(n || 0).toLocaleString('es-CO');
+
+    function isValidEmail(email) {
+        return STRICT_RE.test(String(email || '').trim().toLowerCase());
+    }
+
+    // Una celda puede traer "correo1; correo2", espacios, "mailto:" o signos pegados
+    function extractEmails(raw) {
+        const out = [];
+        String(raw == null ? '' : raw).toLowerCase().replace(/mailto:/g, ' ')
+            .split(/[\s,;/|]+/)
+            .forEach((token) => {
+                const t = token.replace(/^[<("'[]+/, '').replace(/[>)"'\].,:;]+$/, '');
+                if (STRICT_RE.test(t) && !out.includes(t)) out.push(t);
+            });
+        return out;
+    }
+
+    async function fetchStaff() {
+        const base = new URLSearchParams();
+        ['NOMBRE', 'EMAIL', 'ENTIDAD', 'PROCESO', 'CEDULA'].forEach((f) => base.append('fields[]', f));
+        base.set('pageSize', '100');
+        let all = [], offset = '', pages = 0;
+        do {
+            const p = new URLSearchParams(base);
+            if (offset) p.set('offset', offset);
+            const data = await airtableProxyRequest({ method: 'GET', path: `/${PERSONAL_TABLE}?${p.toString()}` });
+            all = all.concat((data && data.records) ? data.records : []);
+            offset = data && data.offset ? data.offset : '';
+            pages += 1;
+        } while (offset && pages < 200);
+        if (offset) throw new Error('Personal HSLV tiene más registros de los que se pudieron leer.');
+        return all;
+    }
+
+    // Convierte los registros en personas con correo y arma la auditoría de cobertura
+    function parseStaff(records) {
+        const people = [];
+        const audit = { total: records.length, empty: [], invalid: [], multi: 0, shared: 0, unique: 0 };
+        const seen = new Set();
+        records.forEach((r) => {
+            const f = r.fields || {};
+            const base = {
+                nombre: String(f['NOMBRE'] || '').trim(),
+                entidad: String(f['ENTIDAD'] || '').trim(),
+                proceso: String(f['PROCESO'] || '').trim(),
+                cedula: String(f['CEDULA'] ?? f['Cédula'] ?? f['Cedula'] ?? '').trim()
+            };
+            const raw = String(f['EMAIL'] || '').trim();
+            const emails = extractEmails(raw);
+            if (!raw) { audit.empty.push(base); return; }
+            if (!emails.length) { audit.invalid.push({ ...base, raw }); return; }
+            if (emails.length > 1) audit.multi += 1;
+            let isNew = false;
+            emails.forEach((email) => {
+                if (!seen.has(email)) { seen.add(email); isNew = true; }
+                people.push({ ...base, email });
+            });
+            if (!isNew) audit.shared += 1;
+        });
+        audit.unique = seen.size;
+        return { people, audit };
+    }
+
+    async function loadStaff() {
+        const records = await fetchStaff();
+        return parseStaff(records);
+    }
+
+    function renderAudit(el, audit) {
+        if (!el) return;
+        if (!audit) { el.innerHTML = ''; return; }
+        const problems = audit.empty.length + audit.invalid.length;
+        el.innerHTML = `<i class="fas fa-address-book"></i> Personal HSLV: <b>${fmt(audit.total)}</b> registros · <b>${fmt(audit.unique)}</b> correos únicos`
+            + (audit.empty.length ? ` · <span class="warn">${fmt(audit.empty.length)} sin correo</span>` : '')
+            + (audit.invalid.length ? ` · <span class="warn">${fmt(audit.invalid.length)} con correo inválido</span>` : '')
+            + (problems ? ' <button type="button" data-hslv-audit>Ver y descargar</button>' : '');
+        const btn = el.querySelector('[data-hslv-audit]');
+        if (btn) btn.onclick = () => showAudit(audit);
+    }
+
+    function exportAudit(audit) {
+        const rows = [
+            ...audit.invalid.map((p) => ({ 'Problema': 'Correo inválido', 'Nombre': p.nombre, 'Cédula': p.cedula, 'Entidad': p.entidad, 'Proceso': p.proceso, 'Valor actual en EMAIL': p.raw })),
+            ...audit.empty.map((p) => ({ 'Problema': 'Sin correo', 'Nombre': p.nombre, 'Cédula': p.cedula, 'Entidad': p.entidad, 'Proceso': p.proceso, 'Valor actual en EMAIL': '' }))
+        ];
+        const name = `Personal_HSLV_correos_por_corregir_${new Date().toISOString().slice(0, 10)}`;
+        if (typeof XLSX !== 'undefined') {
+            const ws = XLSX.utils.json_to_sheet(rows);
+            ws['!cols'] = [{ wch: 16 }, { wch: 38 }, { wch: 14 }, { wch: 22 }, { wch: 26 }, { wch: 36 }];
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Correos por corregir');
+            XLSX.writeFile(wb, `${name}.xlsx`);
+            return;
+        }
+        const cols = Object.keys(rows[0] || { Problema: '' });
+        const csv = [cols.join(';')].concat(rows.map((r) => cols.map((c) => `"${String(r[c] ?? '').replace(/"/g, '""')}"`).join(';'))).join('\n');
+        const url = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+        const a = document.createElement('a');
+        a.href = url; a.download = `${name}.csv`; a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    async function showAudit(audit) {
+        const inv = audit.invalid.map((p) => `<tr><td>${esc(p.nombre || '—')}</td><td>${esc(p.cedula || '—')}</td><td><code>${esc(p.raw)}</code></td></tr>`).join('');
+        const emp = audit.empty.slice(0, 300).map((p) => `<tr><td>${esc(p.nombre || '—')}</td><td>${esc(p.cedula || '—')}</td><td>${esc(p.proceso || p.entidad || '—')}</td></tr>`).join('');
+        const r = await Swal.fire({
+            title: 'Correos por corregir en Personal HSLV',
+            width: 820,
+            html: `
+                <p class="hslv-audit-note">Estas personas <b>no reciben</b> publicidad ni cursos virtuales hasta que se corrija su correo en la tabla Personal HSLV de Airtable.</p>
+                ${audit.invalid.length ? `<div class="hslv-audit-h">Correo inválido (${fmt(audit.invalid.length)})</div>
+                <div class="hslv-audit-scroll"><table class="hslv-audit-table"><thead><tr><th>Nombre</th><th>Cédula</th><th>Valor en EMAIL</th></tr></thead><tbody>${inv}</tbody></table></div>` : ''}
+                ${audit.empty.length ? `<div class="hslv-audit-h">Sin correo (${fmt(audit.empty.length)})</div>
+                <div class="hslv-audit-scroll"><table class="hslv-audit-table"><thead><tr><th>Nombre</th><th>Cédula</th><th>Proceso / Entidad</th></tr></thead><tbody>${emp}</tbody></table></div>
+                ${audit.empty.length > 300 ? '<p class="hslv-audit-note">Se muestran 300; el archivo de Excel trae la lista completa.</p>' : ''}` : ''}
+                ${audit.shared ? `<p class="hslv-audit-note">${fmt(audit.shared)} registro(s) repiten un correo de otro registro: ese correo recibe un solo mensaje.</p>` : ''}`,
+            showCancelButton: true,
+            confirmButtonText: '<i class="fas fa-file-excel"></i> Descargar Excel',
+            cancelButtonText: 'Cerrar',
+            confirmButtonColor: '#2E7D32'
+        });
+        if (r.isConfirmed) exportAudit(audit);
+    }
+
+    // Envía en tandas de 100 (= 1 lote de Resend por invocación: rápido y sin 504)
+    async function sendInChunks({ endpoint, basePayload, recipients, chunkSize = 100, onProgress }) {
+        const total = recipients.length;
+        const failed = [];
+        let sent = 0, processed = 0, unknownFailed = 0, firstError = '';
+        for (let i = 0; i < recipients.length; i += chunkSize) {
+            const chunk = recipients.slice(i, i + chunkSize);
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ ...basePayload, recipients: chunk })
+                });
+                const data = await readJsonResponse(res, 'No se pudo enviar una tanda de correos');
+                const s = Number(data.sent || 0);
+                const f = Number(data.failed || 0);
+                const errs = Array.isArray(data.errors) ? data.errors : [];
+                sent += s;
+                if (!s && !f && data.error) {
+                    chunk.forEach((r) => failed.push({ ...r, error: data.error }));
+                    if (!firstError) firstError = data.error;
+                } else if (f) {
+                    const byEmail = new Map(errs.map((e) => [String(e.email || '').toLowerCase(), e.error || 'Error']));
+                    let matched = 0;
+                    chunk.forEach((r) => { if (byEmail.has(r.email)) { failed.push({ ...r, error: byEmail.get(r.email) }); matched += 1; } });
+                    if (!s && matched < chunk.length && f >= chunk.length) {
+                        // Falló toda la tanda (versión anterior de la función devolvía solo 50 errores)
+                        chunk.forEach((r) => { if (!byEmail.has(r.email)) failed.push({ ...r, error: errs[0]?.error || 'Error' }); });
+                    } else if (matched < f) {
+                        unknownFailed += f - matched;
+                    }
+                    if (!firstError) firstError = errs[0]?.error || data.error || '';
+                }
+            } catch (e) {
+                const msg = (e && e.message) ? e.message : 'Error de conexión';
+                chunk.forEach((r) => failed.push({ ...r, error: msg }));
+                if (!firstError) firstError = msg;
+            }
+            processed += chunk.length;
+            if (onProgress) onProgress(processed, total, sent);
+        }
+        return { total, sent, failed, unknownFailed, firstError };
+    }
+
+    // Resumen final con causa del error y opción de reintentar solo los fallidos
+    async function showSendResult({ what, result, onRetry }) {
+        const failedN = result.failed.length + result.unknownFailed;
+        const quota = /quota|daily|limit|l[ií]mite|429|too many/i.test(result.firstError || '');
+        const list = result.failed.slice(0, 12).map((r) => `<li><code>${esc(r.email)}</code>${r.nombre ? ` · ${esc(r.nombre)}` : ''}</li>`).join('');
+        const html = `Enviados: <strong>${fmt(result.sent)}</strong> de <strong>${fmt(result.total)}</strong>.`
+            + (failedN ? `<br>Fallaron: <strong>${fmt(failedN)}</strong>.` : '')
+            + (result.firstError && failedN ? `<p class="hslv-audit-note" style="margin-top:.6rem;">Causa reportada: <code>${esc(result.firstError)}</code></p>` : '')
+            + (quota ? '<p class="hslv-audit-note">Resend indica un límite de envío. El plan gratuito de Resend permite 100 correos al día; para llegar a todo el personal se necesita un plan de pago.</p>' : '')
+            + (list ? `<ul class="hslv-audit-note" style="padding-left:1.1rem;">${list}${result.failed.length > 12 ? `<li>… y ${fmt(result.failed.length - 12)} más</li>` : ''}</ul>` : '');
+        const canRetry = result.failed.length > 0 && typeof onRetry === 'function';
+        const r = await Swal.fire({
+            icon: !failedN ? 'success' : (result.sent ? 'warning' : 'error'),
+            title: !failedN ? `${what} enviada` : (result.sent ? 'Envío parcial' : 'No se pudo enviar'),
+            html,
+            showCancelButton: canRetry,
+            confirmButtonText: canRetry ? `Reintentar los ${fmt(result.failed.length)} fallidos` : 'Aceptar',
+            cancelButtonText: 'Cerrar',
+            confirmButtonColor: '#7c3aed'
+        });
+        if (canRetry && r.isConfirmed) {
+            await onRetry(result.failed.map(({ email, nombre }) => ({ email, nombre })));
+        }
+    }
+
+    window.hslvEmailTools = { isValidEmail, extractEmails, loadStaff, parseStaff, renderAudit, showAudit, sendInChunks, showSendResult };
+})();
+</script>
+
 <!-- ==================== MÓDULO PUBLICIDAD / COMUNICACIONES ==================== -->
 <script>
 (function () {
     const PUB_PERSONAL_TABLE = 'tbl5A7rayv5BbiYF1'; // "Personal HSLV" (por ID)
-    const PUB_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
     async function pubUploadImage(base64) {
         const res = await fetch('/.netlify/functions/upload-campaign-image', {
@@ -19048,35 +19260,12 @@ function makeCronogramaFilterFormula(year, tipo) {
         if (pubStaffLoaded && !force) { pubUpdateRecipients(); return; }
         const loading = document.getElementById('pubLoading');
         if (loading) loading.style.display = 'inline';
+        const auditEl = document.getElementById('pubAudit');
         try {
-            const base = new URLSearchParams();
-            ['NOMBRE', 'EMAIL', 'ENTIDAD', 'PROCESO'].forEach(f => base.append('fields[]', f));
-            base.set('pageSize', '100');
-
-            let all = [];
-            let offset = '';
-            let pageCount = 0;
-            do {
-                const p = new URLSearchParams(base);
-                if (offset) p.set('offset', offset);
-                const data = await airtableProxyRequest({ method: 'GET', path: `/${PUB_PERSONAL_TABLE}?${p.toString()}` });
-                const recs = (data && data.records) ? data.records : [];
-                all = all.concat(recs);
-                offset = data && data.offset ? data.offset : '';
-                pageCount++;
-            } while (offset && pageCount < 30);
-
-            pubStaffCache = all.reduce((staff, r) => {
-                const f = r.fields || {};
-                const person = {
-                    nombre: String(f['NOMBRE'] || '').trim(),
-                    email: String(f['EMAIL'] || '').trim().toLowerCase(),
-                    entidad: String(f['ENTIDAD'] || '').trim(),
-                    proceso: String(f['PROCESO'] || '').trim()
-                };
-                if (PUB_EMAIL_RE.test(person.email)) staff.push(person);
-                return staff;
-            }, []);
+            // Lectura completa de Personal HSLV con auditoría de correos (vacíos / inválidos)
+            const { people, audit } = await window.hslvEmailTools.loadStaff();
+            pubStaffCache = people;
+            window.hslvEmailTools.renderAudit(auditEl, audit);
 
             const entidades = Array.from(pubStaffCache.reduce((set, person) => {
                 if (person.entidad) set.add(person.entidad);
@@ -19095,6 +19284,7 @@ function makeCronogramaFilterFormula(year, tipo) {
         } catch (e) {
             console.error('❌ Error cargando personal para publicidad:', e);
             pubStaffCache = [];
+            if (auditEl) auditEl.innerHTML = `<span class="warn">No se pudo leer Personal HSLV: ${pubEscape(e.message || 'error')}</span>`;
         } finally {
             if (loading) loading.style.display = 'none';
             pubUpdateRecipients();
@@ -19110,7 +19300,7 @@ function makeCronogramaFilterFormula(year, tipo) {
         const extra = String(document.getElementById('pubExtra')?.value || '')
             .split(/[,;\s]+/).reduce((emails, value) => {
                 const email = value.trim().toLowerCase();
-                if (PUB_EMAIL_RE.test(email)) emails.push(email);
+                if (window.hslvEmailTools.isValidEmail(email)) emails.push(email);
                 return emails;
             }, []);
         extra.forEach(em => list.push({ nombre: '', email: em, entidad: '', proceso: '' }));
@@ -19318,70 +19508,44 @@ function makeCronogramaFilterFormula(year, tipo) {
         }
 
         const payloadBase = { subject, title, message, videoUrl, imageUrl };
+        await pubRunSend(payloadBase, recipients);
+    }
 
-        // Trocear los destinatarios en tandas: cada invocación de la función queda
-        // corta y nunca se agota (evita el error 504 con listas grandes).
-        const CLIENT_CHUNK = 120;
-        const chunks = [];
-        for (let i = 0; i < recipients.length; i += CLIENT_CHUNK) {
-            chunks.push(recipients.slice(i, i + CLIENT_CHUNK));
-        }
-
-        let totalSent = 0, totalFailed = 0, processed = 0;
-        const total = recipients.length;
-        let globalError = '';
-
+    // Tandas de 100 = un lote de Resend por invocación (rápido, sin 504). Al final se informa
+    // quién falló y por qué, y se ofrece reintentar solo esos destinatarios.
+    async function pubRunSend(payloadBase, recipients) {
+        const err = document.getElementById('pubError');
+        const btn = document.getElementById('pubSendBtn');
+        if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando…'; }
         Swal.fire({
             title: 'Enviando publicidad…',
-            html: `Progreso: <strong id="pubProg">0</strong> / ${total}`,
+            html: `Progreso: <strong id="pubProg">0</strong> / ${recipients.length}`,
             allowOutsideClick: false,
             didOpen: () => Swal.showLoading()
         });
 
-        await runSequentially(chunks, async (ch) => {
-            try {
-                const res = await fetch('/.netlify/functions/send-campaign-email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ ...payloadBase, recipients: ch })
-                });
-                const data = await readJsonResponse(res, 'No se pudo enviar una tanda de publicidad');
-                if (data) {
-                    totalSent += Number(data.sent || 0);
-                    totalFailed += Number(data.failed || 0);
-                    // Error global de la tanda (p. ej. falta RESEND_API_KEY): nada enviado
-                    if (data.error && !data.sent && !data.failed) {
-                        totalFailed += ch.length;
-                        if (!globalError) globalError = data.error;
-                    }
-                }
-            } catch (e) {
-                console.error('❌ Error enviando tanda de publicidad:', e);
-                totalFailed += ch.length;
-            }
-            processed += ch.length;
-            const prog = document.getElementById('pubProg');
-            if (prog) prog.textContent = String(processed);
-        });
-
-        Swal.close();
-        if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar publicidad'; }
-
-        if (totalSent > 0) {
-            const urlInfo = imageUrl
-                ? `<br><br><span style="font-size:.85rem;color:#475569;">Imagen alojada:</span><br><a href="${pubEscape(imageUrl)}" target="_blank" rel="noopener" style="font-size:.8rem;color:#7c3aed;word-break:break-all;">${pubEscape(imageUrl)}</a><br><span style="font-size:.78rem;color:#94a3b8;">Si la imagen no se ve en el correo, abre este enlace para comprobar que carga.</span>`
-                : '';
-            Swal.fire({
-                icon: totalFailed ? 'warning' : 'success',
-                title: totalFailed ? 'Envío parcial' : 'Publicidad enviada',
-                html: `Enviados: <strong>${totalSent}</strong> de <strong>${total}</strong>.` +
-                    (totalFailed ? `<br>Fallaron: <strong>${totalFailed}</strong>.` : '') + urlInfo
+        let result;
+        try {
+            result = await window.hslvEmailTools.sendInChunks({
+                endpoint: '/.netlify/functions/send-campaign-email',
+                basePayload: payloadBase,
+                recipients,
+                onProgress: (done) => { const el = document.getElementById('pubProg'); if (el) el.textContent = String(done); }
             });
-        } else {
-            const msg = globalError || 'No se pudieron enviar los correos.';
-            if (err) { err.textContent = msg; err.classList.add('show'); }
-            Swal.fire({ icon: 'error', title: 'No se pudo enviar', text: msg });
+        } finally {
+            if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Enviar publicidad'; }
         }
+        Swal.close();
+
+        if (!result.sent && err) {
+            err.textContent = result.firstError || 'No se pudieron enviar los correos.';
+            err.classList.add('show');
+        }
+        await window.hslvEmailTools.showSendResult({
+            what: 'Publicidad',
+            result,
+            onRetry: (failedOnes) => pubRunSend(payloadBase, failedOnes)
+        });
     }
 
     // Exponer handlers usados desde el HTML

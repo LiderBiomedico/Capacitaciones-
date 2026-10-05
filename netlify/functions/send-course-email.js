@@ -76,7 +76,8 @@ function chunk(arr, size) {
   return out;
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+// Formato que Resend acepta (la parte local no puede terminar en punto ni tener "..")
+const EMAIL_RE = /^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,}$/;
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: CORS, body: '' };
@@ -124,45 +125,76 @@ exports.handler = async (event) => {
   let sent = 0, failed = 0;
   const errors = [];
 
-  // Resend permite hasta 100 mensajes por lote (/emails/batch).
-  const batches = chunk(recipients, 100);
-  async function sendBatchesSequentially(index = 0) {
-    if (index >= batches.length) return;
-    const batch = batches[index];
-    const payload = batch.map(r => ({
-      from,
-      to: [r.email],
-      subject,
-      html: buildHtml({ nombre: r.nombre, courseTitle, courseDescription, courseUrl, intro })
-    }));
-    try {
-      const res = await fetch('https://api.resend.com/emails/batch', {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        sent += batch.length;
-      } else {
+  // Envía un lote de hasta 100 correos. Modo "permissive": si un correo es rechazado,
+  // Resend envía los demás y devuelve el error solo para ese índice (en modo estricto
+  // un único correo inválido tumbaba el lote completo).
+  async function sendBatch(batch, buildPayload) {
+    const reqBody = JSON.stringify(batch.map(buildPayload));
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const res = await fetch('https://api.resend.com/emails/batch', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'x-batch-validation': 'permissive'
+          },
+          body: reqBody
+        });
         const txt = await res.text().catch(() => '');
+        let j = null;
+        try { j = txt ? JSON.parse(txt) : null; } catch (e) { j = null; }
+        if (res.ok) {
+          const rejected = (j && Array.isArray(j.errors)) ? j.errors : [];
+          const badIdx = new Set();
+          rejected.forEach((e) => {
+            const i = Number(e && e.index);
+            if (Number.isInteger(i) && batch[i] && !badIdx.has(i)) {
+              badIdx.add(i);
+              errors.push({ email: batch[i].email, error: (e && e.message) || 'Rechazado por Resend' });
+            }
+          });
+          failed += badIdx.size;
+          sent += batch.length - badIdx.size;
+          return;
+        }
+        const msg = (j && (j.message || j.error)) ? (j.message || j.error) : `HTTP ${res.status}`;
+        // 429 por velocidad: esperar y reintentar. Si es cuota diaria/mensual, reintentar no sirve.
+        if (res.status === 429 && attempt < 2 && !/quota/i.test(msg)) {
+          await new Promise(r => setTimeout(r, 1200 * (attempt + 1)));
+          continue;
+        }
         failed += batch.length;
-        let msg = `HTTP ${res.status}`;
-        try { const j = JSON.parse(txt); msg = (j && (j.message || j.error)) ? (j.message || j.error) : msg; } catch (e) {}
         batch.forEach(r => errors.push({ email: r.email, error: msg }));
         console.error('Resend batch error', res.status, txt);
+        return;
+      } catch (e) {
+        if (attempt < 2) { await new Promise(r => setTimeout(r, 800)); continue; }
+        failed += batch.length;
+        batch.forEach(r => errors.push({ email: r.email, error: 'fallo de red' }));
+        console.error('Resend batch fetch error', e);
+        return;
       }
-    } catch (e) {
-      failed += batch.length;
-      batch.forEach(r => errors.push({ email: r.email, error: 'fallo de red' }));
-      console.error('Resend fetch error', e);
     }
-    return sendBatchesSequentially(index + 1);
   }
-  await sendBatchesSequentially();
+
+  const buildPayload = (r) => ({
+    from,
+    to: [r.email],
+    subject,
+    html: buildHtml({ nombre: r.nombre, courseTitle, courseDescription, courseUrl, intro })
+  });
+
+  // Resend permite hasta 100 mensajes por lote (/emails/batch).
+  const batches = chunk(recipients, 100);
+  for (const batch of batches) {
+    await sendBatch(batch, buildPayload);
+  }
+
 
   return {
     statusCode: 200,
     headers: CORS,
-    body: JSON.stringify({ success: failed === 0, sent, failed, total: recipients.length, errors: errors.slice(0, 50) })
+    body: JSON.stringify({ success: failed === 0, sent, failed, total: recipients.length, errors: errors.slice(0, 200) })
   };
 };
