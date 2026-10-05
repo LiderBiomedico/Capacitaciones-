@@ -19203,12 +19203,14 @@ function makeCronogramaFilterFormula(year, tipo) {
     // Resumen final con causa del error y opción de reintentar solo los fallidos
     async function showSendResult({ what, result, onRetry }) {
         const failedN = result.failed.length + result.unknownFailed;
-        const quota = /quota|daily|limit|l[ií]mite|429|too many/i.test(result.firstError || '');
+        const quota = /quota|cuota/i.test(result.firstError || '');
+        const rate = !quota && /429|too many|rate limit/i.test(result.firstError || '');
         const list = result.failed.slice(0, 12).map((r) => `<li><code>${esc(r.email)}</code>${r.nombre ? ` · ${esc(r.nombre)}` : ''}</li>`).join('');
         const html = `Enviados: <strong>${fmt(result.sent)}</strong> de <strong>${fmt(result.total)}</strong>.`
             + (failedN ? `<br>Fallaron: <strong>${fmt(failedN)}</strong>.` : '')
             + (result.firstError && failedN ? `<p class="hslv-audit-note" style="margin-top:.6rem;">Causa reportada: <code>${esc(result.firstError)}</code></p>` : '')
-            + (quota ? '<p class="hslv-audit-note">Resend indica un límite de envío. El plan gratuito de Resend permite 100 correos al día; para llegar a todo el personal se necesita un plan de pago.</p>' : '')
+            + (quota ? '<p class="hslv-audit-note">Resend indica que se alcanzó la cuota de envío de la cuenta. Revisa el uso del plan en el panel de Resend.</p>' : '')
+            + (rate ? '<p class="hslv-audit-note">Resend limitó la velocidad de envío. Espera unos segundos y usa «Reintentar los fallidos».</p>' : '')
             + (list ? `<ul class="hslv-audit-note" style="padding-left:1.1rem;">${list}${result.failed.length > 12 ? `<li>… y ${fmt(result.failed.length - 12)} más</li>` : ''}</ul>` : '');
         const canRetry = result.failed.length > 0 && typeof onRetry === 'function';
         const r = await Swal.fire({
