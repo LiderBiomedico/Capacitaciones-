@@ -3090,9 +3090,14 @@
                     <h2 class="section-title" style="margin-bottom:0;">
                         <i class="fas fa-plus-circle"></i> Crear Nueva Capacitación
                     </h2>
-                    <button class="btn btn-primary" onclick="switchTab('virtualCourses')" style="background:#2563eb; border-color:#2563eb;">
-                        <i class="fas fa-video"></i> Ir a Cursos Virtuales
-                    </button>
+                    <div style="display:flex; gap:0.6rem; flex-wrap:wrap;">
+                        <button class="btn btn-primary" onclick="qfixOpen()" style="background:#b45309; border-color:#b45309;" title="Corregir preguntas de pretest y postest de capacitaciones ya creadas">
+                            <i class="fas fa-pen-to-square"></i> Corregir Pretest / Postest
+                        </button>
+                        <button class="btn btn-primary" onclick="switchTab('virtualCourses')" style="background:#2563eb; border-color:#2563eb;">
+                            <i class="fas fa-video"></i> Ir a Cursos Virtuales
+                        </button>
+                    </div>
                 </div>
                 
                 <div class="card">
@@ -5180,15 +5185,9 @@
             box.innerHTML = message;
         }
 
-        function getPersonalKnownColumns() {
-            // Airtable omite los campos vacíos: se unen las columnas de todos los registros
-            const set = new Set(PERSONAL_HSLV_KNOWN_COLUMNS);
-            (personalData || []).forEach(r => Object.keys(r || {}).forEach(k => { if (k !== 'id') set.add(k); }));
-            return Array.from(set);
-        }
-
         function buildPersonalRegistrationFieldConfig() {
-            const cols = getPersonalKnownColumns();
+            const sample = personalData.find(r => Object.keys(r || {}).length > 1) || personalData[0] || {};
+            const cols = Object.keys(sample).filter(c => c !== 'id');
             const used = new Set();
             const pick = (aliases) => {
                 const col = detectarCampo(cols, aliases);
@@ -5216,14 +5215,13 @@
             pushField(['CONTRATO', 'Contrato'], 'Contrato', 'text', true);
             pushField(['UBICACIÓN', 'Ubicacion', 'Ubicación', 'SEDE', 'Sede'], 'Ubicación', 'text', true);
 
-            const ignoredNorms = new Set(['name', 'notes', 'assignee', 'status', 'attachments', 'attachment summary', 'capacitaciones realizadas']);
+            const ignoredNorms = new Set(['name', 'notes', 'assignee', 'status', 'attachments', 'attachment summary']);
             cols.forEach(col => {
                 const norm = normStr(col);
                 if (used.has(col)) return;
                 if (ignoredNorms.has(norm)) return;
                 if (norm.startsWith('attachment')) return;
-                const isNumeric = ['hijos'].includes(norm);
-                config.push({ key: col, label: col, type: isNumeric ? 'number' : 'text', required: false, extra: true });
+                config.push({ key: col, label: col, type: 'text', required: false, extra: true });
             });
             return config;
         }
@@ -5319,6 +5317,9 @@
         }
 
         async function registrarNuevoParticipanteEnPersonalHSLV() {
+            if (!personalDbLoaded || personalData.length === 0) {
+                await recargarListaBD();
+            }
             if (!participantManualFieldConfig.length) participantManualFieldConfig = buildPersonalRegistrationFieldConfig();
             const values = getParticipantManualRegistrationValues();
             const missing = [];
@@ -5356,27 +5357,12 @@
                 return raw;
             };
 
-            const emailKey = detectarCampo(detectedKeys, ['EMAIL', 'Correo', 'Correo Electrónico', 'Correo electronico', 'E-mail']);
-            if (emailKey && values[emailKey] && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values[emailKey])) {
-                throw new Error('El correo electrónico no es válido. Revísalo e inténtalo de nuevo.');
-            }
-            const requestedCed = cedulaKey ? normDoc(values[cedulaKey]) : '';
-            if (requestedCed && (await buscarRegistrosPersonalPorCedula(requestedCed, { force: true })).length) {
-                throw new Error(`La cédula ${requestedCed} ya está registrada en Personal HSLV. Vuelve a consultarla con el botón de cargar datos.`);
-            }
-
             const fields = {};
             Object.entries(values).forEach(([k, v]) => {
                 if (v === '') return;
                 let finalValue = v;
-                if (k === cedulaKey) {
-                    finalValue = normalizarNumero(v);           // CEDULA es campo Number
-                } else if (k === contactoKey) {
-                    finalValue = String(v).replace(/[^\d+]/g, ''); // CONTACTO es Phone number: requiere texto
-                } else if (normStr(k) === 'hijos') {
-                    const n = Number(String(v).replace(',', '.'));
-                    if (!Number.isFinite(n)) return;
-                    finalValue = n;
+                if (k === cedulaKey || k === contactoKey) {
+                    finalValue = normalizarNumero(v);
                 } else if (k === fechaNacimientoKey) {
                     finalValue = normalizarFechaAirtable(v);
                 } else if (k === nombreKey || k === generoKey) {
@@ -5386,7 +5372,6 @@
             });
 
             const sequentialNameInfo = (() => {
-                return null; // 'Name' es autonumérico en Personal HSLV: Airtable lo asigna solo
                 const nameKey = pickExistingFieldName(detectedKeys, ['Name']);
                 if (!nameKey) return null;
                 if (fields[nameKey] !== undefined && fields[nameKey] !== null && String(fields[nameKey]).trim() !== '') return null;
@@ -5409,8 +5394,8 @@
 
             const created = await airtableProxyRequest({
                 method: 'POST',
-                path: `/${PERSONAL_HSLV_TABLE_ID}`,
-                body: { fields, typecast: true }
+                path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}`,
+                body: { fields }
             });
 
             const createdFields = { ...(created.fields || {}) };
@@ -5422,8 +5407,8 @@
                 try {
                     const patched = await airtableProxyRequest({
                         method: 'PATCH',
-                        path: `/${PERSONAL_HSLV_TABLE_ID}/${encodeURIComponent(created.id)}`,
-                        body: { fields: patchFields, typecast: true }
+                        path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}/${encodeURIComponent(created.id)}`,
+                        body: { fields: patchFields }
                     });
                     Object.assign(createdFields, patched.fields || patchFields);
                 } catch (patchErr) {
@@ -5438,8 +5423,8 @@
                     try {
                         const patched = await airtableProxyRequest({
                             method: 'PATCH',
-                            path: `/${PERSONAL_HSLV_TABLE_ID}/${encodeURIComponent(created.id)}`,
-                            body: { fields: patchFields, typecast: true }
+                            path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}/${encodeURIComponent(created.id)}`,
+                            body: { fields: patchFields }
                         });
                         Object.assign(createdFields, patched.fields || patchFields);
                     } catch (patchErr) {
@@ -5449,11 +5434,9 @@
             }
 
             const row = { id: created.id, ...fields, ...createdFields };
-            if (personalDbLoaded) personalData.unshift(row);
-            if (requestedCed) {
-                const { id: _rid, ...rowFields } = row;
-                personalCedulaCache.set(requestedCed.replace(/\D/g, ''), [{ id: created.id, fields: rowFields }]);
-            }
+            personalData.unshift(row);
+            personalDbLoaded = true;
+            await recargarListaBD();
             return row;
         }
 
@@ -5550,11 +5533,31 @@
                     loadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cargando';
                 }
 
+                await ensurePersonalDbLoaded(false);
+                if (!personalDbLoaded || personalData.length === 0) {
+                    throw new Error('No fue posible cargar la tabla Personal HSLV.');
+                }
+
+                const sample = personalData.find(r => Object.keys(r || {}).length > 1) || personalData[0] || {};
+                const cols = Object.keys(sample).filter(c => c !== 'id');
+                const colCedula    = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
+                const colNombre    = detectarCampo(cols, ['NOMBRE', 'Nombre Completo', 'Nombre', 'Nombres']);
+                const colEntidad   = detectarCampo(cols, ['ENTIDAD', 'Empresa']);
+                const colPerfil    = detectarCampo(cols, ['PERFIL', 'Perfil']);
+                const colCargo     = detectarCampo(cols, ['CARGO', 'Cargo', 'Profesión', 'Profesion']);
+                const colProceso   = detectarCampo(cols, ['PROCESO', 'Proceso']);
+                const colArea      = detectarCampo(cols, ['AREA', 'Área', 'Area', 'Servicio', 'Departamento']);
+                const colGenero    = detectarCampo(cols, ['GENERO', 'Género', 'Genero', 'Sexo']);
+                const colNacimiento= detectarCampo(cols, ['F.NACIMIENTO', 'Fecha Nacimiento', 'Nacimiento']);
+                const colEmail     = detectarCampo(cols, ['EMAIL', 'Correo', 'Correo Electrónico', 'Correo electronico', 'E-mail']);
+                const colContacto  = detectarCampo(cols, ['CONTACTO', 'Telefono', 'Teléfono', 'Celular']);
+                const colContrato  = detectarCampo(cols, ['CONTRATO', 'Contrato']);
+                const colUbicacion = detectarCampo(cols, ['UBICACIÓN', 'Ubicacion', 'Ubicación', 'SEDE', 'Sede']);
+
+                if (!colCedula) throw new Error('La tabla Personal HSLV no tiene un campo de cédula identificable.');
+
                 const cedulaBuscada = normDoc(cedula);
-                const matches = await buscarRegistrosPersonalPorCedula(cedulaBuscada);
-                const rec = matches[0] || null;
-                const row = rec ? { id: rec.id, ...(rec.fields || {}) } : null;
-                const cols = row ? Object.keys(row).filter(c => c !== 'id') : [];
+                const row = personalData.find(r => normDoc(r[colCedula]) === cedulaBuscada);
                 if (!row) {
                     clearParticipantFields();
                     currentParticipantData = {};
@@ -7947,28 +7950,6 @@ function getSelectedStaff() {
   }, []);
 }
 
-        // Detecta opciones del tipo "A y B son correctas" / "Todas las anteriores" cuya letra no es la marcada
-        function findSuspiciousAnswerKeys(questions, label) {
-            const out = [];
-            const norm = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/^\s*[a-d]\s*[\).:-]\s*/, '').trim();
-            (questions || []).forEach((q, i) => {
-                const marked = String(q.correctAnswer || '').toLowerCase();
-                ['a', 'b', 'c', 'd'].forEach(letter => {
-                    const t = norm(q.options?.[letter]);
-                    const combo = t.match(/\b([a-d])\s*(?:,|y|e)\s*([a-d])\b.*correct/) || t.match(/\bopciones?\s+([a-d])\s*(?:,|y|e)\s*([a-d])\b/);
-                    const todas = /todas\s+(las\s+)?(anteriores|opciones|son correctas)/.test(t);
-                    if (!combo && !todas) return;
-                    if (letter === marked) return;
-                    const incluidas = combo ? [combo[1], combo[2]] : ['a', 'b', 'c', 'd'].filter(l => l !== letter);
-                    if (incluidas.includes(marked)) {
-                        const qText = String(q.question || '').slice(0, 90);
-                        out.push(`<strong>${label} · Pregunta ${i + 1}:</strong> ${escapeHtml(qText)}<br><span style="color:#92400e;">Marcada: ${marked.toUpperCase()} · La opción ${letter.toUpperCase()} dice "${escapeHtml(q.options[letter])}"</span>`);
-                    }
-                });
-            });
-            return out;
-        }
-
         async function saveTraining() {
     const titleInput=document.getElementById('trainingTitle'),descInput=document.getElementById('trainingDescription'),dateInput=document.getElementById('trainingDate'),deptInput=document.getElementById('trainingDepartment'),durationInput=document.getElementById('trainingDuration'),expositorInput=document.getElementById('trainingExpositor'),referenteInput=document.getElementById('trainingReferente'),methodInput=document.getElementById('trainingMethodology'),placeInput=document.getElementById('trainingPlace'),eventDateInput=document.getElementById('trainingEventDate');
     const title=titleInput?titleInput.value.trim():'',description=descInput?descInput.value.trim():'',trainingDate=dateInput?dateInput.value:'',department=deptInput?deptInput.value:'',duration=durationInput?durationInput.value.trim():'',expositor=expositorInput?expositorInput.value.trim():'',referente=referenteInput?referenteInput.value.trim():'',methodology=methodInput?methodInput.value:'',place=placeInput?placeInput.value.trim():'',eventDate=eventDateInput?eventDateInput.value:'';
@@ -7985,29 +7966,6 @@ function getSelectedStaff() {
     const postestQuestions=collectQuestions('postest');
     if(postestQuestions===null)return;
     if(postestQuestions.length===0){Swal.fire({icon:'warning',title:'Sin Preguntas de Post-test',text:'Agrega al menos una pregunta al Post-test'});document.getElementById('postestQuestions').scrollIntoView({behavior:'smooth'});return;}
-
-    // Validación de clave de respuestas: si una opción dice "A y B son correctas", "B y C…",
-    // "Todas las anteriores", etc., y se marcó como correcta una sola de las opciones que ella
-    // incluye, el participante que responde bien queda calificado como incorrecto.
-    const suspiciousKeys = findSuspiciousAnswerKeys(pretestQuestions, 'Pre-test').concat(findSuspiciousAnswerKeys(postestQuestions, 'Post-test'));
-    if (suspiciousKeys.length) {
-        const check = await Swal.fire({
-            icon: 'warning',
-            title: 'Revisa la respuesta correcta',
-            html: `<div style="text-align:left; font-size:0.95rem;">
-                <p style="margin:0 0 0.6rem 0;">Estas preguntas tienen una opción combinada, pero la respuesta marcada es otra:</p>
-                <ul style="margin:0; padding-left:1.2rem;">${suspiciousKeys.map(w => `<li style="margin-bottom:0.4rem;">${w}</li>`).join('')}</ul>
-                <p style="margin:0.8rem 0 0 0;">Si el participante elige la opción combinada, el sistema la calificará como incorrecta.</p>
-            </div>`,
-            showCancelButton: true,
-            confirmButtonText: 'Guardar de todos modos',
-            cancelButtonText: 'Corregir',
-            confirmButtonColor: '#6b7280',
-            cancelButtonColor: '#2E7D32',
-            focusCancel: true
-        });
-        if (!check.isConfirmed) return;
-    }
 
     const accessCode = generateAccessCode();
     const createdAtISO = new Date().toISOString();
@@ -12848,41 +12806,6 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
 
         const PERSONAL_HSLV_TABLE = 'Personal HSLV';
-        // ID de la tabla: el nombre con espacio rompe el enrutamiento del proxy en escrituras (POST/PATCH)
-        const PERSONAL_HSLV_TABLE_ID = 'tbl5A7rayv5BbiYF1';
-        // Columnas reales de Personal HSLV (sirven para el formulario de registro sin descargar toda la tabla)
-        const PERSONAL_HSLV_KNOWN_COLUMNS = ['CEDULA', 'NOMBRE', 'GENERO', 'F.NACIMIENTO', 'HIJOS', 'EMAIL', 'CONTACTO', 'ENTIDAD', 'PERFIL', 'CARGO', 'PROCESO', 'AREA', 'CONTRATO', 'UBICACIÓN'];
-        const personalCedulaCache = new Map();
-
-        // Consulta UN colaborador por cédula con filterByFormula (1 solicitud a Airtable).
-        // Evita el error 429 que aparecía cuando muchos participantes escaneaban el QR a la vez
-        // y cada teléfono descargaba la tabla completa (~18 páginas).
-        async function buscarRegistrosPersonalPorCedula(cedula, { force = false } = {}) {
-            const digits = normDoc(cedula).replace(/\D/g, '');
-            if (!digits) return [];
-
-            if (!force && personalDbLoaded && personalData.length) {
-                const cols = getPersonalKnownColumns();
-                const colCed = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'No. Cédula', 'Número de Cédula', 'Documento']);
-                if (colCed) {
-                    return personalData
-                        .filter(r => normDoc(r[colCed]).replace(/\D/g, '') === digits)
-                        .map(r => { const { id, ...fields } = r; return { id, fields }; });
-                }
-            }
-
-            if (!force && personalCedulaCache.has(digits)) return personalCedulaCache.get(digits);
-
-            const query = new URLSearchParams({ pageSize: '10', maxRecords: '10' });
-            query.set('filterByFormula', `{CEDULA}&''='${digits}'`);
-            const res = await airtableProxyRequest({
-                method: 'GET',
-                path: `/${PERSONAL_HSLV_TABLE_ID}?${query.toString()}`
-            });
-            const records = Array.isArray(res?.records) ? res.records : [];
-            personalCedulaCache.set(digits, records);
-            return records;
-        }
         let personalData = [];
         let personalDbLoaded = false;
         let personalDbName = PERSONAL_HSLV_TABLE;
@@ -12917,7 +12840,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 const res = await airtableProxyRequest({
                     method: 'GET',
-                    path: `/${PERSONAL_HSLV_TABLE_ID}?${query.toString()}`
+                    path: `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}?${query.toString()}`
                 });
 
                 const records = Array.isArray(res?.records) ? res.records : [];
@@ -13688,7 +13611,7 @@ async function airtableProxyRequest(payload) {
         const message = String(msg);
 
         const matchUnknown = message.match(/Unknown field name/i);
-        const matchInvalid = message.match(/Field\s+["'“]([^"'”]+)["'”]\s+cannot accept/i) || message.match(/Field .([^.]+). cannot accept the provided value/i);
+        const matchInvalid = message.match(/Field .([^.]+). cannot accept the provided value/i);
         const matchSelect = message.match(/Insufficient permissions to create new select option/i);
 
         let problematicField = '';
@@ -13740,10 +13663,6 @@ async function airtableProxyRequest(payload) {
         return true;
     };
 
-    let rateLimitRetries = 0;
-    const MAX_RATE_LIMIT_RETRIES = 6;
-    const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-
     for (let attempt = 0; attempt < 10; attempt++) {
         const res = await fetch('/.netlify/functions/airtable-proxy', {
             method: 'POST',
@@ -13761,27 +13680,7 @@ async function airtableProxyRequest(payload) {
         let data = null;
         try { data = rawText ? JSON.parse(rawText) : {}; } catch { data = { raw: rawText }; }
 
-        const pickMsg = (v) => {
-            if (!v) return '';
-            if (typeof v === 'string') return v;
-            if (typeof v === 'object') return v.message || (v.error && pickMsg(v.error)) || v.type || JSON.stringify(v);
-            return String(v);
-        };
-        const msg = pickMsg(data && (data.error || data.message)) || rawText;
-
-        const isRateLimited = res.status === 429 || /\b429\b|rate.?limit|too many requests/i.test(String(msg || ''));
-        if (isRateLimited && rateLimitRetries < MAX_RATE_LIMIT_RETRIES) {
-            // Espera exponencial con variación aleatoria para que los teléfonos no reintenten al mismo tiempo
-            const wait = Math.min(1000 * Math.pow(2, rateLimitRetries), 16000) + Math.floor(Math.random() * 900);
-            rateLimitRetries++;
-            attempt--; // los reintentos por 429 no consumen los intentos de corrección de campos
-            console.warn(`⏳ Airtable 429: reintento ${rateLimitRetries}/${MAX_RATE_LIMIT_RETRIES} en ${wait} ms`);
-            await sleep(wait);
-            continue;
-        }
-        if (isRateLimited) {
-            throw new Error('El sistema está recibiendo muchas consultas al mismo tiempo. Espera unos segundos y presiona de nuevo "Cargar datos".');
-        }
+        const msg = (data && (data.error || data.message)) ? (data.error || data.message) : rawText;
 
         if (res.status === 422 && attempt < 9 && removeProblematicFieldVariant(msg)) {
             continue;
@@ -17171,7 +17070,10 @@ function makeCronogramaFilterFormula(year, tipo) {
             const objetivo = normDoc(cedula);
             if (!objetivo) return '';
             try {
-                const records = await buscarRegistrosPersonalPorCedula(objetivo);
+                if (!virtualPersonalCache) {
+                    virtualPersonalCache = await obtenerTodosLosRegistrosPersonal();
+                }
+                const records = virtualPersonalCache || [];
                 if (!records.length) return '';
                 const cols = Object.keys(records[0].fields || {});
                 const colCedula = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
@@ -17206,7 +17108,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             const objetivo = normDoc(cedula);
             if (!objetivo) return null;
             try {
-                const records = await buscarRegistrosPersonalPorCedula(objetivo);
+                const records = await obtenerTodosLosRegistrosPersonal();
                 const cols = records.flatMap(r => Object.keys(r.fields || {}));
                 const colCedula = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']);
                 if (!colCedula) return null;
@@ -17416,7 +17318,8 @@ function makeCronogramaFilterFormula(year, tipo) {
 
             Swal.fire({ title: 'Registrando...', text: 'Guardando en Personal HSLV', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
             try {
-                const cols = PERSONAL_HSLV_KNOWN_COLUMNS.slice();
+                if (!virtualPersonalCache) virtualPersonalCache = await obtenerTodosLosRegistrosPersonal();
+                const cols = (virtualPersonalCache && virtualPersonalCache.length) ? Object.keys(virtualPersonalCache[0].fields || {}) : [];
                 const colCedula = detectarCampo(cols, ['CEDULA', 'Cédula', 'Cedula', 'CC', 'Documento', 'Identificación', 'Identificacion', 'No. Cédula', 'Número de Cédula']) || 'CEDULA';
                 const colNombre = detectarCampo(cols, ['NOMBRE', 'Nombre', 'Nombre Completo', 'Nombres']) || 'NOMBRE';
                 const colEntidad = detectarCampo(cols, ['ENTIDAD', 'Entidad', 'Empresa']) || 'ENTIDAD';
@@ -17436,13 +17339,12 @@ function makeCronogramaFilterFormula(year, tipo) {
                 const existingId = existingPerson?.id || '';
                 const created = await airtableProxyRequest({
                     method: existingId ? 'PATCH' : 'POST',
-                    path: existingId ? `/${PERSONAL_HSLV_TABLE_ID}/${existingId}` : `/${PERSONAL_HSLV_TABLE_ID}`,
-                    body: { fields, typecast: true }
+                    path: existingId ? `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}/${existingId}` : `/${encodeURIComponent(PERSONAL_HSLV_TABLE)}`,
+                    body: { fields }
                 });
                 if (!created || (!created.id && !existingId)) throw new Error('Airtable no confirmó el registro.');
 
                 virtualPersonalCache = null;
-                personalCedulaCache.delete(String(cedula).replace(/\D/g, ''));
                 Swal.close();
                 await Swal.fire({ icon: 'success', title: existingId ? 'Datos actualizados' : 'Registro exitoso', text: 'Tus datos quedaron guardados en Personal HSLV.', timer: 1400, showConfirmButton: false });
                 return { name: nombre.toUpperCase(), entity: entidad, process: proceso, profile: perfil, cargo };
@@ -19952,6 +19854,1330 @@ function makeCronogramaFilterFormula(year, tipo) {
     window.fillQuarterlySatisfaction = fillQuarterlySatisfaction;
     window.loadDashboardSatisfaction = loadDashboardSatisfaction;
     window.SAT_DIMENSIONS = SAT_DIMENSIONS;
+})();
+</script>
+
+<!-- ==========================================================
+     CORREGIR PRETEST / POSTEST  (pestaña Crear)
+     Edita preguntas de capacitaciones ya creadas, detecta
+     inconsistencias entre pretest y postest y recalcula los
+     puntajes de los participantes cuando cambia una clave.
+     Escritura por ID de campo; cada corrección deja una línea
+     de trazabilidad en el campo Notes de la pregunta.
+     ========================================================== -->
+<style id="qfixStyles">
+    .qfix-overlay{position:fixed;inset:0;z-index:1050;display:none;align-items:flex-start;justify-content:center;padding:2vh 12px;background:rgba(15,23,42,.55);}
+    .qfix-overlay.show{display:flex;}
+    .qfix-overlay *, .qfix-overlay *::before, .qfix-overlay *::after{box-sizing:border-box;}
+    .qfix-box{width:100%;max-width:1280px;max-height:96vh;display:flex;flex-direction:column;background:#f8fafc;border-radius:16px;box-shadow:0 24px 60px rgba(2,8,23,.35);overflow:hidden;}
+    .qfix-top{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;padding:1rem 1.25rem;background:#fff;border-bottom:1px solid #e5e7eb;}
+    .qfix-top h2{margin:0;font-size:1.25rem;color:#0f172a;display:flex;gap:.5rem;align-items:center;}
+    .qfix-top h2 i{color:#b45309;}
+    .qfix-top p{margin:.25rem 0 0;color:#64748b;font-size:.88rem;}
+    .qfix-x{flex:none;border:0;background:#f1f5f9;width:36px;height:36px;border-radius:10px;font-size:1.4rem;line-height:1;cursor:pointer;color:#334155;transition:background-color .15s;}
+    .qfix-x:hover{background:#e2e8f0;}
+    .qfix-picker{padding:.9rem 1.25rem;background:#fff;border-bottom:1px solid #e5e7eb;}
+    .qfix-search{display:flex;gap:.5rem;align-items:center;}
+    .qfix-search input{flex:1;min-width:0;padding:.65rem .85rem;border:2px solid #e2e8f0;border-radius:10px;font:inherit;font-size:.95rem;color:#0f172a;background:#fff;}
+    .qfix-search input:focus{outline:none;border-color:var(--primary,#2E7D32);}
+    .qfix-caption{font-size:.78rem;color:#64748b;margin:.55rem 0 .35rem;font-weight:600;}
+    .qfix-results{display:grid;gap:.35rem;max-height:300px;overflow:auto;}
+    .qfix-result{display:flex;justify-content:space-between;gap:1rem;align-items:center;text-align:left;width:100%;padding:.6rem .8rem;border:1px solid #e2e8f0;border-radius:10px;background:#fff;cursor:pointer;color:#0f172a;font:inherit;transition:border-color .15s,background-color .15s;}
+    .qfix-result:hover,.qfix-result:focus-visible{border-color:var(--primary,#2E7D32);background:#f0fdf4;outline:none;}
+    .qfix-result small{color:#64748b;}
+    .qfix-code{font-family:ui-monospace,Consolas,monospace;font-weight:700;color:#334155;background:#f1f5f9;padding:.1rem .45rem;border-radius:6px;white-space:nowrap;}
+    .qfix-current{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;font-size:.9rem;color:#334155;}
+    .qfix-current strong{color:#0f172a;}
+    .qfix-body{flex:1;overflow:auto;padding:1rem 1.25rem;}
+    .qfix-empty{text-align:center;color:#64748b;padding:3rem 1rem;font-size:.95rem;}
+    .qfix-empty i{display:block;font-size:2rem;color:#cbd5e1;margin-bottom:.6rem;}
+    .qfix-muted{color:#94a3b8;font-size:.82rem;}
+    .qfix-summary{display:flex;flex-wrap:wrap;justify-content:space-between;gap:.75rem;align-items:center;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:.85rem 1rem;margin-bottom:1rem;}
+    .qfix-summary h3{margin:0;font-size:1.05rem;color:#0f172a;}
+    .qfix-stats{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.45rem;}
+    .qfix-stat{display:inline-flex;align-items:center;gap:.3rem;font-size:.78rem;font-weight:600;padding:.2rem .55rem;border-radius:999px;background:#f1f5f9;color:#334155;}
+    .qfix-stat.err{background:#fee2e2;color:#b91c1c;}
+    .qfix-stat.warn{background:#fef3c7;color:#92400e;}
+    .qfix-stat.ok{background:#dcfce7;color:#166534;}
+    .qfix-tools{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;}
+    .qfix-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.5rem .85rem;border-radius:9px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;font:inherit;font-weight:600;font-size:.85rem;cursor:pointer;transition:background-color .15s,border-color .15s,transform .15s;}
+    .qfix-btn:hover{background:#f8fafc;border-color:#94a3b8;}
+    .qfix-btn:active{transform:scale(.98);}
+    .qfix-btn:disabled{opacity:.45;cursor:not-allowed;transform:none;}
+    .qfix-btn.primary{background:var(--primary,#2E7D32);border-color:var(--primary,#2E7D32);color:#fff;}
+    .qfix-btn.primary:hover:not(:disabled){background:#256428;}
+    .qfix-toggle{display:inline-flex;align-items:center;gap:.4rem;font-size:.85rem;color:#334155;font-weight:600;cursor:pointer;margin:0;}
+    .qfix-toggle input{width:16px;height:16px;accent-color:var(--primary,#2E7D32);}
+    .qfix-pair{background:#fff;border:1px solid #e5e7eb;border-radius:14px;margin-bottom:.9rem;overflow:hidden;}
+    .qfix-pair.has-err{border-color:#fca5a5;box-shadow:0 0 0 3px rgba(239,68,68,.08);}
+    .qfix-pair.is-hidden{display:none;}
+    .qfix-pair-head{display:flex;flex-wrap:wrap;gap:.5rem .75rem;align-items:center;padding:.6rem .9rem;background:#f8fafc;border-bottom:1px solid #eef2f7;}
+    .qfix-pair-head strong{color:#0f172a;font-size:.92rem;}
+    .qfix-pair-issues{display:flex;flex-wrap:wrap;gap:.35rem;flex:1;min-width:0;}
+    .qfix-pair-tools{display:flex;gap:.35rem;flex-wrap:wrap;}
+    .qfix-pair-body{display:grid;grid-template-columns:1fr 1fr;}
+    .qfix-pair-body > * + *{border-left:1px solid #eef2f7;}
+    @media (max-width:900px){.qfix-pair-body{grid-template-columns:1fr;}.qfix-pair-body > * + *{border-left:0;border-top:1px solid #eef2f7;}}
+    .qfix-card{padding:.85rem .9rem;transition:background-color .15s;min-width:0;}
+    .qfix-card.is-changed{background:#fffbeb;}
+    .qfix-card-head{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem;margin-bottom:.5rem;}
+    .qfix-tag{font-size:.7rem;font-weight:800;letter-spacing:.03em;text-transform:uppercase;padding:.15rem .5rem;border-radius:6px;}
+    .qfix-tag-pre{background:#dbeafe;color:#1e40af;}
+    .qfix-tag-post{background:#dcfce7;color:#166534;}
+    .qfix-tag-other{background:#f1f5f9;color:#475569;}
+    .qfix-meta{font-size:.76rem;color:#64748b;}
+    .qfix-flag{display:none;font-size:.74rem;font-weight:700;color:#b45309;}
+    .qfix-card.is-changed .qfix-flag{display:inline;}
+    .qfix-mini{display:inline-flex;align-items:center;gap:.3rem;border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:.25rem .55rem;cursor:pointer;color:#475569;font:inherit;font-size:.78rem;font-weight:600;transition:background-color .15s,border-color .15s;}
+    .qfix-mini:hover{background:#f8fafc;border-color:#94a3b8;}
+    .qfix-card-head .qfix-mini{margin-left:auto;}
+    .qfix-lbl{display:block;font-size:.74rem;font-weight:700;color:#475569;margin:.1rem 0 .25rem;}
+    .qfix-input{width:100%;padding:.5rem .6rem;border:1.5px solid #e2e8f0;border-radius:8px;font:inherit;font-size:.9rem;color:#0f172a;background:#fff;transition:border-color .15s,background-color .15s;}
+    .qfix-input:focus{outline:none;border-color:var(--primary,#2E7D32);}
+    textarea.qfix-input{resize:vertical;min-height:62px;}
+    textarea.qfix-input.qfix-opt-input{resize:none;min-height:0;overflow:hidden;line-height:1.35;}
+    /* Anula reglas globales con !important de la app (label, textarea) dentro del módulo */
+    .qfix-overlay textarea.qfix-opt-input{min-height:0 !important;}
+    .qfix-overlay textarea.qfix-input:not(.qfix-opt-input){min-height:62px !important;}
+    .qfix-overlay label.qfix-opt{margin-bottom:0 !important;font-size:.9rem !important;}
+    .qfix-overlay label.qfix-lbl{font-size:.74rem !important;margin-bottom:.25rem !important;}
+    .qfix-overlay label.qfix-toggle{margin-bottom:0 !important;}
+    .qfix-overlay input[type=radio],.qfix-overlay input[type=checkbox]{padding:0 !important;}
+    .qfix-input.is-dirty{border-color:#f59e0b;background:#fffdf5;}
+    .qfix-img{display:flex;flex-wrap:wrap;align-items:center;gap:.6rem;margin:.6rem 0;padding:.5rem;border:1px dashed #cbd5e1;border-radius:10px;background:#fcfcfd;}
+    .qfix-img img{max-height:90px;max-width:180px;border-radius:6px;border:1px solid #e2e8f0;background:#fff;object-fit:contain;}
+    .qfix-img.is-removing img{opacity:.35;}
+    .qfix-noimg{font-size:.8rem;color:#94a3b8;}
+    .qfix-img-state{font-size:.74rem;font-weight:700;color:#b45309;}
+    .qfix-img-btns{display:flex;flex-wrap:wrap;gap:.3rem;margin-left:auto;}
+    .qfix-img-btns button{border:1px solid #e2e8f0;background:#fff;border-radius:7px;padding:.25rem .5rem;font:inherit;font-size:.75rem;cursor:pointer;color:#334155;}
+    .qfix-img-btns button:hover:not(:disabled){border-color:#94a3b8;}
+    .qfix-img-btns button:disabled{opacity:.4;cursor:not-allowed;}
+    .qfix-opts{display:grid;gap:.35rem;}
+    .qfix-opt{display:flex;align-items:center;gap:.45rem;padding:.25rem .35rem;border:1.5px solid transparent;border-radius:9px;margin:0;cursor:pointer;}
+    .qfix-opt.is-key{border-color:#86efac;background:#f0fdf4;}
+    .qfix-opt input[type=radio]{width:16px;height:16px;accent-color:var(--primary,#2E7D32);flex:none;cursor:pointer;margin:0;}
+    .qfix-letter{flex:none;width:24px;height:24px;border-radius:6px;display:grid;place-items:center;font-weight:800;font-size:.8rem;background:#f1f5f9;color:#334155;}
+    .qfix-opt.is-key .qfix-letter{background:var(--primary,#2E7D32);color:#fff;}
+    .qfix-issues{display:flex;flex-wrap:wrap;gap:.3rem;margin-top:.5rem;}
+    .qfix-chip{display:inline-flex;align-items:center;gap:.3rem;font-size:.74rem;font-weight:600;padding:.18rem .5rem;border-radius:999px;line-height:1.35;}
+    .qfix-chip.err{background:#fee2e2;color:#b91c1c;}
+    .qfix-chip.warn{background:#fef3c7;color:#92400e;}
+    .qfix-chip.info{background:#e0f2fe;color:#075985;}
+    .qfix-slot{padding:1.25rem;color:#94a3b8;font-size:.85rem;display:flex;align-items:center;justify-content:center;text-align:center;}
+    .qfix-notes summary{cursor:pointer;font-size:.74rem;color:#64748b;margin-top:.45rem;}
+    .qfix-notes pre{white-space:pre-wrap;font:inherit;font-size:.74rem;color:#475569;background:#f8fafc;border-radius:8px;padding:.4rem .55rem;margin:.3rem 0 0;max-height:120px;overflow:auto;}
+    .qfix-foot{display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;padding:.75rem 1.25rem;background:#fff;border-top:1px solid #e5e7eb;}
+    .qfix-pending{font-weight:600;color:#334155;font-size:.9rem;}
+    .qfix-pending b{color:#b45309;}
+    @media (max-width:600px){.qfix-top p{display:none;}.qfix-box{max-height:100%;}.qfix-overlay{padding:8px;}.qfix-body,.qfix-picker,.qfix-foot{padding-left:.8rem;padding-right:.8rem;}}
+    .qfix-sw-h{text-align:left;font-weight:800;color:#0f172a;margin:.85rem 0 .35rem;font-size:.95rem;}
+    .qfix-sw-list{text-align:left;font-size:.88rem;margin:.2rem 0 .5rem;padding-left:1.15rem;color:#334155;}
+    .qfix-sw-list li{margin:.15rem 0;}
+    .qfix-sw-note{text-align:left;font-size:.82rem;color:#64748b;margin:.5rem 0 0;}
+    .qfix-sw-warn{text-align:left;font-size:.85rem;color:#92400e;background:#fef3c7;border-radius:8px;padding:.5rem .7rem;margin:.6rem 0 0;}
+    .qfix-sw-scroll{max-height:300px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px;}
+    .qfix-sw-table{width:100%;border-collapse:collapse;font-size:.84rem;text-align:left;}
+    .qfix-sw-table th,.qfix-sw-table td{padding:.4rem .55rem;border-bottom:1px solid #eef2f7;}
+    .qfix-sw-table th{background:#f8fafc;color:#334155;position:sticky;top:0;}
+    .qfix-up{color:#166534;font-weight:700;}
+    .qfix-down{color:#b91c1c;font-weight:700;}
+</style>
+
+<script>
+(function () {
+    'use strict';
+
+    // ── Tablas y campos (IDs fijos: evitan fallos por tildes o espacios) ──
+    const TABLES = {
+        trainings: 'tblSdqWRhKjVSo9NX', // Capacitaciones
+        questions: 'tblCtk7CItD0yaloI', // Preguntas
+        answers:   'tblWOfNGiAUwOrirA', // Respuestas
+        parts:     'tblCLUiRXPttPVIrP'  // Participaciones
+    };
+    const FIELD = {
+        q: {
+            text: 'fldrlB4KDOXkTTnFv',  // Pregunta
+            a:    'fldKR4eAQQ7Jm6Gj5',  // Opción A
+            b:    'fldlILtZSeaXoyDJF',  // Opción B
+            c:    'fldEvqgiHTyBH7O0T',  // Opción C
+            d:    'fldB1Me1g8oYAqpiI',  // Opción D
+            key:  'fldcUdDXENVJR3Tf8',  // Respuesta Correcta (a/b/c/d)
+            image:'fldXOPjnXtIY4kqDr',  // Imagen (adjunto)
+            notes:'fldsyHDJEU0ypK2xL'   // Notes (trazabilidad)
+        },
+        ans:  { correct: 'fldAXloE8k2dzXvoV' },                    // Es Correcta
+        part: { pre: 'fld63aPVhmNVBKY29', post: 'fldzvdsMAZ5jrMTvg' } // Pretest Score / Post-test Score
+    };
+    const LETTERS = ['a', 'b', 'c', 'd'];
+    const EDIT_KEYS = ['text', 'a', 'b', 'c', 'd', 'key'];
+    const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+    const S = {
+        trainings: [], trainingsLoaded: false,
+        training: null,
+        questions: [], byId: new Map(), pairs: [],
+        answers: null, parts: new Map(),
+        onlyIssues: false, busy: false
+    };
+
+    // ── Utilidades ──
+    const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+    const isRecId = (id) => /^rec[A-Za-z0-9]{14}$/.test(String(id || ''));
+    const stripAccents = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const $ = (sel) => document.querySelector(sel);
+    const overlay = () => document.getElementById('qfixOverlay');
+
+    function normText(s) {
+        return stripAccents(s).toLowerCase()
+            .replace(/\(\s*\d*\s*puntos?\s*\)?/g, ' ')
+            .replace(/\d+\s*puntos?/g, ' ')
+            .replace(/\bpuntos?\b/g, ' ')
+            .replace(/[^a-z0-9 ]+/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+    function normOpt(s) {
+        return normText(String(s || '').replace(/^\s*[a-dA-D]\s*[).]\s*/, ''));
+    }
+    function similarity(a, b) {
+        if (a === b) return 1;
+        if (!a || !b || a.length < 2 || b.length < 2) return 0;
+        const grams = (s) => { const m = new Map(); for (let i = 0; i < s.length - 1; i++) { const g = s.slice(i, i + 2); m.set(g, (m.get(g) || 0) + 1); } return m; };
+        const A = grams(a), B = grams(b);
+        let inter = 0;
+        A.forEach((n, g) => { if (B.has(g)) inter += Math.min(n, B.get(g)); });
+        return (2 * inter) / ((a.length - 1) + (b.length - 1));
+    }
+    function short(s, n = 40) {
+        const t = String(s || '').replace(/\s+/g, ' ').trim();
+        return t.length > n ? t.slice(0, n - 1) + '…' : t;
+    }
+    function fmtDate(iso) {
+        const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})/);
+        return m ? `${m[3]}/${m[2]}/${m[1]}` : 'Sin fecha';
+    }
+    function nowStamp() {
+        const d = new Date();
+        const p = (n) => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    }
+    function currentUserName() {
+        try {
+            if (typeof currentAuthUser !== 'undefined' && currentAuthUser) {
+                return currentAuthUser.nombre || currentAuthUser.usuario || 'Usuario';
+            }
+        } catch (e) { /* sin sesión */ }
+        return 'Usuario';
+    }
+    function numOrNull(v) {
+        const n = typeof v === 'number' ? v : parseFloat(v);
+        return Number.isFinite(n) ? n : null;
+    }
+    function normKey(v) {
+        const m = String(v || '').trim().toLowerCase().match(/^[a-d]/);
+        return m ? m[0] : '';
+    }
+
+    // ── Animaciones (motion@12, carga diferida; nunca bloquean la lógica) ──
+    let motionPromise = null;
+    function fx(run) {
+        try {
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+            if (!motionPromise) motionPromise = import('https://cdn.jsdelivr.net/npm/motion@12/+esm').catch(() => null);
+            motionPromise.then((m) => { if (m) { try { run(m); } catch (e) { /* solo visual */ } } });
+        } catch (e) { /* solo visual */ }
+    }
+
+    // ── Airtable vía proxy (errores explícitos, sin descartar campos en silencio) ──
+    async function proxy(payload) {
+        const res = await fetch('/.netlify/functions/airtable-proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        let data;
+        if (typeof readJsonResponse === 'function') {
+            data = await readJsonResponse(res, 'No se pudo comunicar con Airtable');
+        } else {
+            const text = await res.text();
+            if (!res.ok) throw new Error(text || `Error HTTP ${res.status}`);
+            data = text ? JSON.parse(text) : {};
+        }
+        if (data && data.success === false) throw new Error(data.error || data.message || 'Airtable rechazó la operación.');
+        return data || {};
+    }
+    async function fetchAll(table, params) {
+        let out = [], offset = null, guard = 0;
+        do {
+            const p = new URLSearchParams(params ? params.toString() : '');
+            if (offset) p.set('offset', offset);
+            const qs = p.toString();
+            const data = await proxy({ method: 'GET', path: `/${table}${qs ? '?' + qs : ''}`, body: null });
+            out = out.concat(Array.isArray(data.records) ? data.records : []);
+            offset = data.offset || null;
+            guard += 1;
+        } while (offset && guard < 200);
+        return out;
+    }
+    async function pool(items, limit, worker) {
+        const results = new Array(items.length);
+        let next = 0;
+        const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
+            while (next < items.length) {
+                const idx = next++;
+                results[idx] = await worker(items[idx], idx);
+            }
+        });
+        await Promise.all(runners);
+        return results;
+    }
+    async function fetchByIds(table, ids) {
+        const unique = [...new Set((ids || []).filter(isRecId))];
+        if (!unique.length) return [];
+        const chunks = [];
+        for (let i = 0; i < unique.length; i += 40) chunks.push(unique.slice(i, i + 40));
+        const parts = await pool(chunks, 3, (chunk) => {
+            const p = new URLSearchParams();
+            p.set('filterByFormula', `OR(${chunk.map(id => `RECORD_ID()='${id}'`).join(',')})`);
+            p.set('pageSize', '100');
+            return fetchAll(table, p);
+        });
+        return parts.flat();
+    }
+    async function patchMany(table, updates, onProgress) {
+        const chunks = [];
+        for (let i = 0; i < updates.length; i += 10) chunks.push(updates.slice(i, i + 10));
+        let done = 0;
+        for (const chunk of chunks) {
+            try {
+                await proxy({ method: 'PATCH', path: `/${table}`, body: { records: chunk, typecast: true } });
+            } catch (batchError) {
+                // Respaldo: registro por registro (si el proxy no admite lotes)
+                for (const u of chunk) {
+                    await proxy({ method: 'PATCH', path: `/${table}/${u.id}`, body: { fields: u.fields, typecast: true } });
+                }
+            }
+            done += chunk.length;
+            if (onProgress) onProgress(done, updates.length);
+        }
+    }
+    async function uploadImageFile(recordId, action) {
+        if (typeof uploadQuestionAttachment !== 'function') {
+            throw new Error('La función de carga de imágenes no está disponible.');
+        }
+        return uploadQuestionAttachment(recordId, 'Imagen', {
+            filename: action.filename || 'imagen.png',
+            contentType: action.contentType || 'image/png',
+            base64: action.base64
+        });
+    }
+
+    // ── Modelo de preguntas ──
+    function readQuestion(r) {
+        const f = r.fields || {};
+        const att = Array.isArray(f['Imagen']) && f['Imagen'][0] ? f['Imagen'][0] : null;
+        let image = null;
+        if (att && att.url) {
+            image = { url: att.url, name: att.filename || 'imagen.png', thumb: att.thumbnails?.large?.url || att.url, external: false };
+        } else if (typeof getQuestionImageUrl === 'function') {
+            const url = getQuestionImageUrl(f);
+            if (url) image = { url, name: 'imagen', thumb: url, external: true };
+        }
+        const orig = {
+            text: String(f['Pregunta'] || ''),
+            a: String(f['Opción A'] || ''),
+            b: String(f['Opción B'] || ''),
+            c: String(f['Opción C'] || ''),
+            d: String(f['Opción D'] || ''),
+            key: normKey(f['Respuesta Correcta'])
+        };
+        const tipo = String(f['Tipo'] || '').toLowerCase();
+        return {
+            id: r.id,
+            created: r.createdTime || '',
+            type: tipo.includes('pre') ? 'pre' : (tipo.includes('pos') ? 'post' : 'other'),
+            orig,
+            edit: { ...orig },
+            image,
+            imageAction: null,
+            notes: String(f['Notes'] || ''),
+            responseIds: Array.isArray(f['Respuestas']) ? f['Respuestas'] : [],
+            pair: -1
+        };
+    }
+    function buildPairs() {
+        const pre = S.questions.filter(q => q.type === 'pre');
+        const post = S.questions.filter(q => q.type === 'post');
+        const other = S.questions.filter(q => q.type === 'other');
+        const candidates = [];
+        pre.forEach((a, i) => post.forEach((b, j) => {
+            const s = similarity(normText(a.orig.text), normText(b.orig.text));
+            if (s >= 0.6) candidates.push({ i, j, s });
+        }));
+        candidates.sort((x, y) => (y.s - x.s) || (Math.abs(x.i - x.j) - Math.abs(y.i - y.j)));
+        const usedPre = new Set(), usedPost = new Set(), match = new Map();
+        candidates.forEach(c => {
+            if (usedPre.has(c.i) || usedPost.has(c.j)) return;
+            usedPre.add(c.i); usedPost.add(c.j); match.set(c.i, c.j);
+        });
+        const pairs = pre.map((a, i) => ({ pre: a, post: match.has(i) ? post[match.get(i)] : null }));
+        post.forEach((b, j) => { if (!usedPost.has(j)) pairs.push({ pre: null, post: b }); });
+        other.forEach(o => pairs.push({ pre: o, post: null, other: true }));
+        pairs.forEach((p, k) => { if (p.pre) p.pre.pair = k; if (p.post) p.post.pair = k; });
+        S.pairs = pairs;
+    }
+    function partnerOf(q) {
+        const p = S.pairs[q.pair];
+        if (!p) return null;
+        return p.pre === q ? p.post : p.pre;
+    }
+    function changedFields(q) {
+        return EDIT_KEYS.filter(k => (q.edit[k] || '') !== (q.orig[k] || ''));
+    }
+    function isChanged(q) {
+        return changedFields(q).length > 0 || !!q.imageAction;
+    }
+    function currentImage(q) {
+        const a = q.imageAction;
+        if (a) {
+            if (a.kind === 'remove') return null;
+            return { url: a.preview || a.url, name: a.filename || 'imagen', pending: a.kind };
+        }
+        return q.image;
+    }
+    function typeLabel(q) {
+        return q.type === 'pre' ? 'Pretest' : (q.type === 'post' ? 'Postest' : 'Sin tipo');
+    }
+    function questionLabel(q) {
+        return `Pregunta ${q.pair + 1} · ${typeLabel(q)}`;
+    }
+    function changeLabels(q) {
+        const labels = [];
+        changedFields(q).forEach(k => {
+            if (k === 'key') labels.push(`Clave ${(q.orig.key || '—').toUpperCase()}→${(q.edit.key || '—').toUpperCase()}`);
+            else if (k === 'text') labels.push('Enunciado');
+            else labels.push(`Opción ${k.toUpperCase()}`);
+        });
+        const imageLabels = { file: 'Imagen nueva', url: 'Imagen por URL', pair: 'Imagen copiada del par', remove: 'Imagen quitada' };
+        if (q.imageAction) labels.push(imageLabels[q.imageAction.kind] || 'Imagen');
+        return labels;
+    }
+
+    // ── Diagnóstico ──
+    function questionIssues(q) {
+        const st = q.edit, out = [];
+        const text = st.text.trim();
+        if (!text) out.push({ lvl: 'err', msg: 'Enunciado vacío' });
+        if (!LETTERS.includes(st.key)) out.push({ lvl: 'err', msg: 'Sin respuesta correcta' });
+        else if (!String(st[st.key] || '').trim()) out.push({ lvl: 'err', msg: 'La respuesta correcta apunta a una opción vacía' });
+        if (q.type === 'other') out.push({ lvl: 'warn', msg: 'Sin tipo Pretest/Postest: no aparece en ningún examen' });
+        if (/\([^)]*$/.test(text)) out.push({ lvl: 'warn', msg: 'Enunciado cortado al final' });
+        if (/puntos?\s*\)?\s*\.?\s*$/i.test(text) && !/\d\s*puntos?\s*\)?\s*\.?\s*$/i.test(text)) out.push({ lvl: 'warn', msg: '"Puntos" sin número' });
+        if (/\?/.test(text) && !/¿/.test(text)) out.push({ lvl: 'info', msg: 'Falta el signo ¿' });
+        LETTERS.forEach(l => {
+            const v = String(st[l] || '');
+            if (!v.trim()) out.push({ lvl: 'warn', msg: `Opción ${l.toUpperCase()} vacía` });
+            else if (/^\s*[a-dA-D]\s*[).]\s*/.test(v) || /\t/.test(v)) out.push({ lvl: 'warn', msg: `Opción ${l.toUpperCase()} con residuo de formato` });
+        });
+        const filled = LETTERS.map(l => normOpt(st[l])).filter(Boolean);
+        if (new Set(filled).size !== filled.length) out.push({ lvl: 'warn', msg: 'Opciones repetidas' });
+        return out;
+    }
+    function pairIssues(p) {
+        if (!p.pre || !p.post) return [];
+        const a = p.pre.edit, b = p.post.edit, out = [];
+        if (LETTERS.includes(a.key) && LETTERS.includes(b.key) && normOpt(a[a.key]) !== normOpt(b[b.key])) {
+            out.push({ lvl: 'err', msg: `Clave distinta: pretest ${a.key.toUpperCase()} («${esc(short(a[a.key], 28))}») · postest ${b.key.toUpperCase()} («${esc(short(b[b.key], 28))}»)`, html: true });
+        }
+        const diff = LETTERS.filter(l => normOpt(a[l]) !== normOpt(b[l])).map(l => l.toUpperCase());
+        if (diff.length) out.push({ lvl: 'warn', msg: `Opciones distintas: ${diff.join(', ')}` });
+        if (normText(a.text) !== normText(b.text)) out.push({ lvl: 'info', msg: 'Redacción del enunciado distinta' });
+        const ia = !!currentImage(p.pre), ib = !!currentImage(p.post);
+        if (ia !== ib) out.push({ lvl: 'warn', msg: `Imagen solo en el ${ia ? 'pretest' : 'postest'}` });
+        return out;
+    }
+    function pairHasLevel(p, lvl) {
+        return pairIssues(p).some(i => i.lvl === lvl)
+            || [p.pre, p.post].filter(Boolean).some(q => questionIssues(q).some(i => i.lvl === lvl));
+    }
+    function chipsHtml(list) {
+        const icons = { err: 'fa-circle-xmark', warn: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+        return list.map(i => `<span class="qfix-chip ${i.lvl}"><i class="fas ${icons[i.lvl]}"></i> ${i.html ? i.msg : esc(i.msg)}</span>`).join('');
+    }
+
+    // ── Render ──
+    function ensureDom() {
+        if (overlay()) return;
+        const el = document.createElement('div');
+        el.className = 'qfix-overlay';
+        el.id = 'qfixOverlay';
+        el.innerHTML = `
+            <div class="qfix-box" role="dialog" aria-modal="true" aria-labelledby="qfixTitle">
+                <div class="qfix-top">
+                    <div>
+                        <h2 id="qfixTitle"><i class="fas fa-pen-to-square"></i> Corregir Pretest / Postest</h2>
+                        <p>Corrige preguntas de capacitaciones ya creadas. Las inconsistencias entre pretest y postest se marcan en rojo y amarillo; si cambias una clave, los puntajes se recalculan.</p>
+                    </div>
+                    <button type="button" class="qfix-x" data-act="close" aria-label="Cerrar">&times;</button>
+                </div>
+                <div class="qfix-picker" id="qfixPicker"></div>
+                <div class="qfix-body" id="qfixBody"></div>
+                <div class="qfix-foot">
+                    <div class="qfix-pending" id="qfixPending">Selecciona una capacitación</div>
+                    <div class="qfix-tools">
+                        <button type="button" class="qfix-btn" data-act="discard" id="qfixDiscard" disabled><i class="fas fa-rotate-left"></i> Descartar cambios</button>
+                        <button type="button" class="qfix-btn primary" data-act="save" id="qfixSave" disabled><i class="fas fa-floppy-disk"></i> Guardar cambios</button>
+                    </div>
+                </div>
+            </div>`;
+        document.body.appendChild(el);
+        el.addEventListener('click', onClick);
+        el.addEventListener('input', onInput);
+        el.addEventListener('change', onChange);
+        el.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && e.target.classList && e.target.classList.contains('qfix-opt-input')) e.preventDefault();
+        });
+    }
+
+    function renderPicker() {
+        const box = document.getElementById('qfixPicker');
+        if (!box) return;
+        if (S.training) {
+            box.innerHTML = `
+                <div class="qfix-current">
+                    <span><i class="fas fa-graduation-cap" style="color:var(--primary,#2E7D32);"></i> Capacitación: <strong>${esc(S.training.title)}</strong></span>
+                    <span class="qfix-code">${esc(S.training.code || '—')}</span>
+                    <button type="button" class="qfix-mini" data-act="change-training"><i class="fas fa-magnifying-glass"></i> Cambiar capacitación</button>
+                </div>`;
+            return;
+        }
+        box.innerHTML = `
+            <div class="qfix-search">
+                <input type="search" id="qfixSearch" placeholder="Buscar por nombre, código de acceso, expositor o equipo…" autocomplete="off" aria-label="Buscar capacitación">
+                <button type="button" class="qfix-btn" data-act="reload-list" title="Recargar la lista"><i class="fas fa-rotate"></i></button>
+            </div>
+            <div class="qfix-caption" id="qfixCaption">Cargando capacitaciones…</div>
+            <div class="qfix-results" id="qfixResults"></div>`;
+    }
+
+    function renderResults() {
+        const results = document.getElementById('qfixResults');
+        const caption = document.getElementById('qfixCaption');
+        const input = document.getElementById('qfixSearch');
+        if (!results || !input) return;
+        const words = stripAccents(input.value).toLowerCase().trim().split(/\s+/).filter(Boolean);
+        const list = words.length
+            ? S.trainings.filter(t => words.every(w => t.search.includes(w))).slice(0, 25)
+            : S.trainings.slice(0, 8);
+        if (caption) caption.textContent = words.length ? `${list.length} resultado(s)` : 'Capacitaciones más recientes';
+        results.innerHTML = list.length
+            ? list.map(t => `
+                <button type="button" class="qfix-result" data-act="pick" data-id="${esc(t.id)}">
+                    <span><strong>${esc(t.title)}</strong><br><small>${esc(t.expositor || 'Sin expositor')} · ${esc(fmtDate(t.date))} · ${t.qCount} preguntas</small></span>
+                    <span class="qfix-code">${esc(t.code || '—')}</span>
+                </button>`).join('')
+            : '<div class="qfix-muted">No se encontraron capacitaciones con ese criterio.</div>';
+    }
+
+    function imageBlockHtml(q) {
+        const img = currentImage(q);
+        const a = q.imageAction;
+        const partner = partnerOf(q);
+        const partnerImg = partner ? currentImage(partner) : null;
+        const stateText = a ? ({ file: 'Nueva imagen (pendiente)', url: 'Imagen por URL (pendiente)', pair: 'Copiada del par (pendiente)', remove: 'Se quitará al guardar' })[a.kind] : '';
+        const shown = a && a.kind === 'remove' ? q.image : img;
+        const canRemove = a ? a.kind !== 'remove' : !!(q.image && !q.image.external);
+        return `
+            <div class="qfix-img ${a && a.kind === 'remove' ? 'is-removing' : ''}">
+                ${shown ? `<img src="${esc(shown.thumb || shown.url)}" alt="Imagen de la pregunta" onerror="this.style.display='none'">` : '<span class="qfix-noimg"><i class="far fa-image"></i> Sin imagen</span>'}
+                ${stateText ? `<span class="qfix-img-state">${esc(stateText)}</span>` : (q.image && q.image.external && !a ? '<span class="qfix-muted">Imagen enlazada desde otro campo</span>' : '')}
+                <div class="qfix-img-btns">
+                    <button type="button" data-act="img-file" title="Subir una imagen (máx. 5 MB)"><i class="fas fa-upload"></i> Subir</button>
+                    <button type="button" data-act="img-url" title="Usar una imagen desde un enlace"><i class="fas fa-link"></i> URL</button>
+                    <button type="button" data-act="img-pair" ${partnerImg ? '' : 'disabled'} title="Usar la misma imagen de la pregunta equivalente"><i class="fas fa-clone"></i> Copiar del par</button>
+                    <button type="button" data-act="img-remove" ${canRemove ? '' : 'disabled'} title="Quitar la imagen"><i class="fas fa-trash-can"></i> Quitar</button>
+                </div>
+                <input type="file" accept="image/*" data-file hidden>
+            </div>`;
+    }
+
+    function cardHtml(q) {
+        const dirty = new Set(changedFields(q));
+        const opts = LETTERS.map(l => `
+            <label class="qfix-opt ${q.edit.key === l ? 'is-key' : ''}">
+                <input type="radio" name="qfix-key-${q.id}" value="${l}" ${q.edit.key === l ? 'checked' : ''} aria-label="Marcar ${l.toUpperCase()} como correcta">
+                <span class="qfix-letter">${l.toUpperCase()}</span>
+                <textarea class="qfix-input qfix-opt-input ${dirty.has(l) ? 'is-dirty' : ''}" data-f="${l}" rows="1" aria-label="Opción ${l.toUpperCase()}">${esc(q.edit[l])}</textarea>
+            </label>`).join('');
+        return `
+            <div class="qfix-card ${isChanged(q) ? 'is-changed' : ''}" data-qid="${esc(q.id)}">
+                <div class="qfix-card-head">
+                    <span class="qfix-tag qfix-tag-${q.type}">${typeLabel(q)}</span>
+                    <span class="qfix-meta"><i class="fas fa-user-check"></i> ${q.responseIds.length} respuesta(s)</span>
+                    <span class="qfix-flag"><i class="fas fa-pen"></i> Editada</span>
+                    <button type="button" class="qfix-mini" data-act="revert" title="Volver al texto guardado en Airtable"><i class="fas fa-rotate-left"></i> Revertir</button>
+                </div>
+                <label class="qfix-lbl">Enunciado</label>
+                <textarea class="qfix-input ${dirty.has('text') ? 'is-dirty' : ''}" data-f="text" rows="3" aria-label="Enunciado">${esc(q.edit.text)}</textarea>
+                ${imageBlockHtml(q)}
+                <label class="qfix-lbl">Opciones <span class="qfix-muted">(marca la correcta)</span></label>
+                <div class="qfix-opts">${opts}</div>
+                <div class="qfix-issues" data-issues>${chipsHtml(questionIssues(q))}</div>
+                ${q.notes ? `<details class="qfix-notes"><summary>Historial de correcciones</summary><pre>${esc(q.notes)}</pre></details>` : ''}
+            </div>`;
+    }
+
+    function pairHtml(p, i) {
+        const tools = (p.pre && p.post)
+            ? `<button type="button" class="qfix-mini" data-act="copy" data-dir="pre2post" data-pair="${i}" title="Copia enunciado, opciones, clave e imagen del pretest al postest"><i class="fas fa-arrow-right"></i> Pretest a postest</button>
+               <button type="button" class="qfix-mini" data-act="copy" data-dir="post2pre" data-pair="${i}" title="Copia enunciado, opciones, clave e imagen del postest al pretest"><i class="fas fa-arrow-left"></i> Postest a pretest</button>`
+            : `<span class="qfix-muted">${p.other ? 'Pregunta sin tipo' : 'Sin pregunta equivalente en el otro examen'}</span>`;
+        const slot = (label) => `<div class="qfix-slot">Sin pregunta de ${label}</div>`;
+        return `
+            <div class="qfix-pair ${pairHasLevel(p, 'err') ? 'has-err' : ''}" data-pair-row="${i}">
+                <div class="qfix-pair-head">
+                    <strong>Pregunta ${i + 1}</strong>
+                    <div class="qfix-pair-issues" data-pair-issues>${chipsHtml(pairIssues(p))}</div>
+                    <div class="qfix-pair-tools">${tools}</div>
+                </div>
+                <div class="qfix-pair-body">
+                    ${p.pre ? cardHtml(p.pre) : slot('pretest')}
+                    ${p.post ? cardHtml(p.post) : slot('postest')}
+                </div>
+            </div>`;
+    }
+
+    function renderBodyMessage(icon, html) {
+        const body = document.getElementById('qfixBody');
+        if (body) body.innerHTML = `<div class="qfix-empty"><i class="fas ${icon}"></i>${html}</div>`;
+    }
+
+    function renderTraining() {
+        const body = document.getElementById('qfixBody');
+        if (!body || !S.training) return;
+        if (!S.questions.length) {
+            renderBodyMessage('fa-circle-question', 'Esta capacitación no tiene preguntas vinculadas.');
+            updateFoot();
+            return;
+        }
+        const preN = S.questions.filter(q => q.type === 'pre').length;
+        const postN = S.questions.filter(q => q.type === 'post').length;
+        const resp = S.questions.reduce((n, q) => n + q.responseIds.length, 0);
+        body.innerHTML = `
+            <div class="qfix-summary">
+                <div>
+                    <h3>${esc(S.training.title)}</h3>
+                    <div class="qfix-stats">
+                        <span class="qfix-stat">${preN} pretest · ${postN} postest</span>
+                        <span class="qfix-stat"><i class="fas fa-user-check"></i> ${resp} respuesta(s) registradas</span>
+                        <span id="qfixHealth" class="qfix-stats" style="margin:0;"></span>
+                    </div>
+                </div>
+                <div class="qfix-tools">
+                    <label class="qfix-toggle"><input type="checkbox" data-act="only-issues" ${S.onlyIssues ? 'checked' : ''}> Solo preguntas con problemas</label>
+                    <button type="button" class="qfix-btn" data-act="verify-scores" ${resp ? '' : 'disabled'} title="Recalcula los puntajes con las claves actuales y muestra diferencias"><i class="fas fa-calculator"></i> Verificar puntajes</button>
+                    <button type="button" class="qfix-btn" data-act="reload"><i class="fas fa-rotate"></i> Recargar</button>
+                </div>
+            </div>
+            <div id="qfixPairs">${S.pairs.map((p, i) => pairHtml(p, i)).join('')}</div>`;
+        updateHealth();
+        updateFoot();
+        applyFilter();
+        fitOptions(body);
+        fx((m) => {
+            const rows = [...body.querySelectorAll('.qfix-pair:not(.is-hidden)')].slice(0, 10);
+            if (rows.length) m.animate(rows, { opacity: [0, 1], y: [12, 0] }, { delay: m.stagger(0.05), duration: 0.35, ease: 'easeOut' });
+        });
+    }
+
+    function updateHealth() {
+        const box = document.getElementById('qfixHealth');
+        if (!box) return;
+        let errs = 0, warns = 0;
+        S.pairs.forEach(p => {
+            const all = pairIssues(p).concat(...[p.pre, p.post].filter(Boolean).map(questionIssues));
+            errs += all.filter(i => i.lvl === 'err').length;
+            warns += all.filter(i => i.lvl === 'warn').length;
+        });
+        box.innerHTML = (errs || warns)
+            ? `${errs ? `<span class="qfix-stat err"><i class="fas fa-circle-xmark"></i> ${errs} error(es)</span>` : ''}${warns ? `<span class="qfix-stat warn"><i class="fas fa-triangle-exclamation"></i> ${warns} advertencia(s)</span>` : ''}`
+            : '<span class="qfix-stat ok"><i class="fas fa-circle-check"></i> Sin inconsistencias</span>';
+    }
+
+    function updateFoot() {
+        const pending = document.getElementById('qfixPending');
+        const save = document.getElementById('qfixSave');
+        const discard = document.getElementById('qfixDiscard');
+        const n = S.questions.filter(isChanged).length;
+        if (pending) {
+            pending.innerHTML = !S.training
+                ? 'Selecciona una capacitación'
+                : (n ? `<b>${n}</b> pregunta(s) con cambios sin guardar` : 'Sin cambios pendientes');
+        }
+        if (save) save.disabled = !n || S.busy;
+        if (discard) discard.disabled = !n || S.busy;
+    }
+
+    function applyFilter() {
+        document.querySelectorAll('#qfixPairs .qfix-pair').forEach(row => {
+            const p = S.pairs[Number(row.dataset.pairRow)];
+            if (!p) return;
+            const keep = !S.onlyIssues
+                || pairHasLevel(p, 'err') || pairHasLevel(p, 'warn')
+                || [p.pre, p.post].filter(Boolean).some(isChanged);
+            row.classList.toggle('is-hidden', !keep);
+        });
+        fitOptions(document.getElementById('qfixPairs'));
+    }
+
+    function fitOption(t) {
+        t.style.height = 'auto';
+        if (t.scrollHeight) t.style.height = `${t.scrollHeight + 2}px`;
+    }
+    function fitOptions(root) {
+        (root || document).querySelectorAll('textarea.qfix-opt-input').forEach(fitOption);
+    }
+
+    function rerenderPair(i) {
+        const row = document.querySelector(`#qfixPairs .qfix-pair[data-pair-row="${i}"]`);
+        if (!row || !S.pairs[i]) return;
+        row.outerHTML = pairHtml(S.pairs[i], i);
+        fitOptions(document.querySelector(`#qfixPairs .qfix-pair[data-pair-row="${i}"]`));
+        updateHealth();
+        updateFoot();
+    }
+
+    function refreshCard(q) {
+        const card = document.querySelector(`#qfixPairs .qfix-card[data-qid="${q.id}"]`);
+        if (card) {
+            card.classList.toggle('is-changed', isChanged(q));
+            const issues = card.querySelector('[data-issues]');
+            if (issues) issues.innerHTML = chipsHtml(questionIssues(q));
+            card.querySelectorAll('.qfix-opt').forEach(opt => {
+                const radio = opt.querySelector('input[type=radio]');
+                opt.classList.toggle('is-key', !!radio && radio.value === q.edit.key);
+            });
+        }
+        const p = S.pairs[q.pair];
+        const row = document.querySelector(`#qfixPairs .qfix-pair[data-pair-row="${q.pair}"]`);
+        if (p && row) {
+            const box = row.querySelector('[data-pair-issues]');
+            if (box) box.innerHTML = chipsHtml(pairIssues(p));
+            row.classList.toggle('has-err', pairHasLevel(p, 'err'));
+        }
+        updateHealth();
+        updateFoot();
+    }
+
+    // ── Carga de datos ──
+    async function loadTrainings(force) {
+        if (S.trainingsLoaded && !force) return;
+        const p = new URLSearchParams();
+        p.set('pageSize', '100');
+        const recs = await fetchAll(TABLES.trainings, p);
+        S.trainings = recs.map(r => {
+            const f = r.fields || {};
+            const title = f['Título'] || '(sin título)';
+            const code = f['Código de Acceso'] || '';
+            const expositor = f['Expositor'] || '';
+            const qCount = new Set([...(f['Preguntas'] || []), ...(f['Preguntas 2'] || [])]).size;
+            return {
+                id: r.id, created: r.createdTime || '', title, code, expositor, qCount,
+                date: f['Fecha de la capacitación'] || f['Fecha Creación'] || '',
+                // El objetivo también se indexa: el nombre del equipo (p. ej. "Infusomat") a veces solo aparece allí
+                search: stripAccents(`${title} ${code} ${expositor} ${f['Objetivo'] || ''} ${f['Temas '] || f['Temas'] || ''}`).toLowerCase()
+            };
+        }).sort((a, b) => String(b.created).localeCompare(String(a.created)));
+        S.trainingsLoaded = true;
+    }
+
+    async function loadTraining(id) {
+        if (!isRecId(id)) return;
+        S.busy = true;
+        updateFoot();
+        renderBodyMessage('fa-spinner fa-spin', 'Cargando preguntas…');
+        try {
+            const rec = await proxy({ method: 'GET', path: `/${TABLES.trainings}/${id}`, body: null });
+            const f = rec.fields || rec.record?.fields || {};
+            S.training = {
+                id,
+                title: f['Título'] || '(sin título)',
+                code: f['Código de Acceso'] || ''
+            };
+            const qIds = [...(f['Preguntas'] || []), ...(f['Preguntas 2'] || [])];
+            const qRecs = await fetchByIds(TABLES.questions, qIds);
+            // Orden de creación; si coinciden en el mismo segundo, el orden en que se vincularon
+            const rank = new Map(qIds.map((qid, i) => [qid, i]));
+            S.questions = qRecs.map(readQuestion)
+                .sort((a, b) => String(a.created).localeCompare(String(b.created)) || ((rank.get(a.id) ?? 0) - (rank.get(b.id) ?? 0)));
+            S.byId = new Map(S.questions.map(q => [q.id, q]));
+            S.answers = null;
+            S.parts = new Map();
+            buildPairs();
+            renderPicker();
+            renderTraining();
+        } catch (e) {
+            console.error('❌ Corregir pretest/postest:', e);
+            renderBodyMessage('fa-triangle-exclamation', `No se pudieron cargar las preguntas.<br><small>${esc(e.message)}</small>`);
+        } finally {
+            S.busy = false;
+            updateFoot();
+        }
+    }
+
+    async function ensureAnswers(force) {
+        if (S.answers && !force) return;
+        const ids = S.questions.flatMap(q => q.responseIds);
+        const recs = await fetchByIds(TABLES.answers, ids);
+        S.answers = recs.map(r => {
+            const f = r.fields || {};
+            return {
+                id: r.id,
+                created: r.createdTime || '',
+                qid: (f['Pregunta'] || [])[0] || '',
+                pid: (f['Participación'] || [])[0] || '',
+                user: normKey(f['Respuesta Usuario']),
+                correct: f['Es Correcta'] === true
+            };
+        });
+        const pids = [...new Set(S.answers.map(a => a.pid).filter(Boolean))];
+        const precs = await fetchByIds(TABLES.parts, pids);
+        S.parts = new Map(precs.map(r => {
+            const f = r.fields || {};
+            return [r.id, {
+                id: r.id,
+                name: String(f['Nombre'] || f['Nombre Completo'] || f['Name'] || 'Sin nombre'),
+                pre: numOrNull(f['Pretest Score']),
+                post: numOrNull(f['Post-test Score'])
+            }];
+        }));
+    }
+
+    // ── Recálculo de puntajes (misma regla del examen: correctas / respondidas × 100) ──
+    function computeRecalc(keyOf) {
+        const qType = new Map(S.questions.map(q => [q.id, q.type]));
+        const total = {
+            pre: S.questions.filter(q => q.type === 'pre').length,
+            post: S.questions.filter(q => q.type === 'post').length
+        };
+        const isRight = (a) => { const k = keyOf(a.qid); return LETTERS.includes(k) && a.user === k; };
+
+        // Respuestas cuya marca "Es Correcta" ya no coincide con la clave
+        const answerUpdates = [];
+        S.answers.forEach(a => {
+            const t = qType.get(a.qid);
+            if (t !== 'pre' && t !== 'post') return;
+            const now = isRight(a);
+            if (now !== a.correct) answerUpdates.push({ id: a.id, pid: a.pid, correct: now });
+        });
+
+        // Una sola respuesta por participante y pregunta (la más reciente)
+        const latest = new Map();
+        S.answers.forEach(a => {
+            if (!a.pid || !a.qid) return;
+            const k = `${a.pid}|${a.qid}`;
+            const prev = latest.get(k);
+            if (!prev || String(a.created) > String(prev.created)) latest.set(k, a);
+        });
+        const byPart = new Map();
+        latest.forEach(a => {
+            const t = qType.get(a.qid);
+            if (t !== 'pre' && t !== 'post') return;
+            const e = byPart.get(a.pid) || { pre: { n: 0, ok: 0, delta: 0 }, post: { n: 0, ok: 0, delta: 0 } };
+            const now = isRight(a);
+            e[t].n += 1;
+            if (now) e[t].ok += 1;
+            e[t].delta += (now ? 1 : 0) - (a.correct ? 1 : 0);
+            byPart.set(a.pid, e);
+        });
+
+        const rows = [];
+        byPart.forEach((e, pid) => {
+            const part = S.parts.get(pid);
+            if (!part) return;
+            const row = {
+                pid, name: part.name,
+                pre: { old: part.pre, val: part.pre, est: false },
+                post: { old: part.post, val: part.post, est: false }
+            };
+            ['pre', 'post'].forEach(t => {
+                const s = e[t];
+                if (!s.n) return;
+                if (total[t] > 0 && s.n >= total[t]) {
+                    row[t].val = Math.round((s.ok / s.n) * 100);
+                } else if (s.delta && row[t].old != null) {
+                    // Respuestas incompletas en Airtable: se ajusta el puntaje guardado solo por las preguntas que cambian
+                    const den = Math.max(total[t], s.n);
+                    const base = Math.round((row[t].old * den) / 100);
+                    row[t].val = Math.max(0, Math.min(100, Math.round(((base + s.delta) / den) * 100)));
+                    row[t].est = true;
+                }
+            });
+            const scoreChanged = row.pre.val !== row.pre.old || row.post.val !== row.post.old;
+            row.answersChanged = answerUpdates.filter(u => u.pid === pid).length;
+            if (scoreChanged || row.answersChanged) rows.push(row);
+        });
+        rows.sort((a, b) => a.name.localeCompare(b.name, 'es'));
+        return { rows, answerUpdates, participants: byPart.size };
+    }
+
+    function scoreCell(s) {
+        const fmt = (v) => (v == null ? '—' : `${v}`);
+        if (s.val === s.old) return `<span class="qfix-muted">${fmt(s.old)}</span>`;
+        const cls = (s.val ?? 0) >= (s.old ?? 0) ? 'qfix-up' : 'qfix-down';
+        return `${fmt(s.old)} → <span class="${cls}">${fmt(s.val)}</span>${s.est ? ' <span title="Ajuste estimado: faltan respuestas individuales en Airtable">≈</span>' : ''}`;
+    }
+    function recalcTableHtml(r) {
+        if (!r.rows.length) return '';
+        const anyEst = r.rows.some(x => x.pre.est || x.post.est);
+        return `
+            <div class="qfix-sw-scroll">
+                <table class="qfix-sw-table">
+                    <thead><tr><th>Participante</th><th>Pretest</th><th>Postest</th><th>Respuestas re-calificadas</th></tr></thead>
+                    <tbody>${r.rows.map(x => `<tr><td>${esc(x.name)}</td><td>${scoreCell(x.pre)}</td><td>${scoreCell(x.post)}</td><td>${x.answersChanged || '—'}</td></tr>`).join('')}</tbody>
+                </table>
+            </div>
+            ${anyEst ? '<p class="qfix-sw-note">≈ Ajuste estimado: ese participante no tiene todas sus respuestas individuales guardadas en Airtable; el puntaje se corrige solo por las preguntas que cambian.</p>' : ''}`;
+    }
+
+    async function applyRecalc(r, prog) {
+        let answers = 0, parts = 0;
+        if (r.answerUpdates.length) {
+            await patchMany(TABLES.answers,
+                r.answerUpdates.map(u => ({ id: u.id, fields: { [FIELD.ans.correct]: u.correct } })),
+                (d, t) => prog(`Re-calificando respuestas ${d}/${t}…`));
+            answers = r.answerUpdates.length;
+        }
+        const updates = r.rows.map(x => {
+            const fields = {};
+            if (x.pre.val !== x.pre.old && x.pre.val != null) fields[FIELD.part.pre] = x.pre.val;
+            if (x.post.val !== x.post.old && x.post.val != null) fields[FIELD.part.post] = x.post.val;
+            return { id: x.pid, fields };
+        }).filter(u => Object.keys(u.fields).length);
+        if (updates.length) {
+            await patchMany(TABLES.parts, updates, (d, t) => prog(`Actualizando puntajes ${d}/${t}…`));
+            parts = updates.length;
+        }
+        return { answers, parts };
+    }
+
+    function showProgress(title) {
+        Swal.fire({
+            title,
+            html: '<span id="qfixProgress">Preparando…</span>',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            didOpen: () => Swal.showLoading()
+        });
+        return (text) => { const el = document.getElementById('qfixProgress'); if (el) el.textContent = text; };
+    }
+
+    // ── Guardar ──
+    async function saveAll() {
+        const changed = S.questions.filter(isChanged);
+        if (!changed.length || S.busy) return;
+
+        const blocking = changed
+            .map(q => ({ q, errs: questionIssues(q).filter(i => i.lvl === 'err') }))
+            .filter(x => x.errs.length);
+        if (blocking.length) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Revisa antes de guardar',
+                html: `<ul class="qfix-sw-list">${blocking.map(x => `<li><b>${esc(questionLabel(x.q))}:</b> ${esc(x.errs.map(i => i.msg).join(', '))}</li>`).join('')}</ul>`,
+                confirmButtonColor: '#2E7D32'
+            });
+            return;
+        }
+
+        const keyChanged = changed.some(q => q.edit.key !== q.orig.key);
+        const hasResponses = S.questions.some(q => q.responseIds.length);
+        let recalc = { rows: [], answerUpdates: [], participants: 0 };
+        if (keyChanged && hasResponses) {
+            showProgress('Calculando el impacto en los puntajes…');
+            try {
+                await ensureAnswers(true);
+                recalc = computeRecalc(qid => (S.byId.get(qid) || { edit: {} }).edit.key || '');
+            } catch (e) {
+                Swal.fire({ icon: 'error', title: 'No se pudo calcular el impacto', text: e.message });
+                return;
+            }
+        }
+
+        const pendingPairErrors = S.pairs.filter(p => pairIssues(p).some(i => i.lvl === 'err')).length;
+        const html = `
+            <div class="qfix-sw-h">Preguntas que se modifican (${changed.length})</div>
+            <ul class="qfix-sw-list">${changed.map(q => `<li><b>${esc(questionLabel(q))}:</b> ${esc(changeLabels(q).join(', '))}</li>`).join('')}</ul>
+            ${keyChanged ? `
+                <div class="qfix-sw-h">Puntajes</div>
+                ${!hasResponses ? '<p class="qfix-sw-note">Nadie ha respondido todavía: no hay puntajes que recalcular.</p>'
+                    : (recalc.rows.length ? recalcTableHtml(recalc) : `<p class="qfix-sw-note">Se revisaron ${recalc.participants} participante(s): ningún puntaje cambia.</p>`)}` : ''}
+            ${pendingPairErrors ? `<p class="qfix-sw-warn"><i class="fas fa-triangle-exclamation"></i> Después de guardar seguirán ${pendingPairErrors} pregunta(s) con clave distinta entre pretest y postest.</p>` : ''}
+            <p class="qfix-sw-note">Cada pregunta corregida queda con una línea de trazabilidad (usuario, fecha y cambios) en Airtable.</p>`;
+        const ok = await Swal.fire({
+            title: 'Confirmar corrección',
+            html,
+            width: 900,
+            showCancelButton: true,
+            confirmButtonText: recalc.rows.length ? 'Guardar y recalcular' : 'Guardar cambios',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#2E7D32',
+            cancelButtonColor: '#6c757d'
+        });
+        if (!ok.isConfirmed) return;
+        await applyChanges(changed, recalc);
+    }
+
+    async function applyChanges(changed, recalc) {
+        S.busy = true;
+        updateFoot();
+        const who = currentUserName();
+        const stamp = nowStamp();
+        const prog = showProgress('Guardando correcciones…');
+        const imageErrors = [];
+        let saved = 0;
+        try {
+            for (const q of changed) {
+                prog(`Pregunta ${saved + 1} de ${changed.length}…`);
+                const fields = {};
+                changedFields(q).forEach(k => { fields[FIELD.q[k]] = q.edit[k]; });
+                const a = q.imageAction;
+                if (a) {
+                    if (a.kind === 'remove' || a.kind === 'file') fields[FIELD.q.image] = [];
+                    else fields[FIELD.q.image] = [{ url: a.url, ...(a.filename ? { filename: a.filename } : {}) }];
+                }
+                const keyMoved = q.edit.key !== q.orig.key;
+                const line = `[${stamp}] ${who}: ${changeLabels(q).join('; ')}${keyMoved && recalc.rows.length ? ' · puntajes recalculados' : ''}`;
+                fields[FIELD.q.notes] = q.notes ? `${q.notes}\n${line}` : line;
+                await proxy({ method: 'PATCH', path: `/${TABLES.questions}/${q.id}`, body: { fields, typecast: true } });
+                if (a && a.kind === 'file') {
+                    try { await uploadImageFile(q.id, a); }
+                    catch (e) { imageErrors.push(`${questionLabel(q)}: ${e.message}`); }
+                }
+                saved += 1;
+            }
+        } catch (e) {
+            console.error('❌ Error guardando corrección:', e);
+            S.busy = false;
+            await Swal.fire({
+                icon: 'error',
+                title: 'El guardado no se completó',
+                html: `Se guardaron ${saved} de ${changed.length} pregunta(s).<br><small>${esc(e.message)}</small><br><br>No se recalcularon puntajes. Revisa y vuelve a guardar.`
+            });
+            await loadTraining(S.training.id);
+            return;
+        }
+
+        let result = { answers: 0, parts: 0 };
+        try {
+            if (recalc.rows.length || recalc.answerUpdates.length) result = await applyRecalc(recalc, prog);
+        } catch (e) {
+            console.error('❌ Error recalculando puntajes:', e);
+            S.busy = false;
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Preguntas guardadas, recálculo incompleto',
+                html: `Las correcciones de las preguntas quedaron guardadas, pero el recálculo de puntajes falló.<br><small>${esc(e.message)}</small><br><br>Usa <b>Verificar puntajes</b> para completarlo.`
+            });
+            await loadTraining(S.training.id);
+            return;
+        }
+
+        S.busy = false;
+        await loadTraining(S.training.id);
+        Swal.fire({
+            icon: imageErrors.length ? 'warning' : 'success',
+            title: 'Correcciones guardadas',
+            html: `${saved} pregunta(s) corregida(s).`
+                + (result.parts ? `<br>${result.parts} puntaje(s) de participante actualizado(s).` : '')
+                + (result.answers ? `<br>${result.answers} respuesta(s) re-calificada(s).` : '')
+                + (imageErrors.length ? `<br><br><b>Imágenes que no se pudieron cargar:</b><ul class="qfix-sw-list">${imageErrors.map(m => `<li>${esc(m)}</li>`).join('')}</ul>` : ''),
+            confirmButtonColor: '#2E7D32'
+        });
+        fx((m) => {
+            const h = document.querySelector('#qfixBody .qfix-summary');
+            if (h) m.animate(h, { scale: [1, 1.02, 1] }, { duration: 0.35 });
+        });
+    }
+
+    async function verifyScores() {
+        if (S.busy || !S.training) return;
+        if (S.questions.some(isChanged)) {
+            Swal.fire({ icon: 'info', title: 'Hay cambios sin guardar', text: 'Guarda o descarta los cambios antes de verificar los puntajes.', confirmButtonColor: '#2E7D32' });
+            return;
+        }
+        showProgress('Verificando puntajes…');
+        let r;
+        try {
+            await ensureAnswers(true);
+            r = computeRecalc(qid => (S.byId.get(qid) || { orig: {} }).orig.key || '');
+        } catch (e) {
+            Swal.fire({ icon: 'error', title: 'No se pudo verificar', text: e.message });
+            return;
+        }
+        if (!r.rows.length) {
+            Swal.fire({ icon: 'success', title: 'Puntajes al día', text: `Se revisaron ${r.participants} participante(s): todos los puntajes coinciden con las claves actuales.`, confirmButtonColor: '#2E7D32' });
+            return;
+        }
+        const ok = await Swal.fire({
+            title: 'Puntajes desactualizados',
+            html: `<p class="qfix-sw-note" style="margin-top:0;">Estos participantes tienen un puntaje que no coincide con las claves actuales de las preguntas.</p>${recalcTableHtml(r)}`,
+            width: 860,
+            showCancelButton: true,
+            confirmButtonText: 'Corregir puntajes',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#2E7D32',
+            cancelButtonColor: '#6c757d'
+        });
+        if (!ok.isConfirmed) return;
+        S.busy = true;
+        updateFoot();
+        const prog = showProgress('Corrigiendo puntajes…');
+        try {
+            const res = await applyRecalc(r, prog);
+            S.busy = false;
+            updateFoot();
+            S.answers = null;
+            Swal.fire({ icon: 'success', title: 'Puntajes corregidos', html: `${res.parts} puntaje(s) actualizado(s) · ${res.answers} respuesta(s) re-calificada(s).`, confirmButtonColor: '#2E7D32' });
+        } catch (e) {
+            S.busy = false;
+            updateFoot();
+            Swal.fire({ icon: 'error', title: 'No se completó la corrección', text: e.message });
+        }
+    }
+
+    // ── Acciones de edición ──
+    function copyPair(i, dir) {
+        const p = S.pairs[i];
+        if (!p || !p.pre || !p.post) return;
+        const src = dir === 'pre2post' ? p.pre : p.post;
+        const dst = dir === 'pre2post' ? p.post : p.pre;
+        dst.edit = { ...src.edit };
+        const sa = src.imageAction;
+        if (sa) {
+            if (sa.kind === 'remove') dst.imageAction = dst.image ? { kind: 'remove' } : null;
+            else dst.imageAction = { ...sa };
+        } else if (src.image) {
+            const same = dst.image && dst.image.name === src.image.name && !dst.image.external;
+            dst.imageAction = same ? null : { kind: 'pair', url: src.image.url, filename: src.image.name };
+        } else {
+            dst.imageAction = dst.image ? { kind: 'remove' } : null;
+        }
+        rerenderPair(i);
+    }
+
+    function revertQuestion(q) {
+        q.edit = { ...q.orig };
+        q.imageAction = null;
+        rerenderPair(q.pair);
+    }
+
+    function pickImageFile(q, file) {
+        if (!file) return;
+        if (!/^image\//i.test(file.type || '')) {
+            Swal.fire({ icon: 'warning', title: 'Archivo no válido', text: 'Selecciona una imagen (PNG, JPG, GIF o WEBP).' });
+            return;
+        }
+        if (file.size > MAX_IMAGE_BYTES) {
+            Swal.fire({ icon: 'warning', title: 'Imagen demasiado pesada', text: 'Airtable permite cargar imágenes de hasta 5 MB.' });
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = String(e.target?.result || '');
+            const base64 = dataUrl.split(',')[1] || '';
+            q.imageAction = { kind: 'file', base64, filename: file.name || 'imagen.png', contentType: file.type || 'image/png', preview: dataUrl };
+            rerenderPair(q.pair);
+        };
+        reader.onerror = () => Swal.fire({ icon: 'error', title: 'No se pudo leer la imagen' });
+        reader.readAsDataURL(file);
+    }
+
+    async function askImageUrl(q) {
+        const r = await Swal.fire({
+            title: 'Imagen desde un enlace',
+            input: 'url',
+            inputPlaceholder: 'https://…/imagen.png',
+            showCancelButton: true,
+            confirmButtonText: 'Usar imagen',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#2E7D32',
+            inputValidator: (v) => (/^https?:\/\/\S+$/i.test(String(v || '').trim()) ? undefined : 'Escribe un enlace válido que empiece por http:// o https://')
+        });
+        if (!r.isConfirmed) return;
+        const url = String(r.value || '').trim();
+        q.imageAction = { kind: 'url', url, filename: decodeURIComponent(url.split('/').pop().split('?')[0] || 'imagen') };
+        rerenderPair(q.pair);
+    }
+
+    function copyImageFromPair(q) {
+        const partner = partnerOf(q);
+        if (!partner) return;
+        const pa = partner.imageAction;
+        if (pa && pa.kind !== 'remove') q.imageAction = { ...pa };
+        else if (!pa && partner.image) q.imageAction = { kind: 'pair', url: partner.image.url, filename: partner.image.name };
+        else return;
+        rerenderPair(q.pair);
+    }
+
+    function removeImage(q) {
+        if (q.imageAction && q.imageAction.kind !== 'remove') q.imageAction = q.image ? { kind: 'remove' } : null;
+        else if (q.image) q.imageAction = { kind: 'remove' };
+        rerenderPair(q.pair);
+    }
+
+    // ── Navegación del módulo ──
+    async function confirmDiscard(text) {
+        if (!S.questions.some(isChanged)) return true;
+        const r = await Swal.fire({
+            icon: 'warning',
+            title: 'Hay cambios sin guardar',
+            text,
+            showCancelButton: true,
+            confirmButtonText: 'Descartar cambios',
+            cancelButtonText: 'Seguir editando',
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#6c757d'
+        });
+        return r.isConfirmed;
+    }
+
+    async function startPicker() {
+        renderPicker();
+        renderBodyMessage('fa-magnifying-glass', 'Busca la capacitación que quieres corregir.');
+        updateFoot();
+        const input = document.getElementById('qfixSearch');
+        if (input) {
+            let timer = null;
+            input.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(renderResults, 120); });
+            setTimeout(() => input.focus(), 50);
+        }
+        try {
+            await loadTrainings(false);
+            renderResults();
+        } catch (e) {
+            const caption = document.getElementById('qfixCaption');
+            if (caption) caption.innerHTML = `<span style="color:#b91c1c;">No se pudo cargar la lista: ${esc(e.message)}</span>`;
+        }
+    }
+
+    async function onClick(ev) {
+        const btn = ev.target.closest('[data-act]');
+        if (!btn || btn.disabled) return;
+        const act = btn.dataset.act;
+        if (act === 'only-issues') return; // lo maneja onChange
+        const card = btn.closest('.qfix-card');
+        const q = card ? S.byId.get(card.dataset.qid) : null;
+        switch (act) {
+            case 'close': return requestClose();
+            case 'pick': return loadTraining(btn.dataset.id);
+            case 'reload-list':
+                S.trainingsLoaded = false;
+                return startPicker();
+            case 'change-training':
+                if (!(await confirmDiscard('Si cambias de capacitación se perderán los cambios.'))) return;
+                S.training = null; S.questions = []; S.pairs = []; S.byId = new Map();
+                return startPicker();
+            case 'reload':
+                if (!(await confirmDiscard('Al recargar se perderán los cambios.'))) return;
+                return loadTraining(S.training.id);
+            case 'discard':
+                if (!(await confirmDiscard('Se volverá al contenido guardado en Airtable.'))) return;
+                S.questions.forEach(x => { x.edit = { ...x.orig }; x.imageAction = null; });
+                return renderTraining();
+            case 'save': return saveAll();
+            case 'verify-scores': return verifyScores();
+            case 'copy': return copyPair(Number(btn.dataset.pair), btn.dataset.dir);
+            case 'revert': return q && revertQuestion(q);
+            case 'img-file': {
+                const input = card && card.querySelector('input[data-file]');
+                if (input) { input.value = ''; input.click(); }
+                return;
+            }
+            case 'img-url': return q && askImageUrl(q);
+            case 'img-pair': return q && copyImageFromPair(q);
+            case 'img-remove': return q && removeImage(q);
+            default: return;
+        }
+    }
+
+    function onInput(ev) {
+        const el = ev.target;
+        if (!el.matches || !el.matches('[data-f]')) return;
+        const card = el.closest('.qfix-card');
+        const q = card ? S.byId.get(card.dataset.qid) : null;
+        if (!q) return;
+        const f = el.dataset.f;
+        if (el.classList.contains('qfix-opt-input')) {
+            // Las opciones son de una sola línea: se eliminan saltos pegados desde otro documento
+            if (/[\r\n]/.test(el.value)) el.value = el.value.replace(/[\r\n]+/g, ' ');
+            fitOption(el);
+        }
+        q.edit[f] = el.value;
+        el.classList.toggle('is-dirty', (q.edit[f] || '') !== (q.orig[f] || ''));
+        refreshCard(q);
+    }
+
+    function onChange(ev) {
+        const el = ev.target;
+        if (el.matches('[data-act="only-issues"]')) {
+            S.onlyIssues = el.checked;
+            applyFilter();
+            return;
+        }
+        const card = el.closest('.qfix-card');
+        const q = card ? S.byId.get(card.dataset.qid) : null;
+        if (!q) return;
+        if (el.type === 'radio') {
+            q.edit.key = el.value;
+            refreshCard(q);
+        } else if (el.matches('input[data-file]')) {
+            pickImageFile(q, el.files && el.files[0]);
+        }
+    }
+
+    async function requestClose() {
+        if (S.busy) return;
+        if (!(await confirmDiscard('Si cierras se perderán los cambios.'))) return;
+        const el = overlay();
+        if (!el) return;
+        el.classList.remove('show');
+        document.body.style.overflow = '';
+        S.questions.forEach(x => { x.edit = { ...x.orig }; x.imageAction = null; });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        const el = overlay();
+        if (e.key !== 'Escape' || !el || !el.classList.contains('show')) return;
+        if (typeof Swal !== 'undefined' && Swal.isVisible && Swal.isVisible()) return;
+        requestClose();
+    });
+
+    async function open(trainingId) {
+        ensureDom();
+        const el = overlay();
+        el.classList.add('show');
+        document.body.style.overflow = 'hidden';
+        fx((m) => {
+            m.animate(el, { opacity: [0, 1] }, { duration: 0.2 });
+            const box = el.querySelector('.qfix-box');
+            if (box) m.animate(box, { opacity: [0, 1], scale: [0.97, 1] }, { duration: 0.25, ease: 'easeOut' });
+        });
+        if (isRecId(trainingId)) {
+            await loadTraining(trainingId);
+            return;
+        }
+        if (S.training) {
+            // Al reabrir se recarga desde Airtable para no editar sobre datos viejos
+            await loadTraining(S.training.id);
+            return;
+        }
+        await startPicker();
+    }
+
+    window.qfixOpen = open;
+    window.qfixClose = requestClose;
 })();
 </script>
 
