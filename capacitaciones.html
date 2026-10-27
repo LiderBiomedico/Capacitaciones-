@@ -4861,7 +4861,7 @@
             <div class="form-group">
                 <label><i class="fas fa-id-card"></i> Número de Cédula *</label>
                 <div style="display:flex; gap:0.6rem; align-items:center;">
-                    <input type="text" id="participantCedula" placeholder="Ej: 76328229" required onkeydown="if(event.key==='Enter'){event.preventDefault(); cargarDatosParticipantePorCedula();}">
+                    <input type="text" id="participantCedula" placeholder="Escribe tu número de cédula" required onkeydown="if(event.key==='Enter'){event.preventDefault(); cargarDatosParticipantePorCedula();}">
                     <button type="button" id="participantLoadDataBtn" class="btn btn-secondary" onclick="cargarDatosParticipantePorCedula()" style="white-space:nowrap; min-width:150px;">
                         <i class="fas fa-search"></i> Presione para cargar datos
                     </button>
@@ -6029,6 +6029,10 @@
                 if (!('Completado Pretest' in participationFields) && !('Completado Pre-Test' in participationFields)) {
                     participationFields['Completado Pretest'] = true;
                 }
+                // Respuestas del pretest en JSON dentro de la participación (no se crean registros en "Respuestas").
+                if (answersToSave.length) {
+                    participationFields['Detalle Pretest'] = serializeExamAnswers(answersToSave);
+                }
                 console.log('📤 Creando participación con campos:', JSON.stringify(participationFields));
 
                 const participationData = { fields: participationFields };
@@ -6055,47 +6059,15 @@
                 console.log('✅ Participación creada:', participationResult.id);
                 
                 // ==========================================
-                // PASO 5: Guardar respuestas individuales (opcional)
+                // PASO 5: Respuestas individuales
                 // ==========================================
-                
+                // Ya quedaron guardadas en "Detalle Pretest" (JSON) dentro de la participación:
+                // no se crea un registro por pregunta en la tabla "Respuestas".
+
                 // IMPORTANTE: Guardar el ID globalmente AHORA, antes del Swal
                 currentParticipationId = participationResult.id;
                 currentSessionId = currentSession.id;
-                
-                const participationId = participationResult.id;
-                
-                // Guardar las respuestas independientes en paralelo.
-                await Promise.all(answersToSave.map(async (answer) => {
-                    try {
-                        const answerData = {
-                            fields: {
-                                'Participación': [participationId],
-                                'Pregunta': [answer.questionId],
-                                'Respuesta Usuario': answer.userAnswer,
-                                'Es Correcta': answer.isCorrect,
-                                'Tipo Examen': 'Pretest'
-                            }
-                        };
-                        
-                        const answerResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                method: 'POST',
-                                path: `/Respuestas`,
-                                body: answerData
-                            })
-                        });
-                        await readJsonResponse(answerResponse, 'No se pudo guardar una respuesta del pretest');
-                        
-                        console.log(`✅ Respuesta guardada para pregunta: ${answer.questionId}`);
-                        
-                    } catch (answerError) {
-                        console.warn(`⚠️ No se pudo guardar respuesta individual:`, answerError);
-                        // Continuar con las demás respuestas aunque una falle
-                    }
-                }));
-                
+
                 // ==========================================
                 // PASO 6: Mostrar resultado al usuario
                 // ==========================================
@@ -6508,6 +6480,10 @@
                 if (!('Completado Posttest' in updateFields) && !('Completado Post-Test' in updateFields)) {
                     updateFields['Completado Posttest'] = true;
                 }
+                // Respuestas del postest en JSON dentro de la participación (no se crean registros en "Respuestas").
+                if (answersToSave.length) {
+                    updateFields['Detalle Posttest'] = serializeExamAnswers(answersToSave);
+                }
 
                 console.log('📤 Actualizando participación con campos:', JSON.stringify(updateFields));
 
@@ -6531,39 +6507,11 @@
                 console.log('✅ Participación actualizada:', currentParticipationId);
                 
                 // ==========================================
-                // PASO 4: Guardar respuestas individuales
+                // PASO 4: Respuestas individuales
                 // ==========================================
-                
-                await Promise.all(answersToSave.map(async (answer) => {
-                    try {
-                        const answerData = {
-                            fields: {
-                                'Participación': [currentParticipationId],
-                                'Pregunta': [answer.questionId],
-                                'Respuesta Usuario': answer.userAnswer,
-                                'Es Correcta': answer.isCorrect,
-                                'Tipo Examen': 'Posttest'
-                            }
-                        };
-                        
-                        const answerResponse = await fetch('/.netlify/functions/airtable-proxy', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                                method: 'POST',
-                                path: `/Respuestas`,
-                                body: answerData
-                            })
-                        });
-                        await readJsonResponse(answerResponse, 'No se pudo guardar una respuesta del postest');
-                        
-                        console.log(`✅ Respuesta guardada para pregunta: ${answer.questionId}`);
-                        
-                    } catch (answerError) {
-                        console.warn(`⚠️ No se pudo guardar respuesta individual:`, answerError);
-                    }
-                }));
-                
+                // Ya quedaron guardadas en "Detalle Posttest" (JSON) con la actualización anterior:
+                // no se crea un registro por pregunta en la tabla "Respuestas".
+
                 // ==========================================
                 // PASO 5: Mostrar resultado al usuario
                 // ==========================================
@@ -13578,6 +13526,16 @@ function assignIfDetected(targetFields, existingKeys, candidates, value) {
     if (fieldName) targetFields[fieldName] = value;
 }
 
+// Respuestas de un pretest/postest en JSON para "Detalle Pretest" / "Detalle Posttest" (Participaciones).
+// Formato: [{ pregunta: "rec…" (ID en Preguntas), respuesta: "A", correcta: true }]
+function serializeExamAnswers(answers) {
+    return JSON.stringify((answers || []).map(a => ({
+        pregunta: a.questionId,
+        respuesta: String(a.userAnswer || '').toUpperCase(),
+        correcta: a.isCorrect === true
+    })));
+}
+
 async function airtableProxyRequest(payload) {
     const normalizeKey = (s) => (s || '')
         .toString()
@@ -17241,7 +17199,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                         <p class="virtual-login-helper"><i class="fas fa-info-circle"></i> Ingresa el número de cédula para cargar automáticamente la información del colaborador.</p>
                         <label for="virtualCedulaInput"><i class="fas fa-id-card"></i> Número de Cédula *</label>
                         <div class="virtual-login-row">
-                            <input type="text" id="virtualCedulaInput" placeholder="Ej: 76328229" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault(); Swal.clickConfirm();}">
+                            <input type="text" id="virtualCedulaInput" placeholder="Escribe tu número de cédula" inputmode="numeric" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault(); Swal.clickConfirm();}">
                             <button type="button" class="btn btn-secondary" onclick="Swal.clickConfirm()" style="white-space:nowrap; min-width:145px;">
                                 <i class="fas fa-search"></i> Presione para cargar datos
                             </button>
@@ -20259,8 +20217,15 @@ function makeCronogramaFilterFormula(year, tipo) {
             notes:'fldsyHDJEU0ypK2xL'   // Notes (trazabilidad)
         },
         ans:  { correct: 'fldAXloE8k2dzXvoV' },                    // Es Correcta
-        part: { pre: 'fld63aPVhmNVBKY29', post: 'fldzvdsMAZ5jrMTvg' } // Pretest Score / Post-test Score
+        part: {
+            pre: 'fld63aPVhmNVBKY29', post: 'fldzvdsMAZ5jrMTvg',   // Pretest Score / Post-test Score
+            detailPre: 'fldcDgBwezbGsTpri',                        // Detalle Pretest (JSON)
+            detailPost: 'fldawKuelbdDgKGrq'                        // Detalle Posttest (JSON)
+        }
     };
+    // Las respuestas nuevas viven como JSON en la participación; los registros de la tabla
+    // Respuestas (formato antiguo) se siguen leyendo mientras existan.
+    const DETAIL_FIELD_NAME = { pre: 'Detalle Pretest', post: 'Detalle Posttest' };
     const LETTERS = ['a', 'b', 'c', 'd'];
     const EDIT_KEYS = ['text', 'a', 'b', 'c', 'd', 'key'];
     const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -20455,8 +20420,41 @@ function makeCronogramaFilterFormula(year, tipo) {
             imageAction: null,
             notes: String(f['Notes'] || ''),
             responseIds: Array.isArray(f['Respuestas']) ? f['Respuestas'] : [],
+            jsonCount: 0,
             pair: -1
         };
+    }
+    // Respuestas registradas para una pregunta: registros antiguos + respuestas en JSON
+    function respCount(q) {
+        return (q.responseIds ? q.responseIds.length : 0) + (q.jsonCount || 0);
+    }
+    function parseDetail(raw) {
+        if (!raw) return [];
+        try {
+            const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            return Array.isArray(arr) ? arr.filter(it => it && it.pregunta) : [];
+        } catch (e) {
+            return [];
+        }
+    }
+    // Carga participaciones (puntajes + respuestas en JSON) y actualiza el conteo por pregunta
+    async function loadParts(pids) {
+        const precs = await fetchByIds(TABLES.parts, pids);
+        S.parts = new Map(precs.map(r => {
+            const f = r.fields || {};
+            return [r.id, {
+                id: r.id,
+                name: String(f['Nombre'] || f['Nombre Completo'] || f['Name'] || 'Sin nombre'),
+                pre: numOrNull(f['Pretest Score']),
+                post: numOrNull(f['Post-test Score']),
+                detail: { pre: parseDetail(f[DETAIL_FIELD_NAME.pre]), post: parseDetail(f[DETAIL_FIELD_NAME.post]) }
+            }];
+        }));
+        S.questions.forEach(q => { q.jsonCount = 0; });
+        S.parts.forEach(p => ['pre', 'post'].forEach(t => p.detail[t].forEach(it => {
+            const q = S.byId.get(it.pregunta);
+            if (q) q.jsonCount += 1;
+        })));
     }
     function buildPairs() {
         const pre = S.questions.filter(q => q.type === 'pre');
@@ -20666,7 +20664,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             <div class="qfix-card ${isChanged(q) ? 'is-changed' : ''}" data-qid="${esc(q.id)}">
                 <div class="qfix-card-head">
                     <span class="qfix-tag qfix-tag-${q.type}">${typeLabel(q)}</span>
-                    <span class="qfix-meta"><i class="fas fa-user-check"></i> ${q.responseIds.length} respuesta(s)</span>
+                    <span class="qfix-meta"><i class="fas fa-user-check"></i> ${respCount(q)} respuesta(s)</span>
                     <span class="qfix-flag"><i class="fas fa-pen"></i> Editada</span>
                     <button type="button" class="qfix-mini" data-act="revert" title="Volver al texto guardado en Airtable"><i class="fas fa-rotate-left"></i> Revertir</button>
                 </div>
@@ -20715,7 +20713,7 @@ function makeCronogramaFilterFormula(year, tipo) {
         }
         const preN = S.questions.filter(q => q.type === 'pre').length;
         const postN = S.questions.filter(q => q.type === 'post').length;
-        const resp = S.questions.reduce((n, q) => n + q.responseIds.length, 0);
+        const resp = S.questions.reduce((n, q) => n + respCount(q), 0);
         body.innerHTML = `
             <div class="qfix-summary">
                 <div>
@@ -20855,7 +20853,8 @@ function makeCronogramaFilterFormula(year, tipo) {
             S.training = {
                 id,
                 title: f['Título'] || '(sin título)',
-                code: f['Código de Acceso'] || ''
+                code: f['Código de Acceso'] || '',
+                partIds: Array.isArray(f['Participaciones']) ? f['Participaciones'] : []
             };
             const qIds = [...(f['Preguntas'] || []), ...(f['Preguntas 2'] || [])];
             const qRecs = await fetchByIds(TABLES.questions, qIds);
@@ -20866,6 +20865,11 @@ function makeCronogramaFilterFormula(year, tipo) {
             S.byId = new Map(S.questions.map(q => [q.id, q]));
             S.answers = null;
             S.parts = new Map();
+            // Participaciones de la capacitación: traen las respuestas en JSON (conteo por pregunta)
+            if (S.training.partIds.length) {
+                renderBodyMessage('fa-spinner fa-spin', 'Cargando respuestas de los participantes…');
+                await loadParts(S.training.partIds);
+            }
             buildPairs();
             renderPicker();
             renderTraining();
@@ -20880,11 +20884,15 @@ function makeCronogramaFilterFormula(year, tipo) {
 
     async function ensureAnswers(force) {
         if (S.answers && !force) return;
+        const qType = new Map(S.questions.map(q => [q.id, q.type]));
+
+        // 1) Formato antiguo: un registro por respuesta en la tabla Respuestas (mientras existan)
         const ids = S.questions.flatMap(q => q.responseIds);
         const recs = await fetchByIds(TABLES.answers, ids);
-        S.answers = recs.map(r => {
+        const legacy = recs.map(r => {
             const f = r.fields || {};
             return {
+                src: 'rec',
                 id: r.id,
                 created: r.createdTime || '',
                 qid: (f['Pregunta'] || [])[0] || '',
@@ -20893,17 +20901,31 @@ function makeCronogramaFilterFormula(year, tipo) {
                 correct: f['Es Correcta'] === true
             };
         });
-        const pids = [...new Set(S.answers.map(a => a.pid).filter(Boolean))];
-        const precs = await fetchByIds(TABLES.parts, pids);
-        S.parts = new Map(precs.map(r => {
-            const f = r.fields || {};
-            return [r.id, {
-                id: r.id,
-                name: String(f['Nombre'] || f['Nombre Completo'] || f['Name'] || 'Sin nombre'),
-                pre: numOrNull(f['Pretest Score']),
-                post: numOrNull(f['Post-test Score'])
-            }];
-        }));
+
+        // 2) Participaciones de la capacitación (+ las que solo aparecen en registros antiguos)
+        const pids = [...new Set([...(S.training?.partIds || []), ...legacy.map(a => a.pid)].filter(Boolean))];
+        await loadParts(pids);
+
+        // 3) Formato nuevo: respuestas en JSON dentro de cada participación
+        const json = [];
+        S.parts.forEach(p => ['pre', 'post'].forEach(t => p.detail[t].forEach((it, idx) => {
+            json.push({
+                src: 'json',
+                id: null,
+                t, idx,
+                created: '9999', // el JSON siempre es el envío más reciente de ese examen
+                qid: it.pregunta,
+                pid: p.id,
+                user: normKey(it.respuesta),
+                correct: it.correcta === true
+            });
+        })));
+        // Si un examen ya está en JSON, sus registros antiguos (duplicados) no se cuentan
+        const inJson = new Set(json.map(a => `${a.pid}|${a.t}`));
+        S.answers = [
+            ...legacy.filter(a => !inJson.has(`${a.pid}|${qType.get(a.qid)}`)),
+            ...json
+        ];
     }
 
     // ── Recálculo de puntajes (misma regla del examen: correctas / respondidas × 100) ──
@@ -20921,7 +20943,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             const t = qType.get(a.qid);
             if (t !== 'pre' && t !== 'post') return;
             const now = isRight(a);
-            if (now !== a.correct) answerUpdates.push({ id: a.id, pid: a.pid, correct: now });
+            if (now !== a.correct) answerUpdates.push({ id: a.id, pid: a.pid, correct: now, src: a.src || 'rec', t: a.t || t, idx: a.idx });
         });
 
         // Una sola respuesta por participante y pregunta (la más reciente)
@@ -20995,21 +21017,47 @@ function makeCronogramaFilterFormula(year, tipo) {
 
     async function applyRecalc(r, prog) {
         let answers = 0, parts = 0;
-        if (r.answerUpdates.length) {
+        // Registros antiguos de la tabla Respuestas
+        const recUpdates = r.answerUpdates.filter(u => u.src !== 'json' && u.id);
+        if (recUpdates.length) {
             await patchMany(TABLES.answers,
-                r.answerUpdates.map(u => ({ id: u.id, fields: { [FIELD.ans.correct]: u.correct } })),
+                recUpdates.map(u => ({ id: u.id, fields: { [FIELD.ans.correct]: u.correct } })),
                 (d, t) => prog(`Re-calificando respuestas ${d}/${t}…`));
-            answers = r.answerUpdates.length;
+            answers += recUpdates.length;
         }
-        const updates = r.rows.map(x => {
-            const fields = {};
-            if (x.pre.val !== x.pre.old && x.pre.val != null) fields[FIELD.part.pre] = x.pre.val;
-            if (x.post.val !== x.post.old && x.post.val != null) fields[FIELD.part.post] = x.post.val;
+        // Respuestas en JSON: se reescribe el detalle de la participación con la nueva calificación
+        const detailFields = new Map();
+        const jsonUpdates = r.answerUpdates.filter(u => u.src === 'json');
+        const drafts = new Map();
+        jsonUpdates.forEach(u => {
+            const p = S.parts.get(u.pid);
+            const key = `${u.pid}|${u.t}`;
+            if (!p || !p.detail[u.t]) return;
+            if (!drafts.has(key)) drafts.set(key, p.detail[u.t].map(it => ({ ...it })));
+            const arr = drafts.get(key);
+            if (!arr[u.idx]) return;
+            arr[u.idx].correcta = u.correct;
+            const fields = detailFields.get(u.pid) || {};
+            fields[u.t === 'pre' ? FIELD.part.detailPre : FIELD.part.detailPost] = JSON.stringify(arr);
+            detailFields.set(u.pid, fields);
+            answers += 1;
+        });
+        let scoreUpdates = 0;
+        const rowUpdates = r.rows.map(x => {
+            const fields = { ...(detailFields.get(x.pid) || {}) };
+            let scoreChanged = false;
+            if (x.pre.val !== x.pre.old && x.pre.val != null) { fields[FIELD.part.pre] = x.pre.val; scoreChanged = true; }
+            if (x.post.val !== x.post.old && x.post.val != null) { fields[FIELD.part.post] = x.post.val; scoreChanged = true; }
+            if (scoreChanged) scoreUpdates += 1;
+            detailFields.delete(x.pid);
             return { id: x.pid, fields };
-        }).filter(u => Object.keys(u.fields).length);
+        });
+        // Participaciones con respuestas re-calificadas pero sin cambio de puntaje
+        const detailOnly = [...detailFields].map(([pid, fields]) => ({ id: pid, fields }));
+        const updates = [...rowUpdates, ...detailOnly].filter(u => Object.keys(u.fields).length);
         if (updates.length) {
             await patchMany(TABLES.parts, updates, (d, t) => prog(`Actualizando puntajes ${d}/${t}…`));
-            parts = updates.length;
+            parts = scoreUpdates;
         }
         return { answers, parts };
     }
@@ -21044,7 +21092,7 @@ function makeCronogramaFilterFormula(year, tipo) {
         }
 
         const keyChanged = changed.some(q => q.edit.key !== q.orig.key);
-        const hasResponses = S.questions.some(q => q.responseIds.length);
+        const hasResponses = S.questions.some(q => respCount(q) > 0);
         let recalc = { rows: [], answerUpdates: [], participants: 0 };
         if (keyChanged && hasResponses) {
             showProgress('Calculando el impacto en los puntajes…');
