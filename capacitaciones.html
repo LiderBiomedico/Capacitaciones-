@@ -9755,7 +9755,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     const dateOf = (f) => new Date(virtualRespValue(f, [VIRTUAL_RESP_FIELD_DATE, 'Fecha Respuesta']) || 0).getTime();
                     const sorted = rows.toSorted((a, b) => dateOf(a) - dateOf(b));
                     const summaries = sorted.filter(isVirtualSummaryRow);
-                    const checkpoints = sorted.filter(f => !isVirtualSummaryRow(f));
+                    const checkpoints = expandVirtualCheckpointRows(sorted.filter(f => !isVirtualSummaryRow(f)));
                     const lastSummary = summaries.length ? summaries[summaries.length - 1] : null;
                     const anyRow = lastSummary || sorted[sorted.length - 1] || {};
 
@@ -15847,6 +15847,12 @@ function makeCronogramaFilterFormula(year, tipo) {
         const VIRTUAL_RESP_FIELD_TOTAL = 'Total Checkpoints';
         const VIRTUAL_RESP_FIELD_CORRECT_COUNT = 'Correctas';
         const VIRTUAL_RESP_FIELD_PERCENT = 'Porcentaje';
+        // Detalle de checkpoints del intento en JSON (texto largo). Un solo registro por intento:
+        // se crea como "En curso" en la primera respuesta y se actualiza hasta el cierre.
+        const VIRTUAL_RESP_FIELD_DETAIL = 'Detalle Checkpoints';
+        const VIRTUAL_RESP_TYPE_IN_PROGRESS = 'En curso';
+        // Intentos abiertos (sin cierre): se leen como checkpoints sueltos en los reportes.
+        const VIRTUAL_RESP_OPEN_TYPES = ['en curso', 'intento incompleto'];
         // Datos institucionales del participante (se guardan junto a cada respuesta).
         // Crear estos campos en Airtable como "Texto de una sola línea" (no Single Select).
         const VIRTUAL_RESP_FIELD_ENTITY = 'Entidad';
@@ -15871,6 +15877,17 @@ function makeCronogramaFilterFormula(year, tipo) {
         let currentVirtualResults = [];
         let virtualFinalSummarySaved = false;
         let virtualSatisfactionAsked = false;   // evita pedir la encuesta dos veces en la misma sesión
+
+        // ===== Intento actual (un registro en Airtable por intento) =====
+        function newVirtualAttempt() { return { recordId: null, detail: [], closed: false }; }
+        let currentVirtualAttempt = newVirtualAttempt();
+        // Cola de guardado: garantiza que el POST inicial termine antes de cada PATCH.
+        let virtualAttemptSaveChain = Promise.resolve();
+        function queueVirtualAttemptSave(task) {
+            const run = virtualAttemptSaveChain.then(task);
+            virtualAttemptSaveChain = run.catch(() => {});
+            return run;
+        }
 
         // ===== Estado del reproductor de YouTube para cursos virtuales =====
         let virtualYTPlayer = null;          // instancia del reproductor de YouTube
@@ -16038,8 +16055,8 @@ function makeCronogramaFilterFormula(year, tipo) {
 
         // Construye los campos institucionales del participante para guardarlos junto a cada respuesta.
         // Solo incluye los que tienen valor (evita enviar cadenas vacías a Airtable).
-        function virtualParticipantPersonalFields() {
-            const p = currentVirtualParticipant || {};
+        function virtualParticipantPersonalFields(participant = currentVirtualParticipant) {
+            const p = participant || {};
             const fields = {};
             const v = (x) => String(x || '').trim();
             if (v(p.entity))  fields[VIRTUAL_RESP_FIELD_ENTITY]  = v(p.entity);
@@ -16049,13 +16066,19 @@ function makeCronogramaFilterFormula(year, tipo) {
             return fields;
         }
 
-        async function saveVirtualResponseRecord(payloadFields) {
+        // Crea (POST) o actualiza (PATCH, si llega recordId) un registro de respuestas.
+        // Devuelve el ID del registro en Airtable.
+        async function saveVirtualResponseRecord(payloadFields, recordId = null) {
+            const send = (fields) => virtualCourseProxy({
+                method: recordId ? 'PATCH' : 'POST',
+                path: recordId
+                    ? `${airtableTablePath(VIRTUAL_RESPONSES_TABLE)}/${encodeURIComponent(recordId)}`
+                    : airtableTablePath(VIRTUAL_RESPONSES_TABLE),
+                body: { fields }
+            });
+            let data;
             try {
-                await virtualCourseProxy({
-                    method: 'POST',
-                    path: airtableTablePath(VIRTUAL_RESPONSES_TABLE),
-                    body: { fields: payloadFields }
-                });
+                data = await send(payloadFields);
             } catch (err) {
                 // Si Airtable rechaza el registro porque algún campo institucional aún no existe
                 // (o tiene un tipo incompatible), reintenta SIN esos campos para no perder la respuesta.
@@ -16064,67 +16087,80 @@ function makeCronogramaFilterFormula(year, tipo) {
                 const reduced = { ...payloadFields };
                 VIRTUAL_RESP_PERSONAL_FIELDS.forEach(k => delete reduced[k]);
                 console.warn('No se pudieron guardar los campos institucionales en la respuesta; se reintenta sin ellos. Crea los campos Entidad, Proceso, Perfil y Cargo (texto) en la tabla de respuestas.', err);
-                await virtualCourseProxy({
-                    method: 'POST',
-                    path: airtableTablePath(VIRTUAL_RESPONSES_TABLE),
-                    body: { fields: reduced }
-                });
+                data = await send(reduced);
             }
+            const record = data?.record || data?.records?.[0] || data;
+            return record?.id || recordId || null;
         }
 
+        // Campos comunes del registro del intento (identificación + conteos + detalle JSON).
+        function buildVirtualAttemptFields(attempt, tipo, moduleLabel, course, participant) {
+            const total = getVirtualCourseTotals(course).totalCheckpoints;
+            const correctCount = attempt.detail.filter(it => it.resultado === 'Correcta').length;
+            const percentage = total ? Math.round((correctCount / total) * 100) : 0;
+            const fields = {
+                [VIRTUAL_RESP_FIELD_TYPE]: tipo,
+                [VIRTUAL_RESP_FIELD_PARTICIPANT]: participant.name,
+                [VIRTUAL_RESP_FIELD_CEDULA]: participant.cedula,
+                [VIRTUAL_RESP_FIELD_COURSE]: course.title || '',
+                [VIRTUAL_RESP_FIELD_COURSE_ID]: course.id || '',
+                [VIRTUAL_RESP_FIELD_MODULE]: moduleLabel,
+                [VIRTUAL_RESP_FIELD_DATE]: new Date().toISOString(),
+                [VIRTUAL_RESP_FIELD_TOTAL]: total,
+                [VIRTUAL_RESP_FIELD_CORRECT_COUNT]: correctCount,
+                [VIRTUAL_RESP_FIELD_PERCENT]: percentage,
+                [VIRTUAL_RESP_FIELD_RESULT]: `${correctCount}/${total}`,
+                [VIRTUAL_RESP_FIELD_SCORE]: percentage,
+                ...virtualParticipantPersonalFields(participant)
+            };
+            if (attempt.detail.length) fields[VIRTUAL_RESP_FIELD_DETAIL] = JSON.stringify(attempt.detail);
+            return fields;
+        }
+
+        // Guarda la respuesta de un checkpoint dentro del registro del intento (JSON),
+        // en lugar de crear un registro por pregunta.
         async function saveVirtualCheckpointResult(moduleIndex, checkpoint, selected, isCorrect) {
             if (!currentVirtualCourse || !currentVirtualParticipant) return;
-            const module = currentVirtualCourse.modules?.[moduleIndex] || {};
-            const totals = getVirtualCourseTotals(currentVirtualCourse);
-            const correctCount = currentVirtualResults.filter(r => r.isCorrect).length + (isCorrect ? 1 : 0);
-            const answeredCount = currentVirtualResults.length + 1;
-            const percentage = answeredCount ? Math.round((correctCount / answeredCount) * 100) : 0;
-
-            const fields = {
-                [VIRTUAL_RESP_FIELD_TYPE]: 'Checkpoint',
-                [VIRTUAL_RESP_FIELD_PARTICIPANT]: currentVirtualParticipant.name,
-                [VIRTUAL_RESP_FIELD_CEDULA]: currentVirtualParticipant.cedula,
-                [VIRTUAL_RESP_FIELD_COURSE]: currentVirtualCourse.title || '',
-                [VIRTUAL_RESP_FIELD_COURSE_ID]: currentVirtualCourse.id || '',
-                [VIRTUAL_RESP_FIELD_MODULE]: module.title || `Módulo ${moduleIndex + 1}`,
-                [VIRTUAL_RESP_FIELD_MODULE_INDEX]: moduleIndex + 1,
-                [VIRTUAL_RESP_FIELD_CHECKPOINT]: checkpoint.id || '',
-                [VIRTUAL_RESP_FIELD_TIME]: formatSeconds(checkpoint.time || 0),
-                [VIRTUAL_RESP_FIELD_QUESTION]: checkpoint.question || '',
-                [VIRTUAL_RESP_FIELD_ANSWER]: selected || '',
-                [VIRTUAL_RESP_FIELD_CORRECT]: checkpoint.correct || '',
-                [VIRTUAL_RESP_FIELD_RESULT]: isCorrect ? 'Correcta' : 'Incorrecta',
-                [VIRTUAL_RESP_FIELD_DATE]: new Date().toISOString(),
-                [VIRTUAL_RESP_FIELD_SCORE]: isCorrect ? 100 : 0,
-                [VIRTUAL_RESP_FIELD_TOTAL]: totals.totalCheckpoints,
-                [VIRTUAL_RESP_FIELD_CORRECT_COUNT]: correctCount,
-                [VIRTUAL_RESP_FIELD_PERCENT]: percentage,
-                ...virtualParticipantPersonalFields()
-            };
-            await saveVirtualResponseRecord(fields);
+            const course = currentVirtualCourse;
+            const participant = currentVirtualParticipant;
+            const module = course.modules?.[moduleIndex] || {};
+            const attempt = currentVirtualAttempt;
+            attempt.detail.push({
+                checkpointId: checkpoint.id || '',
+                modulo: module.title || `Módulo ${moduleIndex + 1}`,
+                indiceModulo: moduleIndex + 1,
+                tiempo: formatSeconds(checkpoint.time || 0),
+                pregunta: checkpoint.question || '',
+                respuestaUsuario: selected || '',
+                respuestaCorrecta: checkpoint.correct || '',
+                resultado: isCorrect ? 'Correcta' : 'Incorrecta',
+                calificacion: isCorrect ? 100 : 0,
+                fecha: new Date().toISOString()
+            });
+            return queueVirtualAttemptSave(async () => {
+                // Si el intento ya se cerró (resumen guardado), no se vuelve a marcar "En curso".
+                if (attempt.closed) return;
+                const fields = buildVirtualAttemptFields(attempt, VIRTUAL_RESP_TYPE_IN_PROGRESS, 'Intento en curso', course, participant);
+                attempt.recordId = await saveVirtualResponseRecord(fields, attempt.recordId);
+            });
         }
 
+        // Cierra el intento: actualiza su registro con el estado final y el detalle completo.
         async function saveVirtualCourseSummary(finalStatus = 'Finalizado') {
             if (!currentVirtualCourse || !currentVirtualParticipant) return;
-            const totals = getVirtualCourseTotals(currentVirtualCourse);
-            const correctCount = currentVirtualResults.filter(r => r.isCorrect).length;
-            const percentage = totals.totalCheckpoints ? Math.round((correctCount / totals.totalCheckpoints) * 100) : 0;
-            const fields = {
-                [VIRTUAL_RESP_FIELD_TYPE]: finalStatus,
-                [VIRTUAL_RESP_FIELD_PARTICIPANT]: currentVirtualParticipant.name,
-                [VIRTUAL_RESP_FIELD_CEDULA]: currentVirtualParticipant.cedula,
-                [VIRTUAL_RESP_FIELD_COURSE]: currentVirtualCourse.title || '',
-                [VIRTUAL_RESP_FIELD_COURSE_ID]: currentVirtualCourse.id || '',
-                [VIRTUAL_RESP_FIELD_MODULE]: 'Resumen final',
-                [VIRTUAL_RESP_FIELD_DATE]: new Date().toISOString(),
-                [VIRTUAL_RESP_FIELD_TOTAL]: totals.totalCheckpoints,
-                [VIRTUAL_RESP_FIELD_CORRECT_COUNT]: correctCount,
-                [VIRTUAL_RESP_FIELD_PERCENT]: percentage,
-                [VIRTUAL_RESP_FIELD_RESULT]: `${correctCount}/${totals.totalCheckpoints}`,
-                [VIRTUAL_RESP_FIELD_SCORE]: percentage,
-                ...virtualParticipantPersonalFields()
-            };
-            await saveVirtualResponseRecord(fields);
+            const attempt = currentVirtualAttempt;
+            const fields = buildVirtualAttemptFields(attempt, finalStatus, 'Resumen final', currentVirtualCourse, currentVirtualParticipant);
+            return queueVirtualAttemptSave(async () => {
+                try {
+                    attempt.recordId = await saveVirtualResponseRecord(fields, attempt.recordId);
+                } catch (err) {
+                    if (!attempt.recordId) throw err;
+                    // El registro del intento no se pudo actualizar: se crea uno nuevo para no perder el resultado.
+                    console.warn('No se pudo actualizar el registro del intento; se crea un registro nuevo.', err);
+                    attempt.recordId = await saveVirtualResponseRecord(fields, null);
+                }
+                attempt.closed = true;
+            });
         }
 
 
@@ -16497,6 +16533,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             answeredVirtualCheckpoints = new Set();
             currentVirtualCheckpointKey = null;
             currentVirtualResults = [];
+            currentVirtualAttempt = newVirtualAttempt();
             virtualFinalSummarySaved = false;
             virtualSatisfactionAsked = false;
             document.getElementById('virtualPlayerTitle').textContent = course.title;
@@ -16619,11 +16656,58 @@ function makeCronogramaFilterFormula(year, tipo) {
             });
         }
 
+        // Intento sin cierre ("En curso" o "Intento incompleto"): no cuenta como resumen.
+        function isVirtualOpenAttemptRow(f) {
+            const tipo = virtualRespValue(f, [VIRTUAL_RESP_FIELD_TYPE, 'Tipo Registro']).toLowerCase();
+            return VIRTUAL_RESP_OPEN_TYPES.includes(tipo);
+        }
+
         function isVirtualSummaryRow(f) {
+            if (isVirtualOpenAttemptRow(f)) return false;
             const modulo = virtualRespValue(f, [VIRTUAL_RESP_FIELD_MODULE, 'Módulo']);
             const tipo = virtualRespValue(f, [VIRTUAL_RESP_FIELD_TYPE, 'Tipo Registro']);
             if (modulo === 'Resumen final') return true;
             return tipo && tipo.toLowerCase() !== 'checkpoint';
+        }
+
+        // Lee el JSON de "Detalle Checkpoints" de un registro (arreglo vacío si no hay o está dañado).
+        function parseVirtualAttemptDetail(f) {
+            const raw = f ? f[VIRTUAL_RESP_FIELD_DETAIL] : null;
+            if (!raw) return [];
+            try {
+                const arr = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                return Array.isArray(arr) ? arr : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        // Convierte los intentos abiertos en filas tipo checkpoint (una por pregunta del JSON),
+        // para que los cálculos funcionen igual que con los registros individuales antiguos.
+        function expandVirtualCheckpointRows(rows) {
+            const out = [];
+            rows.forEach(f => {
+                if (!isVirtualOpenAttemptRow(f)) { out.push(f); return; }
+                parseVirtualAttemptDetail(f).forEach(it => {
+                    const row = {
+                        ...f,
+                        [VIRTUAL_RESP_FIELD_TYPE]: 'Checkpoint',
+                        [VIRTUAL_RESP_FIELD_MODULE]: it.modulo || '',
+                        [VIRTUAL_RESP_FIELD_MODULE_INDEX]: it.indiceModulo ?? null,
+                        [VIRTUAL_RESP_FIELD_CHECKPOINT]: it.checkpointId || '',
+                        [VIRTUAL_RESP_FIELD_TIME]: it.tiempo || '',
+                        [VIRTUAL_RESP_FIELD_QUESTION]: it.pregunta || '',
+                        [VIRTUAL_RESP_FIELD_ANSWER]: it.respuestaUsuario || '',
+                        [VIRTUAL_RESP_FIELD_CORRECT]: it.respuestaCorrecta || '',
+                        [VIRTUAL_RESP_FIELD_RESULT]: it.resultado || '',
+                        [VIRTUAL_RESP_FIELD_SCORE]: it.calificacion ?? null,
+                        [VIRTUAL_RESP_FIELD_DATE]: it.fecha || f[VIRTUAL_RESP_FIELD_DATE] || ''
+                    };
+                    delete row[VIRTUAL_RESP_FIELD_DETAIL];
+                    out.push(row);
+                });
+            });
+            return out;
         }
 
         function virtualPercentToGrade(percent) {
@@ -16645,7 +16729,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                 const dateOf = (f) => new Date(virtualRespValue(f, [VIRTUAL_RESP_FIELD_DATE, 'Fecha Respuesta']) || 0).getTime();
                 const sorted = rows.toSorted((a, b) => dateOf(a) - dateOf(b));
                 const summaries = sorted.filter(isVirtualSummaryRow);
-                const checkpoints = sorted.filter(f => !isVirtualSummaryRow(f));
+                const checkpoints = expandVirtualCheckpointRows(sorted.filter(f => !isVirtualSummaryRow(f)));
                 const lastSummary = summaries.length ? summaries[summaries.length - 1] : null;
                 const anyRow = lastSummary || sorted[sorted.length - 1] || {};
 
@@ -17728,6 +17812,7 @@ function makeCronogramaFilterFormula(year, tipo) {
         function restartVirtualCourseAfterFailure() {
             answeredVirtualCheckpoints = new Set();
             currentVirtualResults = [];
+            currentVirtualAttempt = newVirtualAttempt(); // el nuevo intento queda en un registro nuevo
             virtualFinalSummarySaved = false;
             currentVirtualCheckpointKey = null;
             const panel = document.getElementById('virtualCourseFinalResultPanel');
@@ -18187,6 +18272,7 @@ function makeCronogramaFilterFormula(year, tipo) {
             currentVirtualCheckpointKey = null;
             currentVirtualParticipant = null;
             currentVirtualResults = [];
+            currentVirtualAttempt = newVirtualAttempt();
             virtualFinalSummarySaved = false;
             if (virtualDirectAccessMode) {
                 document.body.classList.add('hslv-participant-flow');
