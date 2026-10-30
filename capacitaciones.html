@@ -4942,8 +4942,8 @@
         // ==================== VARIABLES GLOBALES ====================
         let pretestQuestionCount = 0;
         let postestQuestionCount = 0;
-        const MAX_QUESTIONS = 10;
-        
+        const MAX_QUESTIONS = 20; // Pretest y postest: hasta 20 preguntas cada uno
+
         // Variables para el flujo de pretest
         let currentAccessCode = null;
         let currentTrainingRecord = null;
@@ -8058,29 +8058,43 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             return true;
         }
 
-        await Promise.all(questions.map(async (q, i) => {
-            const recordPayload = {
-                fields: {
-                    "Capacitación": [trainingRecordId],
-                    "Tipo": type === 'pretest' ? 'Pretest' : 'Postest',
-                    "Pregunta": q.question,
-                    "Opción A": q.options.a,
-                    "Opción B": q.options.b,
-                    "Opción C": q.options.c,
-                    "Opción D": q.options.d,
-                    "Respuesta Correcta": q.correctAnswer.toLowerCase(),
-                    ...(q.imageUrl ? { "Imagen URL": q.imageUrl } : {})
-                }
-            };
+        const buildQuestionPayload = (q) => ({
+            fields: {
+                "Capacitación": [trainingRecordId],
+                "Tipo": type === 'pretest' ? 'Pretest' : 'Postest',
+                "Pregunta": q.question,
+                "Opción A": q.options.a,
+                "Opción B": q.options.b,
+                "Opción C": q.options.c,
+                "Opción D": q.options.d,
+                "Respuesta Correcta": q.correctAnswer.toLowerCase(),
+                ...(q.imageUrl ? { "Imagen URL": q.imageUrl } : {})
+            }
+        });
 
+        // Airtable acepta máximo 10 registros por petición y 5 peticiones/segundo por base.
+        // Con tests de hasta 20 preguntas se crean en lotes de 10, uno tras otro
+        // (antes: una petición por pregunta, todas en paralelo).
+        const AIRTABLE_BATCH = 10;
+        const createdIds = [];
+        for (let start = 0; start < questions.length; start += AIRTABLE_BATCH) {
+            const batch = questions.slice(start, start + AIRTABLE_BATCH);
             const createResp = await airtableProxyRequest({
                 method: 'POST',
                 path: '/Preguntas',
-                body: { records: [recordPayload] }
+                body: { records: batch.map(buildQuestionPayload) }
             });
 
-            const createdRecord = createResp?.record || createResp?.records?.[0];
-            const createdId = createdRecord?.id || createResp?.id;
+            const createdRecords = Array.isArray(createResp?.records)
+                ? createResp.records
+                : (createResp?.record ? [createResp.record] : (createResp?.id ? [createResp] : []));
+            batch.forEach((_, j) => createdIds.push(createdRecords[j]?.id || null));
+        }
+
+        // Imágenes adjuntas: una a la vez, cada una sobre el registro ya creado
+        for (let i = 0; i < questions.length; i++) {
+            const q = questions[i];
+            const createdId = createdIds[i];
             if (!createdId) {
                 throw new Error(`No se pudo crear la pregunta ${i + 1} del ${type}`);
             }
@@ -8094,7 +8108,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     throw new Error(`La pregunta ${i + 1} se creó, pero la imagen no pudo cargarse: ${uploadErr.message}`);
                 }
             }
-        }));
+        }
 
         console.log(`✅ ${questions.length} preguntas de ${type} guardadas exitosamente`);
         return true;
