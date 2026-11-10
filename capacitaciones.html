@@ -3642,7 +3642,7 @@
                                 <option value="onlyActive">Solo capacitaciones activas</option>
                                 <option value="onlyFinalized">Solo capacitaciones finalizadas</option>
                             </select>
-                            <small style="color:#1a1a1a;">Nota: el trimestre se calcula por fecha de la capacitación (campo “Fecha”; si no existe, usa “Fecha Creación/Creado En”).</small>
+                            <small style="color:#1a1a1a;">Nota: cada participación cuenta en el trimestre de su fecha de registro (“Fecha de Inicio”, hora de Colombia); las capacitaciones se listan por “Fecha de la capacitación”. Un trimestre cerrado no cambia si alguien se registra después.</small>
                         </div>
                     </div>
 
@@ -3738,7 +3738,7 @@
                             <div style="text-align:center; padding:1rem; background: linear-gradient(135deg, #111827 0%, #374151 100%); border-radius: 8px;">
                                 <div style="color:#fff; font-weight:600; font-size:0.95rem;">Aprobación (Post-test)</div>
                                 <div id="qPassRate" style="color:#fff; font-size:2rem; font-weight:800; margin-top:0.25rem;">0%</div>
-                                <div style="color:#e5e7eb; font-weight:600;">≥ 3.0 / 5.0 (60%)</div>
+                                <div style="color:#e5e7eb; font-weight:600;">≥ 3.5 / 5.0 (70%)</div>
                             </div>
                         </div>
                     </div>
@@ -9147,6 +9147,29 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
         // ═════════════════════════════════════════════════════════════════
         // REPORTES TRIMESTRALES (NUEVO)
+
+        // Nota mínima de aprobación del post-test según el procedimiento SLV-GAT-GTB-1493 (3,5/5,0 = 70 %).
+        const POSTTEST_PASS_PERCENT = 70;
+
+        // Devuelve 'AAAA-MM-DD' en hora local. Las fechas de solo día de Airtable se dejan igual;
+        // las fechas con hora (createdTime y similares, en UTC) se pasan a la hora del navegador,
+        // para que un registro del 30 de septiembre a las 8 p. m. no caiga en octubre.
+        function qLocalYMD(raw) {
+            if (!raw) return '';
+            const s = String(raw).trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+            const d = new Date(s);
+            if (isNaN(d.getTime())) return s.slice(0, 10);
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        }
+
+        // Date local a partir de 'AAAA-MM-DD'. new Date('AAAA-MM-DD') se interpreta como medianoche UTC,
+        // que en Colombia es el día anterior; por eso los listados mostraban las fechas un día antes.
+        function qLocalDate(raw) {
+            const ymd = qLocalYMD(raw);
+            const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(ymd);
+            return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : null;
+        }
         // ═════════════════════════════════════════════════════════════════
 
         let currentQuarterlyReportData = null;
@@ -9354,13 +9377,19 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 // Helper para extraer fecha de una capacitación (acepta todos los campos posibles)
                 function getTrainingDate(t) {
                     const f = t.fields || {};
-                    return f['Fecha de la capacitación'] || f['Fecha Creación'] || f['Fecha'] || t.createdTime || '';
+                    return qLocalYMD(f['Fecha de la capacitación'] || f['Fecha'] || f['Fecha Creación'] || t.createdTime || '');
                 }
 
-                // Helper para extraer fecha de una participación
+                // Fecha propia de la participación (cuándo se registró la persona), en hora local.
+                // Si no la tiene, se usa la fecha de su capacitación y, en último caso, la creación del registro.
+                const trainingDateById = {};
+                allTrainings.forEach(t => { trainingDateById[t.id] = getTrainingDate(t); });
                 function getPartDate(p) {
                     const f = p.fields || {};
-                    return f['Fecha de Inicio'] || f['Fecha Inicio'] || f['Fecha'] || p.createdTime || '';
+                    const own = f['Fecha de Inicio'] || f['Fecha Inicio'] || f['Fecha'] || '';
+                    if (own) return qLocalYMD(own);
+                    if (p._trainingId && trainingDateById[p._trainingId]) return trainingDateById[p._trainingId];
+                    return qLocalYMD(p.createdTime || '');
                 }
 
                 // Filtrar capacitaciones del trimestre (por fecha)
@@ -9374,23 +9403,28 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 // Filtrar participaciones del trimestre
                 // Estrategia: fecha propia O fecha de la capacitación a la que pertenecen
                 const trimTrainingIds = new Set(trimTrainings.map(t => t.id));
+                // Cada participación cuenta en UN solo trimestre: el de su propia fecha de registro.
+                // Antes también entraba si su capacitación era del trimestre; así los registros tardíos
+                // cambiaban trimestres ya cerrados y un mismo registro podía contarse en dos trimestres.
                 const trimParts = allParts.filter(p => {
-                    // Estrategia 1: la participación tiene su propia fecha en el rango
-                    const fechaRaw = getPartDate(p);
-                    if (fechaRaw) {
-                        const fecha = fechaRaw.slice(0, 10);
-                        if (fecha >= dateStart && fecha <= dateEnd) return true;
-                    }
-                    // Estrategia 2: pertenece a una capacitación del trimestre
-                    if (p._trainingId && trimTrainingIds.has(p._trainingId)) return true;
-                    return false;
+                    const fecha = getPartDate(p);
+                    return !!fecha && fecha >= dateStart && fecha <= dateEnd;
                 });
 
-                // Scope filter (departamento)
+                // Filtro opcional por estado de la capacitación (opciones del selector: onlyActive / onlyFinalized).
+                // Antes se comparaba contra el departamento y esas opciones dejaban el reporte vacío.
+                const trainingById = new Map(allTrainings.map(t => [t.id, t]));
+                const isTrainingFinalized = (t) => {
+                    const tf = (t && t.fields) || {};
+                    return !!(tf['Finalizada'] || tf['Estado'] === 'Finalizada' || tf['Estado'] === 'Inactiva');
+                };
                 const partsScoped = scope === 'all' ? trimParts : trimParts.filter(p => {
-                    const dept = (p.fields?.['Servicio'] || p.fields?.['Departamento'] || '').toLowerCase();
-                    return dept.includes(scope.toLowerCase());
+                    const t = p._trainingId ? trainingById.get(p._trainingId) : null;
+                    if (!t) return false;
+                    return scope === 'onlyFinalized' ? isTrainingFinalized(t) : !isTrainingFinalized(t);
                 });
+                // Participaciones del trimestre hechas en capacitaciones con fecha de otro trimestre
+                const partsOtherQuarterTrainings = partsScoped.filter(p => !(p._trainingId && trimTrainingIds.has(p._trainingId))).length;
 
                 // Calcular KPIs globales
                 let sumPre = 0, sumPost = 0, countPre = 0, countPost = 0, completados = 0;
@@ -9430,7 +9464,9 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     if (pre > 0) { sumPre += pre; countPre++; }
                     if (post > 0) { sumPost += post; countPost++; }
                     if (completadoPost) completados++;
-                    if (nombre) uniqueNames.add(nombre.toLowerCase().trim());
+                    // Persona única: cédula (de la participación o de Personal HSLV) o, si no hay, nombre normalizado sin tildes
+                    const personKey = cedPart || infoPart.cedula || normName(nombre);
+                    if (personKey) uniqueNames.add(personKey);
 
                     if (!byDeptMap[dept]) byDeptMap[dept] = { dept, count: 0, sumPre: 0, sumPost: 0, nPre: 0, nPost: 0 };
                     byDeptMap[dept].count++;
@@ -9456,7 +9492,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const avgPost = countPost > 0 ? Math.round(sumPost / countPost) : 0;
                 const avgImprovement = avgPost - avgPre;
                 const adherenceRate = totalParts > 0 ? Math.round((completados / totalParts) * 100) : 0;
-                const passRate = countPost > 0 ? Math.round(partsScoped.filter(p => parseFloat(p.fields?.['Post-test Score'] || p.fields?.['Posttest Score'] || 0) >= 60).length / countPost * 100) : 0;
+                const passRate = countPost > 0 ? Math.round(partsScoped.filter(p => parseFloat(p.fields?.['Post-test Score'] || p.fields?.['Posttest Score'] || 0) >= POSTTEST_PASS_PERCENT).length / countPost * 100) : 0;
 
                 // Construir lista de capacitaciones del trimestre con stats
                 const trainingIds = new Set(trimTrainings.map(t => t.id));
@@ -9470,8 +9506,8 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     const tCompletados = tParts.filter(p => !!(p.fields?.['Completado Posttest'] || p.fields?.['Completado Post-Test'])).length;
                     const isActiva = !!(tf['Activa'] || tf['Estado'] === 'Activa' || tf['Estado'] === 'active');
                     const isFinalizada = !!(tf['Finalizada'] || tf['Estado'] === 'Finalizada' || tf['Estado'] === 'Inactiva');
-                    const rawDate = tf['Fecha de la capacitación'] || tf['Fecha Creación'] || tf['Fecha'] || t.createdTime || '';
-                    const dateObj = rawDate ? new Date(rawDate) : null;
+                    const rawDate = getTrainingDate(t);
+                    const dateObj = rawDate ? qLocalDate(rawDate) : null;
                     const dateLabel = dateObj && !isNaN(dateObj) ? dateObj.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
                     return {
                         id: t.id,
@@ -9489,7 +9525,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         avgPostestScore: tAvgPost,
                         avgImprovement: tAvgPost - tAvgPre,
                         adherenceRate: tf['Adherencia'] != null ? Math.round(parseFloat(tf['Adherencia'])) : (tParts.length > 0 ? Math.round((tCompletados / tParts.length) * 100) : 0),
-                        passRatePostest: tPost.length > 0 ? Math.round(tPost.filter(p => parseFloat(p.fields?.['Post-test Score'] || p.fields?.['Posttest Score'] || 0) >= 60).length / tPost.length * 100) : 0
+                        passRatePostest: tPost.length > 0 ? Math.round(tPost.filter(p => parseFloat(p.fields?.['Post-test Score'] || p.fields?.['Posttest Score'] || 0) >= POSTTEST_PASS_PERCENT).length / tPost.length * 100) : 0
                     };
                 });
 
@@ -9508,7 +9544,8 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     const deptRaw = f['Departamento'] || f['Servicio'] || infoP.proceso || infoP.area || 'Sin servicio';
                     const dept = qDeptG.key(deptRaw, 'Sin servicio');
                     if (!uniqueByDeptMap[dept]) uniqueByDeptMap[dept] = new Set();
-                    if (nombre) uniqueByDeptMap[dept].add(nombre);
+                    const personKeyDept = cedP || infoP.cedula || nombre;
+                    if (personKeyDept) uniqueByDeptMap[dept].add(personKeyDept);
                 });
 
                 const byDept = Object.values(byDeptMap).sort((a, b) => b.count - a.count).slice(0, 10).map(d => ({
@@ -9535,7 +9572,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 // ── Detalle de participantes (cruce con Personal HSLV) ──
                 const trainingTitleById = {};
-                trimTrainings.forEach(t => {
+                allTrainings.forEach(t => {
                     trainingTitleById[t.id] = (t.fields && (t.fields['Título'] || t.fields['name'])) || 'Sin título';
                 });
 
@@ -9591,7 +9628,8 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         avgPretestScore: avgPre,
                         avgPostestScore: avgPost,
                         avgImprovement,
-                        passRatePostest: passRate
+                        passRatePostest: passRate,
+                        participationsOtherQuarterTrainings: partsOtherQuarterTrainings
                     },
                     trainings: trainingsWithStats,
                     topTrainingsByParticipants: topByParts,
@@ -9614,6 +9652,9 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 // Generar hallazgos automáticos basados en los datos
                 data.insights = generateQuarterlyInsights(data);
+                if (partsOtherQuarterTrainings > 0) {
+                    data.insights.push(`📌 ${partsOtherQuarterTrainings} participación(es) de este trimestre se registraron en capacitaciones con fecha de otro trimestre (registro tardío o código de acceso reutilizado). Cuentan aquí por su fecha de registro; conviene finalizar cada capacitación al cerrar la jornada.`);
+                }
 
                 currentQuarterlyReportData = data;
 
@@ -9670,7 +9711,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     (Array.isArray(resp.records) ? resp.records : []).forEach(r => allResp.push(r));
                     offset = resp.offset || null;
                     pages++;
-                } while (offset && pages < 40);
+                } while (offset && pages < 1000); // antes se cortaba en 40 páginas (4.000 registros) sin avisar
             } catch (e) {
                 console.warn('⚠️ No se pudieron descargar respuestas de cursos virtuales:', e);
                 return { kpis: { ...emptyKpis }, courses: [], participants: [] };
@@ -9715,15 +9756,18 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 const courseParts = [];
                 byCedula.forEach((rows, cedula) => {
                     const dateOf = (f) => new Date(virtualRespValue(f, [VIRTUAL_RESP_FIELD_DATE, 'Fecha Respuesta']) || 0).getTime();
-                    const sorted = rows.toSorted((a, b) => dateOf(a) - dateOf(b));
+                    const ymdOf = (f) => qLocalYMD(virtualRespValue(f, [VIRTUAL_RESP_FIELD_DATE, 'Fecha Respuesta']));
+                    // Solo intentos hechos hasta el cierre del trimestre: repetir el curso después
+                    // ya no saca a la persona de un trimestre cerrado ni cambia su resultado en él.
+                    const sorted = rows.toSorted((a, b) => dateOf(a) - dateOf(b)).filter(f => { const d = ymdOf(f); return !!d && d <= dateEnd; });
+                    if (!sorted.length) return;
                     const summaries = sorted.filter(isVirtualSummaryRow);
                     const checkpoints = expandVirtualCheckpointRows(sorted.filter(f => !isVirtualSummaryRow(f)));
                     const lastSummary = summaries.length ? summaries[summaries.length - 1] : null;
                     const anyRow = lastSummary || sorted[sorted.length - 1] || {};
 
                     // Fecha de la evaluación (preferir resumen final) y filtro por trimestre
-                    const rawDate = virtualRespValue(anyRow, [VIRTUAL_RESP_FIELD_DATE, 'Fecha Respuesta']);
-                    const fecha = (rawDate || '').slice(0, 10);
+                    const fecha = ymdOf(anyRow);
                     if (!fecha || fecha < dateStart || fecha > dateEnd) return;
 
                     let correct, total, percent, statusRaw;
@@ -10096,7 +10140,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             if (k.passRatePostest > 0) {
                 if (k.passRatePostest >= 90) {
                     insights.push(
-                        `✅ El ${k.passRatePostest}% de los participantes aprobaron el post-test (≥60%), lo que indica una alta asimilación del contenido.`
+                        `✅ El ${k.passRatePostest}% de los participantes aprobaron el post-test (≥${POSTTEST_PASS_PERCENT}%), lo que indica una alta asimilación del contenido.`
                     );
                 } else if (k.passRatePostest >= 70) {
                     insights.push(
@@ -11218,7 +11262,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 ['Promedio pre-test', pct(m.kpis.avgPretestScore)],
                 ['Promedio post-test', pct(m.kpis.avgPostestScore)],
                 ['Mejora promedio', pct(m.kpis.avgImprovement)],
-                ['Aprobación post-test (≥60%)', pct(m.kpis.passRatePostest)]
+                [`Aprobación post-test (≥${POSTTEST_PASS_PERCENT}%)`, pct(m.kpis.passRatePostest)]
             ];
             const kpiHeader = s1.addRow(['INDICADORES CLAVE (PRESENCIAL)', '']);
             s1.mergeCells(`A${kpiHeader.number}:B${kpiHeader.number}`);
@@ -11839,7 +11883,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     ['Capacitaciones (trimestre)', safeNumber(k.trainingsCount).toString(), 'Participaciones', safeNumber(k.participationsCount).toString()],
                     ['Participantes únicos', safeNumber(k.uniqueParticipants).toString(), 'Adherencia (Post-test)', `${safeNumber(k.adherenceRate)}%`],
                     ['Promedio Pre-test', `${safeNumber(k.avgPretestScore)}% (${(safeNumber(k.avgPretestScore)/20).toFixed(1)}/5.0)`, 'Promedio Post-test', `${safeNumber(k.avgPostestScore)}% (${(safeNumber(k.avgPostestScore)/20).toFixed(1)}/5.0)`],
-                    ['Mejora promedio', `${safeNumber(k.avgImprovement) >= 0 ? '+' : ''}${safeNumber(k.avgImprovement)}%`, 'Aprobación Post-test (≥60%)', `${safeNumber(k.passRatePostest)}%`]
+                    ['Mejora promedio', `${safeNumber(k.avgImprovement) >= 0 ? '+' : ''}${safeNumber(k.avgImprovement)}%`, `Aprobación Post-test (≥${POSTTEST_PASS_PERCENT}%)`, `${safeNumber(k.passRatePostest)}%`]
                 ];
 
                 doc.autoTable({
@@ -12466,7 +12510,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
 
                 const participantsData = participants.map((p, i) => {
                     const finalScore = (p.postestScore > 0 ? p.postestScore : p.pretestScore) || 0;
-                    const estado = p.postestScore > 0 ? (p.postestScore >= 60 ? 'Aprobado' : 'Reprobado') : (p.pretestScore > 0 ? 'Pretest' : 'Pendiente');
+                    const estado = p.postestScore > 0 ? (p.postestScore >= POSTTEST_PASS_PERCENT ? 'Aprobado' : 'Reprobado') : (p.pretestScore > 0 ? 'Pretest' : 'Pendiente');
                     return [
                         (i + 1).toString(),
                         p.nombre || '',
@@ -12943,8 +12987,8 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 function fmtDate(v) {
                     if (!v) return '—';
                     const s = String(v);
-                    const date = new Date(s);
-                    if (!isNaN(date.getTime())) {
+                    const date = /^\d{4}-\d{2}-\d{2}$/.test(s) ? qLocalDate(s) : new Date(s);
+                    if (date && !isNaN(date.getTime())) {
                         return date.toLocaleDateString('es-CO');
                     }
                     return s.length >= 10 ? s.slice(0, 10) : s;
@@ -14806,7 +14850,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                 const avgPost = withPost.length > 0 ? Math.round(withPost.reduce((s, p) => s + p.postestScore, 0) / withPost.length) : 0;
                 const avgImprovement = avgPost - avgPre;
                 const adherenceRate = total > 0 ? Math.round((completados / total) * 100) : 0;
-                const passRate = withPost.length > 0 ? Math.round(withPost.filter(p => p.postestScore >= 60).length / withPost.length * 100) : 0;
+                const passRate = withPost.length > 0 ? Math.round(withPost.filter(p => p.postestScore >= POSTTEST_PASS_PERCENT).length / withPost.length * 100) : 0;
 
                 const data = {
                     success: true,
@@ -15769,7 +15813,7 @@ function makeCronogramaFilterFormula(year, tipo) {
         function formatDateForReport(dateString) {
             if (!dateString) return '-';
             try {
-                const date = new Date(dateString);
+                const date = /^\d{4}-\d{2}-\d{2}$/.test(String(dateString)) ? qLocalDate(dateString) : new Date(dateString);
                 return date.toLocaleDateString('es-CO', {
                     year: 'numeric',
                     month: 'long',
@@ -16615,7 +16659,7 @@ function makeCronogramaFilterFormula(year, tipo) {
                 (Array.isArray(data.records) ? data.records : []).forEach(r => all.push(r));
                 offset = data.offset || null;
                 pages++;
-            } while (offset && pages < 25);
+            } while (offset && pages < 1000); // antes se cortaba en 25 páginas (2.500 registros)
 
             const courseId = String(course.id || '');
             const courseTitle = String(course.title || '').trim().toLowerCase();
