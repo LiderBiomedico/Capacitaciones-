@@ -37,6 +37,15 @@
   to = "/capacitaciones.html"
   status = 200
 
+# Splash 3D: la escena del robot se sirve desde este mismo dominio.
+# Netlify la descarga de Spline, así el navegador no depende de que la red
+# del hospital resuelva prod.spline.design.
+[[redirects]]
+  from = "/escena/robot-bienvenida.splinecode"
+  to = "https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+  status = 200
+  force = true
+
 # Cache headers para archivos estáticos
 [[headers]]
   for = "/*.{js,css,png,jpg,gif,svg,woff,woff2}"

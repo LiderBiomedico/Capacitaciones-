@@ -8,10 +8,9 @@
     <meta name="description" content="Sistema integral de gestión de capacitaciones hospitalarias">
     <meta name="theme-color" content="#2E7D32">
 
-    <!-- Splash 3D: conexión anticipada y precarga de la escena Spline -->
-    <link rel="preconnect" href="https://prod.spline.design" crossorigin>
+    <!-- Splash 3D: precarga de la escena (servida desde este dominio, ver netlify.toml) y del CDN del motor -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
-    <link rel="preload" href="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode" as="fetch" crossorigin>
+    <link rel="preload" href="/escena/robot-bienvenida.splinecode" as="fetch" crossorigin>
 
     <!-- Tipografía Inter para el splash (carga no bloqueante) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -2912,10 +2911,20 @@ html.hslv-hero-open body {
         var hero = document.getElementById('loadingScreen');
         if (!hero || !hero.classList.contains('hslv-hero')) return;
 
-        var SCENE_URL = 'https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode';
-        var RUNTIME_URLS = [
-            'https://cdn.jsdelivr.net/npm/@splinetool/runtime@2.0.170/build/runtime.js',
-            'https://cdn.spline.design/@splinetool/runtime@2.0.170/build/runtime.js'
+        // La escena se pide al propio dominio: Netlify la trae de Spline (ver netlify.toml, /escena/*).
+        // Así el navegador no depende de que la red del hospital resuelva prod.spline.design.
+        // Si el proxy fallara, se intenta directo contra Spline.
+        var SCENE_URLS = [
+            '/escena/robot-bienvenida.splinecode',
+            'https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode'
+        ];
+        var SCENE_TIMEOUT_MS = 25000;
+        // Motor 3D y sus módulos .wasm desde el mismo CDN (wasmPath). cdn.spline.design queda
+        // de último porque no responde en la red del HSLV.
+        var RUNTIME_BASES = [
+            'https://cdn.jsdelivr.net/npm/@splinetool/runtime@2.0.170/build',
+            'https://unpkg.com/@splinetool/runtime@2.0.170/build',
+            'https://cdn.spline.design/@splinetool/runtime@2.0.170/build'
         ];
 
         var root = document.documentElement;
@@ -2951,19 +2960,47 @@ html.hslv-hero-open body {
         }
 
         function importRuntime(index) {
-            return import(RUNTIME_URLS[index]).catch(function (err) {
-                if (index + 1 < RUNTIME_URLS.length) return importRuntime(index + 1);
-                throw err;
-            });
+            var base = RUNTIME_BASES[index];
+            return import(base + '/runtime.js').then(
+                function (mod) { return { mod: mod, base: base }; },
+                function (err) {
+                    if (index + 1 < RUNTIME_BASES.length) return importRuntime(index + 1);
+                    throw err;
+                }
+            );
+        }
+
+        function fetchScene(index) {
+            var url = SCENE_URLS[index];
+            var ctrl = ('AbortController' in window) ? new AbortController() : null;
+            var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, SCENE_TIMEOUT_MS) : 0;
+            return fetch(url, ctrl ? { signal: ctrl.signal } : undefined)
+                .then(function (res) {
+                    if (!res.ok) throw new Error('HTTP ' + res.status + ' en ' + url);
+                    return res.arrayBuffer();
+                })
+                .then(function (buf) {
+                    clearTimeout(timer);
+                    if (!buf || !buf.byteLength) throw new Error('Escena vacía en ' + url);
+                    return buf;
+                })
+                .catch(function (err) {
+                    clearTimeout(timer);
+                    if (index + 1 < SCENE_URLS.length) return fetchScene(index + 1);
+                    throw err;
+                });
         }
 
         function loadScene() {
             if (!canvas) { removeLoader(); return; }
-            importRuntime(0)
-                .then(function (mod) {
+            // Motor y escena se descargan en paralelo
+            var scenePromise = fetchScene(0);
+            scenePromise.catch(function () { /* se informa abajo */ });
+            Promise.all([importRuntime(0), scenePromise])
+                .then(function (parts) {
                     if (dismissed) return null;
-                    app = new mod.Application(canvas);
-                    return app.load(SCENE_URL);
+                    app = new parts[0].mod.Application(canvas, { wasmPath: parts[0].base });
+                    return app.start(parts[1]);
                 })
                 .then(function () {
                     if (dismissed) { disposeScene(); return; }
@@ -3046,23 +3083,64 @@ html.hslv-hero-open body {
         var welcomeDone = false;
         var WELCOME_EVENTS = ['pointerup', 'touchend', 'keydown'];
 
-        // Prioriza voz colombiana, luego latinoamericana, luego España; y voces "naturales"/Google sobre las básicas.
-        function pickSpanishVoice() {
-            var voices = synth.getVoices() || [];
-            var best = null;
-            var bestScore = -1;
-            voices.forEach(function (v) {
-                var lang = String(v.lang || '').replace('_', '-').toLowerCase();
-                if (lang.indexOf('es') !== 0) return;
-                var name = String(v.name || '').toLowerCase();
-                var score = 0;
-                if (lang === 'es-co') score += 50;
-                else if (/^es-(419|mx|us|ar|cl|pe|ve|ec|bo|uy|py|cr|pa|gt|hn|ni|sv|do|pr|cu)$/.test(lang)) score += 35;
-                else if (lang === 'es-es') score += 15;
-                if (/natural|neural|online|premium|enhanced|google/.test(name)) score += 30;
-                if (score > bestScore) { best = v; bestScore = score; }
+        // Orden de voces: la mejor (colombiana > latinoamericana > España; "natural"/Google primero),
+        // luego las voces instaladas en el equipo, que funcionan sin internet.
+        function rankSpanishVoices() {
+            var voices = (synth.getVoices() || []).filter(function (v) {
+                return /^es([-_]|$)/i.test(String(v.lang || ''));
             });
-            return best;
+            function score(v) {
+                var lang = String(v.lang || '').replace('_', '-').toLowerCase();
+                var name = String(v.name || '').toLowerCase();
+                var s = 0;
+                if (lang === 'es-co') s += 50;
+                else if (/^es-(419|mx|us|ar|cl|pe|ve|ec|bo|uy|py|cr|pa|gt|hn|ni|sv|do|pr|cu)$/.test(lang)) s += 35;
+                else if (lang === 'es-es') s += 15;
+                else s += 10;
+                if (/natural|neural|online|premium|enhanced|google/.test(name)) s += 30;
+                return s;
+            }
+            voices.sort(function (a, b) { return score(b) - score(a); });
+            var order = voices.length ? [voices[0]] : [];
+            voices.forEach(function (v) { if (v.localService && order.indexOf(v) < 0) order.push(v); });
+            voices.forEach(function (v) { if (order.indexOf(v) < 0) order.push(v); });
+            return order.slice(0, 3);
+        }
+
+        var currentUtterance = null; // referencia viva: Chrome pierde los eventos de enunciados descartados
+
+        // Intenta cada voz; si una voz en línea no arranca (red lenta o bloqueada), pasa a la siguiente.
+        // El último intento usa la voz por defecto del navegador para español.
+        function speakAttempt(candidates, index) {
+            var voice = candidates[index] || null;
+            var hasNext = index < candidates.length;
+            var utterance = new SpeechSynthesisUtterance(WELCOME_TEXT);
+            if (voice) { utterance.voice = voice; utterance.lang = voice.lang; }
+            else { utterance.lang = 'es-CO'; }
+            utterance.rate = 0.95;
+            utterance.pitch = 1;
+            utterance.volume = 1;
+
+            var settled = false;
+            var timer = 0;
+            function next() {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                if (!hasNext) return;
+                try { synth.cancel(); } catch (e) { /* nada que cancelar */ }
+                speakAttempt(candidates, index + 1);
+            }
+            utterance.onstart = function () { settled = true; clearTimeout(timer); };
+            utterance.onerror = function (ev) {
+                if (ev && (ev.error === 'interrupted' || ev.error === 'canceled')) return;
+                next();
+            };
+            if (hasNext) timer = setTimeout(next, (voice && !voice.localService) ? 1500 : 2500);
+
+            currentUtterance = utterance;
+            if (synth.speaking || synth.pending) synth.cancel();
+            synth.speak(utterance);
         }
 
         function speakWelcome() {
@@ -3072,16 +3150,7 @@ html.hslv-hero-open body {
                 return;
             }
             if (!synth) return;
-            try {
-                var utterance = new SpeechSynthesisUtterance(WELCOME_TEXT);
-                var voice = pickSpanishVoice();
-                if (voice) { utterance.voice = voice; utterance.lang = voice.lang; }
-                else { utterance.lang = 'es-CO'; }
-                utterance.rate = 0.95;
-                utterance.pitch = 1;
-                utterance.volume = 1;
-                synth.speak(utterance);
-            } catch (e) { /* sin síntesis de voz disponible */ }
+            try { speakAttempt(rankSpanishVoices(), 0); } catch (e) { /* sin síntesis de voz disponible */ }
         }
 
         function removeWelcomeListeners() {
