@@ -2901,6 +2901,7 @@ html.hslv-hero-open body {
        SPLASH 3D — controlador
        - Carga @splinetool/runtime (versión fijada) y la escena.
        - Luz que sigue al cursor con resorte (k=130, c=25, m=0.25).
+       - Voz "Bienvenidos a Campus Susana" con la primera interacción.
        - window.hslvHeroSplash.whenDismissed(): promesa que se
          resuelve cuando el usuario pulsa "Ingresar al campus".
        - Al salir libera el contexto WebGL (app.dispose()).
@@ -3030,11 +3031,87 @@ html.hslv-hero-open body {
             glowRaf = 0;
         }
 
+        // ── Voz de bienvenida "Bienvenidos a Campus Susana" ──
+        // Los navegadores bloquean el sonido hasta que el usuario interactúa con la página,
+        // por eso el saludo suena con el primer clic, toque o tecla en el splash
+        // (normalmente "Ingresar al campus") y sigue sonando mientras aparece el login.
+        var WELCOME_TEXT = 'Bienvenidos a Campus Susana';
+        var WELCOME_AUDIO_URL = '';      // Opcional: grabación propia, p. ej. 'assets/bienvenida-campus.mp3'. Vacío = voz del navegador.
+        var WELCOME_IN_QR_FLOW = false;  // false: no suena en el flujo QR de participantes (varios celulares a la vez en el aula).
+
+        var urlParams = new URLSearchParams(window.location.search);
+        var isQrFlow = !!(urlParams.get('code') || urlParams.get('vc'));
+        var synth = ('speechSynthesis' in window && 'SpeechSynthesisUtterance' in window) ? window.speechSynthesis : null;
+        var welcomeAudio = null;
+        var welcomeDone = false;
+        var WELCOME_EVENTS = ['pointerup', 'touchend', 'keydown'];
+
+        // Prioriza voz colombiana, luego latinoamericana, luego España; y voces "naturales"/Google sobre las básicas.
+        function pickSpanishVoice() {
+            var voices = synth.getVoices() || [];
+            var best = null;
+            var bestScore = -1;
+            voices.forEach(function (v) {
+                var lang = String(v.lang || '').replace('_', '-').toLowerCase();
+                if (lang.indexOf('es') !== 0) return;
+                var name = String(v.name || '').toLowerCase();
+                var score = 0;
+                if (lang === 'es-co') score += 50;
+                else if (/^es-(419|mx|us|ar|cl|pe|ve|ec|bo|uy|py|cr|pa|gt|hn|ni|sv|do|pr|cu)$/.test(lang)) score += 35;
+                else if (lang === 'es-es') score += 15;
+                if (/natural|neural|online|premium|enhanced|google/.test(name)) score += 30;
+                if (score > bestScore) { best = v; bestScore = score; }
+            });
+            return best;
+        }
+
+        function speakWelcome() {
+            if (welcomeAudio) {
+                var playing = welcomeAudio.play();
+                if (playing && playing.catch) playing.catch(function () { /* el navegador rechazó el audio */ });
+                return;
+            }
+            if (!synth) return;
+            try {
+                var utterance = new SpeechSynthesisUtterance(WELCOME_TEXT);
+                var voice = pickSpanishVoice();
+                if (voice) { utterance.voice = voice; utterance.lang = voice.lang; }
+                else { utterance.lang = 'es-CO'; }
+                utterance.rate = 0.95;
+                utterance.pitch = 1;
+                utterance.volume = 1;
+                synth.speak(utterance);
+            } catch (e) { /* sin síntesis de voz disponible */ }
+        }
+
+        function removeWelcomeListeners() {
+            WELCOME_EVENTS.forEach(function (type) { document.removeEventListener(type, onFirstGesture, true); });
+        }
+
+        function onFirstGesture(e) {
+            if (welcomeDone) return;
+            if (e.type === 'keydown' && e.key === 'Escape') return;
+            welcomeDone = true;
+            removeWelcomeListeners();
+            speakWelcome();
+        }
+
+        if ((!isQrFlow || WELCOME_IN_QR_FLOW) && (WELCOME_AUDIO_URL || synth)) {
+            if (WELCOME_AUDIO_URL) {
+                welcomeAudio = new Audio(WELCOME_AUDIO_URL);
+                welcomeAudio.preload = 'auto';
+            } else {
+                synth.getVoices(); // pide la lista de voces con anticipación (algunos navegadores la cargan tarde)
+            }
+            WELCOME_EVENTS.forEach(function (type) { document.addEventListener(type, onFirstGesture, true); });
+        }
+
         // ── Salida del splash ──
         function dismiss() {
             if (dismissed) return dismissedPromise;
             dismissed = true;
             stopGlow();
+            removeWelcomeListeners();
             if (hero.contains(document.activeElement) && document.activeElement.blur) document.activeElement.blur();
             hero.setAttribute('aria-hidden', 'true');
             hero.classList.add('is-leaving');
