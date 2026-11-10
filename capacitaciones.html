@@ -3738,7 +3738,7 @@
                             <div style="text-align:center; padding:1rem; background: linear-gradient(135deg, #111827 0%, #374151 100%); border-radius: 8px;">
                                 <div style="color:#fff; font-weight:600; font-size:0.95rem;">Aprobación (Post-test)</div>
                                 <div id="qPassRate" style="color:#fff; font-size:2rem; font-weight:800; margin-top:0.25rem;">0%</div>
-                                <div style="color:#e5e7eb; font-weight:600;">≥ 3.5 / 5.0 (70%)</div>
+                                <div id="qPassRateNote" style="color:#e5e7eb; font-weight:600;">≥ 3.5 / 5.0 (70%)</div>
                             </div>
                         </div>
                     </div>
@@ -9151,6 +9151,144 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
         // Nota mínima de aprobación del post-test según el procedimiento SLV-GAT-GTB-1493 (3,5/5,0 = 70 %).
         const POSTTEST_PASS_PERCENT = 70;
 
+        // Meta institucional: 250 asistenciales capacitados por trimestre.
+        const QUARTERLY_ASSISTANCE_GOAL = 250;
+
+        // ── Cierres trimestrales oficiales ──
+        // Cifras de los informes trimestrales firmados. Al consultar un trimestre cerrado, el reporte muestra
+        // estas cifras (las mismas del documento firmado) y las marca como oficiales. Los listados de detalle
+        // se siguen calculando con los registros hechos hasta el corte del trimestre.
+        // Para cerrar un trimestre nuevo: generar el reporte, firmar el informe y agregar aquí su entrada.
+        // professions: personas distintas por profesión, con corte al cierre (ver qProfessionGroup).
+        const QUARTERLY_OFFICIAL_CLOSURES = {
+            '2026-1': {
+                passPercent: 60,
+                documento: 'Informe de ejecución del programa de capacitaciones de la tecnología biomédica, primer trimestre 2026',
+                firmado: '2026-04-14',
+                firmante: 'Ing. Paul Eduardo Muñoz R.',
+                corte: '2026-03-31',
+                nota: '',
+                kpis: { trainingsCount: 8, participationsCount: 633, uniqueParticipants: 187, adherenceRate: 99,
+                        avgPretestScore: 85, avgPostestScore: 93, avgImprovement: 8, passRatePostest: 98 },
+                virtual: null,
+                coverage: null,
+                professions: {
+                    counts: { AUX_ENF: 102, ENF: 21, MED_GEN: 17, MED_ESP: 11, TER: 19, IMG: 0, FAR: 0, OTR: 0, NOASIS: 9 },
+                    personas: 179, duplicadosNombre: 8, unicosInforme: 187
+                }
+            },
+            '2026-2': {
+                passPercent: 60,
+                documento: 'Informe de ejecución del programa de capacitaciones de la tecnología biomédica, segundo trimestre 2026',
+                firmado: '2026-07-07',
+                firmante: 'Ing. Paul Eduardo Muñoz R.',
+                corte: '2026-06-30',
+                nota: '',
+                kpis: { trainingsCount: 16, participationsCount: 2867, uniqueParticipants: 574, adherenceRate: 92,
+                        avgPretestScore: 90, avgPostestScore: 93, avgImprovement: 3, passRatePostest: 99 },
+                virtual: { coursesCount: 1, participations: 536, uniqueParticipants: 536, approved: 489, failed: 47, passRate: 91, avgPercent: 89 },
+                coverage: null,
+                professions: {
+                    counts: { AUX_ENF: 229, ENF: 70, MED_GEN: 70, MED_ESP: 47, TER: 45, IMG: 6, FAR: 33, OTR: 7, NOASIS: 61 },
+                    personas: 568, duplicadosNombre: 6, unicosInforme: 574
+                }
+            },
+            '2026-3': {
+                passPercent: 60,
+                documento: 'Informe de ejecución del programa de capacitaciones de la tecnología biomédica, tercer trimestre 2026',
+                firmado: '2026-10-14',
+                firmante: 'Ing. Paul Eduardo Muñoz R.',
+                corte: '2026-09-30',
+                nota: 'Después del cierre se eliminó una capacitación duplicada sin participantes ("Programa de Tecnovigilancia"), por eso el listado muestra 23 de las 24 del informe.',
+                kpis: { trainingsCount: 24, participationsCount: 3341, uniqueParticipants: 608, adherenceRate: 90,
+                        avgPretestScore: 91, avgPostestScore: 93, avgImprovement: 2, passRatePostest: 97 },
+                virtual: { coursesCount: 2, participations: 225, uniqueParticipants: 224, approved: 158, failed: 67, passRate: 70, avgPercent: 82 },
+                coverage: { personal: 1808, asistieron: 708, noAsistieron: 1100, cobertura: 39 },
+                professions: {
+                    counts: { AUX_ENF: 240, ENF: 52, MED_GEN: 74, MED_ESP: 69, TER: 40, IMG: 14, FAR: 26, OTR: 26, NOASIS: 67 },
+                    personas: 608, duplicadosNombre: 0, unicosInforme: 608
+                }
+            }
+        };
+
+        function getQuarterlyOfficialClosure(year, quarter) {
+            return QUARTERLY_OFFICIAL_CLOSURES[`${year}-${quarter}`] || null;
+        }
+
+        // Nota mínima con la que se calculó la aprobación: los informes firmados de 2026 usaron 60 % (3,0/5,0);
+        // desde la corrección del reporte se usa la del procedimiento, 70 % (3,5/5,0).
+        function qPassPercentFor(data) {
+            return (data && data.official) ? safeNumber(data.official.passPercent || 60) : POSTTEST_PASS_PERCENT;
+        }
+
+        // Grupo profesional de una persona a partir de cargo, perfil y proceso (Personal HSLV / participación).
+        // Asistencial = atención directa al paciente. Quien pertenece a un proceso administrativo, los estudiantes,
+        // conductores, mantenimiento, ingeniería y facturación cuentan como no asistenciales.
+        const QUARTERLY_PROFESSION_LABELS = {
+            AUX_ENF: 'Auxiliar de enfermería',
+            ENF: 'Enfermería profesional',
+            MED_GEN: 'Medicina general',
+            MED_ESP: 'Médicos especialistas',
+            TER: 'Terapias y fonoaudiología',
+            IMG: 'Imágenes diagnósticas',
+            FAR: 'Servicio farmacéutico',
+            OTR: 'Otros asistenciales (laboratorio, instrumentación, nutrición, psicología, camilleros, esterilización)',
+            NOASIS: 'No asistenciales (administrativos, mantenimiento, ingeniería, conductores, estudiantes)'
+        };
+        const QUARTERLY_PROFESSION_ORDER = ['AUX_ENF', 'ENF', 'MED_GEN', 'MED_ESP', 'TER', 'IMG', 'FAR', 'OTR'];
+
+        function qProfessionGroup(cargo, perfil, proceso) {
+            const N = (x) => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+            const c = N(cargo), p = N(perfil), pr = N(proceso);
+            const EXC = /ESTUDIANT|ADMINISTRATIV|FACTUR|SECRETARI|AUDITOR|GESTOR|MANTENIM|INGENIER|CONDUCTOR|SERVICIOS GENERALES|ELECTRIC|MECANIC|TOPOGRAF|CONTRATISTA|ARQUITECT|CONTADUR|MERCADEO|SALUD OCUPACIONAL|TEGNOLOGO|OPERARIO(?! DE CENTRAL)|^TECNICO$|^TECENICO$|^AUXLIAR$/;
+            const G = [
+                ['AUX_ENF', /AUX\w* (DE |EN )?ENFERM|AUXILIAR ENFERM/],
+                ['ENF', /ENFERM|\bENFERMA\b/],
+                ['MED_ESP', /MEDICO ESPECIALISTA|ANESTESIO|GINECO|OBSTETR|PEDIATR|NEONAT|CIRUGIA|ORTOPED|UROLOG|NEFROLOG|ENDOCRIN|NEUMOLOG|NEUROLOG|ALGESIOLOG|MEDICINA (INTERNA|FAMILIAR|CRITICA|DEL DOLOR)|^RADIOLOGIA$/],
+                ['MED_GEN', /MEDIC[OA] GENERAL|^MEDICO$|MEDICO HOSPITALARIO|MEDICO URGENCIAS/],
+                ['TER', /TERAPEUT|TERAPIA|FISIOTERAP|FONOAUDIOL/],
+                ['IMG', /RAYOS X|\bRX\b|TOMOGRAF|TECNOLOGO EN RADIOLOGIA|IMAGENES/],
+                ['FAR', /FARMAC|DROGUERIA|REGENTE/],
+                ['OTR', /BACTERIOLOG|LABORATORIO|INSTRUMENTADOR|NUTRICION|PSICOLOG|CAMILLERO|CENTRAL DE MATERIALES|ESTERILIZACION|ODONTOLOG|AREA SALUD|AREA DE LA SALUD|^ASISTENCIAL$/]
+            ];
+            const pick = (x) => { if (!x) return null; for (const [g, re] of G) if (re.test(x)) return g; return null; };
+            if (/ADMINISTRA/.test(pr)) return 'NOASIS';
+            if (c && EXC.test(c)) return 'NOASIS';
+            const gp = pick(p);
+            if (gp === 'MED_GEN' || gp === 'MED_ESP') return gp; // el perfil médico manda (ej. cargo "Pediatría" con perfil médico general)
+            const gc = pick(c);
+            if (gc) return gc;
+            if (gp) return gp;
+            if (/ESTERILIZACION/.test(pr) && /TECNICO/.test(c)) return 'OTR';
+            if (!c && !p && /ASISTENCIAL/.test(pr)) return 'OTR';
+            return 'NOASIS';
+        }
+
+        // Personas distintas por grupo profesional. Cada persona cuenta una vez, en el grupo que más se repite en sus registros.
+        function buildQuarterlyProfessionTable(participants) {
+            const N = (x) => String(x || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toUpperCase();
+            const byPerson = new Map();
+            (participants || []).forEach(p => {
+                const key = String(p.cedula || '').replace(/\D/g, '') || (N(p.nombre) ? 'N:' + N(p.nombre) : '');
+                if (!key) return;
+                const g = qProfessionGroup(p.cargo, p.perfil, p.proceso);
+                if (!byPerson.has(key)) byPerson.set(key, {});
+                const v = byPerson.get(key);
+                v[g] = (v[g] || 0) + 1;
+            });
+            const order = [...QUARTERLY_PROFESSION_ORDER, 'NOASIS'];
+            const counts = Object.fromEntries(order.map(g => [g, 0]));
+            byPerson.forEach(v => {
+                let best = null, bestN = -1;
+                order.forEach(g => {
+                    const n = v[g] || 0;
+                    if (n > bestN || (n === bestN && n > 0 && g !== 'NOASIS' && best === 'NOASIS')) { best = g; bestN = n; }
+                });
+                counts[best]++;
+            });
+            return { counts, personas: byPerson.size };
+        }
+
         // Devuelve 'AAAA-MM-DD' en hora local. Las fechas de solo día de Airtable se dejan igual;
         // las fechas con hora (createdTime y similares, en UTC) se pasan a la hora del navegador,
         // para que un registro del 30 de septiembre a las 8 p. m. no caiga en octubre.
@@ -9651,8 +9789,22 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 }
 
                 // Generar hallazgos automáticos basados en los datos
+                // Personal capacitado por profesión (personas distintas)
+                data.professions = buildQuarterlyProfessionTable(participantsDetail);
+
+                // Trimestre cerrado: se muestran las cifras del informe oficial firmado
+                const closure = scope === 'all' ? getQuarterlyOfficialClosure(year, quarter) : null;
+                if (closure) {
+                    data.liveKpis = { ...data.kpis };
+                    data.kpis = { ...data.kpis, ...closure.kpis };
+                    if (closure.virtual) data.virtual = { ...data.virtual, kpis: { ...(data.virtual.kpis || {}), ...closure.virtual } };
+                    if (closure.coverage && data.coverage) data.coverage = { ...data.coverage, totals: { ...(data.coverage.totals || {}), ...closure.coverage } };
+                    if (closure.professions) data.professions = { ...closure.professions, official: true };
+                    data.official = closure;
+                }
+
                 data.insights = generateQuarterlyInsights(data);
-                if (partsOtherQuarterTrainings > 0) {
+                if (!closure && partsOtherQuarterTrainings > 0) {
                     data.insights.push(`📌 ${partsOtherQuarterTrainings} participación(es) de este trimestre se registraron en capacitaciones con fecha de otro trimestre (registro tardío o código de acceso reutilizado). Cuentan aquí por su fecha de registro; conviene finalizar cada capacitación al cerrar la jornada.`);
                 }
 
@@ -10140,7 +10292,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             if (k.passRatePostest > 0) {
                 if (k.passRatePostest >= 90) {
                     insights.push(
-                        `✅ El ${k.passRatePostest}% de los participantes aprobaron el post-test (≥${POSTTEST_PASS_PERCENT}%), lo que indica una alta asimilación del contenido.`
+                        `✅ El ${k.passRatePostest}% de los participantes aprobaron el post-test (≥${qPassPercentFor(data)}%), lo que indica una alta asimilación del contenido.`
                     );
                 } else if (k.passRatePostest >= 70) {
                     insights.push(
@@ -10302,6 +10454,9 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             const k = data.kpis || {};
             const p = data.period || {};
 
+            renderQuarterlyOfficialBanner(data);
+            renderQuarterlyProfessions(data);
+
             // KPIs
             setText('qKpiTrainings', k.trainingsCount);
             setText('qKpiParticipants', k.participationsCount);
@@ -10312,6 +10467,8 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             setText('qAvgPost', `${safeNumber(k.avgPostestScore)}%`);
             setText('qAvgImprovement', `${safeNumber(k.avgImprovement) >= 0 ? '+' : ''}${safeNumber(k.avgImprovement)}%`);
             setText('qPassRate', `${safeNumber(k.passRatePostest)}%`);
+            const passPct = qPassPercentFor(data);
+            setText('qPassRateNote', `≥ ${(passPct / 20).toFixed(1)} / 5.0 (${passPct}%)${data.official ? ' · criterio del informe firmado' : ''}`);
             setText('qAvgPreNote', `${(safeNumber(k.avgPretestScore) / 20).toFixed(1)} / 5.0`);
             setText('qAvgPostNote', `${(safeNumber(k.avgPostestScore) / 20).toFixed(1)} / 5.0`);
 
@@ -10337,6 +10494,88 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             // Charts
             renderQuarterlyCharts(data);
             renderQuarterlyVirtualCharts(data.virtual || {});
+        }
+
+        function qFormatLongDate(ymd) {
+            const d = qLocalDate(ymd);
+            return d ? d.toLocaleDateString('es-CO', { day: 'numeric', month: 'long', year: 'numeric' }) : String(ymd || '');
+        }
+
+        // Aviso de trimestre cerrado con cifras del informe firmado
+        function renderQuarterlyOfficialBanner(data) {
+            const container = document.getElementById('quarterlyContainer');
+            if (!container) return;
+            let box = document.getElementById('qOfficialBanner');
+            if (!box) {
+                box = document.createElement('div');
+                box.id = 'qOfficialBanner';
+                container.insertBefore(box, container.firstChild);
+            }
+            const o = data && data.official;
+            if (!o) { box.style.display = 'none'; box.innerHTML = ''; return; }
+            box.style.cssText = 'display:block; margin-bottom:1.25rem; padding:1rem 1.25rem; border-radius:10px; background:#ecfdf5; border:1px solid #6ee7b7; color:#064e3b;';
+            box.innerHTML = `
+                <div style="font-weight:800; font-size:1.02rem; margin-bottom:0.35rem;"><i class="fas fa-file-signature"></i> Trimestre cerrado · cifras del informe oficial</div>
+                <div style="font-weight:500; line-height:1.5;">
+                    Los indicadores de este reporte son los del ${escapeHtml(o.documento)}, firmado el ${escapeHtml(qFormatLongDate(o.firmado))} por ${escapeHtml(String(o.firmante || '').replace(/\.$/, ''))}.
+                    Los listados de detalle (capacitaciones, participantes, cobertura por cargo y cursos virtuales) se calculan con los registros hechos hasta el ${escapeHtml(qFormatLongDate(o.corte))}
+                    y pueden diferir en unidades por depuraciones posteriores al cierre.${o.nota ? ' ' + escapeHtml(o.nota) : ''}
+                </div>`;
+        }
+
+        // Personal capacitado por profesión (personas distintas) y cumplimiento de la meta de asistenciales
+        function renderQuarterlyProfessions(data) {
+            const container = document.getElementById('quarterlyContainer');
+            if (!container) return;
+            let card = document.getElementById('qProfessionsCard');
+            if (!card) {
+                card = document.createElement('div');
+                card.id = 'qProfessionsCard';
+                card.className = 'card';
+                card.style.cssText = 'margin-bottom:1.5rem; padding:1.25rem;';
+                const grid = container.querySelector('.stats-grid');
+                if (grid && grid.parentNode === container) grid.after(card); else container.appendChild(card);
+            }
+            const pr = (data && data.professions) || { counts: {}, personas: 0 };
+            const c = pr.counts || {};
+            const asis = QUARTERLY_PROFESSION_ORDER.reduce((sum, g) => sum + safeNumber(c[g]), 0);
+            const noAsis = safeNumber(c.NOASIS);
+            const personas = safeNumber(pr.personas) || (asis + noAsis);
+            const pct = (n) => personas > 0 ? `${Math.round((n / personas) * 100)}%` : '0%';
+            const goalPct = Math.round((asis / QUARTERLY_ASSISTANCE_GOAL) * 100);
+            const goalColor = asis >= QUARTERLY_ASSISTANCE_GOAL ? '#15803d' : '#b91c1c';
+            const td = 'padding:8px 10px; border-top:1px solid #e5e7eb;';
+            const rows = QUARTERLY_PROFESSION_ORDER.map(g => `
+                <tr><td style="${td}">${escapeHtml(QUARTERLY_PROFESSION_LABELS[g])}</td>
+                    <td style="${td} text-align:center; font-weight:700;">${safeNumber(c[g])}</td>
+                    <td style="${td} text-align:center; color:#475569;">${pct(safeNumber(c[g]))}</td></tr>`).join('');
+            const dupRows = safeNumber(pr.duplicadosNombre) > 0 ? `
+                <tr><td style="${td} color:#475569;">Nombres repetidos con otra escritura (con y sin tilde), contados aparte en el informe</td>
+                    <td style="${td} text-align:center; color:#475569;">${safeNumber(pr.duplicadosNombre)}</td><td style="${td}"></td></tr>
+                <tr style="background:#f8fafc;"><td style="${td} font-weight:800;">Participantes únicos del informe firmado</td>
+                    <td style="${td} text-align:center; font-weight:800;">${safeNumber(pr.unicosInforme)}</td><td style="${td}"></td></tr>` : '';
+            card.innerHTML = `
+                <h3 style="margin:0 0 0.35rem 0;"><i class="fas fa-user-nurse"></i> Personal capacitado por profesión</h3>
+                <div style="color:#475569; font-weight:500; margin-bottom:0.85rem;">Personas distintas en sesiones presenciales del trimestre. Meta institucional: ${QUARTERLY_ASSISTANCE_GOAL} asistenciales por trimestre.</div>
+                <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:0.92rem;">
+                    <thead><tr style="background:#1e5b34; color:#fff;">
+                        <th style="padding:9px 10px; text-align:left;">Profesión</th>
+                        <th style="padding:9px 10px; text-align:center;">Personas</th>
+                        <th style="padding:9px 10px; text-align:center;">% del total</th></tr></thead>
+                    <tbody>
+                        ${rows}
+                        <tr style="background:#ecfdf5;"><td style="${td} font-weight:800;">Total asistenciales</td>
+                            <td style="${td} text-align:center; font-weight:800;">${asis}</td>
+                            <td style="${td} text-align:center; font-weight:800; color:${goalColor};">${goalPct}% de la meta</td></tr>
+                        <tr><td style="${td}">${escapeHtml(QUARTERLY_PROFESSION_LABELS.NOASIS)}</td>
+                            <td style="${td} text-align:center; font-weight:700;">${noAsis}</td>
+                            <td style="${td} text-align:center; color:#475569;">${pct(noAsis)}</td></tr>
+                        <tr style="background:#f8fafc;"><td style="${td} font-weight:800;">Personas capacitadas</td>
+                            <td style="${td} text-align:center; font-weight:800;">${personas}</td><td style="${td}"></td></tr>
+                        ${dupRows}
+                    </tbody>
+                </table></div>`;
         }
 
         function setText(id, value) {
@@ -11262,7 +11501,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 ['Promedio pre-test', pct(m.kpis.avgPretestScore)],
                 ['Promedio post-test', pct(m.kpis.avgPostestScore)],
                 ['Mejora promedio', pct(m.kpis.avgImprovement)],
-                [`Aprobación post-test (≥${POSTTEST_PASS_PERCENT}%)`, pct(m.kpis.passRatePostest)]
+                [`Aprobación post-test (≥${qPassPercentFor(currentQuarterlyReportData)}%)`, pct(m.kpis.passRatePostest)]
             ];
             const kpiHeader = s1.addRow(['INDICADORES CLAVE (PRESENCIAL)', '']);
             s1.mergeCells(`A${kpiHeader.number}:B${kpiHeader.number}`);
@@ -11867,6 +12106,23 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 doc.text(`Período: ${p.startDate || ''} a ${p.endDate || ''}`, pageWidth / 2, yPos, { align: 'center' });
                 yPos += 10;
 
+                // Trimestre cerrado: indicar que los indicadores son los del informe oficial firmado
+                if (data.official) {
+                    const o = data.official;
+                    const note = `Trimestre cerrado. Los indicadores son los del informe oficial firmado el ${qFormatLongDate(o.firmado)} por ${String(o.firmante || '').replace(/\.$/, '')}. `
+                        + `El detalle se calcula con los registros hechos hasta el ${qFormatLongDate(o.corte)}.${o.nota ? ' ' + o.nota : ''}`;
+                    const noteLines = doc.splitTextToSize(note, pageWidth - 2 * margin - 6);
+                    const noteH = noteLines.length * 4 + 4;
+                    doc.setFillColor(236, 253, 245);
+                    doc.setDrawColor(110, 231, 183);
+                    doc.rect(margin, yPos - 4, pageWidth - 2 * margin, noteH, 'FD');
+                    doc.setFontSize(8.5);
+                    doc.setFont('helvetica', 'normal');
+                    doc.setTextColor(6, 78, 59);
+                    doc.text(noteLines, margin + 3, yPos);
+                    yPos += noteH + 4;
+                }
+
                 // ═══════════════════════════════════════════════════════════
                 // SECCIÓN 1: KPIs
                 // ═══════════════════════════════════════════════════════════
@@ -11883,7 +12139,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                     ['Capacitaciones (trimestre)', safeNumber(k.trainingsCount).toString(), 'Participaciones', safeNumber(k.participationsCount).toString()],
                     ['Participantes únicos', safeNumber(k.uniqueParticipants).toString(), 'Adherencia (Post-test)', `${safeNumber(k.adherenceRate)}%`],
                     ['Promedio Pre-test', `${safeNumber(k.avgPretestScore)}% (${(safeNumber(k.avgPretestScore)/20).toFixed(1)}/5.0)`, 'Promedio Post-test', `${safeNumber(k.avgPostestScore)}% (${(safeNumber(k.avgPostestScore)/20).toFixed(1)}/5.0)`],
-                    ['Mejora promedio', `${safeNumber(k.avgImprovement) >= 0 ? '+' : ''}${safeNumber(k.avgImprovement)}%`, `Aprobación Post-test (≥${POSTTEST_PASS_PERCENT}%)`, `${safeNumber(k.passRatePostest)}%`]
+                    ['Mejora promedio', `${safeNumber(k.avgImprovement) >= 0 ? '+' : ''}${safeNumber(k.avgImprovement)}%`, `Aprobación Post-test (mín. ${qPassPercentFor(currentQuarterlyReportData)}%)`, `${safeNumber(k.passRatePostest)}%`]
                 ];
 
                 doc.autoTable({
@@ -11902,6 +12158,38 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                 });
 
                 yPos = doc.lastAutoTable.finalY + 10;
+
+                // Personal capacitado por profesión (mismas cifras de la sección del reporte en pantalla)
+                const prof = data.professions || null;
+                if (prof && prof.counts) {
+                    const pc = prof.counts;
+                    const asisTotal = QUARTERLY_PROFESSION_ORDER.reduce((sum, g) => sum + safeNumber(pc[g]), 0);
+                    const profBody = QUARTERLY_PROFESSION_ORDER.map(g => [QUARTERLY_PROFESSION_LABELS[g], String(safeNumber(pc[g]))]);
+                    profBody.push(['Total asistenciales', `${asisTotal} (${Math.round((asisTotal / QUARTERLY_ASSISTANCE_GOAL) * 100)}% de la meta de ${QUARTERLY_ASSISTANCE_GOAL})`]);
+                    profBody.push([QUARTERLY_PROFESSION_LABELS.NOASIS, String(safeNumber(pc.NOASIS))]);
+                    profBody.push(['Personas capacitadas', String(safeNumber(prof.personas))]);
+                    if (safeNumber(prof.duplicadosNombre) > 0) {
+                        profBody.push(['Nombres repetidos con otra escritura (con y sin tilde), contados aparte en el informe', String(safeNumber(prof.duplicadosNombre))]);
+                        profBody.push(['Participantes únicos del informe firmado', String(safeNumber(prof.unicosInforme))]);
+                    }
+                    doc.autoTable({
+                        startY: yPos,
+                        head: [['Personal capacitado por profesión (personas distintas)', 'Personas']],
+                        body: profBody,
+                        theme: 'grid',
+                        headStyles: { fillColor: [46, 125, 50], fontSize: 8.5 },
+                        styles: { fontSize: 8, cellPadding: 2 },
+                        columnStyles: { 0: { cellWidth: 115 }, 1: { halign: 'center', cellWidth: 45 } },
+                        didParseCell: (h) => {
+                            if (h.section === 'body' && /^(Total asistenciales|Personas capacitadas|Participantes únicos)/.test(String(h.row.raw[0]))) {
+                                h.cell.styles.fontStyle = 'bold';
+                            }
+                        },
+                        margin: { left: margin, right: margin }
+                    });
+                    yPos = doc.lastAutoTable.finalY + 10;
+                    if (yPos > pageHeight - 40) { doc.addPage(); yPos = margin; }
+                }
 
                 // ═══════════════════════════════════════════════════════════
                 // SECCIÓN 2: CAPACITACIONES DEL TRIMESTRE
