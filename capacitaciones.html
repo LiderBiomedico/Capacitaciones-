@@ -3655,6 +3655,27 @@ html.hslv-hero-open body {
                     </button>
                 </div>
 
+                <div class="card" id="trainingVideoCard">
+                    <h3>🎬 Video de la Capacitación (opcional)</h3>
+                    <p style="color:#374151; margin:0 0 1rem;">Si agregas un video, el participante lo verá <strong>después del pretest y antes del post-test</strong>. Las preguntas del post-test deben basarse en su contenido.</p>
+                    <div class="form-group">
+                        <label style="color:#1a1a1a;"><i class="fas fa-link"></i> URL del video</label>
+                        <div style="display:flex; gap:0.5rem; flex-wrap:wrap; align-items:center;">
+                            <input type="url" id="trainingVideoUrl" placeholder="https://www.youtube.com/watch?v=...  ·  Google Drive  ·  Vimeo  ·  .mp4" style="flex:1; min-width:240px; color:#1a1a1a;" autocomplete="off">
+                            <button type="button" class="btn btn-secondary" onclick="hslvTrainingVideo.previewAdmin()" style="margin:0;">
+                                <i class="fas fa-eye"></i> Vista previa
+                            </button>
+                        </div>
+                        <small id="trainingVideoUrlHint" class="tv-hint">YouTube (público o no listado), Google Drive (compartido con “Cualquier persona con el enlace”), Vimeo o enlace directo a un archivo .mp4.</small>
+                    </div>
+                    <label style="display:flex; align-items:center; gap:0.5rem; color:#1a1a1a; cursor:pointer; margin:0;">
+                        <input type="checkbox" id="trainingVideoRequired" checked style="width:18px; height:18px; accent-color:var(--primary);">
+                        <span>Exigir ver el video completo antes del post-test</span>
+                    </label>
+                    <small class="tv-hint">En YouTube y MP4 se exige ver al menos el 90 % (adelantar no cuenta). En Drive y Vimeo el participante confirma que lo vio.</small>
+                    <div id="trainingVideoAdminPreview" style="display:none; margin-top:1rem;"></div>
+                </div>
+
                 <div class="card">
                     <h3>✅ Post-test (Evaluación Final)</h3>
                     <div id="postestQuestions" class="questions-container"></div>
@@ -4012,6 +4033,51 @@ html.hslv-hero-open body {
                         <div style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid #e0e0e0;">
                             <button class="btn btn-success" onclick="submitPretest()" style="width: 100%;">
                                 <i class="fas fa-check"></i> Enviar Pre-Test
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Video de la capacitación (entre pretest y postest, oculto inicialmente) -->
+                <div id="trainingVideoSection" style="display: none;">
+                    <div class="card">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem;">
+                            <h3 style="margin:0;"><i class="fas fa-circle-play"></i> Video de la Capacitación</h3>
+                            <button class="btn btn-light" onclick="cancelTraining()" style="margin: 0;" title="Salir">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                        <div style="background: #e3f2fd; padding: 1rem; border-radius: 8px; margin-bottom: 1.25rem; border-left: 4px solid #2196F3;">
+                            <p style="margin: 0;"><strong>Capacitación:</strong> <span id="trainingVideoTrainingTitle">-</span></p>
+                            <p style="margin: 0.5rem 0 0 0; color:#1f2937;">Mira el video y luego presenta el post-test.</p>
+                        </div>
+
+                        <div id="trainingVideoPlayer" class="tv-player"></div>
+
+                        <div id="trainingVideoProgressWrap" style="display:none; margin-top: 0.9rem;">
+                            <div style="display:flex; justify-content:space-between; font-size:0.9rem; color:#1f2937; margin-bottom:0.35rem;">
+                                <span><i class="fas fa-eye"></i> Video visto</span>
+                                <strong id="trainingVideoProgressText">0 %</strong>
+                            </div>
+                            <div class="tv-progress"><div id="trainingVideoProgressBar" class="tv-progress-bar"></div></div>
+                        </div>
+
+                        <div id="trainingVideoStatus" class="tv-status info"></div>
+
+                        <label id="trainingVideoConfirmWrap" style="display:none; align-items:center; gap:0.6rem; margin-top:0.9rem; color:#1f2937; cursor:pointer; font-weight:500;">
+                            <input type="checkbox" id="trainingVideoConfirm" onchange="hslvTrainingVideo.onConfirmChange(this.checked)" style="width:20px; height:20px; accent-color:#2E7D32;">
+                            <span>Confirmo que vi el video completo</span>
+                        </label>
+
+                        <div style="margin-top: 0.75rem;">
+                            <a id="trainingVideoOpenLink" href="#" target="_blank" rel="noopener" style="font-size:0.9rem;">
+                                <i class="fas fa-up-right-from-square"></i> Abrir el video en otra pestaña
+                            </a>
+                        </div>
+
+                        <div style="margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid #e0e0e0;">
+                            <button id="trainingVideoContinueBtn" class="btn btn-success" onclick="hslvTrainingVideo.continueToPostest()" style="width: 100%;">
+                                <i class="fas fa-arrow-right"></i> Continuar al Post-Test
                             </button>
                         </div>
                     </div>
@@ -5546,6 +5612,7 @@ html.hslv-hero-open body {
             if (pretestSection) pretestSection.style.display = 'none';
             if (postestSection) postestSection.style.display = 'none';
             if (participantModal) participantModal.style.display = 'none';
+            if (window.hslvTrainingVideo) window.hslvTrainingVideo.reset();
 
             const examSection = document.getElementById('exam');
             if (examSection) {
@@ -6585,6 +6652,10 @@ html.hslv-hero-open body {
                         currentParticipationId = participationResult.id;
                         currentSessionId = currentSession.id;
                         
+                        if (window.hslvTrainingVideo && window.hslvTrainingVideo.hasVideo()) {
+                            // La capacitación tiene video: se muestra antes del post-test
+                            showPostestButton();
+                        } else {
                         Swal.fire({
                             icon: 'info',
                             title: 'Contenido de Capacitación',
@@ -6594,6 +6665,7 @@ html.hslv-hero-open body {
                             // Mostrar botón para acceder al postest
                             showPostestButton();
                         });
+                        }
                     } else {
                         // Volver al inicio
                         cancelTraining();
@@ -6617,6 +6689,9 @@ html.hslv-hero-open body {
         // ==================== FUNCIONES DE POSTTEST ====================
         
         function showPostestButton() {
+            // Si la capacitación tiene video, se muestra el video antes del post-test
+            if (window.hslvTrainingVideo && window.hslvTrainingVideo.show()) return;
+
             // Ocultar sección de pretest
             document.getElementById('pretestSection').style.display = 'none';
             document.getElementById('accessSection').style.display = 'none';
@@ -6719,6 +6794,7 @@ html.hslv-hero-open body {
                 
                 // Ocultar modal y mostrar sección de postest
                 Swal.close();
+                if (window.hslvTrainingVideo) window.hslvTrainingVideo.hide();
                 document.getElementById('postestSection').style.display = 'block';
                 document.getElementById('accessSection').style.display = 'none';
                 document.getElementById('pretestSection').style.display = 'none';
@@ -7087,6 +7163,7 @@ html.hslv-hero-open body {
             setParticipantLookupStatus('', 'info');
             
             // Mostrar/ocultar secciones
+            if (window.hslvTrainingVideo) window.hslvTrainingVideo.reset();
             document.getElementById('accessSection').style.display = 'block';
             document.getElementById('pretestSection').style.display = 'none';
             document.getElementById('postestSection').style.display = 'none';
@@ -8364,10 +8441,15 @@ function getSelectedStaff() {
     if(postestQuestions===null)return;
     if(postestQuestions.length===0){Swal.fire({icon:'warning',title:'Sin Preguntas de Post-test',text:'Agrega al menos una pregunta al Post-test'});document.getElementById('postestQuestions').scrollIntoView({behavior:'smooth'});return;}
 
+    // Video opcional entre pretest y post-test
+    const _videoForm=(window.hslvTrainingVideo&&typeof window.hslvTrainingVideo.readAdminForm==='function')?window.hslvTrainingVideo.readAdminForm():{url:'',required:false,valid:true};
+    if(!_videoForm.valid){Swal.fire({icon:'warning',title:'URL de video no válida',text:'Revisa el enlace del video (debe empezar por https://) o déjalo vacío.'});const _vi=document.getElementById('trainingVideoUrl');if(_vi)_vi.scrollIntoView({behavior:'smooth',block:'center'});return;}
+    const videoUrl=_videoForm.url,videoRequired=_videoForm.required;
+
     const accessCode = generateAccessCode();
     const createdAtISO = new Date().toISOString();
 
-    const trainingData={title,description,trainingDate,department,duration,expositor,referente,methodology,place,eventDate,staffList:selectedStaff,accessCode,status:'active',createdAtISO,pretestQuestions,postestQuestions};
+    const trainingData={title,description,trainingDate,department,duration,expositor,referente,methodology,place,eventDate,staffList:selectedStaff,accessCode,status:'active',createdAtISO,videoUrl,videoRequired,pretestQuestions,postestQuestions};
 
     // Mostrar indicador de carga
     Swal.fire({
@@ -8419,6 +8501,7 @@ function getSelectedStaff() {
     pretestQuestionCount = 0;
     postestQuestionCount = 0;
     document.querySelectorAll('.question-counter').forEach(c => c.remove());
+    if (window.hslvTrainingVideo) window.hslvTrainingVideo.resetAdminForm();
 
     // Mensaje final
     Swal.fire({
@@ -8434,6 +8517,7 @@ function getSelectedStaff() {
                     ✅ Capacitación guardada en Airtable<br>
                     ${pretestSaved ? '✅' : '⚠️'} ${pretestQuestions.length} preguntas de pretest ${pretestSaved ? 'guardadas' : 'con error'}<br>
                     ${postestSaved ? '✅' : '⚠️'} ${postestQuestions.length} preguntas de postest ${postestSaved ? 'guardadas' : 'con error'}
+                    ${videoUrl ? `<br>🎬 Video entre pretest y post-test${videoRequired ? ' (obligatorio)' : ''}` : ''}
                 </p>
             </div>
         `,
@@ -8468,6 +8552,7 @@ async function sendTrainingToAirtable(trainingData) {
         if(trainingData.place)_f["Lugar"]=trainingData.place;
         if(trainingData.eventDate)_f["Fecha de la capacitación"]=trainingData.eventDate;
         if(trainingData.staffList&&trainingData.staffList.length>0)_f["Dirigido a"]=trainingData.staffList;
+        if(trainingData.videoUrl){_f["Video URL"]=trainingData.videoUrl;_f["Video Obligatorio"]=!!trainingData.videoRequired;}
         const airtableRecord={fields:_f};
 
         console.log('📋 Record a enviar:', JSON.stringify(airtableRecord, null, 2));
@@ -8702,6 +8787,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
             document.getElementById('trainingForm').reset();
             document.getElementById('pretestQuestions').innerHTML = '';
             document.getElementById('postestQuestions').innerHTML = '';
+            if (window.hslvTrainingVideo) window.hslvTrainingVideo.resetAdminForm();
             pretestQuestionCount = 0;
             postestQuestionCount = 0;
             document.querySelectorAll('.question-counter').forEach(c => c.remove());
@@ -8932,6 +9018,9 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                         <button class="btn-action btn-qr" onclick="showTrainingQR('${accessCode}', '${title}')">
                             <i class="fas fa-qrcode"></i> QR
                         </button>
+                        <button class="btn-action btn-video ${fields['Video URL'] ? 'has-video' : ''}" onclick="hslvTrainingVideo.editForTraining('${id}')" title="${fields['Video URL'] ? 'Cambiar o quitar el video' : 'Agregar video entre pretest y post-test'}">
+                            <i class="fas ${fields['Video URL'] ? 'fa-circle-play' : 'fa-video'}"></i> Video
+                        </button>
                         <button class="btn-action btn-delete" onclick="deleteTraining('${id}', '${title}')">
                             <i class="fas fa-trash"></i> Eliminar
                         </button>
@@ -8990,6 +9079,7 @@ async function saveQuestionsToAirtable(questions, trainingRecordId, type) {
                             <div class="training-info-item"><i class="fas fa-map-marker-alt"></i><strong>Lugar:</strong> ${fields['Lugar'] || 'N/A'}</div>
                             <div class="training-info-item"><i class="fas fa-users"></i><strong>Dirigido a:</strong> ${Array.isArray(fields['Dirigido a']) ? fields['Dirigido a'].join(', ') : (fields['Dirigido a'] || 'N/A')}</div>
                             <div class="training-info-item"><i class="fas fa-key"></i><strong>Código de Acceso:</strong> ${fields['Código de Acceso'] || 'N/A'}</div>
+                            <div class="training-info-item"><i class="fas fa-video"></i><strong>Video:</strong> ${fields['Video URL'] ? `<a href="${escapeAttr(fields['Video URL'])}" target="_blank" rel="noopener">Abrir video</a>${fields['Video Obligatorio'] ? ' (obligatorio)' : ''}` : 'Sin video'}</div>
                         </div>
                     </div>
                     
@@ -22217,6 +22307,545 @@ function makeCronogramaFilterFormula(year, tipo) {
 
     window.qfixOpen = open;
     window.qfixClose = requestClose;
+})();
+</script>
+
+
+<!-- ==================== VIDEO ENTRE PRETEST Y POST-TEST (2026-11-23) ==================== -->
+<style id="hslv-training-video-css">
+    .tv-player { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #0b1220; border-radius: 12px; overflow: hidden; }
+    .tv-player iframe, .tv-player video, .tv-player > div { position: absolute; inset: 0; width: 100% !important; height: 100% !important; border: 0; }
+    .tv-progress { height: 10px; background: #e5e7eb; border-radius: 999px; overflow: hidden; }
+    .tv-progress-bar { height: 100%; width: 0; background: linear-gradient(90deg, #2E7D32, #66BB6A); transition: width .4s ease; }
+    .tv-status { margin-top: .75rem; padding: .75rem 1rem; border-radius: 8px; font-size: .95rem; font-weight: 500; }
+    .tv-status.info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; }
+    .tv-status.ok { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+    .tv-status.warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+    .tv-hint { display: block; margin-top: .4rem; font-size: .85rem; color: #555; }
+    .tv-hint.ok { color: #166534; font-weight: 600; }
+    .tv-hint.bad { color: #b91c1c; font-weight: 600; }
+    #trainingVideoContinueBtn:disabled { opacity: .55; cursor: not-allowed; }
+    .training-actions { flex-wrap: wrap; }
+    .btn-video { background: linear-gradient(135deg, #00796b 0%, #004d40 100%); color: #ffffff; font-weight: 600; }
+    .btn-video:hover { background: #00352c; color: #ffffff; }
+    .btn-video.has-video { box-shadow: inset 0 0 0 2px #a7f3d0; }
+</style>
+<script>
+(function () {
+    'use strict';
+
+    // Video opcional entre el pretest y el post-test.
+    // Airtable (tabla Capacitaciones): "Video URL" (url) y "Video Obligatorio" (checkbox).
+    const FIELD_URL = 'Video URL';
+    const FIELD_REQ = 'Video Obligatorio';
+    const MIN_COVERAGE = 0.9; // porcentaje mínimo visto cuando el video es obligatorio
+
+    const S = {
+        key: '',             // trainingId|url del video montado
+        info: null,
+        ytPlayer: null,
+        videoEl: null,
+        pollTimer: null,
+        buckets: new Set(),  // segundos efectivamente vistos (YouTube)
+        lastT: null,
+        duration: 0,
+        coverage: 0,
+        fallback: false,     // el reproductor falló: se pide confirmación manual
+        confirmed: false,
+        done: {}             // key -> true cuando ya cumplió el requisito
+    };
+
+    function esc(v) {
+        return String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function youtubeId(url) {
+        const u = String(url || '').trim();
+        const patterns = [
+            /(?:youtube\.com\/watch\?(?:.*&)?v=)([A-Za-z0-9_-]{11})/,
+            /(?:youtu\.be\/)([A-Za-z0-9_-]{11})/,
+            /(?:youtube(?:-nocookie)?\.com\/embed\/)([A-Za-z0-9_-]{11})/,
+            /(?:youtube\.com\/shorts\/)([A-Za-z0-9_-]{11})/,
+            /(?:youtube\.com\/live\/)([A-Za-z0-9_-]{11})/
+        ];
+        for (const p of patterns) {
+            const m = u.match(p);
+            if (m && m[1]) return m[1];
+        }
+        return null;
+    }
+
+    // Identifica el tipo de enlace y arma la URL para insertar el video.
+    function parseVideo(raw) {
+        const url = String(raw || '').trim();
+        if (!url) return null;
+        let u;
+        try { u = new URL(url); } catch (e) { return { kind: 'invalid', url }; }
+        if (!/^https?:$/i.test(u.protocol)) return { kind: 'invalid', url };
+
+        const yt = youtubeId(url);
+        if (yt) return { kind: 'youtube', id: yt, url, label: 'YouTube', trackable: true };
+
+        const drive = url.match(/drive\.google\.com\/(?:file\/d\/|open\?(?:.*&)?id=|uc\?(?:.*&)?id=)([A-Za-z0-9_-]{10,})/i);
+        if (drive) {
+            return { kind: 'drive', id: drive[1], url, label: 'Google Drive', trackable: false,
+                embed: `https://drive.google.com/file/d/${drive[1]}/preview` };
+        }
+
+        if (/(^|\.)vimeo\.com$/i.test(u.hostname)) {
+            const m = u.pathname.match(/(\d{6,})(?:\/([A-Za-z0-9]+))?/);
+            if (m) {
+                const h = u.searchParams.get('h') || m[2] || '';
+                return { kind: 'vimeo', id: m[1], url, label: 'Vimeo', trackable: false,
+                    embed: `https://player.vimeo.com/video/${m[1]}${h ? `?h=${encodeURIComponent(h)}` : ''}` };
+            }
+        }
+
+        if (/\.(mp4|webm|ogg|ogv|m4v|mov)$/i.test(u.pathname)) {
+            if (/(^|\.)dropbox\.com$/i.test(u.hostname)) { u.searchParams.set('raw', '1'); u.searchParams.delete('dl'); }
+            return { kind: 'file', url, src: u.toString(), label: 'Archivo de video', trackable: true };
+        }
+
+        return { kind: 'link', url, label: 'Enlace web', trackable: false, embed: url };
+    }
+
+    // ==================== PARTICIPANTE ====================
+
+    function getTrainingVideo() {
+        let rec = null;
+        try { rec = (typeof currentTrainingRecord !== 'undefined') ? currentTrainingRecord : null; } catch (e) { rec = null; }
+        const f = rec && rec.fields ? rec.fields : null;
+        if (!f) return null;
+        const info = parseVideo(f[FIELD_URL] || '');
+        if (!info || info.kind === 'invalid') return null;
+        info.required = !!f[FIELD_REQ];
+        info.trainingId = rec.id;
+        info.title = f['Título'] || f['name'] || 'Capacitación';
+        info.key = `${rec.id}|${info.url}`;
+        return info;
+    }
+
+    function hasVideo() { return !!getTrainingVideo(); }
+
+    function stopPolling() {
+        if (S.pollTimer) { clearInterval(S.pollTimer); S.pollTimer = null; }
+    }
+
+    function unmount() {
+        stopPolling();
+        if (S.ytPlayer && typeof S.ytPlayer.destroy === 'function') { try { S.ytPlayer.destroy(); } catch (e) {} }
+        S.ytPlayer = null;
+        if (S.videoEl) { try { S.videoEl.pause(); S.videoEl.removeAttribute('src'); S.videoEl.load(); } catch (e) {} }
+        S.videoEl = null;
+        const box = document.getElementById('trainingVideoPlayer');
+        if (box) box.innerHTML = '';
+    }
+
+    function isDone() { return !!S.done[S.key]; }
+
+    function canContinue() {
+        const info = S.info;
+        if (!info) return true;
+        if (!info.required) return true;
+        if (isDone()) return true;
+        if (!info.trackable || S.fallback) return S.confirmed;
+        return S.coverage >= MIN_COVERAGE;
+    }
+
+    function updateUI() {
+        const info = S.info;
+        if (!info) return;
+        const pct = Math.min(100, Math.round(S.coverage * 100));
+        const tracking = info.trackable && !S.fallback;
+
+        const progWrap = document.getElementById('trainingVideoProgressWrap');
+        const bar = document.getElementById('trainingVideoProgressBar');
+        const pctText = document.getElementById('trainingVideoProgressText');
+        if (progWrap) progWrap.style.display = tracking ? 'block' : 'none';
+        if (bar) bar.style.width = `${isDone() ? 100 : pct}%`;
+        if (pctText) pctText.textContent = `${isDone() ? 100 : pct} %`;
+
+        const confirmWrap = document.getElementById('trainingVideoConfirmWrap');
+        if (confirmWrap) confirmWrap.style.display = (info.required && (!tracking) && !isDone()) ? 'flex' : 'none';
+
+        const status = document.getElementById('trainingVideoStatus');
+        if (status) {
+            let cls = 'info', msg = '';
+            if (S.fallback) {
+                cls = 'warn';
+                msg = `<i class="fas fa-exclamation-triangle"></i> El video no se pudo reproducir dentro de la página. Ábrelo con el botón <strong>“Abrir el video en otra pestaña”</strong>${info.required ? ' y, cuando termines, marca la confirmación.' : '.'}`;
+            } else if (isDone()) {
+                cls = 'ok';
+                msg = '<i class="fas fa-check-circle"></i> ¡Video completado! Ya puedes presentar el post-test.';
+            } else if (info.required && tracking) {
+                msg = `<i class="fas fa-info-circle"></i> Debes ver al menos el ${Math.round(MIN_COVERAGE * 100)} % del video para habilitar el post-test. Adelantar el video no suma avance.`;
+            } else if (info.required) {
+                msg = '<i class="fas fa-info-circle"></i> Mira el video completo y luego marca la confirmación para habilitar el post-test.';
+            } else {
+                msg = '<i class="fas fa-info-circle"></i> Mira el video con atención: las preguntas del post-test se basan en su contenido.';
+            }
+            status.className = `tv-status ${cls}`;
+            status.innerHTML = msg;
+        }
+
+        const btn = document.getElementById('trainingVideoContinueBtn');
+        if (btn) btn.disabled = !canContinue();
+    }
+
+    function markCompleteIfReached() {
+        if (S.info && S.info.trackable && !S.fallback && S.coverage >= MIN_COVERAGE && !isDone()) {
+            S.done[S.key] = true;
+        }
+        updateUI();
+    }
+
+    function useFallback() {
+        S.fallback = true;
+        stopPolling();
+        updateUI();
+    }
+
+    function waitForYouTubeApi(onReady, onFail) {
+        if (window.YT && typeof window.YT.Player === 'function') { onReady(); return; }
+        if (!document.getElementById('youtube-iframe-api') && !document.querySelector('script[src*="youtube.com/iframe_api"]')) {
+            const tag = document.createElement('script');
+            tag.id = 'youtube-iframe-api';
+            tag.src = 'https://www.youtube.com/iframe_api';
+            document.head.appendChild(tag);
+        }
+        let waited = 0;
+        const iv = setInterval(() => {
+            waited += 250;
+            if (window.YT && typeof window.YT.Player === 'function') { clearInterval(iv); onReady(); }
+            else if (waited >= 15000) { clearInterval(iv); onFail(); }
+        }, 250);
+    }
+
+    function ytCoverage() {
+        const total = Math.max(1, Math.floor(S.duration || 0));
+        return S.duration > 0 ? Math.min(1, S.buckets.size / total) : 0;
+    }
+
+    function markRange(from, to) {
+        const a = Math.max(0, Math.floor(from));
+        const b = Math.floor(to);
+        for (let s = a; s <= b; s++) S.buckets.add(s);
+    }
+
+    function mountYouTube(info, box) {
+        box.innerHTML = '<div id="trainingVideoYT"></div>';
+        const key = S.key;
+        waitForYouTubeApi(() => {
+            if (S.key !== key || !document.getElementById('trainingVideoYT')) return;
+            try {
+                S.ytPlayer = new YT.Player('trainingVideoYT', {
+                    videoId: info.id,
+                    width: '100%',
+                    height: '100%',
+                    host: 'https://www.youtube.com',
+                    playerVars: { rel: 0, modestbranding: 1, playsinline: 1, iv_load_policy: 3, origin: window.location.origin },
+                    events: {
+                        onReady: (ev) => {
+                            try { S.duration = ev.target.getDuration() || 0; } catch (e) {}
+                            stopPolling();
+                            S.pollTimer = setInterval(() => {
+                                const p = S.ytPlayer;
+                                if (!p || typeof p.getCurrentTime !== 'function') return;
+                                let t = 0, state = -1;
+                                try { t = p.getCurrentTime() || 0; state = p.getPlayerState(); } catch (e) { return; }
+                                if (!S.duration) { try { S.duration = p.getDuration() || 0; } catch (e) {} }
+                                // Solo suma avance la reproducción continua (máx. 3 s entre lecturas, admite velocidad 2x).
+                                if (state === YT.PlayerState.PLAYING && S.lastT !== null && t >= S.lastT && (t - S.lastT) <= 3) {
+                                    markRange(S.lastT, t);
+                                }
+                                S.lastT = t;
+                                S.coverage = ytCoverage();
+                                markCompleteIfReached();
+                            }, 1000);
+                        },
+                        onStateChange: (e) => {
+                            if (e.data === YT.PlayerState.ENDED) {
+                                if (S.lastT !== null && S.duration && (S.duration - S.lastT) <= 3) markRange(S.lastT, S.duration - 0.01);
+                                S.coverage = ytCoverage();
+                                markCompleteIfReached();
+                            }
+                        },
+                        onError: () => useFallback()
+                    }
+                });
+            } catch (err) {
+                console.warn('No se pudo crear el reproductor de YouTube:', err);
+                useFallback();
+            }
+        }, () => useFallback());
+    }
+
+    function fileCoverage(v) {
+        const d = v.duration;
+        if (!d || !isFinite(d)) return 0;
+        let sum = 0;
+        for (let i = 0; i < v.played.length; i++) sum += (v.played.end(i) - v.played.start(i));
+        return Math.min(1, sum / d);
+    }
+
+    function mountFile(info, box) {
+        box.innerHTML = '<video id="trainingVideoFile" controls playsinline preload="metadata" controlsList="nodownload"></video>';
+        const v = document.getElementById('trainingVideoFile');
+        S.videoEl = v;
+        const refresh = () => { S.coverage = fileCoverage(v); markCompleteIfReached(); };
+        v.addEventListener('timeupdate', refresh);
+        v.addEventListener('ended', refresh);
+        v.addEventListener('error', () => useFallback());
+        v.src = info.src;
+    }
+
+    function mountIframe(info, box) {
+        box.innerHTML = `<iframe src="${esc(info.embed)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="Video de la capacitación"></iframe>`;
+    }
+
+    function mount(info) {
+        const box = document.getElementById('trainingVideoPlayer');
+        if (!box) return;
+        unmount();
+        S.info = info;
+        S.key = info.key;
+        S.buckets = new Set();
+        S.lastT = null;
+        S.duration = 0;
+        S.coverage = 0;
+        S.fallback = false;
+        S.confirmed = false;
+        const confirmInput = document.getElementById('trainingVideoConfirm');
+        if (confirmInput) confirmInput.checked = false;
+
+        const link = document.getElementById('trainingVideoOpenLink');
+        if (link) link.href = info.url;
+
+        if (info.kind === 'youtube') mountYouTube(info, box);
+        else if (info.kind === 'file') mountFile(info, box);
+        else mountIframe(info, box);
+        updateUI();
+    }
+
+    // Muestra el paso de video. Devuelve false si la capacitación no tiene video.
+    function show() {
+        const info = getTrainingVideo();
+        const section = document.getElementById('trainingVideoSection');
+        if (!info || !section) return false;
+
+        if (typeof Swal !== 'undefined') Swal.close();
+        ['accessSection', 'pretestSection', 'postestSection'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = 'none';
+        });
+
+        const title = document.getElementById('trainingVideoTrainingTitle');
+        if (title) title.textContent = info.title;
+
+        section.style.display = 'block';
+        mount(info);
+        try { section.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) {}
+        return true;
+    }
+
+    function hide() {
+        unmount();
+        const section = document.getElementById('trainingVideoSection');
+        if (section) section.style.display = 'none';
+    }
+
+    function reset() {
+        hide();
+        S.info = null;
+        S.key = '';
+        S.done = {};
+    }
+
+    function onConfirmChange(checked) {
+        S.confirmed = !!checked;
+        updateUI();
+    }
+
+    function continueToPostest() {
+        if (!canContinue()) {
+            const tracking = S.info && S.info.trackable && !S.fallback;
+            Swal.fire({
+                icon: 'warning',
+                title: 'Aún no puedes continuar',
+                text: tracking
+                    ? `Has visto el ${Math.round(S.coverage * 100)} % del video. Debes ver al menos el ${Math.round(MIN_COVERAGE * 100)} % para presentar el post-test.`
+                    : 'Marca la confirmación de que viste el video completo.',
+                confirmButtonText: 'Entendido'
+            });
+            return;
+        }
+        try { if (S.ytPlayer && typeof S.ytPlayer.pauseVideo === 'function') S.ytPlayer.pauseVideo(); } catch (e) {}
+        try { if (S.videoEl) S.videoEl.pause(); } catch (e) {}
+        if (typeof loadPosttest === 'function') loadPosttest();
+    }
+
+    // ==================== ADMINISTRADOR: FORMULARIO DE CREACIÓN ====================
+
+    function describe(info) {
+        if (!info) return { cls: '', text: 'YouTube (público o no listado), Google Drive (compartido con “Cualquier persona con el enlace”), Vimeo o enlace directo a un archivo .mp4.' };
+        if (info.kind === 'invalid') return { cls: 'bad', text: 'La URL no es válida. Debe empezar por https://' };
+        const extra = info.trackable
+            ? 'se controla cuánto del video ve cada participante.'
+            : 'no se puede medir el avance; si el video es obligatorio, el participante confirma que lo vio.';
+        const tip = info.kind === 'link' ? ' Verifica con la vista previa que el sitio permita mostrar el video aquí.' : '';
+        return { cls: 'ok', text: `✓ ${info.label} detectado: ${extra}${tip}` };
+    }
+
+    function refreshAdminHint() {
+        const input = document.getElementById('trainingVideoUrl');
+        const hint = document.getElementById('trainingVideoUrlHint');
+        if (!input || !hint) return;
+        const d = describe(parseVideo(input.value));
+        hint.className = `tv-hint ${d.cls}`;
+        hint.textContent = d.text;
+    }
+
+    function readAdminForm() {
+        const input = document.getElementById('trainingVideoUrl');
+        const req = document.getElementById('trainingVideoRequired');
+        const url = input ? input.value.trim() : '';
+        if (!url) return { url: '', required: false, valid: true };
+        const info = parseVideo(url);
+        return { url, required: !!(req && req.checked), valid: !!info && info.kind !== 'invalid' };
+    }
+
+    function previewHtml(info) {
+        if (info.kind === 'youtube') {
+            return `<div class="tv-player"><iframe src="https://www.youtube.com/embed/${esc(info.id)}?rel=0&modestbranding=1" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="Vista previa"></iframe></div>`;
+        }
+        if (info.kind === 'file') {
+            return `<div class="tv-player"><video src="${esc(info.src)}" controls playsinline preload="metadata"></video></div>`;
+        }
+        return `<div class="tv-player"><iframe src="${esc(info.embed)}" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="Vista previa"></iframe></div>`;
+    }
+
+    function previewAdmin() {
+        const input = document.getElementById('trainingVideoUrl');
+        const box = document.getElementById('trainingVideoAdminPreview');
+        if (!input || !box) return;
+        const info = parseVideo(input.value);
+        if (!info) {
+            Swal.fire({ icon: 'info', title: 'Sin URL', text: 'Pega primero el enlace del video.' });
+            return;
+        }
+        if (info.kind === 'invalid') {
+            Swal.fire({ icon: 'warning', title: 'URL no válida', text: 'El enlace debe empezar por https://' });
+            return;
+        }
+        if (box.style.display === 'block' && box.dataset.url === info.url) {
+            box.style.display = 'none';
+            box.innerHTML = '';
+            box.dataset.url = '';
+            return;
+        }
+        box.dataset.url = info.url;
+        box.innerHTML = previewHtml(info) + `<small class="tv-hint">Así lo verá el participante después del pretest. Si aparece en negro o con error, revisa que el video sea público o que permita insertarse.</small>`;
+        box.style.display = 'block';
+    }
+
+    function resetAdminForm() {
+        const input = document.getElementById('trainingVideoUrl');
+        const req = document.getElementById('trainingVideoRequired');
+        const box = document.getElementById('trainingVideoAdminPreview');
+        if (input) input.value = '';
+        if (req) req.checked = true;
+        if (box) { box.style.display = 'none'; box.innerHTML = ''; box.dataset.url = ''; }
+        refreshAdminHint();
+    }
+
+    // ==================== ADMINISTRADOR: CAPACITACIONES YA CREADAS ====================
+
+    async function editForTraining(trainingId) {
+        let list = [];
+        try { list = (typeof allTrainings !== 'undefined' && Array.isArray(allTrainings)) ? allTrainings : []; } catch (e) { list = []; }
+        const training = list.find(t => t.id === trainingId);
+        const f = (training && training.fields) || {};
+        const current = String(f[FIELD_URL] || '');
+        const required = current ? !!f[FIELD_REQ] : true;
+
+        const res = await Swal.fire({
+            title: 'Video entre pretest y post-test',
+            html: `
+                <p style="margin:0 0 .75rem; text-align:left; font-weight:600; color:#1f2937;">${esc(f['Título'] || 'Capacitación')}</p>
+                <input id="swalTvUrl" type="url" class="swal2-input" placeholder="https://www.youtube.com/watch?v=..." value="${esc(current)}" style="width:100%; margin:0 0 .6rem; box-sizing:border-box;">
+                <label style="display:flex; align-items:center; gap:.5rem; font-size:.92rem; color:#1f2937; text-align:left;">
+                    <input id="swalTvReq" type="checkbox" ${required ? 'checked' : ''} style="width:18px; height:18px;"> Exigir ver el video completo antes del post-test
+                </label>
+                <small style="display:block; text-align:left; color:#6b7280; margin-top:.6rem;">Deja la URL vacía para quitar el video. El cambio aplica a los participantes que entren desde ahora.</small>`,
+            showCancelButton: true,
+            confirmButtonText: 'Guardar',
+            cancelButtonText: 'Cancelar',
+            confirmButtonColor: '#00796b',
+            focusConfirm: false,
+            preConfirm: () => {
+                const url = (document.getElementById('swalTvUrl').value || '').trim();
+                const req = document.getElementById('swalTvReq').checked;
+                if (url) {
+                    const info = parseVideo(url);
+                    if (!info || info.kind === 'invalid') {
+                        Swal.showValidationMessage('La URL no es válida. Debe empezar por https://');
+                        return false;
+                    }
+                }
+                return { url, req };
+            }
+        });
+        if (!res.isConfirmed || !res.value) return;
+
+        const { url, req } = res.value;
+        const fields = { [FIELD_URL]: url || null, [FIELD_REQ]: url ? !!req : false };
+        try {
+            Swal.fire({ title: 'Guardando...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+            await airtableProxyRequest({ method: 'PATCH', path: `/Capacitaciones/${trainingId}`, body: { fields } });
+            if (training) {
+                training.fields = { ...training.fields };
+                if (url) { training.fields[FIELD_URL] = url; training.fields[FIELD_REQ] = !!req; }
+                else { delete training.fields[FIELD_URL]; delete training.fields[FIELD_REQ]; }
+            }
+            if (typeof renderTrainingsList === 'function') renderTrainingsList();
+            Swal.fire({
+                icon: 'success',
+                title: url ? 'Video guardado' : 'Video eliminado',
+                text: url ? 'Los participantes verán el video después del pretest y antes del post-test.' : 'La capacitación ya no muestra video.',
+                timer: 2500,
+                showConfirmButton: false
+            });
+        } catch (err) {
+            console.error('❌ Error guardando video:', err);
+            Swal.fire({ icon: 'error', title: 'No se pudo guardar', text: err.message || 'Error comunicándose con Airtable.' });
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const input = document.getElementById('trainingVideoUrl');
+        if (input) {
+            input.addEventListener('input', () => {
+                refreshAdminHint();
+                const box = document.getElementById('trainingVideoAdminPreview');
+                if (box && box.style.display === 'block') { box.style.display = 'none'; box.innerHTML = ''; box.dataset.url = ''; }
+            });
+        }
+        refreshAdminHint();
+    });
+
+    window.hslvTrainingVideo = {
+        parseVideo,
+        hasVideo,
+        show,
+        hide,
+        reset,
+        onConfirmChange,
+        continueToPostest,
+        previewAdmin,
+        readAdminForm,
+        resetAdminForm,
+        editForTraining
+    };
 })();
 </script>
 
